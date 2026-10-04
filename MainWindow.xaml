@@ -14,7 +14,7 @@
         FontFamily="Segoe UI, -apple-system, sans-serif">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="0" CornerRadius="0" CaptionHeight="46" UseAeroCaptionButtons="False" />
+        <WindowChrome GlassFrameThickness="0" CornerRadius="0" CaptionHeight="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -26,7 +26,8 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Height" Value="46" />
-            <Setter Property="Padding" Value="20,0" />
+            <Setter Property="Padding" Value="22,0" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -51,6 +52,7 @@
             <Setter Property="Width" Value="46" />
             <Setter Property="Height" Value="46" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -146,27 +148,28 @@
         <!-- ============================================== -->
         <!-- 1. TOP HEADER BAR                              -->
         <!-- ============================================== -->
-        <Border Grid.Row="0" Background="#0B0E16" BorderThickness="0,0,0,1" BorderBrush="#1C2333"
-                MouseLeftButtonDown="Window_MouseLeftButtonDown">
+        <Border Grid.Row="0" Background="#0B0E16" BorderThickness="0,0,0,1" BorderBrush="#1C2333">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
-                    <!-- Brand -->
+                    <!-- Brand (Draggable) -->
                     <ColumnDefinition Width="*" />
-                    <!-- Tabs -->
+                    <!-- Tabs (Clickable) -->
                     <ColumnDefinition Width="Auto" />
-                    <!-- Window Controls -->
+                    <!-- Window Controls (Clickable) -->
                 </Grid.ColumnDefinitions>
 
-                <!-- Left: Clean Brand -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <!-- Left: Clean Brand (Draggable) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0"
+                            Cursor="SizeAll" MouseLeftButtonDown="Window_MouseLeftButtonDown" Background="Transparent">
                     <Image Source="app_icon.png" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center" />
                     <TextBlock Text="AURA" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <TextBlock Text="Minecraft 1.20.1 Fabric" FontSize="12" Foreground="#64748B" VerticalAlignment="Center" />
                 </StackPanel>
 
                 <!-- Center: Clean Text Tabs -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button x:Name="TabBtnOverview" Click="NavOverview_Click" Style="{StaticResource NavTabBtn}" Content="ИГРАТЬ" Foreground="#FFFFFF" />
                     <Button x:Name="TabBtnMods" Click="NavMods_Click" Style="{StaticResource NavTabBtn}" Content="МОДЫ" />
                     <Button x:Name="TabBtnWardrobe" Click="NavWardrobe_Click" Style="{StaticResource NavTabBtn}" Content="СКИН" />
@@ -174,7 +177,8 @@
                 </StackPanel>
 
                 <!-- Right: Window Buttons -->
-                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                <StackPanel Grid.Column="2" Orientation="Horizontal"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Click="BtnMinimize_Click" Style="{StaticResource WinControlBtn}" Content="—" />
                     <Button Click="BtnClose_Click" Style="{StaticResource WinControlBtn}" Content="✕" />
                 </StackPanel>
