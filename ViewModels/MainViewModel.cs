@@ -43,6 +43,14 @@ public class MainViewModel : ObservableObject
     private ImageSource _playerAvatar = null!;
     private Process? _gameProcess;
     private CancellationTokenSource? _launchCts;
+    private System.Windows.Threading.DispatcherTimer? _backgroundUpdateTimer;
+
+    // Свойства баннера/тоста обновления
+    private bool _isUpdateBannerVisible;
+    private string _updateBannerTitle = string.Empty;
+    private string _updateBannerMessage = string.Empty;
+    private string _updateBannerButtonText = string.Empty;
+    private bool _isLauncherUpdatePending;
 
     public OverviewViewModel OverviewVM { get; }
     public SettingsViewModel SettingsVM { get; }
@@ -215,6 +223,31 @@ public class MainViewModel : ObservableObject
 
     public ObservableCollection<string> GameLogs { get; } = new();
 
+    // Свойства баннера обновлений
+    public bool IsUpdateBannerVisible
+    {
+        get => _isUpdateBannerVisible;
+        set => SetProperty(ref _isUpdateBannerVisible, value);
+    }
+
+    public string UpdateBannerTitle
+    {
+        get => _updateBannerTitle;
+        set => SetProperty(ref _updateBannerTitle, value);
+    }
+
+    public string UpdateBannerMessage
+    {
+        get => _updateBannerMessage;
+        set => SetProperty(ref _updateBannerMessage, value);
+    }
+
+    public string UpdateBannerButtonText
+    {
+        get => _updateBannerButtonText;
+        set => SetProperty(ref _updateBannerButtonText, value);
+    }
+
     // Команды
     public RelayCommand LaunchOrCancelCommand { get; }
     public AsyncRelayCommand LaunchGameCommand { get; }
@@ -223,6 +256,8 @@ public class MainViewModel : ObservableObject
     public RelayCommand NavigateCommand { get; }
     public RelayCommand CloseWindowCommand { get; }
     public RelayCommand MinimizeWindowCommand { get; }
+    public AsyncRelayCommand ApplyBannerUpdateCommand { get; }
+    public RelayCommand DismissBannerCommand { get; }
 
     public MainViewModel(
         IConfigService configService,
@@ -278,6 +313,26 @@ public class MainViewModel : ObservableObject
             }
         });
 
+        DismissBannerCommand = new RelayCommand(_ =>
+        {
+            IsUpdateBannerVisible = false;
+        });
+
+        ApplyBannerUpdateCommand = new AsyncRelayCommand(async () =>
+        {
+            IsUpdateBannerVisible = false;
+            if (_isLauncherUpdatePending)
+            {
+                // Для лаунчера вызываем проверку/применение обновления лаунчера
+                await CheckUpdatesAsync(isStartup: false);
+            }
+            else
+            {
+                // Для сборки запускаем скачивание новых модов
+                await CheckUpdatesAsync(isStartup: false);
+            }
+        }, () => !IsBusy && !IsGameRunning);
+
         UpdateAvatar();
 
         _launchService.GameExited += (s, exitCode) =>
@@ -330,6 +385,8 @@ public class MainViewModel : ObservableObject
             UpdateIdleState();
             await CheckUpdatesAsync(isStartup: true);
         }
+
+        StartBackgroundUpdatePolling();
     }
 
     public void UpdateIdleState()
@@ -676,6 +733,87 @@ public class MainViewModel : ObservableObject
         finally
         {
             IsProgressVisible = false;
+        }
+    }
+
+    private void StartBackgroundUpdatePolling()
+    {
+        _backgroundUpdateTimer?.Stop();
+        _backgroundUpdateTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMinutes(15)
+        };
+        _backgroundUpdateTimer.Tick += async (s, e) =>
+        {
+            await CheckBackgroundUpdatesAsync();
+        };
+        _backgroundUpdateTimer.Start();
+    }
+
+    public async Task CheckBackgroundUpdatesAsync()
+    {
+        if (IsBusy || IsGameRunning || _isLaunching)
+        {
+            return;
+        }
+
+        try
+        {
+            // 1. Проверяем обновление лаунчера
+            if (_launcherUpdateService.IsInstalled)
+            {
+                var launcherResult = await _launcherUpdateService.CheckAndApplyAsync(null, CancellationToken.None);
+                if (launcherResult.Status == LauncherUpdateStatus.UpdatedRestarting)
+                {
+                    // Обновление скачано и готово к перезапуску
+                    _isLauncherUpdatePending = true;
+                    UpdateBannerTitle = "Обновление лаунчера";
+                    UpdateBannerMessage = string.IsNullOrWhiteSpace(launcherResult.NewVersion)
+                        ? "Доступна новая версия лаунчера. Нажмите для перезапуска."
+                        : $"Доступна версия {launcherResult.NewVersion}. Нажмите для перезапуска.";
+                    UpdateBannerButtonText = "ПЕРЕЗАПУСТИТЬ";
+                    IsUpdateBannerVisible = true;
+                    return;
+                }
+            }
+
+            // 2. Проверяем обновление сборки (манифеста)
+            var config = _configService.CurrentConfig;
+            var gameDir = config.GameDir;
+            if (!string.IsNullOrWhiteSpace(gameDir))
+            {
+                var currentState = PackState.LoadValidState(gameDir);
+                if (currentState != null)
+                {
+                    var repo = string.IsNullOrWhiteSpace(config.PackRepo) ? PackUpdateService.DefaultPackRepo : config.PackRepo.Trim();
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+                    using var client = new HttpClient();
+                    client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("AuraLauncher", "1.0"));
+                    string manifestUrl = $"https://raw.githubusercontent.com/{repo}/{PackUpdateService.DefaultBranch}/manifest.json?t={DateTime.UtcNow.Ticks}";
+                    var resp = await client.GetAsync(manifestUrl, cts.Token);
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        var json = await resp.Content.ReadAsStringAsync(cts.Token);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("packVersion", out var pvElem))
+                        {
+                            var remoteVersion = pvElem.GetString();
+                            if (!string.IsNullOrWhiteSpace(remoteVersion) && !string.Equals(remoteVersion, currentState.PackVersion, StringComparison.Ordinal))
+                            {
+                                _isLauncherUpdatePending = false;
+                                UpdateBannerTitle = "Обновление сборки";
+                                UpdateBannerMessage = $"Доступны новые моды или файлы сборки ({remoteVersion}).";
+                                UpdateBannerButtonText = "ОБНОВИТЬ";
+                                IsUpdateBannerVisible = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Фоновая проверка не должна мешать пользователю
         }
     }
 }

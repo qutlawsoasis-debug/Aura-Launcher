@@ -93,7 +93,49 @@
             <!-- ============================================== -->
             <!-- 2. MAIN DYNAMIC CONTENT AREA (ContentControl)  -->
             <!-- ============================================== -->
-            <ContentControl Grid.Row="1" Panel.ZIndex="1" Content="{Binding CurrentView}" />
+            <Grid Grid.Row="1" Panel.ZIndex="1">
+                <ContentControl Content="{Binding CurrentView}" />
+
+                <!-- Плавающее уведомление об обновлении (Toast / Banner) -->
+                <Border VerticalAlignment="Top" HorizontalAlignment="Center"
+                        Margin="0,16,0,0" Panel.ZIndex="50"
+                        Background="#EE171A21" BorderBrush="#252A33" BorderThickness="1"
+                        CornerRadius="10" Padding="16,12"
+                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
+                        Effect="{x:Null}">
+                    <Border.Resources>
+                        <DropShadowEffect x:Key="ToastShadow" BlurRadius="20" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.5" />
+                    </Border.Resources>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Effect" Value="{StaticResource ToastShadow}" />
+                        </Style>
+                    </Border.Style>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Иконка или индикатор -->
+                        <Border Width="8" Height="8" CornerRadius="4" Background="#19D3A7" Margin="0,0,12,0" VerticalAlignment="Center" />
+                        
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="#E8EAED" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <!-- Кнопка действия -->
+                        <Button Command="{Binding ApplyBannerUpdateCommand}"
+                                Style="{StaticResource PrimaryNeonBtn}"
+                                Height="30" Padding="14,0" FontSize="11" FontWeight="SemiBold"
+                                Content="{Binding UpdateBannerButtonText}"
+                                Margin="0,0,10,0" VerticalAlignment="Center" />
+
+                        <!-- Кнопка закрытия тоста -->
+                        <Button Command="{Binding DismissBannerCommand}"
+                                Style="{StaticResource WinCloseBtn}"
+                                Width="26" Height="26" FontSize="11"
+                                Content="✕" ToolTip="Закрыть уведомление"
+                                VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <!-- ============================================== -->
             <!-- 3. BOTTOM LAUNCH DECK                          -->
