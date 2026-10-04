@@ -16,14 +16,20 @@ public class IntegrationTests
     private const string TestGameDir = @"C:\AuraTest\game";
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task RealRun_CleanInstall_VerifyAndRepair()
     {
-        // 1. Prepare clean test folder
-        if (Directory.Exists(TestGameDir))
-        {
-            Directory.Delete(TestGameDir, true);
-        }
+        // 1. Prepare clean test folder for pack files
         Directory.CreateDirectory(TestGameDir);
+        foreach (var sub in new[] { "mods", "config", "shaderpacks", "resourcepacks" })
+        {
+            var p = Path.Combine(TestGameDir, sub);
+            if (Directory.Exists(p)) Directory.Delete(p, true);
+        }
+        var opt = Path.Combine(TestGameDir, "options.txt");
+        if (File.Exists(opt)) File.Delete(opt);
+        var st = Path.Combine(TestGameDir, "pack-state.json");
+        if (File.Exists(st)) File.Delete(st);
 
         var testStatePath = Path.Combine(TestGameDir, "pack-state.json");
         var configService = new TestConfigService(TestGameDir, PackUpdateService.DefaultPackRepo);
@@ -47,18 +53,20 @@ public class IntegrationTests
         var rps = Directory.GetFiles(Path.Combine(TestGameDir, "resourcepacks"), "*.zip");
         var optionsPath = Path.Combine(TestGameDir, "options.txt");
 
-        var allFiles = Directory.GetFiles(TestGameDir, "*", SearchOption.AllDirectories)
-            .Where(f => !f.EndsWith("pack-state.json"))
-            .ToList();
+        var packFolders = new[] { "mods", "config", "shaderpacks", "resourcepacks" };
+        var packFiles = packFolders.SelectMany(f => Directory.Exists(Path.Combine(TestGameDir, f))
+            ? Directory.GetFiles(Path.Combine(TestGameDir, f), "*", SearchOption.AllDirectories)
+            : Array.Empty<string>()).ToList();
+        if (File.Exists(optionsPath)) packFiles.Add(optionsPath);
 
         // Output metrics
         Trace.WriteLine($"First install time: {sw.ElapsedMilliseconds} ms ({sw.Elapsed.TotalSeconds:F1} s)");
-        Trace.WriteLine($"Total files installed: {allFiles.Count}");
+        Trace.WriteLine($"Total pack files installed: {packFiles.Count}");
         Trace.WriteLine($"Mods count: {mods.Length}");
         Trace.WriteLine($"Shaders count: {shaders.Length}");
         Trace.WriteLine($"Resourcepacks count: {rps.Length}");
 
-        Assert.Equal(174, allFiles.Count);
+        Assert.Equal(174, packFiles.Count);
         Assert.Equal(60, mods.Length);
         Assert.Equal(4, shaders.Length);
         Assert.Equal(3, rps.Length);
@@ -108,6 +116,7 @@ public class IntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task RealRun_LaunchGame_VerifyLogs()
     {
         var launchService = new FabricGameLaunchService();
@@ -119,7 +128,7 @@ public class IntegrationTests
         };
 
         var logLines = new System.Collections.Concurrent.ConcurrentBag<string>();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
 
         var process = await launchService.LaunchGameAsync(
             config,

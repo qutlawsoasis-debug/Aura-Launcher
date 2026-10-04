@@ -71,6 +71,14 @@ public partial class App : Application
         ConfigureServices(services);
         Services = services.BuildServiceProvider();
 
+        // Логирование версии лаунчера при старте
+        try
+        {
+            var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
+            FabricGameLaunchService.LogLauncherEvent($"Aura Launcher v{launcherUpdateService.CurrentVersion}, установлен через Velopack: {(launcherUpdateService.IsInstalled ? "да" : "нет")}");
+        }
+        catch { }
+
         // Создаем главное окно и передаем MainViewModel в качестве DataContext
         var mainWindow = new MainWindow
         {
@@ -100,6 +108,7 @@ public partial class App : Application
     {
         // Регистрация сервисов как синглтонов
         services.AddSingleton<IConfigService, JsonConfigService>();
+        services.AddSingleton<ILauncherUpdateService, LauncherUpdateService>();
         services.AddSingleton<IPackUpdateService, PackUpdateService>();
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
         services.AddSingleton<ISkinService, SkinService>();
@@ -119,16 +128,7 @@ public partial class App : Application
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
             string logEntry = $"[{timestamp}] Unhandled Crash:\n{ex}\n----------------------------------------\n";
 
-            // 1. Запись в локальный launcher_crash.log
-            try
-            {
-                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string localLogPath = Path.Combine(baseDir, "launcher_crash.log");
-                File.AppendAllText(localLogPath, logEntry);
-            }
-            catch { }
-
-            // 2. Запись в системный %AppData%\Aura\launcher.log
+            // Запись в системный %AppData%\Aura\launcher.log
             try
             {
                 string appDataAura = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Aura");
@@ -138,11 +138,11 @@ public partial class App : Application
             }
             catch { }
 
-            // 3. Показываем диалог пользователю ОДИН РАЗ, предотвращая зацикливание модальных окон
+            // Показываем диалог пользователю ОДИН РАЗ, предотвращая зацикливание модальных окон
             if (Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
             {
                 MessageBox.Show(
-                    $"Произошла ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nПолный стек ошибки сохранен в launcher.log и launcher_crash.log.\nПриложение продолжит работу.",
+                    $"Произошла ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nПолный стек ошибки сохранен в launcher.log.\nПриложение продолжит работу.",
                     "AURA Launcher — Внимание",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);

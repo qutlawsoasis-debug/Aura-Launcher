@@ -21,6 +21,7 @@ namespace AuraLauncher.ViewModels;
 public class MainViewModel : ObservableObject
 {
     private readonly IConfigService _configService;
+    private readonly ILauncherUpdateService _launcherUpdateService;
     private readonly IPackUpdateService _packUpdateService;
     private readonly IGameLaunchService _launchService;
     private readonly ISkinService _skinService;
@@ -225,6 +226,7 @@ public class MainViewModel : ObservableObject
 
     public MainViewModel(
         IConfigService configService,
+        ILauncherUpdateService launcherUpdateService,
         IPackUpdateService packUpdateService,
         IGameLaunchService launchService,
         ISkinService skinService,
@@ -233,6 +235,7 @@ public class MainViewModel : ObservableObject
         WardrobeViewModel wardrobeViewModel)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
         _packUpdateService = packUpdateService ?? throw new ArgumentNullException(nameof(packUpdateService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
@@ -552,6 +555,42 @@ public class MainViewModel : ObservableObject
 
     private async Task CheckUpdatesAsync(bool isStartup = false)
     {
+        // 1. Сначала обновление лаунчера через Velopack
+        try
+        {
+            if (!isStartup)
+            {
+                SetLauncherState(LauncherState.Checking, "Проверка обновлений лаунчера...");
+            }
+
+            var launcherProgress = new Progress<DownloadProgressReport>(report =>
+            {
+                IsProgressVisible = true;
+                SetLauncherState(LauncherState.Downloading, report.StatusText);
+                ProgressPercentage = report.Percentage;
+                SpeedText = string.Empty;
+                RemainingTimeText = string.Empty;
+                StatusText = report.StatusText;
+            });
+
+            var launcherResult = await _launcherUpdateService.CheckAndApplyAsync(launcherProgress, CancellationToken.None);
+            if (launcherResult.Status == LauncherUpdateStatus.UpdatedRestarting)
+            {
+                IsProgressVisible = false;
+                SetLauncherState(LauncherState.Ready, launcherResult.Message);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: UNHANDLED] {ex.Message}");
+        }
+        finally
+        {
+            IsProgressVisible = false;
+        }
+
+        // 2. Затем обновление сборки модов
         var progress = new Progress<DownloadProgressReport>(report =>
         {
             IsProgressVisible = true;

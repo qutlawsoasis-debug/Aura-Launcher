@@ -332,24 +332,27 @@ public class SkinService : ISkinService
         Directory.CreateDirectory(localSkinDir);
         var targetFile = Path.Combine(localSkinDir, $"{nickname.Trim()}.png");
 
-        var steveLocal = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
-        if (File.Exists(steveLocal))
+        bool written = false;
+        try
         {
-            await Task.Run(() => File.Copy(steveLocal, targetFile, overwrite: true), cancellationToken);
-        }
-        else
-        {
-            try
+            var uri = new Uri("pack://application:,,,/AuraLauncher;component/steve.png", UriKind.Absolute);
+            var streamInfo = Application.GetResourceStream(uri);
+            if (streamInfo != null)
             {
-                var uri = new Uri("pack://application:,,,/AuraLauncher;component/steve.png", UriKind.Absolute);
-                var streamInfo = Application.GetResourceStream(uri);
-                if (streamInfo != null)
-                {
-                    await using var fs = File.Create(targetFile);
-                    await streamInfo.Stream.CopyToAsync(fs, cancellationToken);
-                }
+                await using var fs = File.Create(targetFile);
+                await streamInfo.Stream.CopyToAsync(fs, cancellationToken);
+                written = true;
             }
-            catch { }
+        }
+        catch { }
+
+        if (!written)
+        {
+            var steveLocal = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
+            if (File.Exists(steveLocal))
+            {
+                await Task.Run(() => File.Copy(steveLocal, targetFile, overwrite: true), cancellationToken);
+            }
         }
     }
 
