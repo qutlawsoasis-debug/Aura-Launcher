@@ -247,28 +247,30 @@ public static class SceneDiagnostics
                     var foundProc = launchService.FindRunningGameProcess(originalGameDir);
                     App.Log($"[SELFTEST] WMI running game process check: FoundPID={foundProc?.Id}");
 
-                    // Реальная проверка: ожидание в latest.log строки "Backend library: LWJGL" или "Setting user:" (таймаут 120 с)
+                    // Честная проверка: ожидание в latest.log "Reloading ResourceManager" И "Created: ... atlas" (таймаут 120 с)
                     var sw = Stopwatch.StartNew();
                     bool targetLineFound = false;
                     string matchedLogLine = string.Empty;
 
-                    App.Log("[SELFTEST] Monitoring latest.log for 'Backend library: LWJGL' or 'Setting user:' (timeout 120s)...");
+                    App.Log("[SELFTEST] Monitoring latest.log for 'Reloading ResourceManager' AND 'Created: ... atlas' (timeout 120s)...");
 
                     while (sw.Elapsed.TotalSeconds < 120)
                     {
                         if (proc.HasExited)
                         {
                             double elapsedSec = sw.Elapsed.TotalSeconds;
-                            App.Log($"[SELFTEST] Process exited after {elapsedSec:F1}s with code {proc.ExitCode}");
-                            if (elapsedSec < 20.0)
+                            App.Log($"[SELFTEST: FAILURE] Process exited prematurely after {elapsedSec:F1}s with code {proc.ExitCode} before reaching ResourceManager/atlas!");
+                            if (File.Exists(latestLogPath))
                             {
-                                App.Log($"[SELFTEST: FAILURE] Process exited prematurely in less than 20 seconds ({elapsedSec:F1}s)!");
-                                if (File.Exists(gameLogPath))
-                                {
-                                    var logLines = await File.ReadAllLinesAsync(gameLogPath);
-                                    var tail = logLines.TakeLast(50);
-                                    App.Log($"[SELFTEST: GAME-LOG-TAIL]\n{string.Join(Environment.NewLine, tail)}");
-                                }
+                                var logLines = await File.ReadAllLinesAsync(latestLogPath);
+                                var tail = logLines.TakeLast(40);
+                                App.Log($"[SELFTEST: LATEST-LOG-TAIL]\n{string.Join(Environment.NewLine, tail)}");
+                            }
+                            else if (File.Exists(gameLogPath))
+                            {
+                                var logLines = await File.ReadAllLinesAsync(gameLogPath);
+                                var tail = logLines.TakeLast(50);
+                                App.Log($"[SELFTEST: GAME-LOG-TAIL]\n{string.Join(Environment.NewLine, tail)}");
                             }
                             break;
                         }
@@ -279,22 +281,22 @@ public static class SceneDiagnostics
                             {
                                 using var fs = new FileStream(latestLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                                 using var reader = new StreamReader(fs, Encoding.UTF8);
-                                string? line;
-                                while ((line = reader.ReadLine()) != null)
+                                var text = await reader.ReadToEndAsync();
+                                bool hasReloading = text.Contains("Reloading ResourceManager");
+                                bool hasAtlas = System.Text.RegularExpressions.Regex.IsMatch(text, @"Created:\s+.*atlas", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                                if (!proc.HasExited && hasReloading && hasAtlas)
                                 {
-                                    if (line.Contains("Backend library: LWJGL") || line.Contains("Setting user:"))
-                                    {
-                                        matchedLogLine = line;
-                                        targetLineFound = true;
-                                        break;
-                                    }
+                                    targetLineFound = true;
+                                    matchedLogLine = "Reloading ResourceManager & atlas created";
+                                    break;
                                 }
                             }
                             catch { }
 
                             if (targetLineFound)
                             {
-                                App.Log($"[SELFTEST: SUCCESS] Found target line in latest.log after {sw.Elapsed.TotalSeconds:F1}s: {matchedLogLine}");
+                                App.Log($"[SELFTEST: SUCCESS] Found target criteria in latest.log after {sw.Elapsed.TotalSeconds:F1}s: {matchedLogLine}");
                                 break;
                             }
                         }
@@ -304,7 +306,7 @@ public static class SceneDiagnostics
 
                     if (!targetLineFound && !proc.HasExited)
                     {
-                        App.Log("[SELFTEST: FAILURE] 120s timeout exceeded without matching target line in latest.log!");
+                        App.Log("[SELFTEST: FAILURE] 120s timeout exceeded without matching target criteria in latest.log!");
                     }
 
                     // Завершение тестового процесса игры ТОЛЬКО после проверки строки из latest.log

@@ -127,6 +127,12 @@ public class IntegrationTests
             RamMb = 4096
         };
 
+        var latestLog = Path.Combine(TestGameDir, "logs", "latest.log");
+        if (File.Exists(latestLog))
+        {
+            try { File.Delete(latestLog); } catch { }
+        }
+
         var logLines = new System.Collections.Concurrent.ConcurrentBag<string>();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
 
@@ -143,13 +149,31 @@ public class IntegrationTests
         Assert.NotNull(process);
         Assert.False(process.HasExited);
 
-        // Wait for game to initialize (up to 45 seconds)
-        var latestLog = Path.Combine(TestGameDir, "logs", "latest.log");
-        bool initialized = false;
-        var timeout = DateTime.UtcNow.AddSeconds(45);
+        // Wait for game to initialize honestly (up to 120 seconds)
+        // SUCCESS: java process is ALIVE AND latest.log contains "Reloading ResourceManager" AND "Created: ... atlas".
+        // "Backend library: LWJGL" does NOT count as success.
+        // If the process exits before success, fail immediately with exit code and the last 40 lines of latest.log.
+        bool success = false;
+        var timeout = DateTime.UtcNow.AddSeconds(120);
 
         while (DateTime.UtcNow < timeout)
         {
+            if (process.HasExited)
+            {
+                var last40Lines = Array.Empty<string>();
+                if (File.Exists(latestLog))
+                {
+                    try
+                    {
+                        var lines = File.ReadAllLines(latestLog);
+                        last40Lines = lines.TakeLast(40).ToArray();
+                    }
+                    catch { }
+                }
+                var logTail = string.Join(Environment.NewLine, last40Lines);
+                Assert.Fail($"Process exited prematurely with code {process.ExitCode} before reaching launch success! Last 40 lines of latest.log:\n{logTail}");
+            }
+
             if (File.Exists(latestLog))
             {
                 try
@@ -157,9 +181,12 @@ public class IntegrationTests
                     using var fs = new FileStream(latestLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var reader = new StreamReader(fs);
                     var text = await reader.ReadToEndAsync();
-                    if (text.Contains("Backend library: LWJGL") && text.Contains("Setting user: TestPlayer"))
+                    bool hasReloading = text.Contains("Reloading ResourceManager");
+                    bool hasAtlas = System.Text.RegularExpressions.Regex.IsMatch(text, @"Created:\s+.*atlas", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    if (!process.HasExited && hasReloading && hasAtlas)
                     {
-                        initialized = true;
+                        success = true;
                         break;
                     }
                 }
@@ -173,15 +200,43 @@ public class IntegrationTests
             if (!process.HasExited)
             {
                 process.Kill(true);
+                process.WaitForExit(5000);
             }
         }
         catch { }
 
-        Assert.True(initialized, "Game did not reach LWJGL initialization in time.");
+        static string ReadLogSafe(string path)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                try
+                {
+                    using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var reader = new StreamReader(fs, System.Text.Encoding.UTF8);
+                    return reader.ReadToEnd();
+                }
+                catch when (i < 4)
+                {
+                    Thread.Sleep(200);
+                }
+            }
+            return string.Empty;
+        }
+
+        if (!success)
+        {
+            var raw = ReadLogSafe(latestLog);
+            var lines = raw.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var last40Lines = lines.TakeLast(40).ToArray();
+            var logTail = string.Join(Environment.NewLine, last40Lines);
+            Assert.Fail($"Launch timed out after 120s without honest success. HasExited: {process.HasExited}. Last 40 lines of latest.log:\n{logTail}");
+        }
+
         Assert.True(File.Exists(latestLog));
-        var logContent = File.ReadAllText(latestLog);
+        var logContent = ReadLogSafe(latestLog);
         Assert.Contains("Setting user: TestPlayer", logContent);
-        Assert.Contains("Backend library: LWJGL", logContent);
+        Assert.Contains("Reloading ResourceManager", logContent);
+        Assert.Matches(@"Created:\s+.*atlas", logContent);
         Assert.DoesNotContain("Incompatible mods found", logContent);
         Assert.DoesNotContain("Mod resolution failed", logContent);
         Assert.DoesNotContain("Mixin apply failed", logContent);
