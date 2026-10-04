@@ -14,7 +14,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using Microsoft.Win32;
 
@@ -42,8 +41,6 @@ namespace AuraLauncher
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-        private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-        private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
 
         private LauncherConfig _config = new();
         private readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "aura_config.json");
@@ -51,10 +48,6 @@ namespace AuraLauncher
         private readonly DispatcherTimer _quoteTimer = new();
         private int _quoteIndex = 0;
         private readonly List<ModItemInfo> _allMods = new();
-
-        // 3D Mouse Drag Rotation
-        private Point _last3DMousePos;
-        private bool _isDragging3D = false;
 
         private readonly string[] _csQuotes = new[]
         {
@@ -82,7 +75,7 @@ namespace AuraLauncher
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            ApplyWindows11MicaOrAcrylic();
+            ApplyDarkModeHeader();
             LoadConfig();
             LoadModsList();
             ShowView("Overview");
@@ -97,31 +90,24 @@ namespace AuraLauncher
             }
         }
 
-        private void ApplyWindows11MicaOrAcrylic()
+        private void ApplyDarkModeHeader()
         {
             try
             {
                 var helper = new WindowInteropHelper(this);
                 int darkMode = 1;
                 DwmSetWindowAttribute(helper.Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
-
-                int cornerPref = 2; // Round
-                DwmSetWindowAttribute(helper.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPref, sizeof(int));
-
-                int backdropType = 3; // 3 = Acrylic
-                DwmSetWindowAttribute(helper.Handle, DWMWA_SYSTEMBACKDROP_TYPE, ref backdropType, sizeof(int));
             }
             catch { }
         }
 
         // ==========================================
-        // TAB NAVIGATION
+        // CLEAN TAB SWITCHING
         // ==========================================
         private void NavOverview_Click(object sender, RoutedEventArgs e) => ShowView("Overview");
         private void NavMods_Click(object sender, RoutedEventArgs e) => ShowView("Mods");
         private void NavWardrobe_Click(object sender, RoutedEventArgs e) => ShowView("Wardrobe");
         private void NavSettings_Click(object sender, RoutedEventArgs e) => ShowView("Settings");
-        private void BtnDockNick_Click(object sender, MouseButtonEventArgs e) => ShowView("Wardrobe");
 
         private void ShowView(string viewName)
         {
@@ -130,13 +116,13 @@ namespace AuraLauncher
             ViewWardrobe.Visibility = viewName == "Wardrobe" ? Visibility.Visible : Visibility.Collapsed;
             ViewSettings.Visibility = viewName == "Settings" ? Visibility.Visible : Visibility.Collapsed;
 
-            var activeCol = (SolidColorBrush)new BrushConverter().ConvertFromString("#FFFFFF")!;
-            var inactiveCol = (SolidColorBrush)new BrushConverter().ConvertFromString("#94A3B8")!;
+            var activeBrush = Brushes.White;
+            var inactiveBrush = (SolidColorBrush)new BrushConverter().ConvertFromString("#8E9CAE")!;
 
-            TabBtnOverview.Foreground = viewName == "Overview" ? activeCol : inactiveCol;
-            TabBtnMods.Foreground = viewName == "Mods" ? activeCol : inactiveCol;
-            TabBtnWardrobe.Foreground = viewName == "Wardrobe" ? activeCol : inactiveCol;
-            TabBtnSettings.Foreground = viewName == "Settings" ? activeCol : inactiveCol;
+            TabBtnOverview.Foreground = viewName == "Overview" ? activeBrush : inactiveBrush;
+            TabBtnMods.Foreground = viewName == "Mods" ? activeBrush : inactiveBrush;
+            TabBtnWardrobe.Foreground = viewName == "Wardrobe" ? activeBrush : inactiveBrush;
+            TabBtnSettings.Foreground = viewName == "Settings" ? activeBrush : inactiveBrush;
         }
 
         private void BtnMinimize_Click(object sender, RoutedEventArgs e)
@@ -179,7 +165,6 @@ namespace AuraLauncher
                 case 12288: RbRam12.IsChecked = true; break;
                 default: RbRam6.IsChecked = true; break;
             }
-            UpdateRamDisplay(_config.RamMb);
 
             UpdateSkinModelPreview(_config.SkinPath);
         }
@@ -217,16 +202,7 @@ namespace AuraLauncher
                 if (int.TryParse(rb.Tag.ToString(), out int ram))
                 {
                     _config.RamMb = ram;
-                    UpdateRamDisplay(ram);
                 }
-            }
-        }
-
-        private void UpdateRamDisplay(int ram)
-        {
-            if (TxtDockRam != null)
-            {
-                TxtDockRam.Text = $"{ram / 1024} ГБ ОЗУ";
             }
         }
 
@@ -270,37 +246,6 @@ namespace AuraLauncher
         }
 
         // ==========================================
-        // 3D MOUSE ROTATION (DRAG TO ROTATE)
-        // ==========================================
-        private void Viewport3D_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            _isDragging3D = true;
-            _last3DMousePos = e.GetPosition(this);
-            ((UIElement)sender).CaptureMouse();
-        }
-
-        private void Viewport3D_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (_isDragging3D)
-            {
-                var pos = e.GetPosition(this);
-                double dx = pos.X - _last3DMousePos.X;
-                double deltaAngle = dx * 0.9;
-
-                CharacterRotation.Angle = (CharacterRotation.Angle + deltaAngle) % 360;
-                WardrobeRotation.Angle = (WardrobeRotation.Angle + deltaAngle) % 360;
-
-                _last3DMousePos = pos;
-            }
-        }
-
-        private void Viewport3D_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            _isDragging3D = false;
-            ((UIElement)sender).ReleaseMouseCapture();
-        }
-
-        // ==========================================
         // DRAG & DROP SKIN
         // ==========================================
         private void Window_DragOver(object sender, DragEventArgs e)
@@ -332,6 +277,7 @@ namespace AuraLauncher
                         UpdateSkinModelPreview(_config.SkinPath);
                         SyncSkinToGame(_config.SkinPath);
                         SaveConfig();
+                        ShowView("Wardrobe");
                     }
                     catch { }
                 }
@@ -339,7 +285,7 @@ namespace AuraLauncher
         }
 
         // ==========================================
-        // REAL 3D MINECRAFT MODEL & SKIN PREVIEW
+        // CRISP NEAREST-NEIGHBOR SKIN RENDERING
         // ==========================================
         private void UpdateSkinModelPreview(string? skinPath)
         {
@@ -401,160 +347,13 @@ namespace AuraLauncher
 
             if (sourceBmp == null) return;
 
-            // 1. Build 3D Mesh and apply material
-            var mesh = BuildCharacter3DMesh(sourceBmp);
-            var brush = new ImageBrush(sourceBmp)
-            {
-                TileMode = TileMode.None,
-                Stretch = Stretch.Fill
-            };
-            RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.NearestNeighbor);
-            RenderOptions.SetEdgeMode(brush, EdgeMode.Aliased);
-
-            var material = new DiffuseMaterial(brush);
-            CharacterBodyModel.Geometry = mesh;
-            CharacterBodyModel.Material = material;
-            CharacterBodyModel.BackMaterial = material;
-
-            WardrobeBodyModel.Geometry = mesh;
-            WardrobeBodyModel.Material = material;
-            WardrobeBodyModel.BackMaterial = material;
-
-            // 2. Generate Mini Face for dock
-            var miniFace = ExtractMiniFace(sourceBmp);
+            var (fullModel, miniFace) = RenderPixelPerfectSkin(sourceBmp);
+            ImgSkinPreview2D.Source = fullModel;
             ImgDockFace.Source = miniFace;
             TxtWardrobeFormat.Text = desc;
         }
 
-        private MeshGeometry3D BuildCharacter3DMesh(BitmapSource skinBmp)
-        {
-            var mesh = new MeshGeometry3D();
-            int skinW = skinBmp.PixelWidth;
-            int skinH = skinBmp.PixelHeight;
-            bool is64x64 = skinH >= 64;
-
-            // 1. Head (x: -4..4, y: 24..32, z: -4..4)
-            AddBox(mesh, -4, 24, -4, 8, 8, 8, 0, 0, 8, 8, 8, skinW, skinH);
-            // Hat outer layer
-            AddBox(mesh, -4.5, 23.5, -4.5, 9, 9, 9, 32, 0, 8, 8, 8, skinW, skinH);
-
-            // 2. Torso (x: -4..4, y: 12..24, z: -2..2)
-            AddBox(mesh, -4, 12, -2, 8, 12, 4, 16, 16, 8, 12, 4, skinW, skinH);
-            // Jacket outer layer
-            if (is64x64)
-            {
-                AddBox(mesh, -4.3, 11.7, -2.3, 8.6, 12.6, 4.6, 16, 32, 8, 12, 4, skinW, skinH);
-            }
-
-            // 3. Right Arm (x: -8..-4, y: 12..24, z: -2..2)
-            AddBox(mesh, -8, 12, -2, 4, 12, 4, 40, 16, 4, 12, 4, skinW, skinH);
-            if (is64x64)
-            {
-                AddBox(mesh, -8.3, 11.7, -2.3, 4.6, 12.6, 4.6, 40, 32, 4, 12, 4, skinW, skinH);
-            }
-
-            // 4. Left Arm (x: 4..8, y: 12..24, z: -2..2)
-            int laU = is64x64 ? 32 : 40;
-            int laV = is64x64 ? 48 : 16;
-            AddBox(mesh, 4, 12, -2, 4, 12, 4, laU, laV, 4, 12, 4, skinW, skinH);
-            if (is64x64)
-            {
-                AddBox(mesh, 3.7, 11.7, -2.3, 4.6, 12.6, 4.6, 48, 48, 4, 12, 4, skinW, skinH);
-            }
-
-            // 5. Right Leg (x: -4..0, y: 0..12, z: -2..2)
-            AddBox(mesh, -4, 0, -2, 4, 12, 4, 0, 16, 4, 12, 4, skinW, skinH);
-            if (is64x64)
-            {
-                AddBox(mesh, -4.3, -0.3, -2.3, 4.6, 12.6, 4.6, 0, 32, 4, 12, 4, skinW, skinH);
-            }
-
-            // 6. Left Leg (x: 0..4, y: 0..12, z: -2..2)
-            int llU = is64x64 ? 16 : 0;
-            int llV = is64x64 ? 48 : 16;
-            AddBox(mesh, 0, 0, -2, 4, 12, 4, llU, llV, 4, 12, 4, skinW, skinH);
-            if (is64x64)
-            {
-                AddBox(mesh, -0.3, -0.3, -2.3, 4.6, 12.6, 4.6, 0, 48, 4, 12, 4, skinW, skinH);
-            }
-
-            return mesh;
-        }
-
-        private static void AddBox(
-            MeshGeometry3D mesh,
-            double x, double y, double z,
-            double dx, double dy, double dz,
-            int u, int v, int w, int h, int d,
-            int texW, int texH)
-        {
-            double x0 = x, x1 = x + dx;
-            double y0 = y, y1 = y + dy;
-            double z0 = z, z1 = z + dz;
-
-            // 1. Top face (+Y)
-            AddQuad(mesh,
-                new Point3D(x0, y1, z1), new Point3D(x1, y1, z1), new Point3D(x1, y1, z0), new Point3D(x0, y1, z0),
-                u + d, v, u + d + w, v + d, texW, texH);
-
-            // 2. Bottom face (-Y)
-            AddQuad(mesh,
-                new Point3D(x0, y0, z0), new Point3D(x1, y0, z0), new Point3D(x1, y0, z1), new Point3D(x0, y0, z1),
-                u + d + w, v, u + d + 2 * w, v + d, texW, texH);
-
-            // 3. Right face (-X, player's right)
-            AddQuad(mesh,
-                new Point3D(x0, y0, z0), new Point3D(x0, y0, z1), new Point3D(x0, y1, z1), new Point3D(x0, y1, z0),
-                u, v + d, u + d, v + d + h, texW, texH);
-
-            // 4. Front face (+Z)
-            AddQuad(mesh,
-                new Point3D(x0, y0, z1), new Point3D(x1, y0, z1), new Point3D(x1, y1, z1), new Point3D(x0, y1, z1),
-                u + d, v + d, u + d + w, v + d + h, texW, texH);
-
-            // 5. Left face (+X, player's left)
-            AddQuad(mesh,
-                new Point3D(x1, y0, z1), new Point3D(x1, y0, z0), new Point3D(x1, y1, z0), new Point3D(x1, y1, z1),
-                u + d + w, v + d, u + 2 * d + w, v + d + h, texW, texH);
-
-            // 6. Back face (-Z)
-            AddQuad(mesh,
-                new Point3D(x1, y0, z0), new Point3D(x0, y0, z0), new Point3D(x0, y1, z0), new Point3D(x1, y1, z0),
-                u + 2 * d + w, v + d, u + 2 * d + 2 * w, v + d + h, texW, texH);
-        }
-
-        private static void AddQuad(
-            MeshGeometry3D mesh,
-            Point3D p0, Point3D p1, Point3D p2, Point3D p3,
-            double u0, double v0, double u1, double v1,
-            int texW, int texH)
-        {
-            int baseIdx = mesh.Positions.Count;
-            mesh.Positions.Add(p0);
-            mesh.Positions.Add(p1);
-            mesh.Positions.Add(p2);
-            mesh.Positions.Add(p3);
-
-            double nu0 = u0 / texW;
-            double nv0 = v0 / texH;
-            double nu1 = u1 / texW;
-            double nv1 = v1 / texH;
-
-            mesh.TextureCoordinates.Add(new Point(nu0, nv1));
-            mesh.TextureCoordinates.Add(new Point(nu1, nv1));
-            mesh.TextureCoordinates.Add(new Point(nu1, nv0));
-            mesh.TextureCoordinates.Add(new Point(nu0, nv0));
-
-            mesh.TriangleIndices.Add(baseIdx);
-            mesh.TriangleIndices.Add(baseIdx + 1);
-            mesh.TriangleIndices.Add(baseIdx + 2);
-
-            mesh.TriangleIndices.Add(baseIdx);
-            mesh.TriangleIndices.Add(baseIdx + 2);
-            mesh.TriangleIndices.Add(baseIdx + 3);
-        }
-
-        private BitmapSource ExtractMiniFace(BitmapSource sourceBmp)
+        private (ImageSource FullModel, ImageSource MiniFace) RenderPixelPerfectSkin(BitmapSource sourceBmp)
         {
             var conv = new FormatConvertedBitmap(sourceBmp, PixelFormats.Bgra32, null, 0);
             int skinW = conv.PixelWidth;
@@ -563,6 +362,112 @@ namespace AuraLauncher
             uint[] skinPixels = new uint[skinW * skinH];
             conv.CopyPixels(skinPixels, skinW * 4, 0);
 
+            // 1. FULL BODY 16x32 CANVAS
+            uint[] canvas = new uint[16 * 32];
+
+            void Blit(int sx, int sy, int w, int h, int dx, int dy, bool flipX = false)
+            {
+                if (sx + w > skinW || sy + h > skinH) return;
+
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        int srcX = flipX ? (sx + w - 1 - x) : (sx + x);
+                        int srcY = sy + y;
+                        uint px = skinPixels[srcY * skinW + srcX];
+                        byte a = (byte)((px >> 24) & 0xFF);
+                        if (a == 0) continue;
+
+                        int dstX = dx + x;
+                        int dstY = dy + y;
+                        if (dstX < 0 || dstX >= 16 || dstY < 0 || dstY >= 32) continue;
+
+                        int dstIdx = dstY * 16 + dstX;
+                        if (a == 255)
+                        {
+                            canvas[dstIdx] = px;
+                        }
+                        else
+                        {
+                            uint dstPx = canvas[dstIdx];
+                            byte da = (byte)((dstPx >> 24) & 0xFF);
+                            byte dr = (byte)((dstPx >> 16) & 0xFF);
+                            byte dg = (byte)((dstPx >> 8) & 0xFF);
+                            byte db = (byte)(dstPx & 0xFF);
+
+                            byte sr = (byte)((px >> 16) & 0xFF);
+                            byte sg = (byte)((px >> 8) & 0xFF);
+                            byte sb = (byte)(px & 0xFF);
+
+                            int inv = 255 - a;
+                            int oa = a + (da * inv) / 255;
+                            int or = (sr * a + dr * inv) / 255;
+                            int og = (sg * a + dg * inv) / 255;
+                            int ob = (sb * a + db * inv) / 255;
+
+                            canvas[dstIdx] = (uint)((oa << 24) | (or << 16) | (og << 8) | ob);
+                        }
+                    }
+                }
+            }
+
+            // Head (8,8,8,8) + Hat (40,8,8,8) at (4,0)
+            Blit(8, 8, 8, 8, 4, 0);
+            Blit(40, 8, 8, 8, 4, 0);
+
+            // Torso (20,20,8,12) + Jacket (20,36,8,12) at (4,8)
+            Blit(20, 20, 8, 12, 4, 8);
+            Blit(20, 36, 8, 12, 4, 8);
+
+            // Right Arm (44,20,4,12) + Sleeve (44,36,4,12) at (0,8)
+            Blit(44, 20, 4, 12, 0, 8);
+            Blit(44, 36, 4, 12, 0, 8);
+
+            // Left Arm
+            if (skinH >= 64)
+            {
+                Blit(36, 52, 4, 12, 12, 8);
+                Blit(52, 52, 4, 12, 12, 8);
+            }
+            else
+            {
+                Blit(44, 20, 4, 12, 12, 8, flipX: true);
+            }
+
+            // Right Leg
+            Blit(4, 20, 4, 12, 4, 20);
+            Blit(4, 36, 4, 12, 4, 20);
+
+            // Left Leg
+            if (skinH >= 64)
+            {
+                Blit(20, 52, 4, 12, 8, 20);
+                Blit(4, 52, 4, 12, 8, 20);
+            }
+            else
+            {
+                Blit(4, 20, 4, 12, 8, 20, flipX: true);
+            }
+
+            // Scale 8x Nearest-Neighbor to 128x256
+            uint[] scaledFull = new uint[128 * 256];
+            for (int y = 0; y < 256; y++)
+            {
+                int sy = y / 8;
+                int row = y * 128;
+                int srow = sy * 16;
+                for (int x = 0; x < 128; x++)
+                {
+                    scaledFull[row + x] = canvas[srow + (x / 8)];
+                }
+            }
+
+            var wbFull = new WriteableBitmap(128, 256, 96, 96, PixelFormats.Bgra32, null);
+            wbFull.WritePixels(new Int32Rect(0, 0, 128, 256), scaledFull, 128 * 4, 0);
+            wbFull.Freeze();
+
+            // 2. MINI HEAD FACE (8x8 -> 38x38)
             uint[] face8x8 = new uint[8 * 8];
             for (int y = 0; y < 8; y++)
             {
@@ -604,20 +509,21 @@ namespace AuraLauncher
                 }
             }
 
-            uint[] scaled36 = new uint[36 * 36];
-            for (int y = 0; y < 36; y++)
+            uint[] scaled38 = new uint[38 * 38];
+            for (int y = 0; y < 38; y++)
             {
-                int sy = y * 8 / 36;
-                for (int x = 0; x < 36; x++)
+                int sy = y * 8 / 38;
+                for (int x = 0; x < 38; x++)
                 {
-                    scaled36[y * 36 + x] = face8x8[sy * 8 + (x * 8 / 36)];
+                    scaled38[y * 38 + x] = face8x8[sy * 8 + (x * 8 / 38)];
                 }
             }
 
-            var wb = new WriteableBitmap(36, 36, 96, 96, PixelFormats.Bgra32, null);
-            wb.WritePixels(new Int32Rect(0, 0, 36, 36), scaled36, 36 * 4, 0);
-            wb.Freeze();
-            return wb;
+            var wbMini = new WriteableBitmap(38, 38, 96, 96, PixelFormats.Bgra32, null);
+            wbMini.WritePixels(new Int32Rect(0, 0, 38, 38), scaled38, 38 * 4, 0);
+            wbMini.Freeze();
+
+            return (wbFull, wbMini);
         }
 
         private void BtnChangeSkin_Click(object sender, RoutedEventArgs e)
@@ -772,8 +678,7 @@ namespace AuraLauncher
                     m.Description.Contains(query, StringComparison.OrdinalIgnoreCase));
 
             ModsItemsControl.ItemsSource = filtered;
-            TxtModCountBadge.Text = $"Всего {_allMods.Count} модов в сборке";
-            TxtNavModsLabel.Text = $"Модификации ({_allMods.Count})";
+            TxtModCountBadge.Text = $"Всего {_allMods.Count} модов";
         }
 
         // ==========================================
