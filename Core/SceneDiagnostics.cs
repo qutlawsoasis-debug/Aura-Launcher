@@ -184,8 +184,8 @@ public static class SceneDiagnostics
             // Сохраняем также scene.png для совместимости
             File.Copy(playPng, Path.Combine(debugDir, "scene.png"), true);
 
-            // Копируем снимки в папку артефактов
-            string artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\505ea531-6b09-4125-a4ba-b001f45a6b91";
+            // Копируем снимки в папку снимков (из --shots-dir или %TEMP%\AuraShots)
+            string artifactDir = ResolveShotsDir();
             try
             {
                 File.Copy(emptyPlayPng, Path.Combine(artifactDir, "tab_play_empty.png"), true);
@@ -373,5 +373,37 @@ public static class SceneDiagnostics
             App.Log($"[SELFTEST: ERROR] Exception during selftest shots: {ex}");
             return false;
         }
+    }
+
+    private static string ResolveShotsDir()
+    {
+        var args = Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i].Equals("--shots-dir", StringComparison.OrdinalIgnoreCase))
+            {
+                var candidate = args[i + 1];
+                if (!string.IsNullOrWhiteSpace(candidate))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(candidate);
+                        return candidate;
+                    }
+                    catch
+                    {
+                        // Ignore and fallback
+                    }
+                }
+            }
+        }
+
+        string tempDir = Path.Combine(Path.GetTempPath(), "AuraShots");
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+        }
+        catch { }
+        return tempDir;
     }
 }
