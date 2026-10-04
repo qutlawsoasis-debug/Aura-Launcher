@@ -9,6 +9,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -69,7 +71,16 @@ namespace AuraLauncher
         {
             ApplyWindows11MicaOrAcrylic();
             LoadConfig();
+            LoadModsList();
             await CheckForUpdatesAsync();
+        }
+
+        private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                DragMove();
+            }
         }
 
         private void ApplyWindows11MicaOrAcrylic()
@@ -101,7 +112,13 @@ namespace AuraLauncher
                 catch { }
             }
 
-            TxtNickname.Text = string.IsNullOrWhiteSpace(_config.Nickname) ? "Player" : _config.Nickname;
+            var nick = string.IsNullOrWhiteSpace(_config.Nickname) ? "Player" : _config.Nickname;
+            TxtSettingsNick.Text = nick;
+            TxtSidebarNick.Text = nick;
+            TxtSkinNickPreview.Text = nick;
+
+            TxtGitHubRepo.Text = string.IsNullOrWhiteSpace(_config.GitHubRepo) ? "qutlawsoasis-debug/Aura" : _config.GitHubRepo;
+            TxtGameDir.Text = FindMinecraftDir();
 
             switch (_config.RamMb)
             {
@@ -111,21 +128,15 @@ namespace AuraLauncher
                 default: RbRam6.IsChecked = true; break;
             }
 
-            if (!string.IsNullOrEmpty(_config.SkinPath) && File.Exists(_config.SkinPath))
-            {
-                RenderSkinFace(_config.SkinPath);
-            }
-            else
-            {
-                RenderDefaultFace();
-            }
+            UpdateSkinModelPreview(_config.SkinPath);
         }
 
         private void SaveConfig()
         {
             try
             {
-                _config.Nickname = TxtNickname.Text.Trim();
+                _config.Nickname = TxtSettingsNick.Text.Trim();
+                _config.GitHubRepo = TxtGitHubRepo.Text.Trim();
                 var json = JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(_configPath, json);
             }
@@ -149,14 +160,29 @@ namespace AuraLauncher
             Close();
         }
 
-        private void TxtNickname_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        private void Nav_Click(object sender, RoutedEventArgs e)
         {
-            _config.Nickname = TxtNickname.Text.Trim();
+            if (sender is RadioButton rb && rb.Tag is string tag)
+            {
+                TabPlay.Visibility = tag == "TabPlay" ? Visibility.Visible : Visibility.Collapsed;
+                TabSkin.Visibility = tag == "TabSkin" ? Visibility.Visible : Visibility.Collapsed;
+                TabMods.Visibility = tag == "TabMods" ? Visibility.Visible : Visibility.Collapsed;
+                TabSettings.Visibility = tag == "TabSettings" ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        private void TxtNickname_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var nick = TxtSettingsNick.Text.Trim();
+            if (string.IsNullOrEmpty(nick)) nick = "Player";
+            _config.Nickname = nick;
+            TxtSidebarNick.Text = nick;
+            TxtSkinNickPreview.Text = nick;
         }
 
         private void RamRadio_Checked(object sender, RoutedEventArgs e)
         {
-            if (sender is System.Windows.Controls.RadioButton rb && rb.Tag != null)
+            if (sender is RadioButton rb && rb.Tag != null)
             {
                 if (int.TryParse(rb.Tag.ToString(), out int ram))
                 {
@@ -165,9 +191,39 @@ namespace AuraLauncher
             }
         }
 
+        private void BtnOpenGameDir_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dir = TxtGameDir.Text;
+                if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = dir,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+
+        private async void BtnSaveSettings_Click(object sender, RoutedEventArgs e)
+        {
+            SaveConfig();
+            TxtSettingsStatus.Visibility = Visibility.Visible;
+            await Task.Delay(2000);
+            TxtSettingsStatus.Visibility = Visibility.Collapsed;
+        }
+
         // ==========================================
-        // SKIN SYSTEM
+        // SKIN SYSTEM & FULL-BODY RENDERING
         // ==========================================
+        private void UpdateSkinModelPreview(string? skinPath)
+        {
+            var modelImg = CreateFullBodyModel(skinPath);
+            ImgBodyModel.Source = modelImg;
+            ImgWardrobeModel.Source = modelImg;
+        }
+
         private void BtnChangeSkin_Click(object sender, RoutedEventArgs e)
         {
             var ofd = new OpenFileDialog
@@ -181,7 +237,7 @@ namespace AuraLauncher
                 try
                 {
                     _config.SkinPath = ofd.FileName;
-                    RenderSkinFace(_config.SkinPath);
+                    UpdateSkinModelPreview(_config.SkinPath);
                     SyncSkinToGame(_config.SkinPath);
                     SaveConfig();
                 }
@@ -192,72 +248,23 @@ namespace AuraLauncher
             }
         }
 
-        private void RenderSkinFace(string skinFilePath)
+        private void BtnResetSteve_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(skinFilePath);
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.EndInit();
+                _config.SkinPath = "";
+                UpdateSkinModelPreview(null);
 
-                var headRect = new Int32Rect(8, 8, 8, 8);
-                var hatRect = new Int32Rect(40, 8, 8, 8);
-
-                var headCropped = new CroppedBitmap(bitmap, headRect);
-                CroppedBitmap? hatCropped = null;
-
-                if (bitmap.PixelWidth >= 48)
+                // Copy default steve.png to game skin directory
+                var stevePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
+                if (File.Exists(stevePath))
                 {
-                    try { hatCropped = new CroppedBitmap(bitmap, hatRect); } catch { }
+                    SyncSkinToGame(stevePath);
                 }
 
-                var dv = new DrawingVisual();
-                using (var dc = dv.RenderOpen())
-                {
-                    dc.DrawImage(headCropped, new Rect(0, 0, 88, 88));
-                    if (hatCropped != null)
-                    {
-                        dc.DrawImage(hatCropped, new Rect(0, 0, 88, 88));
-                    }
-                }
-
-                var rtb = new RenderTargetBitmap(88, 88, 96, 96, PixelFormats.Pbgra32);
-                rtb.Render(dv);
-                ImgSkinFace.Source = rtb;
+                SaveConfig();
             }
-            catch
-            {
-                RenderDefaultFace();
-            }
-        }
-
-        private void RenderDefaultFace()
-        {
-            // Classic pixel-art Steve face (8x8 rendered at 88x88 with NearestNeighbor)
-            uint[] steve = new uint[64] {
-                0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12,
-                0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12, 0xFF2B1D12,
-                0xFF2B1D12, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFF2B1D12,
-                0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFFB78263,
-                0xFFB78263, 0xFFFFFFFF, 0xFF293282, 0xFFB78263, 0xFFB78263, 0xFF293282, 0xFFFFFFFF, 0xFFB78263,
-                0xFFB78263, 0xFFB78263, 0xFFB78263, 0xFF975A3C, 0xFF975A3C, 0xFFB78263, 0xFFB78263, 0xFFB78263,
-                0xFFB78263, 0xFFB78263, 0xFF583622, 0xFF583622, 0xFF583622, 0xFF583622, 0xFFB78263, 0xFFB78263,
-                0xFFB78263, 0xFF583622, 0xFF583622, 0xFF583622, 0xFF583622, 0xFF583622, 0xFF583622, 0xFFB78263
-            };
-
-            var wb = new WriteableBitmap(8, 8, 96, 96, PixelFormats.Bgra32, null);
-            wb.WritePixels(new Int32Rect(0, 0, 8, 8), steve, 8 * 4, 0);
-
-            var dv = new DrawingVisual();
-            using (var dc = dv.RenderOpen())
-            {
-                dc.DrawImage(wb, new Rect(0, 0, 88, 88));
-            }
-            var rtb = new RenderTargetBitmap(88, 88, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(dv);
-            ImgSkinFace.Source = rtb;
+            catch { }
         }
 
         private void SyncSkinToGame(string skinFilePath)
@@ -273,6 +280,311 @@ namespace AuraLauncher
                 File.Copy(skinFilePath, targetPath, true);
             }
             catch { }
+        }
+
+        private ImageSource CreateFullBodyModel(string? skinPath)
+        {
+            BitmapSource? sourceBmp = null;
+            if (!string.IsNullOrEmpty(skinPath) && File.Exists(skinPath))
+            {
+                try
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(skinPath);
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.EndInit();
+                    sourceBmp = bmp;
+                }
+                catch { }
+            }
+
+            if (sourceBmp == null)
+            {
+                string stevePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
+                if (File.Exists(stevePath))
+                {
+                    try
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(stevePath);
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        sourceBmp = bmp;
+                    }
+                    catch { }
+                }
+            }
+
+            if (sourceBmp == null)
+            {
+                return new WriteableBitmap(160, 320, 96, 96, PixelFormats.Bgra32, null);
+            }
+
+            var conv = new FormatConvertedBitmap(sourceBmp, PixelFormats.Bgra32, null, 0);
+            int skinW = conv.PixelWidth;
+            int skinH = conv.PixelHeight;
+
+            uint[] skinPixels = new uint[skinW * skinH];
+            conv.CopyPixels(skinPixels, skinW * 4, 0);
+
+            uint[] canvas = new uint[16 * 32];
+
+            void Blit(int sx, int sy, int w, int h, int dx, int dy, bool flipX = false)
+            {
+                if (sx + w > skinW || sy + h > skinH) return;
+
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        int srcX = flipX ? (sx + w - 1 - x) : (sx + x);
+                        int srcY = sy + y;
+                        uint px = skinPixels[srcY * skinW + srcX];
+                        byte a = (byte)((px >> 24) & 0xFF);
+                        if (a == 0) continue;
+
+                        int dstX = dx + x;
+                        int dstY = dy + y;
+                        if (dstX < 0 || dstX >= 16 || dstY < 0 || dstY >= 32) continue;
+
+                        int dstIdx = dstY * 16 + dstX;
+                        if (a == 255)
+                        {
+                            canvas[dstIdx] = px;
+                        }
+                        else
+                        {
+                            uint dstPx = canvas[dstIdx];
+                            byte da = (byte)((dstPx >> 24) & 0xFF);
+                            byte dr = (byte)((dstPx >> 16) & 0xFF);
+                            byte dg = (byte)((dstPx >> 8) & 0xFF);
+                            byte db = (byte)(dstPx & 0xFF);
+
+                            byte sr = (byte)((px >> 16) & 0xFF);
+                            byte sg = (byte)((px >> 8) & 0xFF);
+                            byte sb = (byte)(px & 0xFF);
+
+                            int inv = 255 - a;
+                            int oa = a + (da * inv) / 255;
+                            int or = (sr * a + dr * inv) / 255;
+                            int og = (sg * a + dg * inv) / 255;
+                            int ob = (sb * a + db * inv) / 255;
+
+                            canvas[dstIdx] = (uint)((oa << 24) | (or << 16) | (og << 8) | ob);
+                        }
+                    }
+                }
+            }
+
+            // Head (8,8,8,8) + Hat (40,8,8,8) at (4,0)
+            Blit(8, 8, 8, 8, 4, 0);
+            Blit(40, 8, 8, 8, 4, 0);
+
+            // Torso (20,20,8,12) + Jacket (20,36,8,12) at (4,8)
+            Blit(20, 20, 8, 12, 4, 8);
+            Blit(20, 36, 8, 12, 4, 8);
+
+            // Right Arm (44,20,4,12) + Sleeve (44,36,4,12) at (0,8)
+            Blit(44, 20, 4, 12, 0, 8);
+            Blit(44, 36, 4, 12, 0, 8);
+
+            // Left Arm
+            if (skinH >= 64)
+            {
+                Blit(36, 52, 4, 12, 12, 8);
+                Blit(52, 52, 4, 12, 12, 8);
+            }
+            else
+            {
+                Blit(44, 20, 4, 12, 12, 8, flipX: true);
+            }
+
+            // Right Leg
+            Blit(4, 20, 4, 12, 4, 20);
+            Blit(4, 36, 4, 12, 4, 20);
+
+            // Left Leg
+            if (skinH >= 64)
+            {
+                Blit(20, 52, 4, 12, 8, 20);
+                Blit(4, 52, 4, 12, 8, 20);
+            }
+            else
+            {
+                Blit(4, 20, 4, 12, 8, 20, flipX: true);
+            }
+
+            // Upscale 10x to 160x320 for razor-sharp rendering on all screens
+            uint[] scaled = new uint[160 * 320];
+            for (int y = 0; y < 320; y++)
+            {
+                int sy = y / 10;
+                int rowStart = y * 160;
+                int srcRowStart = sy * 16;
+                for (int x = 0; x < 160; x++)
+                {
+                    scaled[rowStart + x] = canvas[srcRowStart + (x / 10)];
+                }
+            }
+
+            var wb = new WriteableBitmap(160, 320, 96, 96, PixelFormats.Bgra32, null);
+            wb.WritePixels(new Int32Rect(0, 0, 160, 320), scaled, 160 * 4, 0);
+            wb.Freeze();
+            return wb;
+        }
+
+        // ==========================================
+        // MODS CATALOG
+        // ==========================================
+        private void LoadModsList()
+        {
+            PanelModsList.Children.Clear();
+            var mcDir = FindMinecraftDir();
+            var modsDir = Path.Combine(mcDir, "mods");
+
+            var modDetails = new Dictionary<string, (string Title, string Category, string Description)>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["sodium-fabric"] = ("Sodium", "Оптимизация", "Революционный графический движок, увеличивающий FPS в разы."),
+                ["iris"] = ("Iris Shaders", "Графика", "Современный движок шейдеров с поддержкой шейдеров OptiFine."),
+                ["lithium-fabric"] = ("Lithium", "Оптимизация", "Комплексная оптимизация игровой физики, мобов и чанков."),
+                ["ferritecore"] = ("FerriteCore", "Память", "Снижает потребление оперативной памяти Minecraft до 50%."),
+                ["modernfix"] = ("ModernFix", "Оптимизация", "Устраняет утечки памяти и ускоряет время запуска игры."),
+                ["indium"] = ("Indium", "Графика", "Мост совместимости между Sodium и модами с кастомным рендером."),
+                ["immediatelyfast"] = ("ImmediatelyFast", "Оптимизация", "Оптимизация отрисовки интерфейса, текста и частиц."),
+                ["entityculling"] = ("Entity Culling", "Оптимизация", "Скрывает невидимых за стенами мобов для экономии FPS."),
+                ["krypton"] = ("Krypton", "Сеть", "Оптимизация сетевого стека для плавного мультиплеера."),
+                ["terralith"] = ("Terralith", "Мир", "Глобальная генерация 100+ новых ванильных биомов и пещер."),
+                ["tectonic"] = ("Tectonic", "Мир", "Массивные горные гряды, подземные реки и рельеф."),
+                ["ctov"] = ("CTOV (Villages)", "Деревни", "Капитальный редизайн деревень под каждый биом мира."),
+                ["guardvillagers"] = ("Guard Villagers", "Геймплей", "Жители-стражники с мечами и луками, защищающие деревни."),
+                ["travelersbackpack"] = ("Traveler's Backpack", "Снаряжение", "Удобные рюкзаки со спальниками и баками для жидкостей."),
+                ["waystones"] = ("Waystones", "Путешествия", "Путеводные камни для телепортации между поселениями."),
+                ["farmersdelight"] = ("Farmer's Delight", "Кулинария", "Расширенная кулинария, готовка в котлах, сковороды и блюда."),
+                ["treechop"] = ("TreeChop", "Геймплей", "Реалистичная рубка деревьев с динамической анимацией ствола."),
+                ["carryon"] = ("Carry On", "Геймплей", "Возможность переносить сундуки, животных и мелкие блоки в руках."),
+                ["artifacts"] = ("Artifacts", "Снаряжение", "Редкие ценные реликвии и аксессуары в сундуках подземелий."),
+                ["comforts"] = ("Comforts", "Геймплей", "Спальные мешки и гамаки для отдыха без смены точки спавна."),
+                ["appleskin"] = ("AppleSkin", "Интерфейс", "Показ насыщения и восстанавливаемого здоровья еды."),
+                ["jade"] = ("Jade (WAILA)", "Интерфейс", "Информативная плашка с описанием блока или моба под прицелом."),
+                ["zoomify"] = ("Zoomify", "Управление", "Плавный зум с кинематографическим приближением на C."),
+                ["modmenu"] = ("Mod Menu", "Интерфейс", "Главное меню модов и настроек конфигурации на ~ (тильду)."),
+                ["controlling"] = ("Controlling", "Интерфейс", "Поиск и удобное устранение конфликтов клавиш управления."),
+                ["customskinloader"] = ("CustomSkinLoader", "Скины", "Отображение HD и кастомных скинов без лицензии."),
+                ["sound-physics-remastered"] = ("Sound Physics", "Звук", "Реалистичная акустика, эхо в пещерах и реверберация."),
+                ["dungeons-and-taverns"] = ("Dungeons and Taverns", "Структуры", "Атмосферные таверны и интересные данжи для исследования."),
+                ["clumps"] = ("Clumps", "Оптимизация", "Объединение сфер опыта в один сгусток для устранения лагов."),
+                ["animated-doors"] = ("Animated Doors", "Анимация", "Плавная механика открытия дверей."),
+                ["short-grass"] = ("Short Grass", "Графика", "Аккуратная низкая трава для чистого обзора биомов."),
+                ["doubledoors"] = ("Double Doors", "Геймплей", "Одновременное открытие двойных дверей одним кликом."),
+                ["fallingleaves"] = ("Falling Leaves", "Атмосфера", "Опадающие с деревьев разноцветные листья."),
+                ["visuality"] = ("Visuality", "Атмосфера", "Красивые частицы искр, капель и ударов."),
+                ["eating-animation"] = ("Eating Animation", "Анимация", "Анимация откусывания еды в руке."),
+                ["notenoughanimations"] = ("Not Enough Animations", "Анимация", "Плавные движения персонажа от третьего лица.")
+            };
+
+            var jars = Directory.Exists(modsDir)
+                ? Directory.GetFiles(modsDir, "*.jar")
+                : Array.Empty<string>();
+
+            var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var jar in jars)
+            {
+                var fn = Path.GetFileName(jar);
+                string matchedKey = "";
+                foreach (var kvp in modDetails)
+                {
+                    if (fn.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        matchedKey = kvp.Key;
+                        break;
+                    }
+                }
+
+                if (matchedKey != "" && !processed.Contains(matchedKey))
+                {
+                    processed.Add(matchedKey);
+                    var info = modDetails[matchedKey];
+                    PanelModsList.Children.Add(CreateModItem(info.Title, info.Category, info.Description));
+                }
+                else if (matchedKey == "")
+                {
+                    var cleanTitle = Path.GetFileNameWithoutExtension(fn);
+                    PanelModsList.Children.Add(CreateModItem(cleanTitle, "Мод", fn));
+                }
+            }
+
+            if (PanelModsList.Children.Count == 0)
+            {
+                foreach (var kvp in modDetails)
+                {
+                    PanelModsList.Children.Add(CreateModItem(kvp.Value.Title, kvp.Value.Category, kvp.Value.Description));
+                }
+            }
+        }
+
+        private Border CreateModItem(string title, string category, string description)
+        {
+            var brd = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0x14, 0x18, 0x22)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x20, 0x27, 0x38)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Margin = new Thickness(0, 0, 0, 8),
+                Padding = new Thickness(14, 10, 14, 10)
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var sp = new StackPanel();
+            var tbTitle = new TextBlock
+            {
+                Text = title,
+                Foreground = Brushes.White,
+                FontSize = 13,
+                FontWeight = FontWeights.Bold
+            };
+            var tbDesc = new TextBlock
+            {
+                Text = description,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x94, 0xA3, 0xB8)),
+                FontSize = 11,
+                Margin = new Thickness(0, 2, 0, 0),
+                TextWrapping = TextWrapping.Wrap
+            };
+            sp.Children.Add(tbTitle);
+            sp.Children.Add(tbDesc);
+
+            var badge = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(40, 0x10, 0xB9, 0x81)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, 0x10, 0xB9, 0x81)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(8, 3, 8, 3),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var tbCat = new TextBlock
+            {
+                Text = category,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99)),
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold
+            };
+            badge.Child = tbCat;
+
+            Grid.SetColumn(sp, 0);
+            Grid.SetColumn(badge, 1);
+            grid.Children.Add(sp);
+            grid.Children.Add(badge);
+
+            brd.Child = grid;
+            return brd;
         }
 
         // ==========================================
@@ -318,6 +630,14 @@ namespace AuraLauncher
             if (!string.IsNullOrEmpty(_config.SkinPath) && File.Exists(_config.SkinPath))
             {
                 SyncSkinToGame(_config.SkinPath);
+            }
+            else
+            {
+                var stevePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
+                if (File.Exists(stevePath))
+                {
+                    SyncSkinToGame(stevePath);
+                }
             }
 
             try
@@ -434,7 +754,6 @@ namespace AuraLauncher
                         }
                     }
 
-                    // Extract cleanly
                     TxtTechnicalStatus.Text = "Распаковка сборки...";
                     var mcDir = FindMinecraftDir();
 
