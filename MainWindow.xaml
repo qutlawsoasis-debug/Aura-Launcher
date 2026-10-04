@@ -10,6 +10,7 @@
         AllowDrop="True"
         Drop="Window_Drop"
         DragOver="Window_DragOver"
+        Icon="app_icon.png"
         FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif">
 
     <WindowChrome.WindowChrome>
@@ -144,9 +145,12 @@
                         <!-- Controls -->
                     </Grid.ColumnDefinitions>
 
-                    <!-- Clean Brand Header -->
+                    <!-- Clean Brand Header with App Icon -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="A  U  R  A" FontSize="19" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                        <Border Width="24" Height="24" CornerRadius="6" ClipToBounds="True" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <Image Source="app_icon.png" Width="24" Height="24" />
+                        </Border>
+                        <TextBlock Text="A  U  R  A" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                     </StackPanel>
 
                     <!-- Center Floating Island (Capsule) -->
