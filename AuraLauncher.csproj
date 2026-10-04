@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <Resource Include="app_icon.png" />
+    <Resource Include="app_icon.ico" />
     <Resource Include="bg_world.png" />
     <Resource Include="steve.png" />
   </ItemGroup>

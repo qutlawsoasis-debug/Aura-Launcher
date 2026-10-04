@@ -10,7 +10,7 @@
         AllowDrop="True"
         Drop="Window_Drop"
         DragOver="Window_DragOver"
-        Icon="app_icon.png"
+        Icon="app_icon.ico"
         FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system, sans-serif">
 
     <WindowChrome.WindowChrome>
