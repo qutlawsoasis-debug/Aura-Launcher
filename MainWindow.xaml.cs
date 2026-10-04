@@ -14,6 +14,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 using Microsoft.Win32;
 
@@ -30,10 +31,9 @@ namespace AuraLauncher
 
     public class ModItemInfo
     {
-        public string Title { get; set; } = "";
+        public string Name { get; set; } = "";
         public string Category { get; set; } = "";
         public string Description { get; set; } = "";
-        public Color CategoryColor { get; set; } = Color.FromRgb(0x10, 0xB9, 0x81);
     }
 
     public partial class MainWindow : Window
@@ -52,11 +52,15 @@ namespace AuraLauncher
         private int _quoteIndex = 0;
         private readonly List<ModItemInfo> _allMods = new();
 
+        // 3D Mouse Drag Rotation
+        private Point _last3DMousePos;
+        private bool _isDragging3D = false;
+
         private readonly string[] _csQuotes = new[]
         {
             "Заряжаем пули...",
             "Снаряжаем деревенских стражников мечами...",
-            "Калибруем шейдерные лучи...",
+            "Калибруем шейдерные лучи MakeUp...",
             "Выращиваем горные хребты Terralith...",
             "Смазываем петли анимированных дверей...",
             "Упаковываем спальники в рюкзаки...",
@@ -81,6 +85,7 @@ namespace AuraLauncher
             ApplyWindows11MicaOrAcrylic();
             LoadConfig();
             LoadModsList();
+            ShowView("Overview");
             await CheckForUpdatesAsync();
         }
 
@@ -103,59 +108,35 @@ namespace AuraLauncher
                 int cornerPref = 2; // Round
                 DwmSetWindowAttribute(helper.Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPref, sizeof(int));
 
-                int backdropType = 3; // 3 = Acrylic, 2 = Mica
+                int backdropType = 3; // 3 = Acrylic
                 DwmSetWindowAttribute(helper.Handle, DWMWA_SYSTEMBACKDROP_TYPE, ref backdropType, sizeof(int));
             }
             catch { }
         }
 
-        private void LoadConfig()
+        // ==========================================
+        // TAB NAVIGATION
+        // ==========================================
+        private void NavOverview_Click(object sender, RoutedEventArgs e) => ShowView("Overview");
+        private void NavMods_Click(object sender, RoutedEventArgs e) => ShowView("Mods");
+        private void NavWardrobe_Click(object sender, RoutedEventArgs e) => ShowView("Wardrobe");
+        private void NavSettings_Click(object sender, RoutedEventArgs e) => ShowView("Settings");
+        private void BtnDockNick_Click(object sender, MouseButtonEventArgs e) => ShowView("Wardrobe");
+
+        private void ShowView(string viewName)
         {
-            if (File.Exists(_configPath))
-            {
-                try
-                {
-                    var json = File.ReadAllText(_configPath);
-                    _config = JsonSerializer.Deserialize<LauncherConfig>(json) ?? new LauncherConfig();
-                }
-                catch { }
-            }
+            ViewOverview.Visibility = viewName == "Overview" ? Visibility.Visible : Visibility.Collapsed;
+            ViewMods.Visibility = viewName == "Mods" ? Visibility.Visible : Visibility.Collapsed;
+            ViewWardrobe.Visibility = viewName == "Wardrobe" ? Visibility.Visible : Visibility.Collapsed;
+            ViewSettings.Visibility = viewName == "Settings" ? Visibility.Visible : Visibility.Collapsed;
 
-            var nick = string.IsNullOrWhiteSpace(_config.Nickname) ? "Player" : _config.Nickname;
-            TxtSettingsNick.Text = nick;
-            TxtDockNick.Text = nick;
-            TxtWardrobeNick.Text = nick;
+            var activeCol = (SolidColorBrush)new BrushConverter().ConvertFromString("#FFFFFF")!;
+            var inactiveCol = (SolidColorBrush)new BrushConverter().ConvertFromString("#94A3B8")!;
 
-            TxtGitHubRepo.Text = string.IsNullOrWhiteSpace(_config.GitHubRepo) ? "qutlawsoasis-debug/Aura" : _config.GitHubRepo;
-            TxtGameDir.Text = FindMinecraftDir();
-
-            switch (_config.RamMb)
-            {
-                case 4096: RbRam4.IsChecked = true; break;
-                case 8192: RbRam8.IsChecked = true; break;
-                case 12288: RbRam12.IsChecked = true; break;
-                default: RbRam6.IsChecked = true; break;
-            }
-
-            UpdateSkinModelPreview(_config.SkinPath);
-        }
-
-        private void SaveConfig()
-        {
-            try
-            {
-                _config.Nickname = TxtSettingsNick.Text.Trim();
-                _config.GitHubRepo = TxtGitHubRepo.Text.Trim();
-                var json = JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_configPath, json);
-            }
-            catch { }
-        }
-
-        private void NextQuote()
-        {
-            _quoteIndex = (_quoteIndex + 1) % _csQuotes.Length;
-            TxtWittyQuote.Text = _csQuotes[_quoteIndex];
+            TabBtnOverview.Foreground = viewName == "Overview" ? activeCol : inactiveCol;
+            TabBtnMods.Foreground = viewName == "Mods" ? activeCol : inactiveCol;
+            TabBtnWardrobe.Foreground = viewName == "Wardrobe" ? activeCol : inactiveCol;
+            TabBtnSettings.Foreground = viewName == "Settings" ? activeCol : inactiveCol;
         }
 
         private void BtnMinimize_Click(object sender, RoutedEventArgs e)
@@ -170,55 +151,63 @@ namespace AuraLauncher
         }
 
         // ==========================================
-        // FLOATING SHEET MODALS (APPLE HIG)
+        // CONFIG & PERSISTENCE
         // ==========================================
-        private void BtnOpenSkinSheet_Click(object sender, RoutedEventArgs e)
+        private void LoadConfig()
         {
-            OpenSheet("Гардероб", SheetSkin);
+            if (File.Exists(_configPath))
+            {
+                try
+                {
+                    var json = File.ReadAllText(_configPath);
+                    _config = JsonSerializer.Deserialize<LauncherConfig>(json) ?? new LauncherConfig();
+                }
+                catch { }
+            }
+
+            var nick = string.IsNullOrWhiteSpace(_config.Nickname) ? "Player" : _config.Nickname;
+            TxtDockNick.Text = nick;
+            TxtWardrobeNick.Text = nick;
+
+            TxtGitHubRepo.Text = string.IsNullOrWhiteSpace(_config.GitHubRepo) ? "qutlawsoasis-debug/Aura" : _config.GitHubRepo;
+            TxtGameDir.Text = FindMinecraftDir();
+
+            switch (_config.RamMb)
+            {
+                case 4096: RbRam4.IsChecked = true; break;
+                case 8192: RbRam8.IsChecked = true; break;
+                case 12288: RbRam12.IsChecked = true; break;
+                default: RbRam6.IsChecked = true; break;
+            }
+            UpdateRamDisplay(_config.RamMb);
+
+            UpdateSkinModelPreview(_config.SkinPath);
         }
 
-        private void BtnOpenModsSheet_Click(object sender, RoutedEventArgs e)
+        private void SaveConfig()
         {
-            OpenSheet("Модификации (45)", SheetMods);
+            try
+            {
+                _config.Nickname = TxtWardrobeNick.Text.Trim();
+                _config.GitHubRepo = TxtGitHubRepo.Text.Trim();
+                var json = JsonSerializer.Serialize(_config, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(_configPath, json);
+            }
+            catch { }
         }
 
-        private void BtnOpenSettingsSheet_Click(object sender, RoutedEventArgs e)
+        private void NextQuote()
         {
-            OpenSheet("Настройки", SheetSettings);
-        }
-
-        private void OpenSheet(string title, FrameworkElement activeContent)
-        {
-            TxtSheetTitle.Text = title;
-            SheetSkin.Visibility = Visibility.Collapsed;
-            SheetMods.Visibility = Visibility.Collapsed;
-            SheetSettings.Visibility = Visibility.Collapsed;
-            activeContent.Visibility = Visibility.Visible;
-            OverlayScrim.Visibility = Visibility.Visible;
-        }
-
-        private void BtnCloseSheet_Click(object sender, RoutedEventArgs e)
-        {
-            OverlayScrim.Visibility = Visibility.Collapsed;
-        }
-
-        private void OverlayScrim_Click(object sender, MouseButtonEventArgs e)
-        {
-            OverlayScrim.Visibility = Visibility.Collapsed;
-        }
-
-        private void SheetContainer_Click(object sender, MouseButtonEventArgs e)
-        {
-            e.Handled = true; // prevent scrim from closing when clicking inside
+            _quoteIndex = (_quoteIndex + 1) % _csQuotes.Length;
+            TxtWittyQuote.Text = _csQuotes[_quoteIndex];
         }
 
         private void TxtNickname_TextChanged(object sender, TextChangedEventArgs e)
         {
-            var nick = TxtSettingsNick.Text.Trim();
+            var nick = TxtWardrobeNick.Text.Trim();
             if (string.IsNullOrEmpty(nick)) nick = "Player";
             _config.Nickname = nick;
             TxtDockNick.Text = nick;
-            TxtWardrobeNick.Text = nick;
         }
 
         private void RamRadio_Checked(object sender, RoutedEventArgs e)
@@ -228,7 +217,16 @@ namespace AuraLauncher
                 if (int.TryParse(rb.Tag.ToString(), out int ram))
                 {
                     _config.RamMb = ram;
+                    UpdateRamDisplay(ram);
                 }
+            }
+        }
+
+        private void UpdateRamDisplay(int ram)
+        {
+            if (TxtDockRam != null)
+            {
+                TxtDockRam.Text = $"{ram / 1024} ГБ ОЗУ";
             }
         }
 
@@ -247,6 +245,22 @@ namespace AuraLauncher
             catch { }
         }
 
+        private void BtnOpenModsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var mcDir = FindMinecraftDir();
+                var modsDir = Path.Combine(mcDir, "mods");
+                if (!Directory.Exists(modsDir)) Directory.CreateDirectory(modsDir);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = modsDir,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+
         private async void BtnSaveSettings_Click(object sender, RoutedEventArgs e)
         {
             SaveConfig();
@@ -256,7 +270,38 @@ namespace AuraLauncher
         }
 
         // ==========================================
-        // DRAG & DROP SKIN SUPPORT
+        // 3D MOUSE ROTATION (DRAG TO ROTATE)
+        // ==========================================
+        private void Viewport3D_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _isDragging3D = true;
+            _last3DMousePos = e.GetPosition(this);
+            ((UIElement)sender).CaptureMouse();
+        }
+
+        private void Viewport3D_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isDragging3D)
+            {
+                var pos = e.GetPosition(this);
+                double dx = pos.X - _last3DMousePos.X;
+                double deltaAngle = dx * 0.9;
+
+                CharacterRotation.Angle = (CharacterRotation.Angle + deltaAngle) % 360;
+                WardrobeRotation.Angle = (WardrobeRotation.Angle + deltaAngle) % 360;
+
+                _last3DMousePos = pos;
+            }
+        }
+
+        private void Viewport3D_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _isDragging3D = false;
+            ((UIElement)sender).ReleaseMouseCapture();
+        }
+
+        // ==========================================
+        // DRAG & DROP SKIN
         // ==========================================
         private void Window_DragOver(object sender, DragEventArgs e)
         {
@@ -287,8 +332,6 @@ namespace AuraLauncher
                         UpdateSkinModelPreview(_config.SkinPath);
                         SyncSkinToGame(_config.SkinPath);
                         SaveConfig();
-
-                        OpenSheet("Гардероб", SheetSkin);
                     }
                     catch { }
                 }
@@ -296,16 +339,285 @@ namespace AuraLauncher
         }
 
         // ==========================================
-        // SKIN SYSTEM & FULL-BODY RENDERING
+        // REAL 3D MINECRAFT MODEL & SKIN PREVIEW
         // ==========================================
         private void UpdateSkinModelPreview(string? skinPath)
         {
-            var (modelImg, miniFace, desc) = CreateModelAndMiniFace(skinPath);
-            ImgBodyModel.Source = modelImg;
-            ImgBodyReflection.Source = modelImg;
-            ImgWardrobeModel.Source = modelImg;
+            BitmapSource? sourceBmp = null;
+            string desc = "Классический Стив (64×64)";
+
+            if (!string.IsNullOrEmpty(skinPath) && File.Exists(skinPath))
+            {
+                try
+                {
+                    var bmp = new BitmapImage();
+                    bmp.BeginInit();
+                    bmp.UriSource = new Uri(skinPath);
+                    bmp.CacheOption = BitmapCacheOption.OnLoad;
+                    bmp.EndInit();
+                    sourceBmp = bmp;
+                    desc = $"{Path.GetFileName(skinPath)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
+                }
+                catch { }
+            }
+
+            if (sourceBmp == null)
+            {
+                try
+                {
+                    var uri = new Uri("pack://application:,,,/steve.png");
+                    var streamInfo = Application.GetResourceStream(uri);
+                    if (streamInfo != null)
+                    {
+                        using var s = streamInfo.Stream;
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = s;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        sourceBmp = bmp;
+                    }
+                }
+                catch { }
+            }
+
+            if (sourceBmp == null)
+            {
+                string stevePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
+                if (File.Exists(stevePath))
+                {
+                    try
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(stevePath);
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        sourceBmp = bmp;
+                    }
+                    catch { }
+                }
+            }
+
+            if (sourceBmp == null) return;
+
+            // 1. Build 3D Mesh and apply material
+            var mesh = BuildCharacter3DMesh(sourceBmp);
+            var brush = new ImageBrush(sourceBmp)
+            {
+                TileMode = TileMode.None,
+                Stretch = Stretch.Fill
+            };
+            RenderOptions.SetBitmapScalingMode(brush, BitmapScalingMode.NearestNeighbor);
+            RenderOptions.SetEdgeMode(brush, EdgeMode.Aliased);
+
+            var material = new DiffuseMaterial(brush);
+            CharacterBodyModel.Geometry = mesh;
+            CharacterBodyModel.Material = material;
+            CharacterBodyModel.BackMaterial = material;
+
+            WardrobeBodyModel.Geometry = mesh;
+            WardrobeBodyModel.Material = material;
+            WardrobeBodyModel.BackMaterial = material;
+
+            // 2. Generate Mini Face for dock
+            var miniFace = ExtractMiniFace(sourceBmp);
             ImgDockFace.Source = miniFace;
             TxtWardrobeFormat.Text = desc;
+        }
+
+        private MeshGeometry3D BuildCharacter3DMesh(BitmapSource skinBmp)
+        {
+            var mesh = new MeshGeometry3D();
+            int skinW = skinBmp.PixelWidth;
+            int skinH = skinBmp.PixelHeight;
+            bool is64x64 = skinH >= 64;
+
+            // 1. Head (x: -4..4, y: 24..32, z: -4..4)
+            AddBox(mesh, -4, 24, -4, 8, 8, 8, 0, 0, 8, 8, 8, skinW, skinH);
+            // Hat outer layer
+            AddBox(mesh, -4.5, 23.5, -4.5, 9, 9, 9, 32, 0, 8, 8, 8, skinW, skinH);
+
+            // 2. Torso (x: -4..4, y: 12..24, z: -2..2)
+            AddBox(mesh, -4, 12, -2, 8, 12, 4, 16, 16, 8, 12, 4, skinW, skinH);
+            // Jacket outer layer
+            if (is64x64)
+            {
+                AddBox(mesh, -4.3, 11.7, -2.3, 8.6, 12.6, 4.6, 16, 32, 8, 12, 4, skinW, skinH);
+            }
+
+            // 3. Right Arm (x: -8..-4, y: 12..24, z: -2..2)
+            AddBox(mesh, -8, 12, -2, 4, 12, 4, 40, 16, 4, 12, 4, skinW, skinH);
+            if (is64x64)
+            {
+                AddBox(mesh, -8.3, 11.7, -2.3, 4.6, 12.6, 4.6, 40, 32, 4, 12, 4, skinW, skinH);
+            }
+
+            // 4. Left Arm (x: 4..8, y: 12..24, z: -2..2)
+            int laU = is64x64 ? 32 : 40;
+            int laV = is64x64 ? 48 : 16;
+            AddBox(mesh, 4, 12, -2, 4, 12, 4, laU, laV, 4, 12, 4, skinW, skinH);
+            if (is64x64)
+            {
+                AddBox(mesh, 3.7, 11.7, -2.3, 4.6, 12.6, 4.6, 48, 48, 4, 12, 4, skinW, skinH);
+            }
+
+            // 5. Right Leg (x: -4..0, y: 0..12, z: -2..2)
+            AddBox(mesh, -4, 0, -2, 4, 12, 4, 0, 16, 4, 12, 4, skinW, skinH);
+            if (is64x64)
+            {
+                AddBox(mesh, -4.3, -0.3, -2.3, 4.6, 12.6, 4.6, 0, 32, 4, 12, 4, skinW, skinH);
+            }
+
+            // 6. Left Leg (x: 0..4, y: 0..12, z: -2..2)
+            int llU = is64x64 ? 16 : 0;
+            int llV = is64x64 ? 48 : 16;
+            AddBox(mesh, 0, 0, -2, 4, 12, 4, llU, llV, 4, 12, 4, skinW, skinH);
+            if (is64x64)
+            {
+                AddBox(mesh, -0.3, -0.3, -2.3, 4.6, 12.6, 4.6, 0, 48, 4, 12, 4, skinW, skinH);
+            }
+
+            return mesh;
+        }
+
+        private static void AddBox(
+            MeshGeometry3D mesh,
+            double x, double y, double z,
+            double dx, double dy, double dz,
+            int u, int v, int w, int h, int d,
+            int texW, int texH)
+        {
+            double x0 = x, x1 = x + dx;
+            double y0 = y, y1 = y + dy;
+            double z0 = z, z1 = z + dz;
+
+            // 1. Top face (+Y)
+            AddQuad(mesh,
+                new Point3D(x0, y1, z1), new Point3D(x1, y1, z1), new Point3D(x1, y1, z0), new Point3D(x0, y1, z0),
+                u + d, v, u + d + w, v + d, texW, texH);
+
+            // 2. Bottom face (-Y)
+            AddQuad(mesh,
+                new Point3D(x0, y0, z0), new Point3D(x1, y0, z0), new Point3D(x1, y0, z1), new Point3D(x0, y0, z1),
+                u + d + w, v, u + d + 2 * w, v + d, texW, texH);
+
+            // 3. Right face (-X, player's right)
+            AddQuad(mesh,
+                new Point3D(x0, y0, z0), new Point3D(x0, y0, z1), new Point3D(x0, y1, z1), new Point3D(x0, y1, z0),
+                u, v + d, u + d, v + d + h, texW, texH);
+
+            // 4. Front face (+Z)
+            AddQuad(mesh,
+                new Point3D(x0, y0, z1), new Point3D(x1, y0, z1), new Point3D(x1, y1, z1), new Point3D(x0, y1, z1),
+                u + d, v + d, u + d + w, v + d + h, texW, texH);
+
+            // 5. Left face (+X, player's left)
+            AddQuad(mesh,
+                new Point3D(x1, y0, z1), new Point3D(x1, y0, z0), new Point3D(x1, y1, z0), new Point3D(x1, y1, z1),
+                u + d + w, v + d, u + 2 * d + w, v + d + h, texW, texH);
+
+            // 6. Back face (-Z)
+            AddQuad(mesh,
+                new Point3D(x1, y0, z0), new Point3D(x0, y0, z0), new Point3D(x0, y1, z0), new Point3D(x1, y1, z0),
+                u + 2 * d + w, v + d, u + 2 * d + 2 * w, v + d + h, texW, texH);
+        }
+
+        private static void AddQuad(
+            MeshGeometry3D mesh,
+            Point3D p0, Point3D p1, Point3D p2, Point3D p3,
+            double u0, double v0, double u1, double v1,
+            int texW, int texH)
+        {
+            int baseIdx = mesh.Positions.Count;
+            mesh.Positions.Add(p0);
+            mesh.Positions.Add(p1);
+            mesh.Positions.Add(p2);
+            mesh.Positions.Add(p3);
+
+            double nu0 = u0 / texW;
+            double nv0 = v0 / texH;
+            double nu1 = u1 / texW;
+            double nv1 = v1 / texH;
+
+            mesh.TextureCoordinates.Add(new Point(nu0, nv1));
+            mesh.TextureCoordinates.Add(new Point(nu1, nv1));
+            mesh.TextureCoordinates.Add(new Point(nu1, nv0));
+            mesh.TextureCoordinates.Add(new Point(nu0, nv0));
+
+            mesh.TriangleIndices.Add(baseIdx);
+            mesh.TriangleIndices.Add(baseIdx + 1);
+            mesh.TriangleIndices.Add(baseIdx + 2);
+
+            mesh.TriangleIndices.Add(baseIdx);
+            mesh.TriangleIndices.Add(baseIdx + 2);
+            mesh.TriangleIndices.Add(baseIdx + 3);
+        }
+
+        private BitmapSource ExtractMiniFace(BitmapSource sourceBmp)
+        {
+            var conv = new FormatConvertedBitmap(sourceBmp, PixelFormats.Bgra32, null, 0);
+            int skinW = conv.PixelWidth;
+            int skinH = conv.PixelHeight;
+
+            uint[] skinPixels = new uint[skinW * skinH];
+            conv.CopyPixels(skinPixels, skinW * 4, 0);
+
+            uint[] face8x8 = new uint[8 * 8];
+            for (int y = 0; y < 8; y++)
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    int baseSrc = (8 + y) * skinW + (8 + x);
+                    uint px = skinPixels[baseSrc];
+
+                    if (skinW >= 48)
+                    {
+                        int hatSrc = (8 + y) * skinW + (40 + x);
+                        uint hatPx = skinPixels[hatSrc];
+                        byte hatA = (byte)((hatPx >> 24) & 0xFF);
+                        if (hatA == 255)
+                        {
+                            px = hatPx;
+                        }
+                        else if (hatA > 0)
+                        {
+                            byte da = (byte)((px >> 24) & 0xFF);
+                            byte dr = (byte)((px >> 16) & 0xFF);
+                            byte dg = (byte)((px >> 8) & 0xFF);
+                            byte db = (byte)(px & 0xFF);
+
+                            byte sr = (byte)((hatPx >> 16) & 0xFF);
+                            byte sg = (byte)((hatPx >> 8) & 0xFF);
+                            byte sb = (byte)(hatPx & 0xFF);
+
+                            int inv = 255 - hatA;
+                            int oa = hatA + (da * inv) / 255;
+                            int or = (sr * hatA + dr * inv) / 255;
+                            int og = (sg * hatA + dg * inv) / 255;
+                            int ob = (sb * hatA + db * inv) / 255;
+                            px = (uint)((oa << 24) | (or << 16) | (og << 8) | ob);
+                        }
+                    }
+
+                    face8x8[y * 8 + x] = px;
+                }
+            }
+
+            uint[] scaled36 = new uint[36 * 36];
+            for (int y = 0; y < 36; y++)
+            {
+                int sy = y * 8 / 36;
+                for (int x = 0; x < 36; x++)
+                {
+                    scaled36[y * 36 + x] = face8x8[sy * 8 + (x * 8 / 36)];
+                }
+            }
+
+            var wb = new WriteableBitmap(36, 36, 96, 96, PixelFormats.Bgra32, null);
+            wb.WritePixels(new Int32Rect(0, 0, 36, 36), scaled36, 36 * 4, 0);
+            wb.Freeze();
+            return wb;
         }
 
         private void BtnChangeSkin_Click(object sender, RoutedEventArgs e)
@@ -385,436 +697,83 @@ namespace AuraLauncher
             catch { }
         }
 
-        private (ImageSource FullModel, ImageSource MiniFace, string Description) CreateModelAndMiniFace(string? skinPath)
-        {
-            BitmapSource? sourceBmp = null;
-            string desc = "Классический Стив (64×64)";
-
-            if (!string.IsNullOrEmpty(skinPath) && File.Exists(skinPath))
-            {
-                try
-                {
-                    var bmp = new BitmapImage();
-                    bmp.BeginInit();
-                    bmp.UriSource = new Uri(skinPath);
-                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.EndInit();
-                    sourceBmp = bmp;
-                    desc = $"{Path.GetFileName(skinPath)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
-                }
-                catch { }
-            }
-
-            if (sourceBmp == null)
-            {
-                try
-                {
-                    var uri = new Uri("pack://application:,,,/steve.png");
-                    var streamInfo = Application.GetResourceStream(uri);
-                    if (streamInfo != null)
-                    {
-                        using var s = streamInfo.Stream;
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.StreamSource = s;
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.EndInit();
-                        sourceBmp = bmp;
-                    }
-                }
-                catch { }
-            }
-
-            if (sourceBmp == null)
-            {
-                string stevePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
-                if (File.Exists(stevePath))
-                {
-                    try
-                    {
-                        var bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.UriSource = new Uri(stevePath);
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.EndInit();
-                        sourceBmp = bmp;
-                    }
-                    catch { }
-                }
-            }
-
-            if (sourceBmp == null)
-            {
-                var blank = new WriteableBitmap(160, 320, 96, 96, PixelFormats.Bgra32, null);
-                var blankMini = new WriteableBitmap(32, 32, 96, 96, PixelFormats.Bgra32, null);
-                return (blank, blankMini, desc);
-            }
-
-            var conv = new FormatConvertedBitmap(sourceBmp, PixelFormats.Bgra32, null, 0);
-            int skinW = conv.PixelWidth;
-            int skinH = conv.PixelHeight;
-
-            uint[] skinPixels = new uint[skinW * skinH];
-            conv.CopyPixels(skinPixels, skinW * 4, 0);
-
-            // 1. FULL BODY MODEL (16x32 -> 160x320)
-            uint[] canvas = new uint[16 * 32];
-
-            void Blit(int sx, int sy, int w, int h, int dx, int dy, bool flipX = false)
-            {
-                if (sx + w > skinW || sy + h > skinH) return;
-
-                for (int y = 0; y < h; y++)
-                {
-                    for (int x = 0; x < w; x++)
-                    {
-                        int srcX = flipX ? (sx + w - 1 - x) : (sx + x);
-                        int srcY = sy + y;
-                        uint px = skinPixels[srcY * skinW + srcX];
-                        byte a = (byte)((px >> 24) & 0xFF);
-                        if (a == 0) continue;
-
-                        int dstX = dx + x;
-                        int dstY = dy + y;
-                        if (dstX < 0 || dstX >= 16 || dstY < 0 || dstY >= 32) continue;
-
-                        int dstIdx = dstY * 16 + dstX;
-                        if (a == 255)
-                        {
-                            canvas[dstIdx] = px;
-                        }
-                        else
-                        {
-                            uint dstPx = canvas[dstIdx];
-                            byte da = (byte)((dstPx >> 24) & 0xFF);
-                            byte dr = (byte)((dstPx >> 16) & 0xFF);
-                            byte dg = (byte)((dstPx >> 8) & 0xFF);
-                            byte db = (byte)(dstPx & 0xFF);
-
-                            byte sr = (byte)((px >> 16) & 0xFF);
-                            byte sg = (byte)((px >> 8) & 0xFF);
-                            byte sb = (byte)(px & 0xFF);
-
-                            int inv = 255 - a;
-                            int oa = a + (da * inv) / 255;
-                            int or = (sr * a + dr * inv) / 255;
-                            int og = (sg * a + dg * inv) / 255;
-                            int ob = (sb * a + db * inv) / 255;
-
-                            canvas[dstIdx] = (uint)((oa << 24) | (or << 16) | (og << 8) | ob);
-                        }
-                    }
-                }
-            }
-
-            // Head (8,8,8,8) + Hat (40,8,8,8) at (4,0)
-            Blit(8, 8, 8, 8, 4, 0);
-            Blit(40, 8, 8, 8, 4, 0);
-
-            // Torso (20,20,8,12) + Jacket (20,36,8,12) at (4,8)
-            Blit(20, 20, 8, 12, 4, 8);
-            Blit(20, 36, 8, 12, 4, 8);
-
-            // Right Arm (44,20,4,12) + Sleeve (44,36,4,12) at (0,8)
-            Blit(44, 20, 4, 12, 0, 8);
-            Blit(44, 36, 4, 12, 0, 8);
-
-            // Left Arm
-            if (skinH >= 64)
-            {
-                Blit(36, 52, 4, 12, 12, 8);
-                Blit(52, 52, 4, 12, 12, 8);
-            }
-            else
-            {
-                Blit(44, 20, 4, 12, 12, 8, flipX: true);
-            }
-
-            // Right Leg
-            Blit(4, 20, 4, 12, 4, 20);
-            Blit(4, 36, 4, 12, 4, 20);
-
-            // Left Leg
-            if (skinH >= 64)
-            {
-                Blit(20, 52, 4, 12, 8, 20);
-                Blit(4, 52, 4, 12, 8, 20);
-            }
-            else
-            {
-                Blit(4, 20, 4, 12, 8, 20, flipX: true);
-            }
-
-            // Upscale 10x to 160x320
-            uint[] scaled = new uint[160 * 320];
-            for (int y = 0; y < 320; y++)
-            {
-                int sy = y / 10;
-                int rowStart = y * 160;
-                int srcRowStart = sy * 16;
-                for (int x = 0; x < 160; x++)
-                {
-                    scaled[rowStart + x] = canvas[srcRowStart + (x / 10)];
-                }
-            }
-
-            var wbFull = new WriteableBitmap(160, 320, 96, 96, PixelFormats.Bgra32, null);
-            wbFull.WritePixels(new Int32Rect(0, 0, 160, 320), scaled, 160 * 4, 0);
-            wbFull.Freeze();
-
-            // 2. MINI HEAD FACE (8x8 -> 32x32)
-            uint[] face8x8 = new uint[8 * 8];
-            for (int y = 0; y < 8; y++)
-            {
-                for (int x = 0; x < 8; x++)
-                {
-                    int baseSrc = (8 + y) * skinW + (8 + x);
-                    uint px = skinPixels[baseSrc];
-
-                    if (skinW >= 48)
-                    {
-                        int hatSrc = (8 + y) * skinW + (40 + x);
-                        uint hatPx = skinPixels[hatSrc];
-                        byte hatA = (byte)((hatPx >> 24) & 0xFF);
-                        if (hatA == 255)
-                        {
-                            px = hatPx;
-                        }
-                        else if (hatA > 0)
-                        {
-                            byte da = (byte)((px >> 24) & 0xFF);
-                            byte dr = (byte)((px >> 16) & 0xFF);
-                            byte dg = (byte)((px >> 8) & 0xFF);
-                            byte db = (byte)(px & 0xFF);
-
-                            byte sr = (byte)((hatPx >> 16) & 0xFF);
-                            byte sg = (byte)((hatPx >> 8) & 0xFF);
-                            byte sb = (byte)(hatPx & 0xFF);
-
-                            int inv = 255 - hatA;
-                            int oa = hatA + (da * inv) / 255;
-                            int or = (sr * hatA + dr * inv) / 255;
-                            int og = (sg * hatA + dg * inv) / 255;
-                            int ob = (sb * hatA + db * inv) / 255;
-                            px = (uint)((oa << 24) | (or << 16) | (og << 8) | ob);
-                        }
-                    }
-
-                    face8x8[y * 8 + x] = px;
-                }
-            }
-
-            uint[] scaled32 = new uint[32 * 32];
-            for (int y = 0; y < 32; y++)
-            {
-                int sy = y / 4;
-                for (int x = 0; x < 32; x++)
-                {
-                    scaled32[y * 32 + x] = face8x8[sy * 8 + (x / 4)];
-                }
-            }
-
-            var wbMini = new WriteableBitmap(32, 32, 96, 96, PixelFormats.Bgra32, null);
-            wbMini.WritePixels(new Int32Rect(0, 0, 32, 32), scaled32, 32 * 4, 0);
-            wbMini.Freeze();
-
-            return (wbFull, wbMini, desc);
-        }
-
         // ==========================================
-        // MODS CATALOG & REAL-TIME SEARCH
+        // MODS LIST & SEARCH
         // ==========================================
         private void LoadModsList()
         {
             _allMods.Clear();
-            var mcDir = FindMinecraftDir();
-            var modsDir = Path.Combine(mcDir, "mods");
 
-            var modDetails = new Dictionary<string, (string Title, string Category, string Description, Color TagColor)>(StringComparer.OrdinalIgnoreCase)
+            var modDetails = new Dictionary<string, (string Title, string Category, string Description)>(StringComparer.OrdinalIgnoreCase)
             {
-                ["sodium-fabric"] = ("Sodium", "Оптимизация", "Революционный графический движок, увеличивающий FPS в разы.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["iris"] = ("Iris Shaders", "Графика", "Современный движок шейдеров с поддержкой шейдеров OptiFine.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["lithium-fabric"] = ("Lithium", "Оптимизация", "Комплексная оптимизация игровой физики, мобов и чанков.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["ferritecore"] = ("FerriteCore", "Память", "Снижает потребление оперативной памяти Minecraft до 50%.", Color.FromRgb(0x3B, 0x82, 0xF6)),
-                ["modernfix"] = ("ModernFix", "Оптимизация", "Устраняет утечки памяти и ускоряет время запуска игры.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["indium"] = ("Indium", "Графика", "Мост совместимости между Sodium и модами с кастомным рендером.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["immediatelyfast"] = ("ImmediatelyFast", "Оптимизация", "Оптимизация отрисовки интерфейса, текста и частиц.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["entityculling"] = ("Entity Culling", "Оптимизация", "Скрывает невидимых за стенами мобов для экономии FPS.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["krypton"] = ("Krypton", "Сеть", "Оптимизация сетевого стека для плавного мультиплеера.", Color.FromRgb(0x63, 0x66, 0xF1)),
-                ["terralith"] = ("Terralith", "Мир", "Глобальная генерация 100+ новых ванильных биомов и пещер.", Color.FromRgb(0x8B, 0x5C, 0xF6)),
-                ["tectonic"] = ("Tectonic", "Мир", "Массивные горные гряды, подземные реки и рельеф.", Color.FromRgb(0x8B, 0x5C, 0xF6)),
-                ["ctov"] = ("CTOV (Villages)", "Деревни", "Капитальный редизайн деревень под каждый биом мира.", Color.FromRgb(0xF5, 0x9E, 0x0B)),
-                ["guardvillagers"] = ("Guard Villagers", "Геймплей", "Жители-стражники с мечами и луками, защищающие деревни.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["travelersbackpack"] = ("Traveler's Backpack", "Снаряжение", "Удобные рюкзаки со спальниками и баками для жидкостей.", Color.FromRgb(0xEC, 0x48, 0x99)),
-                ["waystones"] = ("Waystones", "Путешествия", "Путеводные камни для телепортации между поселениями.", Color.FromRgb(0x3B, 0x82, 0xF6)),
-                ["farmersdelight"] = ("Farmer's Delight", "Кулинария", "Расширенная кулинария, готовка в котлах, сковороды и блюда.", Color.FromRgb(0xF5, 0x9E, 0x0B)),
-                ["treechop"] = ("TreeChop", "Геймплей", "Реалистичная рубка деревьев с динамической анимацией ствола.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["carryon"] = ("Carry On", "Геймплей", "Возможность переносить сундуки, животных и мелкие блоки в руках.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["artifacts"] = ("Artifacts", "Снаряжение", "Редкие ценные реликвии и аксессуары в сундуках подземелий.", Color.FromRgb(0xEC, 0x48, 0x99)),
-                ["comforts"] = ("Comforts", "Геймплей", "Спальные мешки и гамаки для отдыха без смены точки спавна.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["appleskin"] = ("AppleSkin", "Интерфейс", "Показ насыщения и восстанавливаемого здоровья еды.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["jade"] = ("Jade (WAILA)", "Интерфейс", "Информативная плашка с описанием блока или моба под прицелом.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["zoomify"] = ("Zoomify", "Управление", "Плавный зум с кинематографическим приближением на C.", Color.FromRgb(0x63, 0x66, 0xF1)),
-                ["modmenu"] = ("Mod Menu", "Интерфейс", "Главное меню модов и настроек конфигурации на ~ (тильду).", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["controlling"] = ("Controlling", "Интерфейс", "Поиск и удобное устранение конфликтов клавиш управления.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["customskinloader"] = ("CustomSkinLoader", "Скины", "Отображение HD и кастомных скинов без лицензии.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["sound-physics-remastered"] = ("Sound Physics", "Звук", "Реалистичная акустика, эхо в пещерах и реверберация.", Color.FromRgb(0x8B, 0x5C, 0xF6)),
-                ["dungeons-and-taverns"] = ("Dungeons & Taverns", "Структуры", "Атмосферные таверны и интересные данжи для исследования.", Color.FromRgb(0xF5, 0x9E, 0x0B)),
-                ["clumps"] = ("Clumps", "Оптимизация", "Объединение сфер опыта в один сгусток для устранения лагов.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["animated-doors"] = ("Animated Doors", "Анимация", "Плавная механика открытия дверей.", Color.FromRgb(0xF4, 0x3F, 0x5E)),
-                ["short-grass"] = ("Short Grass", "Графика", "Аккуратная низкая трава для чистого обзора биомов.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["doubledoors"] = ("Double Doors", "Геймплей", "Одновременное открытие двойных дверей одним кликом.", Color.FromRgb(0x10, 0xB9, 0x81)),
-                ["fallingleaves"] = ("Falling Leaves", "Атмосфера", "Опадающие с деревьев разноцветные листья.", Color.FromRgb(0xF5, 0x9E, 0x0B)),
-                ["visuality"] = ("Visuality", "Атмосфера", "Красивые частицы искр, капель и ударов.", Color.FromRgb(0x06, 0xB6, 0xD4)),
-                ["eating-animation"] = ("Eating Animation", "Анимация", "Анимация откусывания еды в руке.", Color.FromRgb(0xF4, 0x3F, 0x5E)),
-                ["notenoughanimations"] = ("Not Enough Animations", "Анимация", "Плавные движения персонажа от третьего лица.", Color.FromRgb(0xF4, 0x3F, 0x5E))
+                ["sodium-fabric"] = ("Sodium", "Оптимизация", "Революционный графический движок, увеличивающий FPS в 3-5 раз."),
+                ["iris"] = ("Iris Shaders", "Графика", "Современный шейдерный движок с ультра-быстрым рендерингом."),
+                ["lithium-fabric"] = ("Lithium", "Оптимизация", "Комплексная оптимизация игровой физики, мобов и тиков."),
+                ["ferritecore"] = ("FerriteCore", "Память", "Снижает потребление оперативной памяти Minecraft до 50%."),
+                ["modernfix"] = ("ModernFix", "Оптимизация", "Устраняет утечки памяти и ускоряет время запуска игры."),
+                ["indium"] = ("Indium", "Графика", "Мост совместимости между Sodium и модами с кастомным рендером."),
+                ["immediatelyfast"] = ("ImmediatelyFast", "Оптимизация", "Оптимизация отрисовки интерфейса, текста и частиц."),
+                ["entityculling"] = ("Entity Culling", "Оптимизация", "Скрывает невидимых за стенами мобов для экономии FPS."),
+                ["krypton"] = ("Krypton", "Сеть", "Оптимизация сетевого стека для плавного мультиплеера."),
+                ["terralith"] = ("Terralith", "Мир", "Глобальная генерация 100+ новых ванильных биомов и пещер."),
+                ["tectonic"] = ("Tectonic", "Мир", "Массивные горные гряды, подземные реки и гладкий рельеф."),
+                ["ctov"] = ("CTOV (Villages)", "Деревни", "Капитальный редизайн деревень под каждый биом мира."),
+                ["guardvillagers"] = ("Guard Villagers", "Геймплей", "Жители-стражники с мечами и луками, защищающие деревни."),
+                ["travelersbackpack"] = ("Traveler's Backpack", "Снаряжение", "Удобные рюкзаки со спальниками и баками для жидкостей."),
+                ["waystones"] = ("Waystones", "Путешествия", "Путеводные камни для телепортации между поселениями."),
+                ["farmersdelight"] = ("Farmer's Delight", "Кулинария", "Расширенная кулинария, готовка в котлах, сковороды и блюда."),
+                ["treechop"] = ("TreeChop", "Геймплей", "Реалистичная рубка деревьев с динамической анимацией ствола."),
+                ["carryon"] = ("Carry On", "Геймплей", "Возможность переносить сундуки, животных и мелкие блоки в руках."),
+                ["artifacts"] = ("Artifacts", "Снаряжение", "Редкие ценные реликвии и аксессуары в сундуках подземелий."),
+                ["comforts"] = ("Comforts", "Геймплей", "Спальные мешки и гамаки для отдыха без смены точки спавна."),
+                ["appleskin"] = ("AppleSkin", "Интерфейс", "Показ насыщения и восстанавливаемого здоровья еды."),
+                ["jade"] = ("Jade (WAILA)", "Интерфейс", "Информативная плашка с описанием блока или моба под прицелом."),
+                ["zoomify"] = ("Zoomify", "Управление", "Плавный кинематографический зум камеры на клавишу C."),
+                ["modmenu"] = ("Mod Menu", "Интерфейс", "Главное меню модов и настроек конфигурации прямо в игре."),
+                ["controlling"] = ("Controlling", "Интерфейс", "Поиск и удобное устранение конфликтов клавиш управления."),
+                ["customskinloader"] = ("CustomSkinLoader", "Скины", "Отображение HD и кастомных скинов без лицензии Mojang."),
+                ["sound-physics-remastered"] = ("Sound Physics", "Звук", "Реалистичная акустика, эхо в пещерах и реверберация."),
+                ["dungeons-and-taverns"] = ("Dungeons & Taverns", "Структуры", "Атмосферные таверны и интересные данжи для исследования."),
+                ["clumps"] = ("Clumps", "Оптимизация", "Объединение сфер опыта в один сгусток для устранения лагов."),
+                ["animated-doors"] = ("Animated Doors", "Анимация", "Плавная физическая анимация открытия дверей."),
+                ["short-grass"] = ("Short Grass", "Графика", "Аккуратная низкая трава для чистого обзора биомов."),
+                ["doubledoors"] = ("Double Doors", "Геймплей", "Одновременное открытие двойных дверей одним кликом."),
+                ["fallingleaves"] = ("Falling Leaves", "Атмосфера", "Опадающие с деревьев разноцветные листья."),
+                ["visuality"] = ("Visuality", "Атмосфера", "Красивые частицы искр, капель и ударов."),
+                ["eating-animation"] = ("Eating Animation", "Анимация", "Анимация откусывания еды в руках персонажа."),
+                ["notenoughanimations"] = ("Not Enough Animations", "Анимация", "Плавные движения персонажа от третьего лица.")
             };
 
-            var jars = Directory.Exists(modsDir)
-                ? Directory.GetFiles(modsDir, "*.jar")
-                : Array.Empty<string>();
-
-            var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var jar in jars)
+            foreach (var kvp in modDetails)
             {
-                var fn = Path.GetFileName(jar);
-                string matchedKey = "";
-                foreach (var kvp in modDetails)
+                _allMods.Add(new ModItemInfo
                 {
-                    if (fn.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
-                    {
-                        matchedKey = kvp.Key;
-                        break;
-                    }
-                }
-
-                if (matchedKey != "" && !processed.Contains(matchedKey))
-                {
-                    processed.Add(matchedKey);
-                    var info = modDetails[matchedKey];
-                    _allMods.Add(new ModItemInfo
-                    {
-                        Title = info.Title,
-                        Category = info.Category,
-                        Description = info.Description,
-                        CategoryColor = info.TagColor
-                    });
-                }
-                else if (matchedKey == "")
-                {
-                    var cleanTitle = Path.GetFileNameWithoutExtension(fn);
-                    _allMods.Add(new ModItemInfo
-                    {
-                        Title = cleanTitle,
-                        Category = "Мод",
-                        Description = fn,
-                        CategoryColor = Color.FromRgb(0x64, 0x74, 0x8B)
-                    });
-                }
+                    Name = kvp.Value.Title,
+                    Category = kvp.Value.Category,
+                    Description = kvp.Value.Description
+                });
             }
 
-            if (_allMods.Count == 0)
-            {
-                foreach (var kvp in modDetails)
-                {
-                    _allMods.Add(new ModItemInfo
-                    {
-                        Title = kvp.Value.Title,
-                        Category = kvp.Value.Category,
-                        Description = kvp.Value.Description,
-                        CategoryColor = kvp.Value.TagColor
-                    });
-                }
-            }
-
-            RenderFilteredMods("");
+            FilterMods("");
         }
 
         private void TxtSearchMods_TextChanged(object sender, TextChangedEventArgs e)
         {
-            RenderFilteredMods(TxtSearchMods.Text.Trim());
+            FilterMods(TxtSearchMods.Text.Trim());
         }
 
-        private void RenderFilteredMods(string query)
+        private void FilterMods(string query)
         {
-            PanelModsList.Children.Clear();
             var filtered = string.IsNullOrEmpty(query)
                 ? _allMods
                 : _allMods.FindAll(m =>
-                    m.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+                    m.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                     m.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                     m.Description.Contains(query, StringComparison.OrdinalIgnoreCase));
 
-            TxtModsCount.Text = $"{filtered.Count} модов";
+            ModsItemsControl.ItemsSource = filtered;
+            TxtModCountBadge.Text = $"Всего {_allMods.Count} модов в сборке";
             TxtNavModsLabel.Text = $"Модификации ({_allMods.Count})";
-
-            foreach (var mod in filtered)
-            {
-                PanelModsList.Children.Add(CreateModCard(mod));
-            }
-        }
-
-        private Border CreateModCard(ModItemInfo mod)
-        {
-            var brd = new Border
-            {
-                Background = new SolidColorBrush(Color.FromRgb(0x0E, 0x12, 0x1D)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x1C, 0x24, 0x36)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(9),
-                Margin = new Thickness(0, 0, 0, 8),
-                Padding = new Thickness(14, 10, 14, 10)
-            };
-
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var sp = new StackPanel();
-            var tbTitle = new TextBlock
-            {
-                Text = mod.Title,
-                Foreground = Brushes.White,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold
-            };
-            var tbDesc = new TextBlock
-            {
-                Text = mod.Description,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x8E, 0x9C, 0xAE)),
-                FontSize = 11,
-                Margin = new Thickness(0, 2, 0, 0),
-                TextWrapping = TextWrapping.Wrap
-            };
-            sp.Children.Add(tbTitle);
-            sp.Children.Add(tbDesc);
-
-            var badge = new Border
-            {
-                Background = new SolidColorBrush(Color.FromArgb(28, mod.CategoryColor.R, mod.CategoryColor.G, mod.CategoryColor.B)),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(70, mod.CategoryColor.R, mod.CategoryColor.G, mod.CategoryColor.B)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(8, 3, 8, 3),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            var tbCat = new TextBlock
-            {
-                Text = mod.Category,
-                Foreground = new SolidColorBrush(mod.CategoryColor),
-                FontSize = 11,
-                FontWeight = FontWeights.SemiBold
-            };
-            badge.Child = tbCat;
-
-            Grid.SetColumn(sp, 0);
-            Grid.SetColumn(badge, 1);
-            grid.Children.Add(sp);
-            grid.Children.Add(badge);
-
-            brd.Child = grid;
-            return brd;
         }
 
         // ==========================================
@@ -824,7 +783,7 @@ namespace AuraLauncher
         {
             try
             {
-                TxtTechnicalStatus.Text = "Проверка обновлений...";
+                TxtStatusDetails.Text = "Проверка файлов сборки...";
                 var url = $"https://api.github.com/repos/{_config.GitHubRepo}/releases/latest";
                 var response = await _http.GetAsync(url);
 
@@ -836,21 +795,21 @@ namespace AuraLauncher
 
                     if (tagName != _config.CurrentVersion)
                     {
-                        TxtTechnicalStatus.Text = $"Доступно обновление ({tagName})";
+                        TxtStatusDetails.Text = $"Доступно обновление ({tagName})";
                         return;
                     }
                 }
 
-                TxtTechnicalStatus.Text = "Все файлы актуальны";
+                TxtStatusDetails.Text = "Все файлы актуальны";
             }
             catch
             {
-                TxtTechnicalStatus.Text = "Локальный режим";
+                TxtStatusDetails.Text = "Локальный режим";
             }
         }
 
         // ==========================================
-        // PLAY & LAUNCH
+        // PLAY & LAUNCH MINECRAFT
         // ==========================================
         private async void BtnPlay_Click(object sender, RoutedEventArgs e)
         {
@@ -878,7 +837,7 @@ namespace AuraLauncher
                     await PerformUpdateDownloadAsync();
                 }
 
-                TxtTechnicalStatus.Text = "Запуск игры...";
+                TxtStatusDetails.Text = "Запуск игры...";
                 TxtWittyQuote.Text = "Увидимся в кубическом мире!";
 
                 LaunchMinecraft();
@@ -889,7 +848,7 @@ namespace AuraLauncher
             {
                 MessageBox.Show($"Ошибка запуска: {ex.Message}", "AURA", MessageBoxButton.OK, MessageBoxImage.Error);
                 BtnPlay.IsEnabled = true;
-                BrdProgress.Visibility = Visibility.Collapsed;
+                ProgressBarLaunch.Visibility = Visibility.Collapsed;
                 _quoteTimer.Stop();
             }
         }
@@ -923,8 +882,8 @@ namespace AuraLauncher
         private async Task PerformUpdateDownloadAsync()
         {
             _quoteTimer.Start();
-            BrdProgress.Visibility = Visibility.Visible;
-            ProgressBarDownload.Value = 0;
+            ProgressBarLaunch.Visibility = Visibility.Visible;
+            ProgressBarLaunch.Value = 0;
 
             try
             {
@@ -979,12 +938,12 @@ namespace AuraLauncher
                             double pct = (double)totalRead / totalBytes * 100.0;
                             double speedMBs = (totalRead / 1024.0 / 1024.0) / Math.Max(0.1, sw.Elapsed.TotalSeconds);
 
-                            ProgressBarDownload.Value = Math.Min(100, pct);
-                            TxtTechnicalStatus.Text = $"{totalRead / 1024 / 1024} МБ / {totalBytes / 1024 / 1024} МБ ({speedMBs:F1} МБ/с) • {pct:F0}%";
+                            ProgressBarLaunch.Value = Math.Min(100, pct);
+                            TxtStatusDetails.Text = $"{totalRead / 1024 / 1024} МБ / {totalBytes / 1024 / 1024} МБ ({speedMBs:F1} МБ/с) • {pct:F0}%";
                         }
                     }
 
-                    TxtTechnicalStatus.Text = "Распаковка сборки...";
+                    TxtStatusDetails.Text = "Распаковка сборки...";
                     var mcDir = FindMinecraftDir();
 
                     using (var archive = ZipFile.OpenRead(tempZip))
@@ -1017,12 +976,12 @@ namespace AuraLauncher
             finally
             {
                 _quoteTimer.Stop();
-                BrdProgress.Visibility = Visibility.Collapsed;
+                ProgressBarLaunch.Visibility = Visibility.Collapsed;
             }
         }
 
         // ==========================================
-        // ROBUST FABRIC LAUNCHER (ZERO CMD LIMIT)
+        // FABRIC LAUNCHER (ZERO CMD LIMIT)
         // ==========================================
         private void LaunchMinecraft()
         {
