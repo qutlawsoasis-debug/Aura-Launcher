@@ -1,0 +1,20 @@
+using System;
+using System.IO;
+
+namespace AuraLauncher.Models;
+
+/// <summary>
+/// Доменная модель конфигурации пользователя и параметров запуска.
+/// </summary>
+public class LauncherConfig
+{
+    public const string DefaultPackRepo = "qutlawsoasis-debug/Aura-Pack";
+
+    public string Nickname { get; set; } = "Player";
+    public int RamMb { get; set; } = 6144;
+    public string SkinPath { get; set; } = "";
+    public string SkinOriginalName { get; set; } = "";
+    public string GameDir { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+    public string PackRepo { get; set; } = DefaultPackRepo;
+    public DateTime? LastUpdateUtc { get; set; }
+}

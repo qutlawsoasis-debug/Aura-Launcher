@@ -1,7 +1,14 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using Microsoft.Extensions.DependencyInjection;
+using AuraLauncher.Services.Interfaces;
+using AuraLauncher.Services.Implementations;
+using AuraLauncher.ViewModels;
 
 namespace AuraLauncher;
 
@@ -10,8 +17,24 @@ namespace AuraLauncher;
 /// </summary>
 public partial class App : Application
 {
+    public static IServiceProvider Services { get; private set; } = null!;
+    private static int _hasShownCrashDialog = 0;
+    private static Mutex? _singleInstanceMutex;
+
+    private const int SW_RESTORE = 9;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
+
     protected override void OnStartup(StartupEventArgs e)
     {
+        // Перехват и логирование необработанных исключений
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
             LogCrash(args.ExceptionObject as Exception);
@@ -20,8 +43,7 @@ public partial class App : Application
         DispatcherUnhandledException += (s, args) =>
         {
             LogCrash(args.Exception);
-            // Show crash message and avoid hard silent exit without notification
-            args.Handled = true;
+            args.Handled = true; // Предотвращаем падение приложения при сбоях в UI/рендере
         };
 
         TaskScheduler.UnobservedTaskException += (s, args) =>
@@ -30,7 +52,63 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        // Режим самодиагностики (--selftest или --selftest-shots)
+        bool isSelfTest = Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+
+        // Именованный Mutex для контроля единого экземпляра приложения
+        _singleInstanceMutex = new Mutex(true, @"Local\Aura.Launcher", out bool isNewInstance);
+        if (!isNewInstance && !isSelfTest)
+        {
+            BringExistingInstanceToFront();
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
+
+        // Инициализация DI-контейнера
+        var services = new ServiceCollection();
+        ConfigureServices(services);
+        Services = services.BuildServiceProvider();
+
+        // Создаем главное окно и передаем MainViewModel в качестве DataContext
+        var mainWindow = new MainWindow
+        {
+            DataContext = Services.GetRequiredService<MainViewModel>()
+        };
+
+        mainWindow.Show();
+
+        // Запускаем фоновую инициализацию ViewModel
+        if (mainWindow.DataContext is MainViewModel mainVM)
+        {
+            _ = mainVM.InitializeAsync();
+        }
+
+        // Проверка режима самодиагностики (--selftest или --selftest-shots)
+        if (isSelfTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunSelfTestShotsAsync(mainWindow);
+                Environment.Exit(success ? 0 : 1);
+            });
+        }
+    }
+
+    private static void ConfigureServices(IServiceCollection services)
+    {
+        // Регистрация сервисов как синглтонов
+        services.AddSingleton<IConfigService, JsonConfigService>();
+        services.AddSingleton<IPackUpdateService, PackUpdateService>();
+        services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
+        services.AddSingleton<ISkinService, SkinService>();
+
+        // Регистрация ViewModels
+        services.AddSingleton<OverviewViewModel>();
+        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<WardrobeViewModel>();
+        services.AddSingleton<MainViewModel>();
     }
 
     private static void LogCrash(Exception? ex)
@@ -38,15 +116,89 @@ public partial class App : Application
         if (ex == null) return;
         try
         {
-            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            string logPath = Path.Combine(baseDir, "launcher_crash.log");
-            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Unhandled Crash:\n{ex}\n----------------------------------------\n");
-            MessageBox.Show(
-                $"Ошибка при запуске или работе AURA Launcher:\n\n{ex.Message}\n\nСтек ошибки записан в launcher_crash.log",
-                "AURA Launcher — Ошибка",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            string logEntry = $"[{timestamp}] Unhandled Crash:\n{ex}\n----------------------------------------\n";
+
+            // 1. Запись в локальный launcher_crash.log
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string localLogPath = Path.Combine(baseDir, "launcher_crash.log");
+                File.AppendAllText(localLogPath, logEntry);
+            }
+            catch { }
+
+            // 2. Запись в системный %AppData%\Aura\launcher.log
+            try
+            {
+                string appDataAura = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Aura");
+                Directory.CreateDirectory(appDataAura);
+                string appDataLogPath = Path.Combine(appDataAura, "launcher.log");
+                File.AppendAllText(appDataLogPath, logEntry);
+            }
+            catch { }
+
+            // 3. Показываем диалог пользователю ОДИН РАЗ, предотвращая зацикливание модальных окон
+            if (Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
+            {
+                MessageBox.Show(
+                    $"Произошла ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nПолный стек ошибки сохранен в launcher.log и launcher_crash.log.\nПриложение продолжит работу.",
+                    "AURA Launcher — Внимание",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
         catch { }
+    }
+
+    public static void Log(string message)
+    {
+        try
+        {
+            string appDataAura = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Aura");
+            Directory.CreateDirectory(appDataAura);
+            string appDataLogPath = Path.Combine(appDataAura, "launcher.log");
+            string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}";
+            File.AppendAllText(appDataLogPath, line);
+            System.Diagnostics.Debug.WriteLine(line);
+        }
+        catch { }
+    }
+
+    private static void BringExistingInstanceToFront()
+    {
+        try
+        {
+            var currentProc = Process.GetCurrentProcess();
+            var processes = Process.GetProcessesByName(currentProc.ProcessName);
+            foreach (var p in processes)
+            {
+                if (p.Id != currentProc.Id && p.MainWindowHandle != IntPtr.Zero)
+                {
+                    ShowWindow(p.MainWindowHandle, SW_RESTORE);
+                    SetForegroundWindow(p.MainWindowHandle);
+                    return;
+                }
+            }
+
+            var hWnd = FindWindow(null, "AURA");
+            if (hWnd != IntPtr.Zero)
+            {
+                ShowWindow(hWnd, SW_RESTORE);
+                SetForegroundWindow(hWnd);
+            }
+        }
+        catch { }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        try
+        {
+            _singleInstanceMutex?.ReleaseMutex();
+            _singleInstanceMutex?.Dispose();
+        }
+        catch { }
+        base.OnExit(e);
     }
 }

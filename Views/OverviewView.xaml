@@ -1,0 +1,80 @@
+<UserControl x:Class="AuraLauncher.Views.OverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d" 
+             d:DesignHeight="620" d:DesignWidth="980">
+    <!-- Background spans entire window under header and footer (-46 top, -96 bottom) -->
+    <Grid Margin="0,-46,0,-96">
+        <!-- 1. Background World Image (Static Resource from UiTheme with DecodePixelWidth 1920) -->
+        <Image Source="{StaticResource WorldBackgroundBitmap}"
+               Stretch="UniformToFill"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+
+        <!-- 2. Top Darkening Vignette (for Top Header Bar readability) -->
+        <Border VerticalAlignment="Top" Height="140" IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#E60F1115" Offset="0.0" />
+                    <GradientStop Color="#990F1115" Offset="0.45" />
+                    <GradientStop Color="#000F1115" Offset="1.0" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- 3. Bottom Darkening Vignette (for Bottom Launch Deck and Info Cards) -->
+        <Border VerticalAlignment="Bottom" Height="320" IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#000F1115" Offset="0.0" />
+                    <GradientStop Color="#550F1115" Offset="0.30" />
+                    <GradientStop Color="#D90F1115" Offset="0.75" />
+                    <GradientStop Color="#F20F1115" Offset="1.0" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- 4. Foreground Modpack Info & Stats Cards (sitting above the bottom launch deck) -->
+        <Grid Margin="36,0,36,124" VerticalAlignment="Bottom">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Hero Typography -->
+            <StackPanel VerticalAlignment="Bottom">
+                <!-- Clean gray single line version text without pill border -->
+                <TextBlock Text="{Binding VersionInfo}" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,8" />
+
+                <!-- Build Title "Aura" SemiBold with light drop shadow -->
+                <TextBlock Text="{Binding BuildName}" FontSize="44" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,6">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="#000000" />
+                    </TextBlock.Effect>
+                </TextBlock>
+
+                <!-- Sub-headline -->
+                <TextBlock Text="Клиентская сборка с оптимизацией и модами" FontSize="13" Foreground="#9AA3B2">
+                    <TextBlock.Effect>
+                        <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.4" Color="#000000" />
+                    </TextBlock.Effect>
+                </TextBlock>
+            </StackPanel>
+
+            <!-- Build Parameters Card: Borderless, single surface with light opacity, thin divider lines -->
+            <Border Grid.Column="1" VerticalAlignment="Bottom"
+                    Background="#D9171A21" CornerRadius="10" BorderThickness="0" Padding="18,14">
+                <StackPanel MinWidth="220">
+                    <TextBlock Text="Параметры сборки" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" />
+                    <Border Height="1" Background="#252A33" Margin="0,8" />
+                    <TextBlock Text="{Binding ModsCountText}" Foreground="#E8EAED" FontSize="12" />
+                    <Border Height="1" Background="#252A33" Margin="0,8" />
+                    <TextBlock Text="{Binding LastUpdateText}" Foreground="#9AA3B2" FontSize="12" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
