@@ -17,53 +17,34 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- Specular Glass Border Brush -->
-        <LinearGradientBrush x:Key="GlassBorderBrush" StartPoint="0,0" EndPoint="0,1">
-            <GradientStop Color="#3D4B66" Offset="0.0" />
-            <GradientStop Color="#222B3D" Offset="0.3" />
-            <GradientStop Color="#141A26" Offset="1.0" />
+        <!-- Apple Specular Top Rim Gradient -->
+        <LinearGradientBrush x:Key="SpecularRimBrush" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#455675" Offset="0.0" />
+            <GradientStop Color="#1E273A" Offset="0.25" />
+            <GradientStop Color="#111622" Offset="1.0" />
         </LinearGradientBrush>
 
-        <!-- Deep Mica Backdrop Gradient -->
-        <LinearGradientBrush x:Key="WindowBackdropBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#11141C" Offset="0.0" />
-            <GradientStop Color="#0B0D13" Offset="1.0" />
-        </LinearGradientBrush>
-
-        <!-- Vector Path RadioButton Style for Navigation -->
-        <Style x:Key="NavTabStyle" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="#8E9CAE" />
-            <Setter Property="FontSize" Value="13" />
+        <!-- Dynamic Island Nav Button Style -->
+        <Style x:Key="IslandNavBtnStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#94A3B8" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Height" Value="42" />
-            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Margin" Value="2,0" />
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Brd" Background="Transparent" CornerRadius="9" Padding="14,0" SnapsToDevicePixels="True">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Active Indicator Bar -->
-                                <Border x:Name="ActivePill" Width="3" Height="16" CornerRadius="1.5" Background="#10B981"
-                                        HorizontalAlignment="Left" Visibility="Collapsed" Margin="-8,0,0,0" />
-
-                                <ContentPresenter Grid.Column="1" VerticalAlignment="Center" Margin="2,0,0,0" />
-                            </Grid>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Brd" Background="Transparent" CornerRadius="16" Padding="14,0" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Brd" Property="Background" Value="#171D2B" />
-                                <Setter TargetName="ActivePill" Property="Visibility" Value="Visible" />
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Brd" Property="Background" Value="#1C2436" />
                                 <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Brd" Property="Background" Value="#141824" />
-                                <Setter Property="Foreground" Value="#E2E8F0" />
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Brd" Property="Background" Value="#253046" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -74,23 +55,23 @@
         <!-- Segmented RAM RadioButton Style -->
         <Style x:Key="SegmentedRamStyle" TargetType="RadioButton">
             <Setter Property="Foreground" Value="#8E9CAE" />
-            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Margin" Value="1" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Brd" Background="Transparent" CornerRadius="7" Padding="12,7">
+                        <Border x:Name="Brd" Background="Transparent" CornerRadius="7" Padding="10,5">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Brd" Property="Background" Value="#1D2638" />
+                                <Setter TargetName="Brd" Property="Background" Value="#1E283D" />
                                 <Setter Property="Foreground" Value="#34D399" />
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Brd" Property="Background" Value="#161C2A" />
+                                <Setter TargetName="Brd" Property="Background" Value="#172030" />
                                 <Setter Property="Foreground" Value="#FFFFFF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -100,231 +81,299 @@
         </Style>
     </Window.Resources>
 
-    <!-- Outer Window Border with Translucent Drop Shadow and Specular Highlight -->
-    <Border Margin="12" CornerRadius="16" BorderThickness="1" BorderBrush="{StaticResource GlassBorderBrush}"
-            Background="{StaticResource WindowBackdropBrush}" MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <!-- Outer Canvas with Corner Radius and Shadow -->
+    <Border Margin="10" CornerRadius="16" BorderThickness="1" BorderBrush="{StaticResource SpecularRimBrush}"
+            ClipToBounds="True" MouseLeftButtonDown="Window_MouseLeftButtonDown">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="40" ShadowDepth="10" Opacity="0.85" Color="#000000" />
+            <DropShadowEffect BlurRadius="45" ShadowDepth="12" Opacity="0.85" Color="#000000" />
         </Border.Effect>
 
         <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="220" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
             <!-- ============================================== -->
-            <!-- 1. SIDEBAR (MINIMALIST APPLE-STYLE)            -->
+            <!-- LAYER 0: ATMOSPHERIC BLURRED BACKDROP          -->
             <!-- ============================================== -->
-            <Border Grid.Column="0" Background="#0C0E15" CornerRadius="15,0,0,15" BorderThickness="0,0,1,0" BorderBrush="#1C2333">
-                <Grid Margin="18,22,18,18">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+            <!-- Real World Screenshot with Gaussian Blur -->
+            <Image x:Name="ImgBgWorld" Source="bg_world.png" Stretch="UniformToFill" Opacity="0.22">
+                <Image.Effect>
+                    <BlurEffect Radius="35" KernelType="Gaussian" />
+                </Image.Effect>
+            </Image>
 
-                    <!-- Clean Header: Just AURA -->
-                    <StackPanel Grid.Row="0" Margin="6,0,0,28">
-                        <TextBlock Text="A  U  R  A" FontSize="21" FontWeight="Bold" Foreground="#FFFFFF" />
-                    </StackPanel>
-
-                    <!-- Navigation Items -->
-                    <StackPanel Grid.Row="1">
-                        <RadioButton x:Name="NavPlay" IsChecked="True" Style="{StaticResource NavTabStyle}" Click="Nav_Click" Tag="TabPlay">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <TextBlock Text="Главная" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <RadioButton x:Name="NavSkin" Style="{StaticResource NavTabStyle}" Click="Nav_Click" Tag="TabSkin">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <TextBlock Text="Гардероб" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <RadioButton x:Name="NavMods" Style="{StaticResource NavTabStyle}" Click="Nav_Click" Tag="TabMods">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="M12 2l-9 4.5v11l9 4.5 9-4.5v-11L12 2zm0 2.2l6.8 3.4L12 11 5.2 7.6 12 4.2zm-7 5.6l6 3v7.6l-6-3V9.8zm8 10.6v-7.6l6-3v7.6l-6 3z"
-                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <TextBlock Text="Модификации" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-
-                        <RadioButton x:Name="NavSettings" Style="{StaticResource NavTabStyle}" Click="Nav_Click" Tag="TabSettings">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
-                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                      Width="14" Height="14" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,12,0" />
-                                <TextBlock Text="Настройки" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </RadioButton>
-                    </StackPanel>
-
-                    <!-- Player Profile Card at Bottom (shows real skin face) -->
-                    <Border Grid.Row="2" Background="#111520" CornerRadius="11" BorderThickness="1" BorderBrush="#1C2333" Padding="10,8">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <!-- Mini 32x32 Player Head Pixel Art -->
-                            <Border Width="34" Height="34" CornerRadius="8" Background="#161B28" ClipToBounds="True" BorderThickness="1" BorderBrush="#252E42">
-                                <Image x:Name="ImgSidebarFace" Width="32" Height="32" RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                            </Border>
-                            <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="TxtSidebarNick" Text="Player" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Text="Готов к игре" Foreground="#64748B" FontSize="11" Margin="0,1,0,0" />
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </Grid>
+            <!-- Deep Obsidian Glass Scrim -->
+            <Border>
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#E60D1017" Offset="0.0" />
+                        <GradientStop Color="#F0090B10" Offset="0.5" />
+                        <GradientStop Color="#FA06070B" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
             </Border>
 
+            <!-- Ambient Emerald Glow from Pedestal -->
+            <Ellipse Width="380" Height="140" Fill="#10B981" Opacity="0.10" VerticalAlignment="Bottom"
+                     HorizontalAlignment="Right" Margin="0,0,130,120">
+                <Ellipse.Effect>
+                    <BlurEffect Radius="70" />
+                </Ellipse.Effect>
+            </Ellipse>
+
             <!-- ============================================== -->
-            <!-- 2. MAIN CONTENT AREA                           -->
+            <!-- LAYER 1: MAIN STAGE CONTENT                    -->
             <!-- ============================================== -->
-            <Grid Grid.Column="1" Margin="28,16,28,18">
+            <Grid Margin="24,18,24,20">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="36" />
+                    <RowDefinition Height="Auto" />
+                    <!-- Top Island Bar -->
                     <RowDefinition Height="*" />
+                    <!-- Hero Stage & Character -->
+                    <RowDefinition Height="Auto" />
+                    <!-- Floating Launch Dock -->
                 </Grid.RowDefinitions>
 
-                <!-- Top Window Controls (Apple HIG subtle squircle buttons) -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Click="BtnMinimize_Click" Width="32" Height="32" Cursor="Hand" Margin="0,0,4,0">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="Brd" Background="Transparent" CornerRadius="8">
-                                    <TextBlock Text="—" Foreground="#8E9CAE" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13" />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Brd" Property="Background" Value="#1E2536" />
-                                        <Setter Property="Foreground" Value="#FFFFFF" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-
-                    <Button Click="BtnClose_Click" Width="32" Height="32" Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="Brd" Background="Transparent" CornerRadius="8">
-                                    <TextBlock Text="✕" Foreground="#8E9CAE" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="Brd" Property="Background" Value="#E11D48" />
-                                        <Setter Property="Foreground" Value="#FFFFFF" />
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                </StackPanel>
-
                 <!-- ============================================== -->
-                <!-- TAB 1: ГЛАВНАЯ (PLAY TAB)                      -->
+                <!-- 1. TOP FLOATING ISLAND BAR                     -->
                 <!-- ============================================== -->
-                <Grid x:Name="TabPlay" Grid.Row="1" Margin="0,6,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Brand -->
+                        <ColumnDefinition Width="*" />
+                        <!-- Center Island -->
+                        <ColumnDefinition Width="Auto" />
+                        <!-- Controls -->
+                    </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="230" />
-                        </Grid.ColumnDefinitions>
+                    <!-- Clean Brand Header -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="A  U  R  A" FontSize="19" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                    </StackPanel>
 
-                        <!-- Left Stage: Hero Info & Memory Selection -->
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,24,0">
-                            <TextBlock Text="Vanilla+" FontSize="36" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
-                            <TextBlock Text="Minecraft 1.20.1 • 45 модов • Шейдеры активны" FontSize="13" Foreground="#8E9CAE" Margin="0,0,0,28" />
+                    <!-- Center Floating Island (Capsule) -->
+                    <Border Grid.Column="1" HorizontalAlignment="Center" Background="#111624" CornerRadius="18"
+                            BorderThickness="1" BorderBrush="#222C3E" Padding="4,3">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Click="BtnOpenSkinSheet_Click" Style="{StaticResource IslandNavBtnStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Text="Гардероб" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
-                            <!-- Integrated RAM Segmented Control -->
-                            <TextBlock Text="ВЫДЕЛЕНИЕ ОПЕРАТИВНОЙ ПАМЯТИ" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,10" />
-                            <Border Background="#111520" CornerRadius="9" BorderThickness="1" BorderBrush="#1C2333" Padding="3" Width="340" HorizontalAlignment="Left" Margin="0,0,0,28">
-                                <UniformGrid Columns="4">
-                                    <RadioButton x:Name="RbRam4" Content="4 ГБ" GroupName="RamGroup" Tag="4096" Style="{StaticResource SegmentedRamStyle}" Checked="RamRadio_Checked" />
-                                    <RadioButton x:Name="RbRam6" Content="6 ГБ" GroupName="RamGroup" Tag="6144" Style="{StaticResource SegmentedRamStyle}" IsChecked="True" Checked="RamRadio_Checked" />
-                                    <RadioButton x:Name="RbRam8" Content="8 ГБ" GroupName="RamGroup" Tag="8192" Style="{StaticResource SegmentedRamStyle}" Checked="RamRadio_Checked" />
-                                    <RadioButton x:Name="RbRam12" Content="12 ГБ" GroupName="RamGroup" Tag="12288" Style="{StaticResource SegmentedRamStyle}" Checked="RamRadio_Checked" />
-                                </UniformGrid>
-                            </Border>
+                            <Button Click="BtnOpenModsSheet_Click" Style="{StaticResource IslandNavBtnStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M12 2l-9 4.5v11l9 4.5 9-4.5v-11L12 2zm0 2.2l6.8 3.4L12 11 5.2 7.6 12 4.2zm-7 5.6l6 3v7.6l-6-3V9.8zm8 10.6v-7.6l6-3v7.6l-6 3z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock x:Name="TxtNavModsLabel" Text="Модификации (45)" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
 
-                            <!-- Subtle Feature Tags (no heavy boxes) -->
-                            <WrapPanel Margin="0,0,0,10">
-                                <Border Background="#10141E" CornerRadius="6" BorderThickness="1" BorderBrush="#1B2232" Padding="8,4" Margin="0,0,8,6">
-                                    <TextBlock Text="⚡ Sodium &amp; Iris" Foreground="#94A3B8" FontSize="11" />
-                                </Border>
-                                <Border Background="#10141E" CornerRadius="6" BorderThickness="1" BorderBrush="#1B2232" Padding="8,4" Margin="0,0,8,6">
-                                    <TextBlock Text="🏔️ Terralith &amp; Tectonic" Foreground="#94A3B8" FontSize="11" />
-                                </Border>
-                                <Border Background="#10141E" CornerRadius="6" BorderThickness="1" BorderBrush="#1B2232" Padding="8,4" Margin="0,0,8,6">
-                                    <TextBlock Text="🛡️ Жители-стражники" Foreground="#94A3B8" FontSize="11" />
-                                </Border>
-                                <Border Background="#10141E" CornerRadius="6" BorderThickness="1" BorderBrush="#1B2232" Padding="8,4" Margin="0,0,8,6">
-                                    <TextBlock Text="🎒 Рюкзаки" Foreground="#94A3B8" FontSize="11" />
-                                </Border>
-                            </WrapPanel>
+                            <Button Click="BtnOpenSettingsSheet_Click" Style="{StaticResource IslandNavBtnStyle}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Data="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                    <TextBlock Text="Настройки" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
+                    </Border>
 
-                        <!-- Right Stage: Full Character Model on Physical Pedestal -->
-                        <Grid Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <!-- Soft Ambient Glow Under Pedestal -->
-                            <Ellipse Width="170" Height="40" Fill="#10B981" Opacity="0.12" VerticalAlignment="Bottom" Margin="0,0,0,12">
+                    <!-- Window Buttons (Minimize, Close) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Click="BtnMinimize_Click" Width="30" Height="30" Cursor="Hand" Margin="0,0,4,0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Brd" Background="Transparent" CornerRadius="8">
+                                        <TextBlock Text="—" Foreground="#8E9CAE" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="13" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Brd" Property="Background" Value="#1E2638" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button Click="BtnClose_Click" Width="30" Height="30" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Brd" Background="Transparent" CornerRadius="8">
+                                        <TextBlock Text="✕" Foreground="#8E9CAE" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12" />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Brd" Property="Background" Value="#E11D48" />
+                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ============================================== -->
+                <!-- 2. HERO STAGE & CHARACTER MODEL                -->
+                <!-- ============================================== -->
+                <Grid Grid.Row="1" Margin="10,14,10,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <!-- Left Hero Info -->
+                        <ColumnDefinition Width="380" />
+                        <!-- Right Character Studio Stage -->
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Clean Modpack Presentation -->
+                    <StackPanel VerticalAlignment="Center" Margin="10,0,20,0">
+                        <TextBlock Text="Vanilla+" FontSize="42" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
+                        <TextBlock Text="Minecraft 1.20.1 Fabric • Шейдеры MakeUp • 45 модов" FontSize="14" Foreground="#94A3B8" Margin="0,0,0,24" />
+
+                        <!-- Clean Minimalist Feature Chips -->
+                        <WrapPanel Margin="0,0,0,20">
+                            <Border Background="#121622" CornerRadius="7" BorderThickness="1" BorderBrush="#1F283C" Padding="10,6" Margin="0,0,8,8">
+                                <TextBlock Text="🏔️ Terralith &amp; Tectonic" Foreground="#E2E8F0" FontSize="12" />
+                            </Border>
+                            <Border Background="#121622" CornerRadius="7" BorderThickness="1" BorderBrush="#1F283C" Padding="10,6" Margin="0,0,8,8">
+                                <TextBlock Text="🛡️ Стражники деревень" Foreground="#E2E8F0" FontSize="12" />
+                            </Border>
+                            <Border Background="#121622" CornerRadius="7" BorderThickness="1" BorderBrush="#1F283C" Padding="10,6" Margin="0,0,8,8">
+                                <TextBlock Text="🎒 Рюкзаки &amp; Спальники" Foreground="#E2E8F0" FontSize="12" />
+                            </Border>
+                            <Border Background="#121622" CornerRadius="7" BorderThickness="1" BorderBrush="#1F283C" Padding="10,6" Margin="0,0,8,8">
+                                <TextBlock Text="⚡ Sodium 60+ FPS" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" />
+                            </Border>
+                        </WrapPanel>
+
+                        <!-- Subtle Hint to Change Skin -->
+                        <Button Click="BtnOpenSkinSheet_Click" HorizontalAlignment="Left" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="Transparent">
+                                        <TextBlock Text="Изменить скин персонажа →" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </StackPanel>
+
+                    <!-- Right: Character Studio Showcase with Pedestal and Floor Reflection -->
+                    <Grid Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <!-- Pedestal Structure -->
+                        <Grid VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,28">
+                            <!-- Soft Base Shadow -->
+                            <Ellipse Width="220" Height="40" Fill="#000000" Opacity="0.75">
                                 <Ellipse.Effect>
-                                    <BlurEffect Radius="26" />
+                                    <BlurEffect Radius="24" />
                                 </Ellipse.Effect>
                             </Ellipse>
 
                             <!-- Glass Disc Pedestal -->
-                            <Border Width="160" Height="26" CornerRadius="13" Background="#111624" BorderThickness="1" BorderBrush="#253248"
-                                    VerticalAlignment="Bottom" Margin="0,0,0,18">
+                            <Border Width="200" Height="26" CornerRadius="13" Background="#111624" BorderThickness="1" BorderBrush="#2D3A50"
+                                    VerticalAlignment="Center">
                                 <Border.Effect>
-                                    <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.6" Color="#000000" />
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Color="#10B981" Opacity="0.25" />
                                 </Border.Effect>
                             </Border>
-
-                            <!-- Standing Full Body Model (160x320) -->
-                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,24">
-                                <Image x:Name="ImgBodyModel" Width="160" Height="320" RenderOptions.BitmapScalingMode="NearestNeighbor" Cursor="Hand" MouseLeftButtonDown="ImgBodyModel_Click" />
-                            </StackPanel>
-                        </Grid>
-                    </Grid>
-
-                    <!-- Bottom Action Bar -->
-                    <StackPanel Grid.Row="1" Margin="0,10,0,2">
-                        <!-- CS:GO Dynamic Quotes & Status -->
-                        <Grid Margin="2,0,2,8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="TxtWittyQuote" Text="Заряжаем пули..." FontSize="13" FontWeight="SemiBold" Foreground="#34D399" />
-                            <TextBlock x:Name="TxtTechnicalStatus" Grid.Column="1" Text="Все файлы актуальны" FontSize="12" Foreground="#64748B" />
                         </Grid>
 
-                        <!-- Glowing Progress Bar -->
-                        <Border x:Name="BrdProgress" Height="5" CornerRadius="2.5" Background="#121622" Margin="0,0,0,10" Visibility="Collapsed">
-                            <ProgressBar x:Name="ProgressBarDownload" Height="5" Minimum="0" Maximum="100" Value="0" Background="Transparent" Foreground="#10B981" BorderThickness="0" />
+                        <!-- Flipped Mirror Reflection Beneath Pedestal -->
+                        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,2" Height="100" ClipToBounds="True">
+                            <Image x:Name="ImgBodyReflection" Width="160" Height="320" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                   Opacity="0.16" VerticalAlignment="Top" Margin="0,-220,0,0">
+                                <Image.RenderTransform>
+                                    <ScaleTransform ScaleY="-1" CenterY="160" />
+                                </Image.RenderTransform>
+                                <Image.OpacityMask>
+                                    <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                                        <GradientStop Color="#FF000000" Offset="0.0" />
+                                        <GradientStop Color="#00000000" Offset="0.7" />
+                                    </LinearGradientBrush>
+                                </Image.OpacityMask>
+                            </Image>
                         </Border>
 
-                        <!-- Apple-style Specular Play Button -->
-                        <Button x:Name="BtnPlay" Click="BtnPlay_Click" Height="52" Cursor="Hand">
+                        <!-- Main Standing Model (Clickable to open Wardrobe) -->
+                        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40">
+                            <Image x:Name="ImgBodyModel" Width="160" Height="320" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                   Cursor="Hand" ToolTip="Нажми, чтобы открыть гардероб" MouseLeftButtonDown="BtnOpenSkinSheet_Click" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- ============================================== -->
+                <!-- 3. FLOATING LAUNCH DOCK (BOTTOM)               -->
+                <!-- ============================================== -->
+                <Border Grid.Row="2" Background="#101420" CornerRadius="14" BorderThickness="1" BorderBrush="#202A3C" Padding="14,10">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="25" ShadowDepth="6" Opacity="0.5" Color="#000000" />
+                    </Border.Effect>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Player Card -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Divider -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- RAM Selector -->
+                            <ColumnDefinition Width="*" />
+                            <!-- Dynamic Quotes & Status -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- PLAY Button -->
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 1. Player Info Pill (Real Mini Face + Nick) -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,14,0" Cursor="Hand"
+                                    MouseLeftButtonDown="BtnOpenSettingsSheet_Click" ToolTip="Нажми, чтобы сменить ник">
+                            <Border Width="34" Height="34" CornerRadius="8" Background="#161B28" ClipToBounds="True" BorderThickness="1" BorderBrush="#28354A">
+                                <Image x:Name="ImgDockFace" Width="32" Height="32" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                            </Border>
+                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="TxtDockNick" Text="Player" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="Готов к игре" Foreground="#64748B" FontSize="11" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Divider -->
+                        <Border Grid.Column="1" Width="1" Height="28" Background="#1C2434" VerticalAlignment="Center" Margin="0,0,14,0" />
+
+                        <!-- 2. Integrated RAM Segmented Control -->
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,18,0">
+                            <TextBlock Text="ОЗУ" FontSize="10" FontWeight="Bold" Foreground="#64748B" Margin="2,0,0,3" />
+                            <Border Background="#0C0E16" CornerRadius="8" BorderThickness="1" BorderBrush="#1C2434" Padding="2">
+                                <UniformGrid Columns="4">
+                                    <RadioButton x:Name="RbRam4" Content="4G" GroupName="DockRam" Tag="4096" Style="{StaticResource SegmentedRamStyle}" Checked="RamRadio_Checked" />
+                                    <RadioButton x:Name="RbRam6" Content="6G" GroupName="DockRam" Tag="6144" Style="{StaticResource SegmentedRamStyle}" IsChecked="True" Checked="RamRadio_Checked" />
+                                    <RadioButton x:Name="RbRam8" Content="8G" GroupName="DockRam" Tag="8192" Style="{StaticResource SegmentedRamStyle}" Checked="RamRadio_Checked" />
+                                    <RadioButton x:Name="RbRam12" Content="12G" GroupName="DockRam" Tag="12288" Style="{StaticResource SegmentedRamStyle}" Checked="RamRadio_Checked" />
+                                </UniformGrid>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 3. Quotes & Progress Center Area -->
+                        <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="0,0,20,0">
+                            <!-- CS:GO Quote -->
+                            <TextBlock x:Name="TxtWittyQuote" Text="Заряжаем пули..." Foreground="#34D399" FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <!-- Technical Status -->
+                            <TextBlock x:Name="TxtTechnicalStatus" Text="Все файлы актуальны" Foreground="#64748B" FontSize="11" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+
+                            <!-- Glowing Download Progress Bar -->
+                            <Border x:Name="BrdProgress" Height="4" CornerRadius="2" Background="#141A28" Margin="0,6,0,0" Visibility="Collapsed">
+                                <ProgressBar x:Name="ProgressBarDownload" Height="4" Minimum="0" Maximum="100" Value="0" Background="Transparent" Foreground="#10B981" BorderThickness="0" />
+                            </Border>
+                        </StackPanel>
+
+                        <!-- 4. Massive Vibrant PLAY Button -->
+                        <Button x:Name="BtnPlay" Grid.Column="4" Click="BtnPlay_Click" Width="170" Height="48" Cursor="Hand">
                             <Button.Template>
                                 <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Brd" CornerRadius="11" BorderThickness="1" BorderBrush="#34D399">
+                                    <Border x:Name="Brd" CornerRadius="11" BorderThickness="1" BorderBrush="#34D399" SnapsToDevicePixels="True">
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                                 <GradientStop Color="#10B981" Offset="0.0" />
@@ -332,7 +381,7 @@
                                             </LinearGradientBrush>
                                         </Border.Background>
                                         <Border.Effect>
-                                            <DropShadowEffect BlurRadius="20" ShadowDepth="3" Color="#10B981" Opacity="0.35" />
+                                            <DropShadowEffect BlurRadius="22" ShadowDepth="3" Color="#10B981" Opacity="0.38" />
                                         </Border.Effect>
                                         <TextBlock x:Name="Txt" Text="ИГРАТЬ" Foreground="#FFFFFF" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
@@ -343,7 +392,7 @@
                                         <Trigger Property="IsPressed" Value="True">
                                             <Setter TargetName="Brd" Property="RenderTransform">
                                                 <Setter.Value>
-                                                    <ScaleTransform ScaleX="0.985" ScaleY="0.985" CenterX="370" CenterY="26" />
+                                                    <ScaleTransform ScaleX="0.975" ScaleY="0.975" CenterX="85" CenterY="24" />
                                                 </Setter.Value>
                                             </Setter>
                                         </Trigger>
@@ -357,141 +406,92 @@
                                 </ControlTemplate>
                             </Button.Template>
                         </Button>
-                    </StackPanel>
-                </Grid>
-
-                <!-- ============================================== -->
-                <!-- TAB 2: ГАРДЕРОБ (WARDROBE / SKIN TAB)          -->
-                <!-- ============================================== -->
-                <Grid x:Name="TabSkin" Grid.Row="1" Margin="0,10,0,0" Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="260" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Wardrobe Model View -->
-                    <Border Grid.Column="0" Background="#0F121B" CornerRadius="14" BorderThickness="1" BorderBrush="#1C2333" Padding="14">
-                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <Image x:Name="ImgWardrobeModel" Width="160" Height="320" RenderOptions.BitmapScalingMode="NearestNeighbor" />
-                            <TextBlock x:Name="TxtSkinNickPreview" Text="Player" Foreground="#FFFFFF" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,14,0,0" />
-                            <TextBlock x:Name="TxtSkinTypeTag" Text="Классический Стив (64×64)" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" />
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Skin Actions and Instructions -->
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="34,0,0,0">
-                        <TextBlock Text="Гардероб персонажа" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,6" />
-                        <TextBlock Text="Выбери файл скина .png или просто перетащи его мышкой в это окно. Скин мгновенно синхронизируется с игрой через CustomSkinLoader без перезапуска аккаунтов."
-                                   Foreground="#8E9CAE" FontSize="13" LineHeight="20" TextWrapping="Wrap" Margin="0,0,0,24" />
-
-                        <!-- Action Buttons -->
-                        <Button Click="BtnChangeSkin_Click" Width="230" Height="44" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Brd" Background="#10B981" CornerRadius="9">
-                                        <TextBlock Text="📂  Выбрать скин (.png)" Foreground="#FFFFFF" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Brd" Property="Background" Value="#34D399" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <Button Click="BtnResetSteve_Click" Width="230" Height="40" HorizontalAlignment="Left" Cursor="Hand">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="Brd" Background="#141824" CornerRadius="9" BorderThickness="1" BorderBrush="#222B3D">
-                                        <TextBlock Text="Сбросить на классического Стива" Foreground="#8E9CAE" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="Brd" Property="Background" Value="#1C2335" />
-                                            <Setter Property="Foreground" Value="#FFFFFF" />
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </StackPanel>
-                </Grid>
-
-                <!-- ============================================== -->
-                <!-- TAB 3: МОДИФИКАЦИИ (MODS TAB)                  -->
-                <!-- ============================================== -->
-                <Grid x:Name="TabMods" Grid.Row="1" Margin="0,8,0,0" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <!-- Header & Real-time Search -->
-                    <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="260" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Модификации" FontSize="22" FontWeight="Bold" Foreground="#FFFFFF" />
-                            <TextBlock x:Name="TxtModsCount" Text="45 активных модов" FontSize="12" Foreground="#64748B" Margin="0,2,0,0" />
-                        </StackPanel>
-
-                        <!-- Search Box -->
-                        <Border Grid.Column="1" Background="#111520" CornerRadius="9" BorderThickness="1" BorderBrush="#1C2333" Height="38">
-                            <Grid Margin="10,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="🔍" Foreground="#64748B" VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0" />
-                                <TextBox x:Name="TxtSearchMods" Grid.Column="1" Background="Transparent" Foreground="#FFFFFF" BorderThickness="0"
-                                         FontSize="13" VerticalAlignment="Center" CaretBrush="#10B981" TextChanged="TxtSearchMods_TextChanged" />
-                            </Grid>
-                        </Border>
                     </Grid>
+                </Border>
+            </Grid>
 
-                    <!-- Scrollable Mod List -->
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <StackPanel x:Name="PanelModsList" Margin="0,0,8,0">
-                            <!-- Populated dynamically in code-behind -->
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
+            <!-- ============================================== -->
+            <!-- LAYER 2: FLOATING SHEET OVERLAYS (APPLE HIG)   -->
+            <!-- ============================================== -->
+            <Grid x:Name="OverlayScrim" Background="#C805070B" Visibility="Collapsed" MouseLeftButtonDown="OverlayScrim_Click">
+                <!-- Floating Glass Sheet Container -->
+                <Border x:Name="SheetContainer" Width="720" Height="480" Background="#111624" CornerRadius="16"
+                        BorderThickness="1" BorderBrush="#2D3A52" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        MouseLeftButtonDown="SheetContainer_Click">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="50" ShadowDepth="12" Opacity="0.9" Color="#000000" />
+                    </Border.Effect>
 
-                <!-- ============================================== -->
-                <!-- TAB 4: НАСТРОЙКИ (SETTINGS TAB)                -->
-                <!-- ============================================== -->
-                <Grid x:Name="TabSettings" Grid.Row="1" Margin="0,8,0,0" Visibility="Collapsed">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="6,0,16,0">
-                            <TextBlock Text="Настройки" FontSize="22" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,0,0,20" />
+                    <Grid Margin="24,20,24,22">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <!-- Sheet Header -->
+                            <RowDefinition Height="*" />
+                            <!-- Sheet Content -->
+                        </Grid.RowDefinitions>
 
-                            <!-- Nickname -->
-                            <TextBlock Text="НИКНЕЙМ В ИГРЕ" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6" />
-                            <Border Background="#111520" CornerRadius="9" BorderThickness="1" BorderBrush="#1C2333" Height="42" Margin="0,0,0,18">
-                                <TextBox x:Name="TxtSettingsNick" Text="Player" Background="Transparent" Foreground="#FFFFFF" BorderThickness="0"
-                                         FontSize="13" VerticalAlignment="Center" Padding="12,0" CaretBrush="#10B981" TextChanged="TxtNickname_TextChanged" />
+                        <!-- Sheet Header (Title + Close Button) -->
+                        <Grid Grid.Row="0" Margin="0,0,0,18">
+                            <TextBlock x:Name="TxtSheetTitle" Text="Гардероб" FontSize="20" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                            <Button Click="BtnCloseSheet_Click" HorizontalAlignment="Right" Width="32" Height="32" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Brd" Background="#1A2130" CornerRadius="16">
+                                            <TextBlock Text="✕" Foreground="#8E9CAE" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="11" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Brd" Property="Background" Value="#253046" />
+                                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+
+                        <!-- ========================= -->
+                        <!-- 1. WARDROBE SHEET CONTENT -->
+                        <!-- ========================= -->
+                        <Grid x:Name="SheetSkin" Grid.Row="1" Visibility="Visible">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="240" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Background="#0C0E16" CornerRadius="12" BorderThickness="1" BorderBrush="#1C2434" Padding="12">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Image x:Name="ImgWardrobeModel" Width="140" Height="280" RenderOptions.BitmapScalingMode="NearestNeighbor" />
+                                    <TextBlock x:Name="TxtWardrobeNick" Text="Player" Foreground="#FFFFFF" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,10,0,0" />
+                                    <TextBlock x:Name="TxtWardrobeFormat" Text="64×64 PNG" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                </StackPanel>
                             </Border>
 
-                            <!-- Game Directory -->
-                            <TextBlock Text="ДИРЕКТОРИЯ .MINECRAFT" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6" />
-                            <Grid Margin="0,0,0,18">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Border Background="#111520" CornerRadius="9" BorderThickness="1" BorderBrush="#1C2333" Height="42">
-                                    <TextBox x:Name="TxtGameDir" Text="D:\.minecraft" Background="Transparent" Foreground="#8E9CAE" BorderThickness="0"
-                                             FontSize="13" VerticalAlignment="Center" Padding="12,0" IsReadOnly="True" />
-                                </Border>
-                                <Button Grid.Column="1" Click="BtnOpenGameDir_Click" Width="94" Height="42" Margin="8,0,0,0" Cursor="Hand">
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="28,0,0,0">
+                                <TextBlock Text="Смена скина" FontSize="18" FontWeight="SemiBold" Foreground="#FFFFFF" Margin="0,0,0,6" />
+                                <TextBlock Text="Выбери файл скина или перетащи любой .png прямо в это окно. Скин запишется в папку CustomSkinLoader и применится в игре моментально."
+                                           Foreground="#8E9CAE" FontSize="13" LineHeight="20" TextWrapping="Wrap" Margin="0,0,0,22" />
+
+                                <Button Click="BtnChangeSkin_Click" Width="220" Height="42" HorizontalAlignment="Left" Cursor="Hand" Margin="0,0,0,10">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Brd" Background="#10B981" CornerRadius="9">
+                                                <TextBlock Text="📂  Выбрать скин (.png)" Foreground="#FFFFFF" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Brd" Property="Background" Value="#34D399" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+
+                                <Button Click="BtnResetSteve_Click" Width="220" Height="38" HorizontalAlignment="Left" Cursor="Hand">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <Border x:Name="Brd" Background="#141824" CornerRadius="9" BorderThickness="1" BorderBrush="#222B3D">
-                                                <TextBlock Text="Открыть" Foreground="#8E9CAE" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="Сбросить на классического Стива" Foreground="#8E9CAE" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -502,36 +502,117 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                 </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- ========================= -->
+                        <!-- 2. MODS SHEET CONTENT     -->
+                        <!-- ========================= -->
+                        <Grid x:Name="SheetMods" Grid.Row="1" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Live Search Filter -->
+                            <Grid Grid.Row="0" Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Background="#0C0E16" CornerRadius="9" BorderThickness="1" BorderBrush="#1C2434" Height="36">
+                                    <Grid Margin="10,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="🔍" Foreground="#64748B" VerticalAlignment="Center" FontSize="12" Margin="0,0,8,0" />
+                                        <TextBox x:Name="TxtSearchMods" Grid.Column="1" Background="Transparent" Foreground="#FFFFFF" BorderThickness="0"
+                                                 FontSize="13" VerticalAlignment="Center" CaretBrush="#10B981" TextChanged="TxtSearchMods_TextChanged" />
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock x:Name="TxtModsCount" Grid.Column="1" Text="45 модов" Foreground="#64748B" FontSize="12" VerticalAlignment="Center" Margin="14,0,4,0" />
                             </Grid>
 
-                            <!-- GitHub Repo -->
-                            <TextBlock Text="GITHUB РЕПОЗИТОРИЙ ДЛЯ ОБНОВЛЕНИЙ" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6" />
-                            <Border Background="#111520" CornerRadius="9" BorderThickness="1" BorderBrush="#1C2333" Height="42" Margin="0,0,0,26">
-                                <TextBox x:Name="TxtGitHubRepo" Text="qutlawsoasis-debug/Aura" Background="Transparent" Foreground="#8E9CAE" BorderThickness="0"
-                                         FontSize="13" VerticalAlignment="Center" Padding="12,0" />
-                            </Border>
+                            <!-- Scrollable Mods -->
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PanelModsList" Margin="0,0,6,0" />
+                            </ScrollViewer>
+                        </Grid>
 
-                            <!-- Save Controls -->
-                            <StackPanel Orientation="Horizontal">
-                                <Button Click="BtnSaveSettings_Click" Width="200" Height="42" Cursor="Hand">
-                                    <Button.Template>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border x:Name="Brd" Background="#10B981" CornerRadius="9">
-                                                <TextBlock Text="💾  Сохранить настройки" Foreground="#FFFFFF" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Brd" Property="Background" Value="#34D399" />
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Button.Template>
-                                </Button>
-                                <TextBlock x:Name="TxtSettingsStatus" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0" Visibility="Collapsed" Text="✓ Настройки сохранены" />
-                            </StackPanel>
-                        </StackPanel>
-                    </ScrollViewer>
-                </Grid>
+                        <!-- ========================= -->
+                        <!-- 3. SETTINGS SHEET CONTENT -->
+                        <!-- ========================= -->
+                        <Grid x:Name="SheetSettings" Grid.Row="1" Visibility="Collapsed">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel Margin="4,0,10,0">
+                                    <!-- Nickname -->
+                                    <TextBlock Text="НИКНЕЙМ В ИГРЕ" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6" />
+                                    <Border Background="#0C0E16" CornerRadius="8" BorderThickness="1" BorderBrush="#1C2434" Height="40" Margin="0,0,0,16">
+                                        <TextBox x:Name="TxtSettingsNick" Text="Player" Background="Transparent" Foreground="#FFFFFF" BorderThickness="0"
+                                                 FontSize="13" VerticalAlignment="Center" Padding="12,0" CaretBrush="#10B981" TextChanged="TxtNickname_TextChanged" />
+                                    </Border>
+
+                                    <!-- Directory -->
+                                    <TextBlock Text="ДИРЕКТОРИЯ .MINECRAFT" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6" />
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Background="#0C0E16" CornerRadius="8" BorderThickness="1" BorderBrush="#1C2434" Height="40">
+                                            <TextBox x:Name="TxtGameDir" Text="D:\.minecraft" Background="Transparent" Foreground="#8E9CAE" BorderThickness="0"
+                                                     FontSize="12" VerticalAlignment="Center" Padding="12,0" IsReadOnly="True" />
+                                        </Border>
+                                        <Button Grid.Column="1" Click="BtnOpenGameDir_Click" Width="90" Height="40" Margin="8,0,0,0" Cursor="Hand">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Brd" Background="#141824" CornerRadius="8" BorderThickness="1" BorderBrush="#222B3D">
+                                                        <TextBlock Text="Открыть" Foreground="#8E9CAE" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Brd" Property="Background" Value="#1C2335" />
+                                                            <Setter Property="Foreground" Value="#FFFFFF" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- GitHub Repo -->
+                                    <TextBlock Text="GITHUB РЕПОЗИТОРИЙ СБОРКИ" FontSize="11" FontWeight="Bold" Foreground="#64748B" Margin="0,0,0,6" />
+                                    <Border Background="#0C0E16" CornerRadius="8" BorderThickness="1" BorderBrush="#1C2434" Height="40" Margin="0,0,0,24">
+                                        <TextBox x:Name="TxtGitHubRepo" Text="qutlawsoasis-debug/Aura" Background="Transparent" Foreground="#8E9CAE" BorderThickness="0"
+                                                 FontSize="12" VerticalAlignment="Center" Padding="12,0" />
+                                    </Border>
+
+                                    <!-- Save Button -->
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Click="BtnSaveSettings_Click" Width="190" Height="40" Cursor="Hand">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Brd" Background="#10B981" CornerRadius="8">
+                                                        <TextBlock Text="💾  Сохранить настройки" Foreground="#FFFFFF" FontSize="13" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Brd" Property="Background" Value="#34D399" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                        <TextBlock x:Name="TxtSettingsStatus" Foreground="#34D399" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,0,0" Visibility="Collapsed" Text="✓ Настройки сохранены" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                </Border>
             </Grid>
         </Grid>
     </Border>

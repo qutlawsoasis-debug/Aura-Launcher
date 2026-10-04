@@ -123,8 +123,8 @@ namespace AuraLauncher
 
             var nick = string.IsNullOrWhiteSpace(_config.Nickname) ? "Player" : _config.Nickname;
             TxtSettingsNick.Text = nick;
-            TxtSidebarNick.Text = nick;
-            TxtSkinNickPreview.Text = nick;
+            TxtDockNick.Text = nick;
+            TxtWardrobeNick.Text = nick;
 
             TxtGitHubRepo.Text = string.IsNullOrWhiteSpace(_config.GitHubRepo) ? "qutlawsoasis-debug/Aura" : _config.GitHubRepo;
             TxtGameDir.Text = FindMinecraftDir();
@@ -169,26 +169,47 @@ namespace AuraLauncher
             Close();
         }
 
-        private void Nav_Click(object sender, RoutedEventArgs e)
+        // ==========================================
+        // FLOATING SHEET MODALS (APPLE HIG)
+        // ==========================================
+        private void BtnOpenSkinSheet_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is RadioButton rb && rb.Tag is string tag)
-            {
-                SwitchToTab(tag);
-            }
+            OpenSheet("Гардероб", SheetSkin);
         }
 
-        private void SwitchToTab(string tag)
+        private void BtnOpenModsSheet_Click(object sender, RoutedEventArgs e)
         {
-            TabPlay.Visibility = tag == "TabPlay" ? Visibility.Visible : Visibility.Collapsed;
-            TabSkin.Visibility = tag == "TabSkin" ? Visibility.Visible : Visibility.Collapsed;
-            TabMods.Visibility = tag == "TabMods" ? Visibility.Visible : Visibility.Collapsed;
-            TabSettings.Visibility = tag == "TabSettings" ? Visibility.Visible : Visibility.Collapsed;
+            OpenSheet("Модификации (45)", SheetMods);
         }
 
-        private void ImgBodyModel_Click(object sender, MouseButtonEventArgs e)
+        private void BtnOpenSettingsSheet_Click(object sender, RoutedEventArgs e)
         {
-            NavSkin.IsChecked = true;
-            SwitchToTab("TabSkin");
+            OpenSheet("Настройки", SheetSettings);
+        }
+
+        private void OpenSheet(string title, FrameworkElement activeContent)
+        {
+            TxtSheetTitle.Text = title;
+            SheetSkin.Visibility = Visibility.Collapsed;
+            SheetMods.Visibility = Visibility.Collapsed;
+            SheetSettings.Visibility = Visibility.Collapsed;
+            activeContent.Visibility = Visibility.Visible;
+            OverlayScrim.Visibility = Visibility.Visible;
+        }
+
+        private void BtnCloseSheet_Click(object sender, RoutedEventArgs e)
+        {
+            OverlayScrim.Visibility = Visibility.Collapsed;
+        }
+
+        private void OverlayScrim_Click(object sender, MouseButtonEventArgs e)
+        {
+            OverlayScrim.Visibility = Visibility.Collapsed;
+        }
+
+        private void SheetContainer_Click(object sender, MouseButtonEventArgs e)
+        {
+            e.Handled = true; // prevent scrim from closing when clicking inside
         }
 
         private void TxtNickname_TextChanged(object sender, TextChangedEventArgs e)
@@ -196,8 +217,8 @@ namespace AuraLauncher
             var nick = TxtSettingsNick.Text.Trim();
             if (string.IsNullOrEmpty(nick)) nick = "Player";
             _config.Nickname = nick;
-            TxtSidebarNick.Text = nick;
-            TxtSkinNickPreview.Text = nick;
+            TxtDockNick.Text = nick;
+            TxtWardrobeNick.Text = nick;
         }
 
         private void RamRadio_Checked(object sender, RoutedEventArgs e)
@@ -267,8 +288,7 @@ namespace AuraLauncher
                         SyncSkinToGame(_config.SkinPath);
                         SaveConfig();
 
-                        NavSkin.IsChecked = true;
-                        SwitchToTab("TabSkin");
+                        OpenSheet("Гардероб", SheetSkin);
                     }
                     catch { }
                 }
@@ -282,9 +302,10 @@ namespace AuraLauncher
         {
             var (modelImg, miniFace, desc) = CreateModelAndMiniFace(skinPath);
             ImgBodyModel.Source = modelImg;
+            ImgBodyReflection.Source = modelImg;
             ImgWardrobeModel.Source = modelImg;
-            ImgSidebarFace.Source = miniFace;
-            TxtSkinTypeTag.Text = desc;
+            ImgDockFace.Source = miniFace;
+            TxtWardrobeFormat.Text = desc;
         }
 
         private void BtnChangeSkin_Click(object sender, RoutedEventArgs e)
@@ -396,9 +417,7 @@ namespace AuraLauncher
             uint[] skinPixels = new uint[skinW * skinH];
             conv.CopyPixels(skinPixels, skinW * 4, 0);
 
-            // =========================
-            // 1. FULL BODY (16x32 -> 160x320)
-            // =========================
+            // 1. FULL BODY MODEL (16x32 -> 160x320)
             uint[] canvas = new uint[16 * 32];
 
             void Blit(int sx, int sy, int w, int h, int dx, int dy, bool flipX = false)
@@ -503,9 +522,7 @@ namespace AuraLauncher
             wbFull.WritePixels(new Int32Rect(0, 0, 160, 320), scaled, 160 * 4, 0);
             wbFull.Freeze();
 
-            // =========================
             // 2. MINI HEAD FACE (8x8 -> 32x32)
-            // =========================
             uint[] face8x8 = new uint[8 * 8];
             for (int y = 0; y < 8; y++)
             {
@@ -689,7 +706,8 @@ namespace AuraLauncher
                     m.Category.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                     m.Description.Contains(query, StringComparison.OrdinalIgnoreCase));
 
-            TxtModsCount.Text = $"{filtered.Count} модов активно";
+            TxtModsCount.Text = $"{filtered.Count} модов";
+            TxtNavModsLabel.Text = $"Модификации ({_allMods.Count})";
 
             foreach (var mod in filtered)
             {
@@ -701,12 +719,12 @@ namespace AuraLauncher
         {
             var brd = new Border
             {
-                Background = new SolidColorBrush(Color.FromRgb(0x11, 0x15, 0x20)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x1C, 0x23, 0x33)),
+                Background = new SolidColorBrush(Color.FromRgb(0x0E, 0x12, 0x1D)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x1C, 0x24, 0x36)),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(9),
                 Margin = new Thickness(0, 0, 0, 8),
-                Padding = new Thickness(14, 11, 14, 11)
+                Padding = new Thickness(14, 10, 14, 10)
             };
 
             var grid = new Grid();
@@ -985,7 +1003,6 @@ namespace AuraLauncher
             var cpList = new List<string>();
             var libsDir = Path.Combine(mcDir, "libraries");
 
-            // Parse EXACT libraries from JSON (avoids dumping all 2000 jars into command line)
             if (File.Exists(verJsonPath))
             {
                 try
@@ -1019,7 +1036,6 @@ namespace AuraLauncher
                 catch { }
             }
 
-            // Fallback: If JSON couldn't be parsed, use common Fabric essentials
             if (cpList.Count == 0 && Directory.Exists(libsDir))
             {
                 foreach (var jar in Directory.GetFiles(libsDir, "*.jar", SearchOption.TopDirectoryOnly))
@@ -1028,7 +1044,6 @@ namespace AuraLauncher
                 }
             }
 
-            // Client JAR
             var base1201 = Path.Combine(versionsDir, "1.20.1", "1.20.1.jar");
             if (File.Exists(base1201))
             {
@@ -1046,7 +1061,6 @@ namespace AuraLauncher
             var classPath = string.Join(";", cpList);
             var uuid = Guid.NewGuid().ToString("N");
 
-            // Write arguments to an argument file (no BOM) to completely prevent Windows cmd length limits
             var argsFile = Path.Combine(Path.GetTempPath(), "aura_minecraft_args.txt");
             var sb = new StringBuilder();
             sb.AppendLine($"-Xmx{_config.RamMb}M");
