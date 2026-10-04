@@ -60,7 +60,10 @@
                     <!-- Логотип и версия (Draggable зона) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0" Background="Transparent">
                         <Image Source="pack://application:,,,/AuraLauncher;component/app_icon.png" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                        <TextBlock Text="AURA" FontSize="14" FontWeight="SemiBold" Foreground="#E8EAED" VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="AURA" FontSize="14" FontWeight="SemiBold" Foreground="#E8EAED" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Border Background="#20242E" CornerRadius="4" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding LauncherVersionText}" FontSize="11" FontWeight="SemiBold" Foreground="#19D3A7" />
+                        </Border>
                         <TextBlock Text="Fabric 1.20.1" FontSize="12" Foreground="#9AA3B2" VerticalAlignment="Center" />
                     </StackPanel>
 
