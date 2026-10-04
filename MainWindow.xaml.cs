@@ -339,10 +339,30 @@ namespace AuraLauncher
                 _config.SkinPath = "";
                 UpdateSkinModelPreview(null);
 
+                var mcDir = FindMinecraftDir();
+                var nick = string.IsNullOrWhiteSpace(_config.Nickname) ? "Player" : _config.Nickname;
+                var localSkinDir = Path.Combine(mcDir, "CustomSkinLoader", "LocalSkin", "skins");
+                Directory.CreateDirectory(localSkinDir);
+                var targetPath = Path.Combine(localSkinDir, $"{nick}.png");
+
                 var stevePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
                 if (File.Exists(stevePath))
                 {
-                    SyncSkinToGame(stevePath);
+                    File.Copy(stevePath, targetPath, true);
+                }
+                else
+                {
+                    try
+                    {
+                        var uri = new Uri("pack://application:,,,/steve.png");
+                        var streamInfo = Application.GetResourceStream(uri);
+                        if (streamInfo != null)
+                        {
+                            using var fs = File.Create(targetPath);
+                            streamInfo.Stream.CopyTo(fs);
+                        }
+                    }
+                    catch { }
                 }
 
                 SaveConfig();
@@ -381,6 +401,26 @@ namespace AuraLauncher
                     bmp.EndInit();
                     sourceBmp = bmp;
                     desc = $"{Path.GetFileName(skinPath)} ({bmp.PixelWidth}×{bmp.PixelHeight})";
+                }
+                catch { }
+            }
+
+            if (sourceBmp == null)
+            {
+                try
+                {
+                    var uri = new Uri("pack://application:,,,/steve.png");
+                    var streamInfo = Application.GetResourceStream(uri);
+                    if (streamInfo != null)
+                    {
+                        using var s = streamInfo.Stream;
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.StreamSource = s;
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        sourceBmp = bmp;
+                    }
                 }
                 catch { }
             }
