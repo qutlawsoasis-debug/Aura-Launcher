@@ -17,13 +17,22 @@ public class LobbyApiClient : ILobbyApiClient
         PropertyNameCaseInsensitive = true
     };
 
-    public LobbyApiClient(HttpClient? httpClient = null, string baseUrl = "http://127.0.0.1:3000")
+    private readonly IConfigService? _configService;
+    private readonly string _defaultBaseUrl;
+
+    public LobbyApiClient(HttpClient? httpClient = null, string baseUrl = "http://localhost:3000", IConfigService? configService = null)
     {
         _httpClient = httpClient ?? new HttpClient();
-        if (_httpClient.BaseAddress == null)
-        {
-            _httpClient.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
-        }
+        _defaultBaseUrl = baseUrl.TrimEnd('/') + "/";
+        _configService = configService;
+    }
+
+    private Uri GetRequestUri(string relativePath)
+    {
+        string baseStr = _configService?.CurrentConfig?.LobbyApiBaseUrl ?? _defaultBaseUrl;
+        if (string.IsNullOrWhiteSpace(baseStr)) baseStr = _defaultBaseUrl;
+        baseStr = baseStr.TrimEnd('/') + "/";
+        return new Uri(new Uri(baseStr), relativePath);
     }
 
     public async Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, CancellationToken cancellationToken = default)
@@ -35,7 +44,7 @@ public class LobbyApiClient : ILobbyApiClient
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync("api/lobby", content, cancellationToken);
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby"), content, cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -56,7 +65,7 @@ public class LobbyApiClient : ILobbyApiClient
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync("api/lobby/join", content, cancellationToken);
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/join"), content, cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -72,7 +81,7 @@ public class LobbyApiClient : ILobbyApiClient
     {
         try
         {
-            var response = await _httpClient.GetAsync($"api/lobby/status?code={Uri.EscapeDataString(code)}", cancellationToken);
+            var response = await _httpClient.GetAsync(GetRequestUri($"api/lobby/status?code={Uri.EscapeDataString(code)}"), cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -93,7 +102,7 @@ public class LobbyApiClient : ILobbyApiClient
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync("api/lobby/open", content, cancellationToken);
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/open"), content, cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -111,7 +120,7 @@ public class LobbyApiClient : ILobbyApiClient
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync("api/lobby/heartbeat", content, cancellationToken);
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/heartbeat"), content, cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch
@@ -129,7 +138,7 @@ public class LobbyApiClient : ILobbyApiClient
                 Encoding.UTF8,
                 "application/json");
 
-            var response = await _httpClient.PostAsync("api/lobby/close", content, cancellationToken);
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/close"), content, cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch

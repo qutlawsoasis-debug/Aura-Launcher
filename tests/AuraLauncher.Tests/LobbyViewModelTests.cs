@@ -33,10 +33,10 @@ public class LobbyViewModelTests
             return Task.FromResult<string?>("TEST01");
         }
 
-        public Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, CancellationToken cancellationToken = default)
+        public Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, int localPort = 25565, CancellationToken cancellationToken = default)
         {
             CurrentStatus = "open";
-            CurrentTunnelAddress = customTunnelAddress ?? "127.0.0.1:25565";
+            CurrentTunnelAddress = customTunnelAddress ?? $"127.0.0.1:{localPort}";
             StatusChanged?.Invoke(CurrentStatus);
             TunnelAddressReady?.Invoke(CurrentTunnelAddress);
             return Task.FromResult(true);

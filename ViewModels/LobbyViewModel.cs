@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using AuraLauncher.Core;
 using AuraLauncher.Services.Interfaces;
+using AuraLauncher.Services.Implementations;
 
 namespace AuraLauncher.ViewModels;
 
@@ -17,6 +18,7 @@ public class LobbyViewModel : ObservableObject
     private readonly ILobbyService _lobbyService;
     private readonly IGameLaunchService _launchService;
     private readonly IConfigService _configService;
+    private readonly ILanWorldWatcher _worldWatcher;
 
     // === Общее состояние ===
     private bool _isInLobby;
@@ -37,11 +39,16 @@ public class LobbyViewModel : ObservableObject
     private string _guestStatusText = "Введите 6-значный код лобби";
     private bool _canGuestConnect;
 
-    public LobbyViewModel(ILobbyService lobbyService, IGameLaunchService launchService, IConfigService configService)
+    public LobbyViewModel(
+        ILobbyService lobbyService,
+        IGameLaunchService launchService,
+        IConfigService configService,
+        ILanWorldWatcher? worldWatcher = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _worldWatcher = worldWatcher ?? new LanWorldWatcher();
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6);
@@ -53,6 +60,9 @@ public class LobbyViewModel : ObservableObject
         // Подписка на события LobbyService
         _lobbyService.StatusChanged += OnLobbyStatusChanged;
         _lobbyService.TunnelAddressReady += OnTunnelAddressReady;
+
+        // Подписка на события лога игры хоста
+        _worldWatcher.WorldOpened += OnLanWorldOpened;
     }
 
     // === Свойства ===
@@ -229,30 +239,45 @@ public class LobbyViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Хост вручную нажимает "Открыть мир" после того, как открыл мир для сети в Minecraft.
-    /// Это сигнализирует lobby-api, что туннель готов и гости могут подключаться.
+    /// Хост нажимает «ОТКРЫТЬ МИР»: если игра не запущена, запускает клиент игры хоста,
+    /// запускает наблюдение за latest.log и ожидает открытия LAN-мира ("Started serving on N").
+    /// Если включен демо-режим UseFakeTunnel, открывает мир немедленно на порту 25565.
     /// </summary>
     private async Task OpenWorldAsHostAsync()
     {
         IsBusy = true;
-        HostStatusText = "Открытие туннеля...";
+        HostStatusText = "Запуск мира...";
 
         try
         {
-            var success = await _lobbyService.HostOpenWorldAsync();
-            if (success)
+            bool isFakeTunnel = string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
+
+            if (isFakeTunnel)
             {
-                IsWorldOpen = true;
-                HostStatusText = "Лобби открыто!";
-                StatusText = "Мир открыт — друзья могут подключиться!";
-                StatusIcon = "✅";
+                var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565);
+                if (success)
+                {
+                    IsWorldOpen = true;
+                    HostStatusText = "Лобби открыто!";
+                    StatusText = "Мир открыт — друзья могут подключиться!";
+                    StatusIcon = "✅";
+                }
+                return;
             }
-            else
-            {
-                HostStatusText = "Ошибка открытия";
-                StatusText = "Не удалось открыть мир. Попробуй снова";
-                StatusIcon = "❌";
-            }
+
+            // Реальный режим: запускаем watcher на latest.log
+            var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+            var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
+            
+            _worldWatcher.Start(logPath);
+
+            // Запускаем игру хоста через MainViewModel
+            HostLaunchRequested?.Invoke(this, EventArgs.Empty);
+
+            HostStatusText = "Ожидание открытия мира...";
+            StatusText = "Игра запущена. Открой мир для сети (Esc → Открыть для сети)";
+            StatusIcon = "⏳";
         }
         catch (Exception ex)
         {
@@ -264,6 +289,37 @@ public class LobbyViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    private void OnLanWorldOpened(int port)
+    {
+        Dispatch(async () =>
+        {
+            HostStatusText = $"Мир открыт на порту {port}! Подключение туннеля...";
+            try
+            {
+                var success = await _lobbyService.HostOpenWorldAsync(localPort: port);
+                if (success)
+                {
+                    IsWorldOpen = true;
+                    HostStatusText = "Лобби открыто!";
+                    StatusText = $"Мир открыт (порт {port}) — друзья могут подключиться!";
+                    StatusIcon = "✅";
+                }
+                else
+                {
+                    HostStatusText = "Ошибка открытия лобби";
+                    StatusText = "Не удалось опубликовать лобби";
+                    StatusIcon = "❌";
+                }
+            }
+            catch (Exception ex)
+            {
+                HostStatusText = "Ошибка";
+                StatusText = $"Ошибка открытия: {ex.Message}";
+                StatusIcon = "❌";
+            }
+        });
     }
 
     private async Task JoinLobbyAsync()
@@ -341,6 +397,11 @@ public class LobbyViewModel : ObservableObject
     /// Событие, которое MainViewModel слушает для запуска игры с quickPlayMultiplayer.
     /// </summary>
     public event EventHandler<string>? GuestConnectRequested;
+
+    /// <summary>
+    /// Событие, которое MainViewModel слушает для запуска игры хоста.
+    /// </summary>
+    public event EventHandler? HostLaunchRequested;
 
     private void CopyCode()
     {

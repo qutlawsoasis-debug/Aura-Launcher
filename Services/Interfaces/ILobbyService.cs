@@ -18,7 +18,7 @@ public interface ILobbyService
     event Action<string>? TunnelAddressReady;
 
     Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default);
-    Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, CancellationToken cancellationToken = default);
+    Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, int localPort = 25565, CancellationToken cancellationToken = default);
     Task CloseLobbyAsHostAsync(CancellationToken cancellationToken = default);
 
     Task<bool> JoinLobbyAsGuestAsync(string code, string playerName, CancellationToken cancellationToken = default);

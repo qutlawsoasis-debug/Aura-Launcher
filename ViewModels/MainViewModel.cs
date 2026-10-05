@@ -305,6 +305,11 @@ public class MainViewModel : ObservableObject
             _ = LaunchGameAsync(tunnelAddress);
         };
 
+        LobbyVM.HostLaunchRequested += (s, e) =>
+        {
+            _ = LaunchGameAsync(null);
+        };
+
         _currentView = OverviewVM;
 
         LaunchGameCommand = new AsyncRelayCommand(() => LaunchGameAsync(null), () => !IsBusy && !IsGameRunning && !_isLaunching && NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid);

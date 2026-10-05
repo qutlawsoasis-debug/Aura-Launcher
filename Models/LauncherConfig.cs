@@ -18,4 +18,5 @@ public class LauncherConfig
     public string PackRepo { get; set; } = DefaultPackRepo;
     public DateTime? LastUpdateUtc { get; set; }
     public string? QuickPlayMultiplayer { get; set; }
+    public string LobbyApiBaseUrl { get; set; } = "http://localhost:3000";
 }
