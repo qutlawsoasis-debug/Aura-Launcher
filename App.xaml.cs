@@ -123,8 +123,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.CaptureLobbyShotsAsync(mainWindow);
-                Environment.Exit(success ? 0 : 1);
+                bool success = await Core.SceneDiagnostics.LiveTestLobbyAsync(mainWindow);
             });
         }
         else if (isSelfTest)
