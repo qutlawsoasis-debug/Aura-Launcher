@@ -177,6 +177,11 @@ public class PlayitTunnelProvider : ITunnelProvider
         LogTunnel($"[BROWSER] Launching browser for: {url}");
         try
         {
+            if (string.Equals(Environment.GetEnvironmentVariable("AURA_SIMULATE_BROWSER_FAIL"), "1", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Simulated Process.Start failure: The system cannot find the file specified / no association");
+            }
+
             var psi = new ProcessStartInfo
             {
                 FileName = url,
@@ -190,6 +195,11 @@ public class PlayitTunnelProvider : ITunnelProvider
             LogTunnel($"[BROWSER: WARN] Process.Start failed: {ex.Message}. Falling back to cmd.exe /c start...");
             try
             {
+                if (string.Equals(Environment.GetEnvironmentVariable("AURA_SIMULATE_BROWSER_FAIL"), "1", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("Simulated fallback failure");
+                }
+
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
