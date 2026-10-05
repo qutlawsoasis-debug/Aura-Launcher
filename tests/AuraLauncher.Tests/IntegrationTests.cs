@@ -66,8 +66,8 @@ public class IntegrationTests
         Trace.WriteLine($"Shaders count: {shaders.Length}");
         Trace.WriteLine($"Resourcepacks count: {rps.Length}");
 
-        Assert.Equal(174, packFiles.Count);
-        Assert.Equal(60, mods.Length);
+        Assert.Equal(175, packFiles.Count);
+        Assert.Equal(61, mods.Length);
         Assert.Equal(4, shaders.Length);
         Assert.Equal(3, rps.Length);
         Assert.True(File.Exists(optionsPath));

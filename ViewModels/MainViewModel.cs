@@ -282,7 +282,7 @@ public class MainViewModel : ObservableObject
 
         _currentView = OverviewVM;
 
-        LaunchGameCommand = new AsyncRelayCommand(LaunchGameAsync, () => !IsBusy && !IsGameRunning && !_isLaunching);
+        LaunchGameCommand = new AsyncRelayCommand(LaunchGameAsync, () => !IsBusy && !IsGameRunning && !_isLaunching && NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid);
         CancelCommand = new RelayCommand(_ => CancelLaunch());
         LaunchOrCancelCommand = new RelayCommand(_ =>
         {
@@ -295,7 +295,7 @@ public class MainViewModel : ObservableObject
             {
                 _ = LaunchGameAsync();
             }
-        }, _ => !IsGameRunning);
+        }, _ => !IsGameRunning && (IsBusy || NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid));
 
         CheckUpdatesCommand = new AsyncRelayCommand(() => CheckUpdatesAsync(isStartup: false), () => !IsBusy && !IsGameRunning);
         CloseWindowCommand = new RelayCommand(_ => System.Windows.Application.Current.Shutdown());
@@ -373,6 +373,12 @@ public class MainViewModel : ObservableObject
         OverviewVM.RefreshStats();
         UpdateAvatar();
 
+        var initialNickValidation = NicknameValidator.Validate(_configService.CurrentConfig.Nickname);
+        if (!initialNickValidation.IsValid)
+        {
+            FabricGameLaunchService.LogLauncherEvent("[CONFIG] Обнаружен невалидный никнейм в конфигурации. Запуск заблокирован до исправления.");
+        }
+
         // Определение уже запущенной игры при старте лаунчера
         var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
         var running = _launchService.FindRunningGameProcess(gameDir);
@@ -401,18 +407,28 @@ public class MainViewModel : ObservableObject
         }
         else
         {
-            var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
-            bool isInstalled = _launchService.CheckEnvironmentInstalled(gameDir);
-            State = LauncherState.Idle;
-            if (isInstalled)
+            var nickVal = NicknameValidator.Validate(_configService.CurrentConfig.Nickname);
+            if (!nickVal.IsValid)
             {
-                StateTitle = "Готов к игре";
-                StatusText = "Готов к запуску";
+                State = LauncherState.Idle;
+                StateTitle = "Некорректный никнейм";
+                StatusText = "Укажи никнейм в Настройках (3-16 символов, A-Z, 0-9, _)";
             }
             else
             {
-                StateTitle = "Готов к установке";
-                StatusText = "Готов к установке";
+                var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+                bool isInstalled = _launchService.CheckEnvironmentInstalled(gameDir);
+                State = LauncherState.Idle;
+                if (isInstalled)
+                {
+                    StateTitle = "Готов к игре";
+                    StatusText = "Готов к запуску";
+                }
+                else
+                {
+                    StateTitle = "Готов к установке";
+                    StatusText = "Готов к установке";
+                }
             }
         }
         OnPropertyChanged(nameof(LaunchButtonText));
@@ -476,6 +492,14 @@ public class MainViewModel : ObservableObject
         {
             return;
         }
+
+        var nickVal = NicknameValidator.Validate(_configService.CurrentConfig.Nickname);
+        if (!nickVal.IsValid)
+        {
+            SetLauncherState(LauncherState.Idle, "Укажи никнейм в Настройках (3-16 символов, A-Z, 0-9, _)");
+            return;
+        }
+
         _isLaunching = true;
         IsBusy = true;
         LaunchOrCancelCommand.RaiseCanExecuteChanged();

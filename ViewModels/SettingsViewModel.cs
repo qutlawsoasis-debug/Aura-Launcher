@@ -19,20 +19,62 @@ public class SettingsViewModel : ObservableObject
     private readonly IConfigService _configService;
     private CancellationTokenSource? _debounceCts;
     private string _errorMessage = string.Empty;
+    private string _nickname = string.Empty;
+    private string _nicknameErrorText = string.Empty;
 
     public string Nickname
     {
-        get => _configService.CurrentConfig.Nickname;
+        get => _nickname;
         set
         {
-            if (_configService.CurrentConfig.Nickname != value)
+            var val = value ?? string.Empty;
+            if (SetProperty(ref _nickname, val))
             {
-                _configService.CurrentConfig.Nickname = value ?? string.Empty;
-                OnPropertyChanged();
-                _ = SaveImmediatelyAsync();
+                ValidateAndApplyNickname(val);
             }
         }
     }
+
+    public string NicknameErrorText
+    {
+        get => _nicknameErrorText;
+        private set
+        {
+            if (SetProperty(ref _nicknameErrorText, value))
+            {
+                OnPropertyChanged(nameof(HasNicknameError));
+            }
+        }
+    }
+
+    public bool HasNicknameError => !string.IsNullOrWhiteSpace(_nicknameErrorText);
+
+    private void ValidateAndApplyNickname(string nick)
+    {
+        var result = NicknameValidator.Validate(nick);
+        if (result.IsValid)
+        {
+            NicknameErrorText = string.Empty;
+            if (_configService.CurrentConfig.Nickname != nick)
+            {
+                _configService.CurrentConfig.Nickname = nick;
+                _ = SaveImmediatelyAsync();
+            }
+        }
+        else
+        {
+            NicknameErrorText = GetNicknameErrorMessage(result.Error);
+        }
+    }
+
+    public static string GetNicknameErrorMessage(NicknameError error) => error switch
+    {
+        NicknameError.Empty => "Никнейм не может быть пустым",
+        NicknameError.TooShort => "Никнейм должен содержать минимум 3 символа",
+        NicknameError.TooLong => "Никнейм не может превышать 16 символов",
+        NicknameError.InvalidChars => "Разрешены только буквы (A-Z), цифры (0-9) и знак _",
+        _ => string.Empty
+    };
 
     public int RamMb
     {
@@ -149,6 +191,13 @@ public class SettingsViewModel : ObservableObject
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
 
+        _nickname = _configService.CurrentConfig.Nickname ?? string.Empty;
+        var initialResult = NicknameValidator.Validate(_nickname);
+        if (!initialResult.IsValid)
+        {
+            _nicknameErrorText = GetNicknameErrorMessage(initialResult.Error);
+        }
+
         SelectGameFolderCommand = new RelayCommand(_ =>
         {
             var dialog = new OpenFolderDialog
@@ -166,6 +215,13 @@ public class SettingsViewModel : ObservableObject
 
         _configService.ConfigChanged += (s, e) =>
         {
+            if (_configService.CurrentConfig.Nickname != _nickname)
+            {
+                _nickname = _configService.CurrentConfig.Nickname ?? string.Empty;
+                var res = NicknameValidator.Validate(_nickname);
+                NicknameErrorText = res.IsValid ? string.Empty : GetNicknameErrorMessage(res.Error);
+                OnPropertyChanged(nameof(Nickname));
+            }
             OnPropertyChanged(null);
         };
     }

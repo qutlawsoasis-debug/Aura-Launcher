@@ -11,6 +11,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using AuraLauncher.Core;
 using AuraLauncher.Models;
 using AuraLauncher.Services.Interfaces;
 using CmlLib.Core;
@@ -768,6 +769,13 @@ public class FabricGameLaunchService : IGameLaunchService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(config);
+        var nickResult = NicknameValidator.Validate(config.Nickname);
+        if (!nickResult.IsValid)
+        {
+            LogLauncherEvent("[LAUNCH] Невалидный никнейм игрока. Запуск отменен.");
+            throw new InvalidOperationException($"Игровой никнейм не соответствует правилам (3-16 символов, A-Z, 0-9, _): {nickResult.Error}");
+        }
+
         var gameDir = ResolveMinecraftDirectory(config.GameDir);
         LogLauncherEvent($"[LAUNCH] Запуск игры для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {gameDir}");
 
