@@ -264,7 +264,7 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _updateBannerButtonText, value);
     }
 
-    public string LauncherVersionText => $"v{_launcherUpdateService.CurrentVersion}";
+    public string LauncherVersionText => "v1.2.0-dev";
 
     // Команды
     public RelayCommand LaunchOrCancelCommand { get; }
@@ -411,6 +411,8 @@ public class MainViewModel : ObservableObject
 
         // Определение уже запущенной игры при старте лаунчера
         var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+        FabricGameLaunchService.EnsureDefaultOptions(gameDir);
+        FabricGameLaunchService.EnsureDefaultLspConfig(gameDir);
         var running = _launchService.FindRunningGameProcess(gameDir);
         if (running != null)
         {

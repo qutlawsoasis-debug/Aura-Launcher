@@ -7,3 +7,4 @@ publish_standalone/
 .vs/
 aura_config.json
 *.pdb
+*.zip

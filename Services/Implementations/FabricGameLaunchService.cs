@@ -180,6 +180,26 @@ public class FabricGameLaunchService : IGameLaunchService
         }
     }
 
+    public static void EnsureDefaultLspConfig(string gameDir)
+    {
+        try
+        {
+            var configDir = Path.Combine(gameDir, "config");
+            var lspPath = Path.Combine(configDir, "lsp.json");
+            if (!File.Exists(lspPath))
+            {
+                Directory.CreateDirectory(configDir);
+                var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
+                File.WriteAllText(lspPath, content, new UTF8Encoding(false));
+                LogLauncherEvent($"[CONFIG] Создан файл конфигурации по умолчанию (lsp.json): {lspPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[CONFIG: ERROR] Ошибка создания lsp.json: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Распаковка нативных библиотек (LWJGL и др.) в папку &lt;GameDir&gt;\versions\&lt;version&gt;\natives,
     /// на которую указывает -Djava.library.path.
@@ -779,8 +799,9 @@ public class FabricGameLaunchService : IGameLaunchService
         var gameDir = ResolveMinecraftDirectory(config.GameDir);
         LogLauncherEvent($"[LAUNCH] Запуск игры для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {gameDir}");
 
-        // 0. Настройки игры по умолчанию (options.txt) перед первым запуском
+        // 0. Настройки игры по умолчанию (options.txt, lsp.json) перед первым запуском
         EnsureDefaultOptions(gameDir);
+        EnsureDefaultLspConfig(gameDir);
 
         // 1. Автоматическая проверка и докачка недостающих компонентов окружения
         await EnsureInstalledAsync(gameDir, installProgress, onLogReceived, cancellationToken);
