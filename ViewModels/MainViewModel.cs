@@ -264,7 +264,7 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _updateBannerButtonText, value);
     }
 
-    public string LauncherVersionText => "v1.2.0-dev";
+    public string LauncherVersionText => $"v{_launcherUpdateService.CurrentVersion}";
 
     // Команды
     public RelayCommand LaunchOrCancelCommand { get; }
