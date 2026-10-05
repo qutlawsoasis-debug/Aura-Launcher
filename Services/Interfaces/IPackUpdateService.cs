@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using AuraLauncher.Models;
@@ -19,6 +20,7 @@ public class PackUpdateResult
     public string Message { get; set; } = string.Empty;
     public int FilesChanged { get; set; }
     public TimeSpan? Duration { get; set; }
+    public IReadOnlyList<ManifestServerEntry>? Servers { get; set; }
 
     public PackUpdateResult() { }
 

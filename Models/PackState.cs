@@ -14,6 +14,7 @@ public class PackState
     public string Minecraft { get; set; } = string.Empty;
     public string FabricLoader { get; set; } = string.Empty;
     public DateTime InstalledAtUtc { get; set; }
+    public List<string> ManagedServers { get; set; } = new();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -44,7 +45,7 @@ public class PackState
         {
             var json = File.ReadAllText(statePath);
             var state = JsonSerializer.Deserialize<PackState>(json, JsonOptions);
-            if (state == null || string.IsNullOrWhiteSpace(state.PackVersion))
+            if (state == null)
                 return null;
 
             // Проверка соответствия gameDir

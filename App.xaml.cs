@@ -112,6 +112,7 @@ public partial class App : Application
         services.AddSingleton<IPackUpdateService, PackUpdateService>();
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
         services.AddSingleton<ISkinService, SkinService>();
+        services.AddSingleton<IServerListSyncService, ServerListSyncService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();

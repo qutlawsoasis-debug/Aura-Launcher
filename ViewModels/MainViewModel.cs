@@ -25,6 +25,7 @@ public class MainViewModel : ObservableObject
     private readonly IPackUpdateService _packUpdateService;
     private readonly IGameLaunchService _launchService;
     private readonly ISkinService _skinService;
+    private readonly IServerListSyncService _serverListSyncService;
 
     // Свойства состояния UI
     private object _currentView = null!;
@@ -269,13 +270,15 @@ public class MainViewModel : ObservableObject
         ISkinService skinService,
         OverviewViewModel overviewViewModel,
         SettingsViewModel settingsViewModel,
-        WardrobeViewModel wardrobeViewModel)
+        WardrobeViewModel wardrobeViewModel,
+        IServerListSyncService? serverListSyncService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
         _packUpdateService = packUpdateService ?? throw new ArgumentNullException(nameof(packUpdateService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
+        _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
@@ -554,6 +557,17 @@ public class MainViewModel : ObservableObject
             OverviewVM.RefreshStats();
 
             ct.ThrowIfCancellationRequested();
+
+            // 1.5. Синхронизация управляемых серверов в servers.dat (перед запуском игры)
+            try
+            {
+                var targetGameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+                await _serverListSyncService.SyncServersAsync(targetGameDir, updateResult.Servers, cancellationToken: ct);
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] Ошибка синхронизации серверов: {ex.Message}");
+            }
 
             // 2. Автоустановка окружения (CmlLib.Core) и запуск игры
             SetLauncherState(LauncherState.Downloading, "Подготовка компонентов игры...");

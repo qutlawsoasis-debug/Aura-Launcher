@@ -31,6 +31,7 @@
 
   <ItemGroup>
     <PackageReference Include="CmlLib.Core" Version="4.0.6" />
+    <PackageReference Include="fNbt" Version="2.1.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Velopack" Version="1.2.161" />

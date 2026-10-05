@@ -385,7 +385,8 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                     GameDir = normalizedGameDir,
                     Minecraft = manifest.Minecraft,
                     FabricLoader = manifest.FabricLoader,
-                    InstalledAtUtc = DateTime.UtcNow
+                    InstalledAtUtc = DateTime.UtcNow,
+                    ManagedServers = currentState?.ManagedServers ?? new List<string>()
                 }, _customStateFilePath);
             }
 
@@ -394,7 +395,8 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 Status = PackUpdateStatus.UpToDate,
                 Message = "Установлена последняя версия сборки",
                 FilesChanged = 0,
-                Duration = sw.Elapsed
+                Duration = sw.Elapsed,
+                Servers = manifest.Servers
             };
         }
 
@@ -483,7 +485,8 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             GameDir = normalizedGameDir,
             Minecraft = manifest.Minecraft,
             FabricLoader = manifest.FabricLoader,
-            InstalledAtUtc = DateTime.UtcNow
+            InstalledAtUtc = DateTime.UtcNow,
+            ManagedServers = currentState?.ManagedServers ?? new List<string>()
         }, _customStateFilePath);
 
         // Обновление LastUpdateUtc в конфигурации лаунчера
@@ -507,7 +510,8 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             Status = PackUpdateStatus.Updated,
             Message = "Сборка успешно обновлена",
             FilesChanged = filesChangedCount,
-            Duration = sw.Elapsed
+            Duration = sw.Elapsed,
+            Servers = manifest.Servers
         };
     }
 
@@ -799,12 +803,31 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             });
         }
 
+        List<ManifestServerEntry>? servers = null;
+        if (root.TryGetProperty("servers", out var serversProp) && serversProp.ValueKind == JsonValueKind.Array)
+        {
+            servers = new List<ManifestServerEntry>();
+            foreach (var sItem in serversProp.EnumerateArray())
+            {
+                var sId = sItem.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+                var sName = sItem.TryGetProperty("name", out var nProp) ? nProp.GetString() ?? "" : "";
+                var sAddress = sItem.TryGetProperty("address", out var aProp) ? aProp.GetString() ?? "" : "";
+                servers.Add(new ManifestServerEntry
+                {
+                    Id = sId,
+                    Name = sName,
+                    Address = sAddress
+                });
+            }
+        }
+
         return new ManifestModel
         {
             Name = name,
             PackVersion = packVersion,
             Minecraft = minecraft,
             FabricLoader = fabricLoader,
+            Servers = servers,
             Files = files
         };
     }
@@ -896,6 +919,7 @@ public class ManifestModel
     public string PackVersion { get; set; } = string.Empty;
     public string Minecraft { get; set; } = string.Empty;
     public string FabricLoader { get; set; } = string.Empty;
+    public List<ManifestServerEntry>? Servers { get; set; }
     public List<ManifestFileEntry> Files { get; set; } = new();
 }
 
