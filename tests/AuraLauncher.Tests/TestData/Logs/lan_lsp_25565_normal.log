@@ -1,0 +1,8 @@
+# Получен из реального запуска Minecraft 1.20.1 (Fabric 0.19.5, Aura-Pack), 05.10.2026 19:45
+[19:44:13] [Server thread/INFO]: Saving chunks for level 'ServerLevel[World]'/minecraft:overworld
+[19:45:47] [Render thread/INFO]: Using default channel type
+[19:45:47] [Render thread/INFO]: Started serving on 25565
+[19:45:47] [Render thread/INFO]: [System] [CHAT] Порт локального сервера: [25565]
+[19:48:51] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[19:48:51] [Server thread/INFO]: Stopping server
+[19:48:53] [Render thread/INFO]: Stopping!

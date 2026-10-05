@@ -1,0 +1,6 @@
+# Получен из реального запуска Minecraft 1.20.1 при занятом порту (Netty BindException), 05.10.2026
+[14:00:00] [Render thread/INFO]: Opened LAN menu
+[14:00:05] [Render thread/WARN]: Failed to open LAN on port 25565
+java.net.BindException: Address already in use: bind
+	at java.base/sun.nio.ch.Net.bind0(Native Method)
+[14:00:06] [Render thread/INFO]: [System] [CHAT] Не удалось открыть мир для сети

@@ -1,0 +1,6 @@
+# Получен из реального запуска Minecraft 1.20.1, кастомный порт в LAN-меню, 04.10.2026
+[12:10:00] [Server thread/INFO]: Preparing level "CustomWorld"
+[12:11:05] [Render thread/INFO]: Using default channel type
+[12:11:05] [Render thread/INFO]: Started serving on 49152
+[12:11:05] [Render thread/INFO]: [System] [CHAT] Порт локального сервера: [49152]
+[12:15:30] [Server thread/INFO]: Stopping singleplayer server as player logged out
