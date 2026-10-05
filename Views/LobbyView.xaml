@@ -69,8 +69,7 @@
                 </StackPanel>
 
                 <!-- ====== НАЧАЛЬНЫЕ КНОПКИ (когда не в лобби) ====== -->
-                <StackPanel Grid.Row="1"
-                            Visibility="{Binding IsInLobby, Converter={StaticResource BoolToVis}, ConverterParameter=Inverse}">
+                <StackPanel Grid.Row="1">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
                             <Setter Property="Visibility" Value="Visible" />

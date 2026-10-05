@@ -52,8 +52,9 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        // Режим самодиагностики (--selftest или --selftest-shots) или отдельный профиль
-        bool isSelfTest = Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        // Режим самодиагностики (--selftest, --selftest-shots или --selftest-lobby) или отдельный профиль
+        bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = isLobbyTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -110,8 +111,16 @@ public partial class App : Application
             _ = mainVM.InitializeAsync();
         }
 
-        // Проверка режима самодиагностики (--selftest или --selftest-shots)
-        if (isSelfTest)
+        // Проверка режима самодиагностики (--selftest-lobby, --selftest или --selftest-shots)
+        if (isLobbyTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.CaptureLobbyShotsAsync(mainWindow);
+                Environment.Exit(success ? 0 : 1);
+            });
+        }
+        else if (isSelfTest)
         {
             _ = Task.Run(async () =>
             {

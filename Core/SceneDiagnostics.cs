@@ -375,6 +375,67 @@ public static class SceneDiagnostics
         }
     }
 
+    public static async Task<bool> CaptureLobbyShotsAsync(MainWindow window)
+    {
+        try
+        {
+            App.Log("[SELFTEST-LOBBY] Starting Lobby screenshot capture...");
+            await Task.Delay(1000);
+
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            // 1. Switch to Lobby
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
+            await Task.Delay(600);
+
+            string shotsDir = ResolveShotsDir();
+            string idlePng = Path.Combine(shotsDir, "lobby_tab_idle.png");
+            CaptureWindowToPng(window, idlePng);
+            App.Log($"[SELFTEST-LOBBY] Captured idle screenshot: {idlePng}");
+
+            // 2. Click Create Lobby
+            window.Dispatcher.Invoke(() =>
+            {
+                if (mainVm.LobbyVM.CreateLobbyCommand.CanExecute(null))
+                {
+                    mainVm.LobbyVM.CreateLobbyCommand.Execute(null);
+                }
+            });
+
+            // Wait for lobby to be created (LobbyCode populated)
+            for (int i = 0; i < 50; i++)
+            {
+                await Task.Delay(200);
+                bool created = window.Dispatcher.Invoke(() => mainVm.LobbyVM.IsLobbyCreated && !string.IsNullOrWhiteSpace(mainVm.LobbyVM.LobbyCode));
+                if (created) break;
+            }
+
+            await Task.Delay(500);
+
+            string createdPng = Path.Combine(shotsDir, "lobby_tab_created.png");
+            CaptureWindowToPng(window, createdPng);
+            App.Log($"[SELFTEST-LOBBY] Captured created screenshot: {createdPng}");
+
+            // Leave lobby
+            window.Dispatcher.Invoke(() =>
+            {
+                if (mainVm.LobbyVM.LeaveLobbyCommand.CanExecute(null))
+                {
+                    mainVm.LobbyVM.LeaveLobbyCommand.Execute(null);
+                }
+            });
+            await Task.Delay(300);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[SELFTEST-LOBBY: ERROR] {ex}");
+            return false;
+        }
+    }
+
     private static string ResolveShotsDir()
     {
         var args = Environment.GetCommandLineArgs();
