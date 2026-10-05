@@ -309,7 +309,7 @@ public class LobbyViewModel : ObservableObject
                 else
                 {
                     HostStatusText = "Ошибка открытия лобби";
-                    StatusText = "Не удалось опубликовать лобби";
+                    StatusText = "Туннель не поднялся";
                     StatusIcon = "❌";
                 }
             }

@@ -82,11 +82,18 @@ public partial class App : Application
             return;
         }
 
+        // Убиваем зависшие процессы playit* (в т.ч. claim exchange)
+        PlayitTunnelProvider.KillStalePlayitProcesses();
+
         base.OnStartup(e);
 
         // Инициализация DI-контейнера
+        bool useFakeTunnel = Array.Exists(e.Args, a => a.Equals("--fake-tunnel", StringComparison.OrdinalIgnoreCase)) ||
+                             string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
+
         var services = new ServiceCollection();
-        ConfigureServices(services);
+        ConfigureServices(services, useFakeTunnel);
         Services = services.BuildServiceProvider();
 
         // Логирование версии лаунчера при старте
@@ -130,7 +137,7 @@ public partial class App : Application
         }
     }
 
-    private static void ConfigureServices(IServiceCollection services)
+    private static void ConfigureServices(IServiceCollection services, bool useFakeTunnel = false)
     {
         // Регистрация сервисов как синглтонов
         services.AddSingleton<IConfigService, JsonConfigService>();
@@ -140,7 +147,16 @@ public partial class App : Application
         services.AddSingleton<ISkinService, SkinService>();
         services.AddSingleton<IServerListSyncService, ServerListSyncService>();
         services.AddSingleton<ILobbyApiClient>(sp => new LobbyApiClient(null, "https://lobby-api.vercel.app", sp.GetRequiredService<IConfigService>()));
-        services.AddSingleton<ITunnelProvider, FakeTunnelProvider>();
+        
+        if (useFakeTunnel)
+        {
+            services.AddSingleton<ITunnelProvider, FakeTunnelProvider>();
+        }
+        else
+        {
+            services.AddSingleton<ITunnelProvider, PlayitTunnelProvider>();
+        }
+
         services.AddSingleton<ILobbyService, LobbyService>();
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();
 

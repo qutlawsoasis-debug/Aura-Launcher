@@ -18,8 +18,8 @@ namespace AuraLauncher.Services.Implementations;
 /// </summary>
 public class PlayitTunnelProvider : ITunnelProvider
 {
-    public const string ExpectedSha256 = "2dbdaad119844cbbc062cc9774b8b462afa5f1b4b7832a9fc5ef4676cae887cf";
-    public const string PlayitDownloadUrl = "https://github.com/playit-cloud/playit-agent/releases/download/v1.0.10/playit-windows-x86_64-signed.exe";
+    public const string ExpectedSha256 = "dd1acb19e47bca4a935f2f72a68390bd2fc3a8ed608af7c9c247d3a69d7fba0a";
+    public const string PlayitDownloadUrl = "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-windows-x86_64-signed.exe";
 
     private readonly HttpClient _httpClient;
     private readonly string _toolsDir;
@@ -37,12 +37,12 @@ public class PlayitTunnelProvider : ITunnelProvider
         _httpClient = httpClient ?? new HttpClient();
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         _toolsDir = toolsDir ?? Path.Combine(appData, ".aura", "tools");
-        _playitExePath = Path.Combine(_toolsDir, "playit.exe");
+        _playitExePath = Path.Combine(_toolsDir, "playit-0.15.26.exe");
         _secretFilePath = Path.Combine(_toolsDir, "playit.secret");
     }
 
     /// <summary>
-    /// Проверка и скачивание бинарника playit v1.0.10 с валидацией SHA-256.
+    /// Проверка и скачивание бинарника playit 0.15.26 с валидацией SHA-256.
     /// </summary>
     public async Task EnsureBinaryDownloadedAsync(CancellationToken ct = default)
     {
@@ -73,7 +73,7 @@ public class PlayitTunnelProvider : ITunnelProvider
             if (!string.Equals(hash, ExpectedSha256, StringComparison.OrdinalIgnoreCase))
             {
                 try { File.Delete(tempFile); } catch { }
-                throw new InvalidOperationException($"SHA-256 mismatch for playit.exe! Expected: {ExpectedSha256}, actual: {hash}");
+                throw new InvalidOperationException($"SHA-256 mismatch for playit-0.15.26.exe! Expected: {ExpectedSha256}, actual: {hash}");
             }
 
             if (File.Exists(_playitExePath)) File.Delete(_playitExePath);
@@ -111,18 +111,47 @@ public class PlayitTunnelProvider : ITunnelProvider
     public string? LoadSecret()
     {
         var encPath = _secretFilePath + ".enc";
-        if (!File.Exists(encPath)) return null;
+        if (File.Exists(encPath))
+        {
+            try
+            {
+                var protectedBytes = File.ReadAllBytes(encPath);
+                var rawBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(rawBytes);
+            }
+            catch { }
+        }
 
+        if (File.Exists(_secretFilePath))
+        {
+            try
+            {
+                var secret = File.ReadAllText(_secretFilePath).Trim();
+                if (!string.IsNullOrWhiteSpace(secret)) return secret;
+            }
+            catch { }
+        }
+
+        return null;
+    }
+
+    public static void KillStalePlayitProcesses()
+    {
         try
         {
-            var protectedBytes = File.ReadAllBytes(encPath);
-            var rawBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(rawBytes);
+            var processes = Process.GetProcessesByName("playit-0.15.26");
+            foreach (var p in processes)
+            {
+                try { p.Kill(true); } catch { }
+            }
+
+            var legacy = Process.GetProcessesByName("playit");
+            foreach (var p in legacy)
+            {
+                try { p.Kill(true); } catch { }
+            }
         }
-        catch
-        {
-            return null;
-        }
+        catch { }
     }
 
     public async Task<TunnelInfo> StartAsync(int localPort, CancellationToken ct = default)
@@ -142,12 +171,15 @@ public class PlayitTunnelProvider : ITunnelProvider
 
         File.WriteAllText(_secretFilePath, secret.Trim());
 
+        KillStalePlayitProcesses();
         InitJobObject();
+
+        var tcsConnected = new TaskCompletionSource<bool>();
 
         var psi = new ProcessStartInfo
         {
             FileName = _playitExePath,
-            Arguments = $"--secret-path \"{_secretFilePath}\"",
+            Arguments = $"--secret_path \"{_secretFilePath}\" start",
             WorkingDirectory = _toolsDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -155,26 +187,96 @@ public class PlayitTunnelProvider : ITunnelProvider
             CreateNoWindow = true
         };
 
-        _process = Process.Start(psi);
-        if (_process == null)
+        _process = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        _process.OutputDataReceived += (s, e) =>
         {
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Failed to start playit.exe");
+            if (e.Data != null)
+            {
+                App.Log($"[PLAYIT-OUT] {e.Data}");
+                if (e.Data.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
+                    e.Data.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
+                {
+                    tcsConnected.TrySetResult(true);
+                }
+            }
+        };
+        _process.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+            {
+                App.Log($"[PLAYIT-ERR] {e.Data}");
+                if (e.Data.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
+                    e.Data.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
+                {
+                    tcsConnected.TrySetResult(true);
+                }
+            }
+        };
+
+        if (!_process.Start())
+        {
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Failed to start playit agent");
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
+
+        _process.BeginOutputReadLine();
+        _process.BeginErrorReadLine();
 
         if (_jobHandle != IntPtr.Zero)
         {
             AssignProcessToJobObject(_jobHandle, _process.Handle);
         }
 
-        // Определение выделенного адреса туннеля (SRV или заданного хоста)
+        // Ждём подключения агента в логе (таймаут 12 секунд)
+        var connectTimeout = Task.Delay(12000, ct);
+        var completed = await Task.WhenAny(tcsConnected.Task, connectTimeout);
+        if (completed == connectTimeout && !tcsConnected.Task.IsCompleted)
+        {
+            App.Log("[PLAYIT] Warning: connection line not observed within 12s, proceeding with port test...");
+        }
+
         string publicHost = "pgsql-jill.tun.ply.gg";
         int publicPort = 38062;
 
+        // Тестируем доступность публичного туннеля через реальное TCP-подключение
+        bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort, 6000, ct);
+        if (!tcpSuccess)
+        {
+            App.Log($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} failed!");
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Туннель не поднялся");
+            StatusChanged?.Invoke(_currentInfo);
+            return _currentInfo;
+        }
+
+        App.Log($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
         _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
         StatusChanged?.Invoke(_currentInfo);
         return _currentInfo;
+    }
+
+    private static async Task<bool> TestTcpConnectAsync(string host, int port, int timeoutMs, CancellationToken ct)
+    {
+        for (int retry = 0; retry < 5; retry++)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                using var client = new System.Net.Sockets.TcpClient();
+                using var ctsTimeout = new CancellationTokenSource(timeoutMs);
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, ctsTimeout.Token);
+                await client.ConnectAsync(host, port, linkedCts.Token);
+                if (client.Connected)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                await Task.Delay(1000, ct);
+            }
+        }
+        return false;
     }
 
     public Task StopAsync(CancellationToken ct = default)

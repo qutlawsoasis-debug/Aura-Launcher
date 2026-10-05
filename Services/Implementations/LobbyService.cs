@@ -59,9 +59,14 @@ public class LobbyService : ILobbyService, IDisposable
         else
         {
             var tunnelResult = await _tunnelProvider.StartAsync(localPort, cancellationToken);
+            if (tunnelResult.Status != TunnelStatus.Active || string.IsNullOrWhiteSpace(tunnelResult.PublicAddress))
+            {
+                return false;
+            }
+
             tunnelAddr = tunnelResult.PublicPort.HasValue 
                 ? $"{tunnelResult.PublicAddress}:{tunnelResult.PublicPort.Value}" 
-                : tunnelResult.PublicAddress ?? $"127.0.0.1:{localPort}";
+                : tunnelResult.PublicAddress;
         }
 
         var success = await _apiClient.OpenLobbyAsync(CurrentLobbyCode, CurrentHostToken, tunnelAddr, cancellationToken);
