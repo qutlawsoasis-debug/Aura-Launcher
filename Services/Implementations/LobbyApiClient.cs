@@ -20,7 +20,7 @@ public class LobbyApiClient : ILobbyApiClient
     private readonly IConfigService? _configService;
     private readonly string _defaultBaseUrl;
 
-    public LobbyApiClient(HttpClient? httpClient = null, string baseUrl = "http://localhost:3000", IConfigService? configService = null)
+    public LobbyApiClient(HttpClient? httpClient = null, string baseUrl = "https://lobby-api.vercel.app", IConfigService? configService = null)
     {
         _httpClient = httpClient ?? new HttpClient();
         _defaultBaseUrl = baseUrl.TrimEnd('/') + "/";

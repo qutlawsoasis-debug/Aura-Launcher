@@ -1,28 +1,7 @@
 import http from 'http';
 import crypto from 'crypto';
 import url from 'url';
-
-interface Lobby {
-  code: string;
-  hostToken: string;
-  hostName: string;
-  status: 'waiting' | 'open' | 'closed';
-  tunnelAddress: string | null;
-  createdAt: number;
-  lastHeartbeat: number;
-  players: string[];
-}
-
-const lobbies = new Map<string, Lobby>();
-
-function generateLobbyCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
+import { getStore, Lobby } from './store.js';
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -57,16 +36,6 @@ function sendJson(res: http.ServerResponse, statusCode: number, data: any) {
   res.end(json);
 }
 
-// Cleanup inactive lobbies older than 30 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, lobby] of lobbies.entries()) {
-    if (now - lobby.lastHeartbeat > 30 * 60 * 1000) {
-      lobbies.delete(code);
-    }
-  }
-}, 60 * 1000);
-
 export const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -83,14 +52,12 @@ export const server = http.createServer(async (req, res) => {
   console.log(`[LOBBY-API] ${req.method} ${pathname}`);
 
   try {
+    const store = getStore();
+
     // 1. POST /api/lobby
     if (req.method === 'POST' && pathname === '/api/lobby') {
       const body = await parseBody(req);
-      let code = generateLobbyCode();
-      while (lobbies.has(code)) {
-        code = generateLobbyCode();
-      }
-
+      const code = await store.generateCode();
       const hostToken = crypto.randomUUID();
       const hostName = body.hostName || 'Host';
 
@@ -105,7 +72,7 @@ export const server = http.createServer(async (req, res) => {
         players: [hostName]
       };
 
-      lobbies.set(code, lobby);
+      await store.set(lobby, 60);
 
       sendJson(res, 201, {
         code,
@@ -117,12 +84,12 @@ export const server = http.createServer(async (req, res) => {
     }
 
     // 2. POST /api/lobby/join
-    if (req.method === 'POST' && pathname === '/api/lobby/join') {
+    if (req.method === 'POST' && (pathname === '/api/lobby/join' || pathname === '/api/join' || pathname === '/join')) {
       const body = await parseBody(req);
       const code = (body.code || '').toUpperCase().trim();
       const playerName = body.playerName || 'Guest';
 
-      const lobby = lobbies.get(code);
+      const lobby = await store.get(code);
       if (!lobby || lobby.status === 'closed') {
         sendJson(res, 404, { error: 'Lobby not found or closed' });
         return;
@@ -130,6 +97,7 @@ export const server = http.createServer(async (req, res) => {
 
       if (!lobby.players.includes(playerName)) {
         lobby.players.push(playerName);
+        await store.set(lobby, 60);
       }
 
       sendJson(res, 200, {
@@ -143,10 +111,14 @@ export const server = http.createServer(async (req, res) => {
     }
 
     // 3. GET /api/lobby/status
-    if (req.method === 'GET' && pathname === '/api/lobby/status') {
+    if (req.method === 'GET' && (pathname === '/api/lobby/status' || pathname === '/api/status' || pathname === '/status')) {
       const code = ((parsedUrl.query.code as string) || '').toUpperCase().trim();
-      const lobby = lobbies.get(code);
+      if (!code) {
+        sendJson(res, 400, { error: 'Query parameter code is required' });
+        return;
+      }
 
+      const lobby = await store.get(code);
       if (!lobby) {
         sendJson(res, 404, { error: 'Lobby not found' });
         return;
@@ -163,13 +135,13 @@ export const server = http.createServer(async (req, res) => {
     }
 
     // 4. POST /api/lobby/open
-    if (req.method === 'POST' && pathname === '/api/lobby/open') {
+    if (req.method === 'POST' && (pathname === '/api/lobby/open' || pathname === '/api/open' || pathname === '/open')) {
       const body = await parseBody(req);
       const code = (body.code || '').toUpperCase().trim();
       const hostToken = body.hostToken;
       const tunnelAddress = body.tunnelAddress;
 
-      const lobby = lobbies.get(code);
+      const lobby = await store.get(code);
       if (!lobby) {
         sendJson(res, 404, { error: 'Lobby not found' });
         return;
@@ -189,6 +161,8 @@ export const server = http.createServer(async (req, res) => {
       lobby.tunnelAddress = tunnelAddress;
       lobby.lastHeartbeat = Date.now();
 
+      await store.set(lobby, 60);
+
       sendJson(res, 200, {
         success: true,
         code: lobby.code,
@@ -199,12 +173,12 @@ export const server = http.createServer(async (req, res) => {
     }
 
     // 5. POST /api/lobby/heartbeat
-    if (req.method === 'POST' && pathname === '/api/lobby/heartbeat') {
+    if (req.method === 'POST' && (pathname === '/api/lobby/heartbeat' || pathname === '/api/heartbeat' || pathname === '/heartbeat')) {
       const body = await parseBody(req);
       const code = (body.code || '').toUpperCase().trim();
       const hostToken = body.hostToken;
 
-      const lobby = lobbies.get(code);
+      const lobby = await store.get(code);
       if (!lobby) {
         sendJson(res, 404, { error: 'Lobby not found' });
         return;
@@ -216,6 +190,7 @@ export const server = http.createServer(async (req, res) => {
       }
 
       lobby.lastHeartbeat = Date.now();
+      await store.set(lobby, 60);
 
       sendJson(res, 200, {
         success: true,
@@ -226,12 +201,12 @@ export const server = http.createServer(async (req, res) => {
     }
 
     // 6. POST /api/lobby/close
-    if (req.method === 'POST' && pathname === '/api/lobby/close') {
+    if (req.method === 'POST' && (pathname === '/api/lobby/close' || pathname === '/api/close' || pathname === '/close')) {
       const body = await parseBody(req);
       const code = (body.code || '').toUpperCase().trim();
       const hostToken = body.hostToken;
 
-      const lobby = lobbies.get(code);
+      const lobby = await store.get(code);
       if (!lobby) {
         sendJson(res, 404, { error: 'Lobby not found' });
         return;
@@ -244,6 +219,7 @@ export const server = http.createServer(async (req, res) => {
 
       lobby.status = 'closed';
       lobby.lastHeartbeat = Date.now();
+      await store.set(lobby, 10);
 
       sendJson(res, 200, {
         success: true,
@@ -259,8 +235,10 @@ export const server = http.createServer(async (req, res) => {
   }
 });
 
+export default server;
+
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-if (process.env.NODE_ENV !== 'test') {
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Lobby API listening on http://127.0.0.1:${PORT}`);
   });

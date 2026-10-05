@@ -130,7 +130,7 @@ public partial class App : Application
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
         services.AddSingleton<ISkinService, SkinService>();
         services.AddSingleton<IServerListSyncService, ServerListSyncService>();
-        services.AddSingleton<ILobbyApiClient>(sp => new LobbyApiClient(null, "http://localhost:3000", sp.GetRequiredService<IConfigService>()));
+        services.AddSingleton<ILobbyApiClient>(sp => new LobbyApiClient(null, "https://lobby-api.vercel.app", sp.GetRequiredService<IConfigService>()));
         services.AddSingleton<ITunnelProvider, FakeTunnelProvider>();
         services.AddSingleton<ILobbyService, LobbyService>();
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();

@@ -168,7 +168,11 @@ public class PlayitTunnelProvider : ITunnelProvider
             AssignProcessToJobObject(_jobHandle, _process.Handle);
         }
 
-        _currentInfo = new TunnelInfo("playit.gg", localPort, TunnelStatus.Active);
+        // Определение выделенного адреса туннеля (SRV или заданного хоста)
+        string publicHost = "pgsql-jill.tun.ply.gg";
+        int publicPort = 38062;
+
+        _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
         StatusChanged?.Invoke(_currentInfo);
         return _currentInfo;
     }

@@ -2,7 +2,6 @@
   "name": "lobby-api",
   "version": "1.0.0",
   "description": "Aura Multiplayer Lobby In-Memory API",
-  "main": "src/server.ts",
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types src/server.ts",
