@@ -19,6 +19,8 @@ public class LobbyViewModel : ObservableObject
     private readonly IGameLaunchService _launchService;
     private readonly IConfigService _configService;
     private readonly ILanWorldWatcher _worldWatcher;
+    private readonly ITunnelProvider? _tunnelProvider;
+    private bool _hasPlayitSecret;
 
     // === Общее состояние ===
     private bool _isInLobby;
@@ -39,17 +41,40 @@ public class LobbyViewModel : ObservableObject
     private string _guestStatusText = "Введите 6-значный код лобби";
     private bool _canGuestConnect;
 
+    public bool HasPlayitSecret
+    {
+        get => _hasPlayitSecret;
+        private set
+        {
+            if (SetProperty(ref _hasPlayitSecret, value))
+            {
+                OnPropertyChanged(nameof(ShowClaimTunnelButton));
+                OnPropertyChanged(nameof(ShowCreateLobbyButton));
+            }
+        }
+    }
+
+    public bool ShowClaimTunnelButton => !HasPlayitSecret;
+    public bool ShowCreateLobbyButton => HasPlayitSecret;
+
+    public AsyncRelayCommand ClaimTunnelCommand { get; }
+
     public LobbyViewModel(
         ILobbyService lobbyService,
         IGameLaunchService launchService,
         IConfigService configService,
-        ILanWorldWatcher? worldWatcher = null)
+        ILanWorldWatcher? worldWatcher = null,
+        ITunnelProvider? tunnelProvider = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _worldWatcher = worldWatcher ?? new LanWorldWatcher();
+        _tunnelProvider = tunnelProvider;
 
+        UpdateSecretState();
+
+        ClaimTunnelCommand = new AsyncRelayCommand(ClaimTunnelAsync, () => !IsBusy && !IsInLobby);
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6);
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
@@ -199,10 +224,78 @@ public class LobbyViewModel : ObservableObject
     public AsyncRelayCommand OpenWorldCommand { get; }
     public RelayCommand LeaveLobbyCommand { get; }
 
-    // === Действия ===
+    public void UpdateSecretState()
+    {
+        if (_tunnelProvider is PlayitTunnelProvider playit)
+        {
+            HasPlayitSecret = playit.HasSecret;
+        }
+        else
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
+            var playitDefault = new PlayitTunnelProvider(null, toolsDir);
+            HasPlayitSecret = playitDefault.HasSecret;
+        }
+    }
+
+    private async Task ClaimTunnelAsync()
+    {
+        IsBusy = true;
+        StatusText = "Подготовка ссылки привязки...";
+        StatusIcon = "⏳";
+
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
+            var provider = _tunnelProvider as PlayitTunnelProvider ?? new PlayitTunnelProvider(null, toolsDir);
+
+            StatusText = "Открываем браузер... Подтвердите в браузере";
+            StatusIcon = "🌐";
+
+            var secret = await provider.ClaimTunnelAsync(url =>
+            {
+                Dispatch(() =>
+                {
+                    StatusText = "Подтвердите в браузере";
+                    StatusIcon = "🌐";
+                });
+            });
+
+            if (!string.IsNullOrWhiteSpace(secret))
+            {
+                UpdateSecretState();
+                StatusText = "Туннель успешно привязан! Теперь можно создать лобби.";
+                StatusIcon = "✅";
+            }
+            else
+            {
+                StatusText = "Туннель не привязан (время ожидания истекло)";
+                StatusIcon = "❌";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Ошибка привязки: {ex.Message}";
+            StatusIcon = "❌";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 
     private async Task CreateLobbyAsync()
     {
+        UpdateSecretState();
+        if (!HasPlayitSecret)
+        {
+            StatusText = "Сначала нажмите «ПРИВЯЗАТЬ ТУННЕЛЬ»";
+            StatusIcon = "⚠️";
+            return;
+        }
+
         IsBusy = true;
         StatusText = "Создание лобби...";
         StatusIcon = "⏳";
@@ -308,16 +401,18 @@ public class LobbyViewModel : ObservableObject
                 }
                 else
                 {
-                    HostStatusText = "Ошибка открытия лобби";
-                    StatusText = "Туннель не поднялся";
+                    HostStatusText = "Ошибка: туннель не поднялся";
+                    StatusText = "Туннель не поднялся. Лобби отменено.";
                     StatusIcon = "❌";
+                    try { await _lobbyService.CloseLobbyAsHostAsync(); } catch { }
                 }
             }
             catch (Exception ex)
             {
                 HostStatusText = "Ошибка";
-                StatusText = $"Ошибка открытия: {ex.Message}";
+                StatusText = $"Ошибка туннеля: {ex.Message}";
                 StatusIcon = "❌";
+                try { await _lobbyService.CloseLobbyAsHostAsync(); } catch { }
             }
         });
     }

@@ -163,7 +163,12 @@ public partial class App : Application
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<WardrobeViewModel>();
-        services.AddSingleton<LobbyViewModel>();
+        services.AddSingleton<LobbyViewModel>(sp => new LobbyViewModel(
+            sp.GetRequiredService<ILobbyService>(),
+            sp.GetRequiredService<IGameLaunchService>(),
+            sp.GetRequiredService<IConfigService>(),
+            sp.GetRequiredService<ILanWorldWatcher>(),
+            sp.GetRequiredService<ITunnelProvider>()));
         services.AddSingleton<MainViewModel>();
     }
 

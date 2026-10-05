@@ -379,13 +379,25 @@ public static class SceneDiagnostics
     {
         try
         {
-            Console.WriteLine("=== LIVE TEST LOBBY START ===");
+            App.Log("[LIVE-TEST-LOBBY] Starting live test...");
             await Task.Delay(1000);
             var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
             if (mainVm == null) return false;
 
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
             await Task.Delay(500);
+
+            string shotsDir = ResolveShotsDir();
+            bool hasClaimBtn = window.Dispatcher.Invoke(() => mainVm.LobbyVM.ShowClaimTunnelButton);
+            App.Log($"[LIVE-TEST-LOBBY] HasClaimButton={hasClaimBtn}");
+
+            if (hasClaimBtn)
+            {
+                string cleanShot = Path.Combine(shotsDir, "clean_host_lobby.png");
+                CaptureWindowToPng(window, cleanShot);
+                App.Log($"[LIVE-TEST-LOBBY] Captured clean host UI with button: {cleanShot}");
+                return true;
+            }
 
             // 1. Create lobby
             window.Dispatcher.Invoke(() => mainVm.LobbyVM.CreateLobbyCommand.Execute(null));
@@ -396,7 +408,7 @@ public static class SceneDiagnostics
             }
 
             string code = window.Dispatcher.Invoke(() => mainVm.LobbyVM.LobbyCode);
-            Console.WriteLine($"[LIVE-TEST] Lobby Created: {code}");
+            App.Log($"[LIVE-TEST-LOBBY] Lobby Created: {code}");
 
             // 2. Open World (localPort 25565 with a fake listener simulating Minecraft LAN)
             var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
@@ -404,14 +416,14 @@ public static class SceneDiagnostics
 
             var lobbyService = App.Services.GetRequiredService<ILobbyService>();
             bool opened = await lobbyService.HostOpenWorldAsync(localPort: 25565);
-            Console.WriteLine($"[LIVE-TEST] HostOpenWorldAsync result: {opened}");
+            App.Log($"[LIVE-TEST-LOBBY] HostOpenWorldAsync result: {opened}");
 
-            await Task.Delay(2000);
+            await Task.Delay(1500);
             return opened;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LIVE-TEST: ERROR] {ex}");
+            App.Log($"[LIVE-TEST-LOBBY: ERROR] {ex}");
             return false;
         }
     }

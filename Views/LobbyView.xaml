@@ -95,8 +95,13 @@
                                     <TextBlock Text="Создай лобби и пригласи друзей" FontSize="12" Foreground="#9AA3B2" />
                                 </StackPanel>
                             </StackPanel>
+                            <Button Command="{Binding ClaimTunnelCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Visibility="{Binding ShowClaimTunnelButton, Converter={StaticResource BoolToVis}}"
+                                    Height="42" Content="ПРИВЯЗАТЬ ТУННЕЛЬ" FontSize="13" />
                             <Button Command="{Binding CreateLobbyCommand}"
                                     Style="{StaticResource PrimaryNeonBtn}"
+                                    Visibility="{Binding ShowCreateLobbyButton, Converter={StaticResource BoolToVis}}"
                                     Height="42" Content="СОЗДАТЬ ЛОББИ" FontSize="13" />
                         </StackPanel>
                     </Border>

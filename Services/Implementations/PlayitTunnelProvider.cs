@@ -35,8 +35,26 @@ public class PlayitTunnelProvider : ITunnelProvider
     public PlayitTunnelProvider(HttpClient? httpClient = null, string? toolsDir = null)
     {
         _httpClient = httpClient ?? new HttpClient();
+
+        string? profileDir = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
+        if (string.IsNullOrWhiteSpace(profileDir) && Program.StartupArgs != null)
+        {
+            for (int i = 0; i < Program.StartupArgs.Length - 1; i++)
+            {
+                if (string.Equals(Program.StartupArgs[i], "--profile", StringComparison.OrdinalIgnoreCase))
+                {
+                    profileDir = Program.StartupArgs[i + 1];
+                    break;
+                }
+            }
+        }
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        _toolsDir = toolsDir ?? Path.Combine(appData, ".aura", "tools");
+        var baseDir = !string.IsNullOrWhiteSpace(profileDir)
+            ? (Path.IsPathRooted(profileDir) ? profileDir : Path.Combine(appData, "Aura", "profiles", profileDir))
+            : Path.Combine(appData, ".aura");
+
+        _toolsDir = toolsDir ?? Path.Combine(baseDir, "tools");
         _playitExePath = Path.Combine(_toolsDir, "playit-0.15.26.exe");
         _secretFilePath = Path.Combine(_toolsDir, "playit.secret");
     }
@@ -154,6 +172,160 @@ public class PlayitTunnelProvider : ITunnelProvider
         catch { }
     }
 
+    public bool HasSecret => !string.IsNullOrWhiteSpace(LoadSecret());
+
+    public async Task<string?> ClaimTunnelAsync(Action<string>? onUrlReady = null, CancellationToken ct = default)
+    {
+        await EnsureBinaryDownloadedAsync(ct);
+        KillStalePlayitProcesses();
+        InitJobObject();
+
+        var tcsUrl = new TaskCompletionSource<string>();
+        var psi = new ProcessStartInfo
+        {
+            FileName = _playitExePath,
+            Arguments = $"--secret_path \"{_secretFilePath}\"",
+            WorkingDirectory = _toolsDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        proc.OutputDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+            {
+                App.Log($"[PLAYIT-CLAIM-OUT] {e.Data}");
+                var match = System.Text.RegularExpressions.Regex.Match(e.Data, @"https?://playit\.gg/claim/\S+");
+                if (match.Success)
+                {
+                    tcsUrl.TrySetResult(match.Value);
+                }
+            }
+        };
+        proc.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+            {
+                App.Log($"[PLAYIT-CLAIM-ERR] {e.Data}");
+                var match = System.Text.RegularExpressions.Regex.Match(e.Data, @"https?://playit\.gg/claim/\S+");
+                if (match.Success)
+                {
+                    tcsUrl.TrySetResult(match.Value);
+                }
+            }
+        };
+
+        if (!proc.Start())
+        {
+            return null;
+        }
+
+        proc.BeginOutputReadLine();
+        proc.BeginErrorReadLine();
+
+        if (_jobHandle != IntPtr.Zero)
+        {
+            AssignProcessToJobObject(_jobHandle, proc.Handle);
+        }
+
+        // Ждем получения claim URL (до 10 секунд)
+        var urlTimeout = Task.Delay(10000, ct);
+        var completed = await Task.WhenAny(tcsUrl.Task, urlTimeout);
+        if (completed == tcsUrl.Task)
+        {
+            string url = await tcsUrl.Task;
+            onUrlReady?.Invoke(url);
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch { }
+        }
+
+        // Ждем появления файла playit.secret (таймаут 120 секунд)
+        for (int i = 0; i < 240; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (File.Exists(_secretFilePath) && new FileInfo(_secretFilePath).Length > 10)
+            {
+                try
+                {
+                    string sec = (await File.ReadAllTextAsync(_secretFilePath, ct)).Trim();
+                    if (!string.IsNullOrWhiteSpace(sec))
+                    {
+                        SaveSecret(sec);
+                        try { proc.Kill(true); } catch { }
+                        return sec;
+                    }
+                }
+                catch { }
+            }
+            await Task.Delay(500, ct);
+        }
+
+        try { proc.Kill(true); } catch { }
+        return null;
+    }
+
+    public async Task<(string? Host, int? Port)> ResolveTunnelAddressAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = _playitExePath,
+                Arguments = $"--secret_path \"{_secretFilePath}\" tunnels list",
+                WorkingDirectory = _toolsDir,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null) return (null, null);
+
+            string stdout = await proc.StandardOutput.ReadToEndAsync(ct);
+            await proc.WaitForExitAsync(ct);
+
+            using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+            if (doc.RootElement.TryGetProperty("tunnels", out var tunnels) && tunnels.GetArrayLength() > 0)
+            {
+                var first = tunnels[0];
+                if (first.TryGetProperty("alloc", out var alloc) &&
+                    alloc.TryGetProperty("data", out var data))
+                {
+                    string? host = null;
+                    if (data.TryGetProperty("assigned_domain", out var domElem) && !string.IsNullOrWhiteSpace(domElem.GetString()))
+                    {
+                        host = domElem.GetString();
+                    }
+                    else if (data.TryGetProperty("ip_hostname", out var ipElem))
+                    {
+                        host = ipElem.GetString();
+                    }
+
+                    int? port = null;
+                    if (data.TryGetProperty("port_start", out var portElem))
+                    {
+                        port = portElem.GetInt32();
+                    }
+
+                    return (host, port);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[PLAYIT: RESOLVE ERROR] {ex.Message}");
+        }
+
+        return (null, null);
+    }
+
     public async Task<TunnelInfo> StartAsync(int localPort, CancellationToken ct = default)
     {
         await EnsureBinaryDownloadedAsync(ct);
@@ -164,7 +336,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         var secret = LoadSecret();
         if (string.IsNullOrWhiteSpace(secret))
         {
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Playit account not claimed. Run setup to pair agent.");
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Туннель не привязан. Нажмите «ПРИВЯЗАТЬ ТУННЕЛЬ».");
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
@@ -236,11 +408,16 @@ public class PlayitTunnelProvider : ITunnelProvider
             App.Log("[PLAYIT] Warning: connection line not observed within 12s, proceeding with port test...");
         }
 
-        string publicHost = "pgsql-jill.tun.ply.gg";
-        int publicPort = 38062;
+        // Разрешаем публичный адрес динамически из аккаунта игрока
+        var (publicHost, publicPort) = await ResolveTunnelAddressAsync(ct);
+        if (string.IsNullOrWhiteSpace(publicHost) || !publicPort.HasValue)
+        {
+            publicHost = "pgsql-jill.tun.ply.gg";
+            publicPort = 38062;
+        }
 
         // Тестируем доступность публичного туннеля через реальное TCP-подключение
-        bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort, 6000, ct);
+        bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort.Value, 6000, ct);
         if (!tcpSuccess)
         {
             App.Log($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} failed!");
@@ -250,7 +427,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         }
 
         App.Log($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
-        _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
+        _currentInfo = new TunnelInfo(publicHost, publicPort.Value, TunnelStatus.Active);
         StatusChanged?.Invoke(_currentInfo);
         return _currentInfo;
     }
