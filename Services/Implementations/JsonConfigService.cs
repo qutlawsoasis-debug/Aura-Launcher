@@ -26,8 +26,25 @@ public class JsonConfigService : IConfigService
 
     public JsonConfigService(string? customConfigPath = null)
     {
+        string? profileDir = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
+        if (string.IsNullOrWhiteSpace(profileDir) && Program.StartupArgs != null)
+        {
+            for (int i = 0; i < Program.StartupArgs.Length - 1; i++)
+            {
+                if (string.Equals(Program.StartupArgs[i], "--profile", StringComparison.OrdinalIgnoreCase))
+                {
+                    profileDir = Program.StartupArgs[i + 1];
+                    break;
+                }
+            }
+        }
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        _configFilePath = customConfigPath ?? Path.Combine(appData, "Aura", "config.json");
+        var baseDir = !string.IsNullOrWhiteSpace(profileDir)
+            ? (Path.IsPathRooted(profileDir) ? profileDir : Path.Combine(appData, "Aura", "profiles", profileDir))
+            : Path.Combine(appData, "Aura");
+
+        _configFilePath = customConfigPath ?? Path.Combine(baseDir, "config.json");
         _legacyConfigFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "aura_config.json");
 
         _jsonOptions = new JsonSerializerOptions

@@ -1,0 +1,490 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
+using AuraLauncher.Core;
+using AuraLauncher.Services.Interfaces;
+
+namespace AuraLauncher.ViewModels;
+
+/// <summary>
+/// ViewModel для вкладки "ЛОББИ" — P2P LAN-лобби.
+/// Управляет UI для хоста (создание лобби, отображение кода, статус мира)
+/// и для гостя (ввод кода, присоединение, ожидание и подключение к игре).
+/// </summary>
+public class LobbyViewModel : ObservableObject
+{
+    private readonly ILobbyService _lobbyService;
+    private readonly IGameLaunchService _launchService;
+    private readonly IConfigService _configService;
+
+    // === Общее состояние ===
+    private bool _isInLobby;
+    private string _statusText = "Создайте лобби или введите код друга";
+    private string _statusIcon = "⚡";
+    private bool _isBusy;
+
+    // === Хост ===
+    private string? _lobbyCode;
+    private string _hostStatusText = "Ожидание мира...";
+    private bool _isLobbyCreated;
+    private bool _isWorldOpen;
+    private bool _codeCopied;
+
+    // === Гость ===
+    private string _guestCodeInput = string.Empty;
+    private bool _isGuestJoined;
+    private string _guestStatusText = "Введите 6-значный код лобби";
+    private bool _canGuestConnect;
+
+    public LobbyViewModel(ILobbyService lobbyService, IGameLaunchService launchService, IConfigService configService)
+    {
+        _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
+        _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
+        _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+
+        CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
+        JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6);
+        CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
+        ConnectToGameCommand = new AsyncRelayCommand(ConnectToGameAsync, () => !IsBusy && CanGuestConnect);
+        OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && _lobbyService.IsHost);
+        LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
+
+        // Подписка на события LobbyService
+        _lobbyService.StatusChanged += OnLobbyStatusChanged;
+        _lobbyService.TunnelAddressReady += OnTunnelAddressReady;
+    }
+
+    // === Свойства ===
+
+    public bool IsInLobby
+    {
+        get => _isInLobby;
+        private set
+        {
+            if (SetProperty(ref _isInLobby, value))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    public string StatusText
+    {
+        get => _statusText;
+        set => SetProperty(ref _statusText, value);
+    }
+
+    public string StatusIcon
+    {
+        get => _statusIcon;
+        set => SetProperty(ref _statusIcon, value);
+    }
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    // --- Хост ---
+
+    public string? LobbyCode
+    {
+        get => _lobbyCode;
+        private set => SetProperty(ref _lobbyCode, value);
+    }
+
+    public string HostStatusText
+    {
+        get => _hostStatusText;
+        private set => SetProperty(ref _hostStatusText, value);
+    }
+
+    public bool IsLobbyCreated
+    {
+        get => _isLobbyCreated;
+        private set
+        {
+            if (SetProperty(ref _isLobbyCreated, value))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    public bool IsWorldOpen
+    {
+        get => _isWorldOpen;
+        private set => SetProperty(ref _isWorldOpen, value);
+    }
+
+    public bool CodeCopied
+    {
+        get => _codeCopied;
+        private set => SetProperty(ref _codeCopied, value);
+    }
+
+    public bool IsHost => _lobbyService.IsHost;
+
+    // --- Гость ---
+
+    public string GuestCodeInput
+    {
+        get => _guestCodeInput;
+        set
+        {
+            // Ограничиваем до 6 символов и приводим к верхнему регистру
+            var cleaned = (value ?? string.Empty).Trim().ToUpperInvariant();
+            if (cleaned.Length > 6) cleaned = cleaned[..6];
+            if (SetProperty(ref _guestCodeInput, cleaned))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    public bool IsGuestJoined
+    {
+        get => _isGuestJoined;
+        private set
+        {
+            if (SetProperty(ref _isGuestJoined, value))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    public string GuestStatusText
+    {
+        get => _guestStatusText;
+        private set => SetProperty(ref _guestStatusText, value);
+    }
+
+    public bool CanGuestConnect
+    {
+        get => _canGuestConnect;
+        private set
+        {
+            if (SetProperty(ref _canGuestConnect, value))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    // === Команды ===
+
+    public AsyncRelayCommand CreateLobbyCommand { get; }
+    public AsyncRelayCommand JoinLobbyCommand { get; }
+    public RelayCommand CopyCodeCommand { get; }
+    public AsyncRelayCommand ConnectToGameCommand { get; }
+    public AsyncRelayCommand OpenWorldCommand { get; }
+    public RelayCommand LeaveLobbyCommand { get; }
+
+    // === Действия ===
+
+    private async Task CreateLobbyAsync()
+    {
+        IsBusy = true;
+        StatusText = "Создание лобби...";
+        StatusIcon = "⏳";
+
+        try
+        {
+            var hostName = _configService.CurrentConfig.Nickname;
+            var code = await _lobbyService.CreateLobbyAsHostAsync(hostName);
+
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                LobbyCode = code;
+                IsLobbyCreated = true;
+                IsInLobby = true;
+                HostStatusText = "Ожидание мира...";
+                StatusText = "Лобби создано! Отправь код другу и открой мир в Minecraft";
+                StatusIcon = "🎮";
+            }
+            else
+            {
+                StatusText = "Не удалось создать лобби. Проверь lobby-api сервер";
+                StatusIcon = "❌";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Ошибка: {ex.Message}";
+            StatusIcon = "❌";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Хост вручную нажимает "Открыть мир" после того, как открыл мир для сети в Minecraft.
+    /// Это сигнализирует lobby-api, что туннель готов и гости могут подключаться.
+    /// </summary>
+    private async Task OpenWorldAsHostAsync()
+    {
+        IsBusy = true;
+        HostStatusText = "Открытие туннеля...";
+
+        try
+        {
+            var success = await _lobbyService.HostOpenWorldAsync();
+            if (success)
+            {
+                IsWorldOpen = true;
+                HostStatusText = "Лобби открыто!";
+                StatusText = "Мир открыт — друзья могут подключиться!";
+                StatusIcon = "✅";
+            }
+            else
+            {
+                HostStatusText = "Ошибка открытия";
+                StatusText = "Не удалось открыть мир. Попробуй снова";
+                StatusIcon = "❌";
+            }
+        }
+        catch (Exception ex)
+        {
+            HostStatusText = "Ошибка";
+            StatusText = $"Ошибка: {ex.Message}";
+            StatusIcon = "❌";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task JoinLobbyAsync()
+    {
+        IsBusy = true;
+        GuestStatusText = "Подключение к лобби...";
+        StatusText = "Подключение...";
+        StatusIcon = "⏳";
+
+        try
+        {
+            var playerName = _configService.CurrentConfig.Nickname;
+            var joined = await _lobbyService.JoinLobbyAsGuestAsync(GuestCodeInput, playerName);
+
+            if (joined)
+            {
+                IsGuestJoined = true;
+                IsInLobby = true;
+                UpdateGuestStatus();
+            }
+            else
+            {
+                GuestStatusText = "Лобби не найдено или код неверный";
+                StatusText = "Не удалось подключиться к лобби";
+                StatusIcon = "❌";
+            }
+        }
+        catch (Exception ex)
+        {
+            GuestStatusText = "Ошибка подключения";
+            StatusText = $"Ошибка: {ex.Message}";
+            StatusIcon = "❌";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private Task ConnectToGameAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_lobbyService.CurrentTunnelAddress))
+        {
+            StatusText = "Адрес сервера не получен";
+            return Task.CompletedTask;
+        }
+
+        IsBusy = true;
+        StatusText = "Запуск игры...";
+        StatusIcon = "🚀";
+
+        try
+        {
+            // Запускаем событие, которое MainViewModel перехватывает
+            // для запуска игры с --quickPlayMultiplayer <tunnelAddress>
+            GuestConnectRequested?.Invoke(this, _lobbyService.CurrentTunnelAddress);
+
+            StatusText = "Игра запускается с подключением к серверу...";
+            StatusIcon = "🎮";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Ошибка запуска: {ex.Message}";
+            StatusIcon = "❌";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Событие, которое MainViewModel слушает для запуска игры с quickPlayMultiplayer.
+    /// </summary>
+    public event EventHandler<string>? GuestConnectRequested;
+
+    private void CopyCode()
+    {
+        if (!string.IsNullOrWhiteSpace(LobbyCode))
+        {
+            try
+            {
+                Clipboard.SetText(LobbyCode);
+                CodeCopied = true;
+
+                // Сбрасываем через 2 секунды
+                _ = Task.Delay(2000).ContinueWith(_ =>
+                {
+                    Application.Current?.Dispatcher?.InvokeAsync(() => CodeCopied = false);
+                });
+            }
+            catch { }
+        }
+    }
+
+    private void LeaveLobby()
+    {
+        if (_lobbyService.IsHost)
+        {
+            _ = _lobbyService.CloseLobbyAsHostAsync();
+        }
+        else
+        {
+            _lobbyService.LeaveLobby();
+        }
+
+        // Сброс всех состояний
+        IsInLobby = false;
+        IsLobbyCreated = false;
+        IsWorldOpen = false;
+        IsGuestJoined = false;
+        CanGuestConnect = false;
+        LobbyCode = null;
+        GuestCodeInput = string.Empty;
+        CodeCopied = false;
+        HostStatusText = "Ожидание мира...";
+        GuestStatusText = "Введите 6-значный код лобби";
+        StatusText = "Создайте лобби или введите код друга";
+        StatusIcon = "⚡";
+
+        OnPropertyChanged(nameof(IsHost));
+    }
+
+    // === Обработчики событий LobbyService ===
+
+    private void Dispatch(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            dispatcher.InvokeAsync(action);
+        }
+    }
+
+    private void OnLobbyStatusChanged(string newStatus)
+    {
+        Dispatch(() =>
+        {
+            if (_lobbyService.IsHost)
+            {
+                switch (newStatus.ToLowerInvariant())
+                {
+                    case "waiting":
+                        HostStatusText = "Ожидание мира...";
+                        break;
+                    case "open":
+                        HostStatusText = "Лобби открыто!";
+                        IsWorldOpen = true;
+                        StatusIcon = "✅";
+                        break;
+                    case "closed":
+                        HostStatusText = "Лобби закрыто";
+                        LeaveLobby();
+                        break;
+                }
+            }
+            else
+            {
+                UpdateGuestStatus();
+            }
+        });
+    }
+
+    private void OnTunnelAddressReady(string tunnelAddress)
+    {
+        Dispatch(() =>
+        {
+            if (!_lobbyService.IsHost)
+            {
+                CanGuestConnect = true;
+                GuestStatusText = "Хост открыл мир — можно подключаться!";
+                StatusText = "Мир готов! Нажми «Подключиться к игре»";
+                StatusIcon = "✅";
+            }
+        });
+    }
+
+    private void UpdateGuestStatus()
+    {
+        var status = _lobbyService.CurrentStatus?.ToLowerInvariant() ?? "idle";
+
+        switch (status)
+        {
+            case "waiting":
+                CanGuestConnect = false;
+                GuestStatusText = "Ожидание хоста...";
+                StatusText = "Ожидаем, пока хост откроет мир для сети";
+                StatusIcon = "⏳";
+                break;
+            case "open":
+                CanGuestConnect = !string.IsNullOrWhiteSpace(_lobbyService.CurrentTunnelAddress);
+                GuestStatusText = CanGuestConnect ? "Хост открыл мир — можно подключаться!" : "Ожидание адреса сервера...";
+                StatusText = CanGuestConnect ? "Мир готов! Нажми «Подключиться к игре»" : "Получение адреса сервера...";
+                StatusIcon = CanGuestConnect ? "✅" : "⏳";
+                break;
+            case "closed":
+                CanGuestConnect = false;
+                GuestStatusText = "Лобби закрыто хостом";
+                StatusText = "Лобби было закрыто";
+                StatusIcon = "❌";
+                break;
+            default:
+                CanGuestConnect = false;
+                GuestStatusText = "Введите 6-значный код лобби";
+                StatusText = "Создайте лобби или введите код друга";
+                StatusIcon = "⚡";
+                break;
+        }
+    }
+
+    private void RaiseAllCommands()
+    {
+        CreateLobbyCommand.RaiseCanExecuteChanged();
+        JoinLobbyCommand.RaiseCanExecuteChanged();
+        ConnectToGameCommand.RaiseCanExecuteChanged();
+        OpenWorldCommand.RaiseCanExecuteChanged();
+    }
+}

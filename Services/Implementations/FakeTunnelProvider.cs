@@ -16,7 +16,11 @@ public class FakeTunnelProvider : ITunnelProvider
 
     public event Action<TunnelInfo>? StatusChanged;
 
-    public string DefaultHost { get; set; } = "aura-lobby.craft.ply.gg";
+    public string DefaultHost { get; set; } = 
+        string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase)
+            ? "127.0.0.1"
+            : "aura-lobby.craft.ply.gg";
     public int DefaultPublicPort { get; set; } = 25565;
     public bool ShouldFail { get; set; }
     public string FailureMessage { get; set; } = "Connection timed out";

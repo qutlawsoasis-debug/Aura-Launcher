@@ -29,6 +29,9 @@
         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
             <views:SettingsView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:LobbyViewModel}">
+            <views:LobbyView />
+        </DataTemplate>
     </Window.Resources>
 
     <!-- Внешний закругленный контейнер окна -->
@@ -78,6 +81,10 @@
                                      IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
                                      GroupName="HeaderTabs"
                                      Style="{StaticResource NavTabRadio}" Content="СКИН" />
+                        <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Lobby"
+                                     IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
+                                     GroupName="HeaderTabs"
+                                     Style="{StaticResource NavTabRadio}" Content="ЛОББИ" />
                         <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Settings"
                                      IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
                                      GroupName="HeaderTabs"

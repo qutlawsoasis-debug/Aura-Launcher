@@ -842,6 +842,13 @@ public class FabricGameLaunchService : IGameLaunchService
         // Убираем аргумент --fullscreen (игра прочитает из options.txt)
         tokens.RemoveAll(t => t.Equals("--fullscreen", StringComparison.OrdinalIgnoreCase));
 
+        // Если задан адрес сервера для быстрого подключения (P2P LAN / лобби)
+        if (!string.IsNullOrWhiteSpace(config.QuickPlayMultiplayer))
+        {
+            tokens.Add("--quickPlayMultiplayer");
+            tokens.Add(config.QuickPlayMultiplayer.Trim());
+        }
+
         var formattedLines = new List<string>();
         var maskedLinesForLog = new List<string>();
         bool nextIsToken = false;

@@ -56,6 +56,7 @@ public class MainViewModel : ObservableObject
     public OverviewViewModel OverviewVM { get; }
     public SettingsViewModel SettingsVM { get; }
     public WardrobeViewModel WardrobeVM { get; }
+    public LobbyViewModel LobbyVM { get; }
 
     public object CurrentView
     {
@@ -72,6 +73,7 @@ public class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(IsOverviewActive));
                 OnPropertyChanged(nameof(IsWardrobeActive));
+                OnPropertyChanged(nameof(IsLobbyActive));
                 OnPropertyChanged(nameof(IsSettingsActive));
             }
         }
@@ -95,6 +97,15 @@ public class MainViewModel : ObservableObject
         }
     }
 
+    public bool IsLobbyActive
+    {
+        get => CurrentTabName.Equals("Lobby", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value) SwitchTab("Lobby");
+        }
+    }
+
     public bool IsSettingsActive
     {
         get => CurrentTabName.Equals("Settings", StringComparison.OrdinalIgnoreCase);
@@ -115,6 +126,10 @@ public class MainViewModel : ObservableObject
         else if (viewName.Equals("Wardrobe", StringComparison.OrdinalIgnoreCase))
         {
             CurrentView = WardrobeVM;
+        }
+        else if (viewName.Equals("Lobby", StringComparison.OrdinalIgnoreCase))
+        {
+            CurrentView = LobbyVM;
         }
         else
         {
@@ -271,6 +286,7 @@ public class MainViewModel : ObservableObject
         OverviewViewModel overviewViewModel,
         SettingsViewModel settingsViewModel,
         WardrobeViewModel wardrobeViewModel,
+        LobbyViewModel? lobbyViewModel = null,
         IServerListSyncService? serverListSyncService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
@@ -282,10 +298,16 @@ public class MainViewModel : ObservableObject
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
+        LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService);
+
+        LobbyVM.GuestConnectRequested += (s, tunnelAddress) =>
+        {
+            _ = LaunchGameAsync(tunnelAddress);
+        };
 
         _currentView = OverviewVM;
 
-        LaunchGameCommand = new AsyncRelayCommand(LaunchGameAsync, () => !IsBusy && !IsGameRunning && !_isLaunching && NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid);
+        LaunchGameCommand = new AsyncRelayCommand(() => LaunchGameAsync(null), () => !IsBusy && !IsGameRunning && !_isLaunching && NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid);
         CancelCommand = new RelayCommand(_ => CancelLaunch());
         LaunchOrCancelCommand = new RelayCommand(_ =>
         {
@@ -488,7 +510,7 @@ public class MainViewModel : ObservableObject
         }
     }
 
-    private async Task LaunchGameAsync()
+    private async Task LaunchGameAsync(string? quickPlayMultiplayer = null)
     {
         // Защита от двойного клика (флаг до любого await)
         if (_isLaunching || _isBusy || IsGameRunning)
@@ -515,6 +537,7 @@ public class MainViewModel : ObservableObject
             var ct = _launchCts.Token;
 
             var config = _configService.CurrentConfig;
+            config.QuickPlayMultiplayer = quickPlayMultiplayer;
 
             // 1. Проверяем наличие и применяем обновления сборки модов через IPackUpdateService
             SetLauncherState(LauncherState.Checking, "Проверка обновлений сборки...");

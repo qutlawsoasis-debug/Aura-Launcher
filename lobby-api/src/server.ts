@@ -80,6 +80,7 @@ export const server = http.createServer(async (req, res) => {
 
   const parsedUrl = url.parse(req.url || '', true);
   const pathname = parsedUrl.pathname || '';
+  console.log(`[LOBBY-API] ${req.method} ${pathname}`);
 
   try {
     // 1. POST /api/lobby

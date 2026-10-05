@@ -17,4 +17,5 @@ public class LauncherConfig
     public string GameDir { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
     public string PackRepo { get; set; } = DefaultPackRepo;
     public DateTime? LastUpdateUtc { get; set; }
+    public string? QuickPlayMultiplayer { get; set; }
 }

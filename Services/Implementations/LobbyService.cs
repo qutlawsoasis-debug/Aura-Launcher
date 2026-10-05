@@ -58,8 +58,10 @@ public class LobbyService : ILobbyService, IDisposable
         }
         else
         {
-            var tunnelResult = await _tunnelProvider.StartTunnelAsync(25565, cancellationToken);
-            tunnelAddr = tunnelResult.PublicAddress;
+            var tunnelResult = await _tunnelProvider.StartAsync(25565, cancellationToken);
+            tunnelAddr = tunnelResult.PublicPort.HasValue 
+                ? $"{tunnelResult.PublicAddress}:{tunnelResult.PublicPort.Value}" 
+                : tunnelResult.PublicAddress ?? "127.0.0.1:25565";
         }
 
         var success = await _apiClient.OpenLobbyAsync(CurrentLobbyCode, CurrentHostToken, tunnelAddr, cancellationToken);
@@ -80,7 +82,7 @@ public class LobbyService : ILobbyService, IDisposable
         if (IsHost && !string.IsNullOrWhiteSpace(CurrentLobbyCode) && !string.IsNullOrWhiteSpace(CurrentHostToken))
         {
             await _apiClient.CloseLobbyAsync(CurrentLobbyCode, CurrentHostToken, cancellationToken);
-            await _tunnelProvider.StopTunnelAsync(cancellationToken);
+            await _tunnelProvider.StopAsync(cancellationToken);
         }
         LeaveLobby();
     }

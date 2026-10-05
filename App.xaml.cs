@@ -52,11 +52,28 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        // Режим самодиагностики (--selftest или --selftest-shots)
+        // Режим самодиагностики (--selftest или --selftest-shots) или отдельный профиль
         bool isSelfTest = Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        
+        string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
+        if (string.IsNullOrWhiteSpace(profileArg))
+        {
+            for (int i = 0; i < e.Args.Length - 1; i++)
+            {
+                if (string.Equals(e.Args[i], "--profile", StringComparison.OrdinalIgnoreCase))
+                {
+                    profileArg = e.Args[i + 1];
+                    break;
+                }
+            }
+        }
+
+        string mutexName = string.IsNullOrWhiteSpace(profileArg)
+            ? @"Local\Aura.Launcher"
+            : $@"Local\Aura.Launcher.{profileArg.Replace('\\', '_').Replace(':', '_').Replace('/', '_')}";
 
         // Именованный Mutex для контроля единого экземпляра приложения
-        _singleInstanceMutex = new Mutex(true, @"Local\Aura.Launcher", out bool isNewInstance);
+        _singleInstanceMutex = new Mutex(true, mutexName, out bool isNewInstance);
         if (!isNewInstance && !isSelfTest)
         {
             BringExistingInstanceToFront();
@@ -113,11 +130,15 @@ public partial class App : Application
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
         services.AddSingleton<ISkinService, SkinService>();
         services.AddSingleton<IServerListSyncService, ServerListSyncService>();
+        services.AddSingleton<ILobbyApiClient, LobbyApiClient>();
+        services.AddSingleton<ITunnelProvider, FakeTunnelProvider>();
+        services.AddSingleton<ILobbyService, LobbyService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<WardrobeViewModel>();
+        services.AddSingleton<LobbyViewModel>();
         services.AddSingleton<MainViewModel>();
     }
 
