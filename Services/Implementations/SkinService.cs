@@ -434,4 +434,202 @@ public class SkinService : ISkinService
             return source32;
         }
     }
+
+    private static readonly System.Net.Http.HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    public async Task<SkinUploadResult> UploadSkinToLobbyApiAsync(
+        string? skinPath,
+        string nickname,
+        string model,
+        string? ownerToken,
+        string? baseUrl = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nickname))
+        {
+            return new SkinUploadResult(false, null, "Никнейм не указан.");
+        }
+
+        byte[] skinBytes;
+        if (!string.IsNullOrWhiteSpace(skinPath) && File.Exists(skinPath))
+        {
+            try
+            {
+                skinBytes = await File.ReadAllBytesAsync(skinPath, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return new SkinUploadResult(false, null, $"Не удалось прочитать файл скина: {ex.Message}");
+            }
+        }
+        else
+        {
+            // Берем дефолтного Стива
+            try
+            {
+                var uri = new Uri("pack://application:,,,/AuraLauncher;component/steve.png", UriKind.Absolute);
+                var streamInfo = Application.GetResourceStream(uri);
+                if (streamInfo != null)
+                {
+                    using var ms = new MemoryStream();
+                    await streamInfo.Stream.CopyToAsync(ms, cancellationToken);
+                    skinBytes = ms.ToArray();
+                }
+                else
+                {
+                    var steveLocal = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steve.png");
+                    if (File.Exists(steveLocal))
+                    {
+                        skinBytes = await File.ReadAllBytesAsync(steveLocal, cancellationToken);
+                    }
+                    else
+                    {
+                        return new SkinUploadResult(false, null, "Файл скина не найден.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return new SkinUploadResult(false, null, $"Не удалось загрузить стандартный скин: {ex.Message}");
+            }
+        }
+
+        var base64 = Convert.ToBase64String(skinBytes);
+        var apiBase = !string.IsNullOrWhiteSpace(baseUrl) ? baseUrl.TrimEnd('/') : "https://lobby-api.vercel.app";
+        var endpoint = $"{apiBase}/api/skin";
+
+        var payload = new
+        {
+            nickname = nickname.Trim(),
+            skinBase64 = base64,
+            model = model == "slim" ? "slim" : "default",
+            ownerToken = string.IsNullOrWhiteSpace(ownerToken) ? null : ownerToken.Trim()
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(payload);
+        using var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+        try
+        {
+            using var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
+            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            {
+                return new SkinUploadResult(false, null, "Этот ник уже занят другим игроком, выбери другой");
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                string err = "Ошибка загрузки скина на сервер";
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(responseText);
+                    if (doc.RootElement.TryGetProperty("error", out var errElem))
+                    {
+                        err = errElem.GetString() ?? err;
+                    }
+                }
+                catch { }
+                return new SkinUploadResult(false, null, err);
+            }
+
+            string? newOwnerToken = ownerToken;
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(responseText);
+                if (doc.RootElement.TryGetProperty("ownerToken", out var tokenElem))
+                {
+                    newOwnerToken = tokenElem.GetString();
+                }
+            }
+            catch { }
+
+            return new SkinUploadResult(true, newOwnerToken, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return new SkinUploadResult(false, null, $"Сетевая ошибка при загрузке скина: {ex.Message}");
+        }
+    }
+
+    public void EnsureCustomSkinLoaderConfig(string gameDir)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(gameDir)) return;
+            var cslDir = Path.Combine(gameDir, "CustomSkinLoader");
+            Directory.CreateDirectory(cslDir);
+            var cslJsonPath = Path.Combine(cslDir, "CustomSkinLoader.json");
+
+            var auraSource = new System.Text.Json.Nodes.JsonObject
+            {
+                ["name"] = "AuraLobby",
+                ["type"] = "CustomSkinAPI",
+                ["root"] = "https://lobby-api.vercel.app/csl/"
+            };
+
+            System.Text.Json.Nodes.JsonNode? rootNode = null;
+            if (File.Exists(cslJsonPath))
+            {
+                try
+                {
+                    var text = File.ReadAllText(cslJsonPath);
+                    rootNode = System.Text.Json.Nodes.JsonNode.Parse(text);
+                }
+                catch { }
+            }
+
+            if (rootNode is not System.Text.Json.Nodes.JsonObject rootObj)
+            {
+                rootObj = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["version"] = "15.0.1",
+                    ["buildNumber"] = 40,
+                    ["loadlist"] = new System.Text.Json.Nodes.JsonArray(),
+                    ["enableTransparentSkin"] = true,
+                    ["forceLoadAllTextures"] = true,
+                    ["enableCape"] = true,
+                    ["threadPoolSize"] = 8,
+                    ["enableLogStdOut"] = false,
+                    ["cacheExpiry"] = 30,
+                    ["forceUpdateSkull"] = false,
+                    ["enableLocalProfileCache"] = false,
+                    ["enableCacheAutoClean"] = false,
+                    ["forceDisableCache"] = false
+                };
+            }
+
+            var loadlistNode = rootObj["loadlist"] as System.Text.Json.Nodes.JsonArray;
+            if (loadlistNode == null)
+            {
+                loadlistNode = new System.Text.Json.Nodes.JsonArray();
+                rootObj["loadlist"] = loadlistNode;
+            }
+
+            // Проверяем, есть ли уже AuraLobby в списке
+            for (int i = loadlistNode.Count - 1; i >= 0; i--)
+            {
+                var item = loadlistNode[i] as System.Text.Json.Nodes.JsonObject;
+                if (item != null && item["name"]?.GetValue<string>() == "AuraLobby")
+                {
+                    loadlistNode.RemoveAt(i);
+                }
+            }
+
+            // Вставляем первым элементом
+            loadlistNode.Insert(0, auraSource);
+
+            var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+            File.WriteAllText(cslJsonPath, rootObj.ToJsonString(options));
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[CSL-CONFIG: ERROR] {ex.Message}");
+        }
+    }
 }

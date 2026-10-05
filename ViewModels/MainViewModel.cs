@@ -599,6 +599,24 @@ public class MainViewModel : ObservableObject
                 FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] Ошибка синхронизации серверов: {ex.Message}");
             }
 
+            // 1.6. Конфигурация CustomSkinLoader: добавление AuraLobby первым источником и загрузка актуального скина
+            try
+            {
+                var targetGameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+                _skinService.EnsureCustomSkinLoaderConfig(targetGameDir);
+                _ = _skinService.UploadSkinToLobbyApiAsync(
+                    config.SkinPath,
+                    config.Nickname,
+                    config.SkinModel,
+                    config.SkinOwnerToken,
+                    config.LobbyApiBaseUrl,
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[CSL-SYNC: ERROR] {ex.Message}");
+            }
+
             // 2. Автоустановка окружения (CmlLib.Core) и запуск игры
             SetLauncherState(LauncherState.Downloading, "Подготовка компонентов игры...");
             IsProgressVisible = true;

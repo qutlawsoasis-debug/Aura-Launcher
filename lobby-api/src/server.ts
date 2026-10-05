@@ -1,7 +1,8 @@
 import http from 'http';
 import crypto from 'crypto';
 import url from 'url';
-import { getStore, Lobby } from './store.js';
+import { getStore, Lobby, SkinRecord } from './store.js';
+import { validatePngSkin, isValidNickname, getClientIp } from './skinUtils.js';
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -226,6 +227,114 @@ export const server = http.createServer(async (req, res) => {
         code: lobby.code,
         status: 'closed'
       });
+      return;
+    }
+
+    // 7. POST /api/skin
+    if (req.method === 'POST' && pathname === '/api/skin') {
+      const clientIp = getClientIp(req);
+      const allowed = await store.checkRateLimit(`skin:${clientIp}`, 10, 60);
+      if (!allowed) {
+        sendJson(res, 429, { error: 'Rate limit exceeded: max 10 requests per minute' });
+        return;
+      }
+
+      const body = await parseBody(req);
+      const { nickname, skinBase64, model, ownerToken } = body;
+
+      if (!isValidNickname(nickname)) {
+        sendJson(res, 400, { error: 'Invalid nickname format (3-16 chars, a-zA-Z0-9_)' });
+        return;
+      }
+
+      const skinModel: 'default' | 'slim' = model === 'slim' ? 'slim' : 'default';
+      const validation = validatePngSkin(skinBase64);
+      if (!validation.valid || !validation.buffer || !validation.sha1) {
+        sendJson(res, 400, { error: validation.error || 'Invalid skin PNG' });
+        return;
+      }
+
+      const nickLower = nickname.toLowerCase();
+      const existing = await store.getSkin(nickLower);
+
+      let token = ownerToken;
+      if (existing) {
+        if (!existing.ownerToken || existing.ownerToken !== ownerToken) {
+          sendJson(res, 403, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+          return;
+        }
+        token = existing.ownerToken;
+      } else {
+        if (!token) {
+          token = crypto.randomUUID();
+        }
+      }
+
+      const skinRecord: SkinRecord = {
+        nickname,
+        ownerToken: token,
+        model: skinModel,
+        sha1: validation.sha1,
+        skinBase64: validation.buffer.toString('base64'),
+        updatedAt: Date.now()
+      };
+
+      const TTL_30_DAYS = 30 * 24 * 3600;
+      await store.setSkin(skinRecord, TTL_30_DAYS);
+      await store.setSkinByHash(validation.sha1, validation.buffer, TTL_30_DAYS);
+
+      sendJson(res, 200, {
+        success: true,
+        nickname,
+        model: skinModel,
+        sha1: validation.sha1,
+        ownerToken: token
+      });
+      return;
+    }
+
+    // 8. GET /csl/{username}.json
+    const cslMatch = pathname.match(/^\/csl\/([^/]+?)(?:\.json)?$/);
+    if (req.method === 'GET' && cslMatch && !pathname.startsWith('/csl/raw/')) {
+      const username = cslMatch[1].trim();
+      const skinRecord = await store.getSkin(username.toLowerCase());
+      if (!skinRecord) {
+        sendJson(res, 404, { error: 'Skin not found' });
+        return;
+      }
+
+      const host = req.headers['host'] || '127.0.0.1:3000';
+      const proto = req.headers['x-forwarded-proto'] || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https');
+      const textureUrl = `${proto}://${host}/csl/raw/${skinRecord.sha1}.png`;
+      const isSlim = skinRecord.model === 'slim';
+
+      sendJson(res, 200, {
+        username: skinRecord.nickname,
+        skins: {
+          default: isSlim ? null : textureUrl,
+          slim: isSlim ? textureUrl : null
+        },
+        cape: null
+      });
+      return;
+    }
+
+    // 9. GET /csl/raw/{sha1}.png
+    const rawMatch = pathname.match(/^\/csl\/raw\/([a-fA-F0-9]+?)(?:\.png)?$/);
+    if (req.method === 'GET' && rawMatch) {
+      const sha1 = rawMatch[1].toLowerCase();
+      const pngBuffer = await store.getSkinByHash(sha1);
+      if (!pngBuffer) {
+        sendJson(res, 404, { error: 'Texture not found' });
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(pngBuffer);
       return;
     }
 

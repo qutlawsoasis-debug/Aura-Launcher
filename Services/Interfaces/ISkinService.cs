@@ -5,6 +5,7 @@ using System.Windows.Media;
 namespace AuraLauncher.Services.Interfaces;
 
 public record SkinValidationResult(bool IsValid, string? ErrorMessage = null, int Width = 0, int Height = 0);
+public record SkinUploadResult(bool Success, string? OwnerToken = null, string? ErrorMessage = null);
 
 /// <summary>
 /// Сервис управления скинами игрока и подготовки 2D-превью (вид спереди и сзади).
@@ -45,4 +46,14 @@ public interface ISkinService
     /// Сброс скина на дефолтного Стива.
     /// </summary>
     Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Загрузка скина в lobby-api для отображения у всех игроков.
+    /// </summary>
+    Task<SkinUploadResult> UploadSkinToLobbyApiAsync(string? skinPath, string nickname, string model, string? ownerToken, string? baseUrl = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Мерж конфига CustomSkinLoader.json: добавление AuraLobby первым источником в loadlist.
+    /// </summary>
+    void EnsureCustomSkinLoaderConfig(string gameDir);
 }

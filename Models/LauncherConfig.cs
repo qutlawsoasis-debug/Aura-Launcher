@@ -19,4 +19,6 @@ public class LauncherConfig
     public DateTime? LastUpdateUtc { get; set; }
     public string? QuickPlayMultiplayer { get; set; }
     public string LobbyApiBaseUrl { get; set; } = "https://lobby-api.vercel.app";
+    public string SkinOwnerToken { get; set; } = "";
+    public string SkinModel { get; set; } = "default";
 }

@@ -88,6 +88,13 @@
                 <!-- Одиночная серая строка подсказки -->
                 <TextBlock Text="PNG 64×64 или 64×32" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,12" />
 
+                <!-- Переключатель модели: Тонкие руки (slim) -->
+                <CheckBox Content="Тонкие руки (Alex / Slim)"
+                          IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
+                          Foreground="#E8EAED"
+                          FontSize="13"
+                          Margin="0,0,0,16" />
+
                 <!-- Однострочное уведомление об ошибке или успехе -->
                 <TextBlock Text="{Binding StatusMessage}"
                            Foreground="{Binding StatusBrush}"

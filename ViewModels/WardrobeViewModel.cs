@@ -122,6 +122,22 @@ public class WardrobeViewModel : ObservableObject
 
     public SolidColorBrush StatusBrush => _isStatusError ? ErrorBrush : SuccessBrush;
 
+    public bool IsSlimModel
+    {
+        get => _configService.CurrentConfig.SkinModel == "slim";
+        set
+        {
+            var newModel = value ? "slim" : "default";
+            if (_configService.CurrentConfig.SkinModel != newModel)
+            {
+                _configService.CurrentConfig.SkinModel = newModel;
+                OnPropertyChanged();
+                _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
+                _ = UploadCurrentSkinAsync();
+            }
+        }
+    }
+
     public RelayCommand SelectSkinCommand { get; }
     public RelayCommand ResetSkinCommand { get; }
 
@@ -139,6 +155,7 @@ public class WardrobeViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(Nickname));
             OnPropertyChanged(nameof(SkinPath));
+            OnPropertyChanged(nameof(IsSlimModel));
             UpdateSkinPreviews();
         };
     }
@@ -173,7 +190,43 @@ public class WardrobeViewModel : ObservableObject
             var mcDir = _configService.CurrentConfig.GameDir;
             _ = _skinService.SyncSkinToGameAsync(SkinPath, Nickname, mcDir);
 
-            StatusMessage = "Скин успешно применен и синхронизирован!";
+            // Загружаем в lobby-api
+            _ = UploadCurrentSkinAsync();
+        }
+    }
+
+    public async Task UploadCurrentSkinAsync()
+    {
+        try
+        {
+            var cfg = _configService.CurrentConfig;
+            var res = await _skinService.UploadSkinToLobbyApiAsync(
+                cfg.SkinPath,
+                cfg.Nickname,
+                cfg.SkinModel,
+                cfg.SkinOwnerToken,
+                cfg.LobbyApiBaseUrl);
+
+            if (res.Success)
+            {
+                if (!string.IsNullOrWhiteSpace(res.OwnerToken))
+                {
+                    cfg.SkinOwnerToken = res.OwnerToken;
+                    await _configService.SaveConfigAsync(cfg);
+                }
+                IsStatusError = false;
+                StatusMessage = "Скин успешно загружен и применен!";
+            }
+            else
+            {
+                IsStatusError = true;
+                StatusMessage = res.ErrorMessage ?? "Ошибка загрузки скина.";
+            }
+        }
+        catch (Exception ex)
+        {
+            IsStatusError = true;
+            StatusMessage = $"Ошибка отправки скина: {ex.Message}";
         }
     }
 
@@ -188,6 +241,9 @@ public class WardrobeViewModel : ObservableObject
 
         FormatDescription = "Классический скин Стива (64×64)";
         StatusMessage = "Скин сброшен на классического Стива.";
+
+        // Загружаем сброшенный дефолтный скин на сервер
+        _ = UploadCurrentSkinAsync();
     }
 
     private void UpdateSkinPreviews()

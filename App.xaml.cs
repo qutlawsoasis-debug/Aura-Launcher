@@ -168,7 +168,8 @@ public partial class App : Application
             sp.GetRequiredService<IGameLaunchService>(),
             sp.GetRequiredService<IConfigService>(),
             sp.GetRequiredService<ILanWorldWatcher>(),
-            sp.GetRequiredService<ITunnelProvider>()));
+            sp.GetRequiredService<ITunnelProvider>(),
+            sp.GetRequiredService<ISkinService>()));
         services.AddSingleton<MainViewModel>();
     }
 

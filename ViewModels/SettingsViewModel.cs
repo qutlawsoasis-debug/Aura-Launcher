@@ -17,6 +17,7 @@ namespace AuraLauncher.ViewModels;
 public class SettingsViewModel : ObservableObject
 {
     private readonly IConfigService _configService;
+    private readonly ISkinService _skinService;
     private CancellationTokenSource? _debounceCts;
     private string _errorMessage = string.Empty;
     private string _nickname = string.Empty;
@@ -59,12 +60,34 @@ public class SettingsViewModel : ObservableObject
             {
                 _configService.CurrentConfig.Nickname = nick;
                 _ = SaveImmediatelyAsync();
+                _ = ReuploadSkinUnderNewNickAsync(nick);
             }
         }
         else
         {
             NicknameErrorText = GetNicknameErrorMessage(result.Error);
         }
+    }
+
+    private async Task ReuploadSkinUnderNewNickAsync(string newNick)
+    {
+        try
+        {
+            var cfg = _configService.CurrentConfig;
+            var res = await _skinService.UploadSkinToLobbyApiAsync(
+                cfg.SkinPath,
+                newNick,
+                cfg.SkinModel,
+                cfg.SkinOwnerToken,
+                cfg.LobbyApiBaseUrl);
+
+            if (res.Success && !string.IsNullOrWhiteSpace(res.OwnerToken))
+            {
+                cfg.SkinOwnerToken = res.OwnerToken;
+                await _configService.SaveConfigAsync(cfg);
+            }
+        }
+        catch { }
     }
 
     public static string GetNicknameErrorMessage(NicknameError error) => error switch
@@ -187,9 +210,10 @@ public class SettingsViewModel : ObservableObject
 
     public RelayCommand SelectGameFolderCommand { get; }
 
-    public SettingsViewModel(IConfigService configService)
+    public SettingsViewModel(IConfigService configService, ISkinService skinService)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
 
         _nickname = _configService.CurrentConfig.Nickname ?? string.Empty;
         var initialResult = NicknameValidator.Validate(_nickname);

@@ -20,6 +20,7 @@ public class LobbyViewModel : ObservableObject
     private readonly IConfigService _configService;
     private readonly ILanWorldWatcher _worldWatcher;
     private readonly ITunnelProvider? _tunnelProvider;
+    private readonly ISkinService? _skinService;
     private bool _hasPlayitSecret;
 
     // === Общее состояние ===
@@ -64,13 +65,15 @@ public class LobbyViewModel : ObservableObject
         IGameLaunchService launchService,
         IConfigService configService,
         ILanWorldWatcher? worldWatcher = null,
-        ITunnelProvider? tunnelProvider = null)
+        ITunnelProvider? tunnelProvider = null,
+        ISkinService? skinService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _worldWatcher = worldWatcher ?? new LanWorldWatcher();
         _tunnelProvider = tunnelProvider;
+        _skinService = skinService;
 
         UpdateSecretState();
 
@@ -303,6 +306,10 @@ public class LobbyViewModel : ObservableObject
         try
         {
             var hostName = _configService.CurrentConfig.Nickname;
+
+            // Автоматически перезаливаем текущий скин под актуальным ником
+            _ = EnsureSkinUploadedAsync();
+
             var code = await _lobbyService.CreateLobbyAsHostAsync(hostName);
 
             if (!string.IsNullOrWhiteSpace(code))
@@ -427,6 +434,10 @@ public class LobbyViewModel : ObservableObject
         try
         {
             var playerName = _configService.CurrentConfig.Nickname;
+
+            // Автоматически перезаливаем текущий скин под актуальным ником
+            _ = EnsureSkinUploadedAsync();
+
             var joined = await _lobbyService.JoinLobbyAsGuestAsync(GuestCodeInput, playerName);
 
             if (joined)
@@ -642,5 +653,27 @@ public class LobbyViewModel : ObservableObject
         JoinLobbyCommand.RaiseCanExecuteChanged();
         ConnectToGameCommand.RaiseCanExecuteChanged();
         OpenWorldCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task EnsureSkinUploadedAsync()
+    {
+        if (_skinService == null) return;
+        try
+        {
+            var cfg = _configService.CurrentConfig;
+            var res = await _skinService.UploadSkinToLobbyApiAsync(
+                cfg.SkinPath,
+                cfg.Nickname,
+                cfg.SkinModel,
+                cfg.SkinOwnerToken,
+                cfg.LobbyApiBaseUrl);
+
+            if (res.Success && !string.IsNullOrWhiteSpace(res.OwnerToken))
+            {
+                cfg.SkinOwnerToken = res.OwnerToken;
+                await _configService.SaveConfigAsync(cfg);
+            }
+        }
+        catch { }
     }
 }
