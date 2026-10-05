@@ -396,6 +396,32 @@ public static class SceneDiagnostics
                 string cleanShot = Path.Combine(shotsDir, "clean_host_lobby.png");
                 CaptureWindowToPng(window, cleanShot);
                 App.Log($"[LIVE-TEST-LOBBY] Captured clean host UI with button: {cleanShot}");
+
+                App.Log("[LIVE-TEST-LOBBY] Triggering ClaimTunnelCommand...");
+                window.Dispatcher.Invoke(() => mainVm.LobbyVM.ClaimTunnelCommand.Execute(null));
+
+                // Wait up to 30s for ClaimUrl
+                for (int i = 0; i < 60; i++)
+                {
+                    await Task.Delay(500);
+                    if (window.Dispatcher.Invoke(() => mainVm.LobbyVM.HasClaimUrl))
+                    {
+                        break;
+                    }
+                }
+
+                await Task.Delay(500);
+
+                string claimShot = Path.Combine(shotsDir, "clean_host_lobby_claim.png");
+                CaptureWindowToPng(window, claimShot);
+                App.Log($"[LIVE-TEST-LOBBY] Captured clean host claim UI with URL and buttons: {claimShot}");
+
+                var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+                if (Directory.Exists(artifactDir))
+                {
+                    try { File.Copy(claimShot, Path.Combine(artifactDir, "clean_host_lobby_claim.png"), true); } catch { }
+                }
+
                 return true;
             }
 

@@ -42,6 +42,14 @@ public class LobbyViewModel : ObservableObject
     private string _guestStatusText = "Введите 6-значный код лобби";
     private bool _canGuestConnect;
 
+    // === Привязка туннеля ===
+    private string? _claimUrl;
+    private bool _hasClaimUrl;
+    private bool _isClaiming;
+    private bool _hasClaimError;
+    private string? _claimErrorMessage;
+    private bool _claimCopied;
+
     public bool HasPlayitSecret
     {
         get => _hasPlayitSecret;
@@ -58,7 +66,58 @@ public class LobbyViewModel : ObservableObject
     public bool ShowClaimTunnelButton => !HasPlayitSecret;
     public bool ShowCreateLobbyButton => HasPlayitSecret;
 
+    public string? ClaimUrl
+    {
+        get => _claimUrl;
+        private set
+        {
+            if (SetProperty(ref _claimUrl, value))
+            {
+                HasClaimUrl = !string.IsNullOrWhiteSpace(value);
+            }
+        }
+    }
+
+    public bool HasClaimUrl
+    {
+        get => _hasClaimUrl;
+        private set => SetProperty(ref _hasClaimUrl, value);
+    }
+
+    public bool IsClaiming
+    {
+        get => _isClaiming;
+        private set
+        {
+            if (SetProperty(ref _isClaiming, value))
+            {
+                RaiseAllCommands();
+            }
+        }
+    }
+
+    public bool HasClaimError
+    {
+        get => _hasClaimError;
+        private set => SetProperty(ref _hasClaimError, value);
+    }
+
+    public string? ClaimErrorMessage
+    {
+        get => _claimErrorMessage;
+        private set => SetProperty(ref _claimErrorMessage, value);
+    }
+
+    public bool ClaimCopied
+    {
+        get => _claimCopied;
+        private set => SetProperty(ref _claimCopied, value);
+    }
+
     public AsyncRelayCommand ClaimTunnelCommand { get; }
+    public RelayCommand OpenClaimUrlCommand { get; }
+    public RelayCommand CopyClaimUrlCommand { get; }
+    public AsyncRelayCommand RetryClaimCommand { get; }
 
     public LobbyViewModel(
         ILobbyService lobbyService,
@@ -77,7 +136,33 @@ public class LobbyViewModel : ObservableObject
 
         UpdateSecretState();
 
-        ClaimTunnelCommand = new AsyncRelayCommand(ClaimTunnelAsync, () => !IsBusy && !IsInLobby);
+        ClaimTunnelCommand = new AsyncRelayCommand(ClaimTunnelAsync, () => !IsClaiming && !IsInLobby);
+        RetryClaimCommand = new AsyncRelayCommand(ClaimTunnelAsync, () => !IsClaiming && !IsInLobby);
+        OpenClaimUrlCommand = new RelayCommand(_ =>
+        {
+            if (!string.IsNullOrWhiteSpace(ClaimUrl))
+            {
+                PlayitTunnelProvider.OpenBrowser(ClaimUrl);
+            }
+        }, _ => !string.IsNullOrWhiteSpace(ClaimUrl));
+        CopyClaimUrlCommand = new RelayCommand(_ =>
+        {
+            if (!string.IsNullOrWhiteSpace(ClaimUrl))
+            {
+                try
+                {
+                    Clipboard.SetText(ClaimUrl);
+                    ClaimCopied = true;
+                    PlayitTunnelProvider.LogTunnel($"[UI] Claim URL copied to clipboard: {ClaimUrl}");
+                    _ = Task.Delay(2000).ContinueWith(_ => Dispatch(() => ClaimCopied = false));
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[UI: ERROR] Failed to copy URL to clipboard: {ex.Message}");
+                }
+            }
+        }, _ => !string.IsNullOrWhiteSpace(ClaimUrl));
+
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6);
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
@@ -244,7 +329,11 @@ public class LobbyViewModel : ObservableObject
 
     private async Task ClaimTunnelAsync()
     {
-        IsBusy = true;
+        IsClaiming = true;
+        HasClaimError = false;
+        ClaimErrorMessage = null;
+        ClaimUrl = null;
+        ClaimCopied = false;
         StatusText = "Подготовка ссылки привязки...";
         StatusIcon = "⏳";
 
@@ -254,38 +343,46 @@ public class LobbyViewModel : ObservableObject
             var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
             var provider = _tunnelProvider as PlayitTunnelProvider ?? new PlayitTunnelProvider(null, toolsDir);
 
-            StatusText = "Открываем браузер... Подтвердите в браузере";
-            StatusIcon = "🌐";
-
             var secret = await provider.ClaimTunnelAsync(url =>
             {
                 Dispatch(() =>
                 {
-                    StatusText = "Подтвердите в браузере";
+                    ClaimUrl = url;
+                    StatusText = "Подтвердите привязку в браузере";
                     StatusIcon = "🌐";
+                    RaiseAllCommands();
                 });
             });
 
             if (!string.IsNullOrWhiteSpace(secret))
             {
                 UpdateSecretState();
+                ClaimUrl = null;
+                HasClaimError = false;
+                ClaimErrorMessage = null;
                 StatusText = "Туннель успешно привязан! Теперь можно создать лобби.";
                 StatusIcon = "✅";
             }
             else
             {
-                StatusText = "Туннель не привязан (время ожидания истекло)";
+                HasClaimError = true;
+                ClaimErrorMessage = "Туннель не привязан (время ожидания истекло).";
+                StatusText = "Туннель не привязан";
                 StatusIcon = "❌";
             }
         }
         catch (Exception ex)
         {
+            PlayitTunnelProvider.LogTunnel($"[CLAIM: EXCEPTION] {ex}");
+            HasClaimError = true;
+            ClaimErrorMessage = ex.Message;
             StatusText = $"Ошибка привязки: {ex.Message}";
             StatusIcon = "❌";
         }
         finally
         {
-            IsBusy = false;
+            IsClaiming = false;
+            RaiseAllCommands();
         }
     }
 
@@ -653,6 +750,10 @@ public class LobbyViewModel : ObservableObject
         JoinLobbyCommand.RaiseCanExecuteChanged();
         ConnectToGameCommand.RaiseCanExecuteChanged();
         OpenWorldCommand.RaiseCanExecuteChanged();
+        ClaimTunnelCommand.RaiseCanExecuteChanged();
+        RetryClaimCommand.RaiseCanExecuteChanged();
+        OpenClaimUrlCommand.RaiseCanExecuteChanged();
+        CopyClaimUrlCommand.RaiseCanExecuteChanged();
     }
 
     private async Task EnsureSkinUploadedAsync()

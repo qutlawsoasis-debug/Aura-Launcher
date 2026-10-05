@@ -71,11 +71,14 @@ public class PlayitTunnelProvider : ITunnelProvider
             var hash = await ComputeFileSha256Async(_playitExePath, ct);
             if (string.Equals(hash, ExpectedSha256, StringComparison.OrdinalIgnoreCase))
             {
+                LogTunnel($"Playit binary verified with expected hash {ExpectedSha256}");
                 return;
             }
+            LogTunnel($"Playit binary hash mismatch ({hash} != {ExpectedSha256}), re-downloading...");
             try { File.Delete(_playitExePath); } catch { }
         }
 
+        LogTunnel($"Downloading playit-0.15.26 from {PlayitDownloadUrl}...");
         var tempFile = _playitExePath + ".tmp";
         try
         {
@@ -96,6 +99,7 @@ public class PlayitTunnelProvider : ITunnelProvider
 
             if (File.Exists(_playitExePath)) File.Delete(_playitExePath);
             File.Move(tempFile, _playitExePath);
+            LogTunnel($"Playit binary downloaded and verified successfully: {_playitExePath}");
         }
         finally
         {
@@ -153,6 +157,55 @@ public class PlayitTunnelProvider : ITunnelProvider
         return null;
     }
 
+    public static void LogTunnel(string message)
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var logDir = Path.Combine(appData, ".aura", "logs");
+            Directory.CreateDirectory(logDir);
+            var logPath = Path.Combine(logDir, "tunnel.log");
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}{Environment.NewLine}";
+            File.AppendAllText(logPath, line);
+        }
+        catch { }
+        App.Log($"[TUNNEL] {message}");
+    }
+
+    public static void OpenBrowser(string url)
+    {
+        LogTunnel($"[BROWSER] Launching browser for: {url}");
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+            LogTunnel("[BROWSER] Process.Start with UseShellExecute=true succeeded.");
+        }
+        catch (Exception ex)
+        {
+            LogTunnel($"[BROWSER: WARN] Process.Start failed: {ex.Message}. Falling back to cmd.exe /c start...");
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c start \"\" \"{url}\"",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+                LogTunnel("[BROWSER] Fallback cmd.exe /c start succeeded.");
+            }
+            catch (Exception ex2)
+            {
+                LogTunnel($"[BROWSER: ERROR] Both browser launch attempts failed: {ex2.Message}");
+            }
+        }
+    }
+
     public static void KillStalePlayitProcesses()
     {
         try
@@ -160,13 +213,23 @@ public class PlayitTunnelProvider : ITunnelProvider
             var processes = Process.GetProcessesByName("playit-0.15.26");
             foreach (var p in processes)
             {
-                try { p.Kill(true); } catch { }
+                try
+                {
+                    LogTunnel($"Killing stale process playit-0.15.26 (PID: {p.Id})");
+                    p.Kill(true);
+                }
+                catch { }
             }
 
             var legacy = Process.GetProcessesByName("playit");
             foreach (var p in legacy)
             {
-                try { p.Kill(true); } catch { }
+                try
+                {
+                    LogTunnel($"Killing stale process playit (PID: {p.Id})");
+                    p.Kill(true);
+                }
+                catch { }
             }
         }
         catch { }
@@ -176,15 +239,16 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public async Task<string?> ClaimTunnelAsync(Action<string>? onUrlReady = null, CancellationToken ct = default)
     {
+        LogTunnel("Starting ClaimTunnelAsync...");
         await EnsureBinaryDownloadedAsync(ct);
         KillStalePlayitProcesses();
         InitJobObject();
 
-        var tcsUrl = new TaskCompletionSource<string>();
+        var tcsUrl = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var psi = new ProcessStartInfo
         {
             FileName = _playitExePath,
-            Arguments = $"--secret_path \"{_secretFilePath}\"",
+            Arguments = $"--secret_path \"{_secretFilePath}\" --stdout",
             WorkingDirectory = _toolsDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -192,35 +256,30 @@ public class PlayitTunnelProvider : ITunnelProvider
             CreateNoWindow = true
         };
 
-        using var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
-        proc.OutputDataReceived += (s, e) =>
+        LogTunnel($"Launching playit agent for claim: \"{_playitExePath}\" {psi.Arguments}");
+        var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+
+        void HandleProcessOutput(string? data, string source)
         {
-            if (e.Data != null)
+            if (string.IsNullOrWhiteSpace(data)) return;
+            LogTunnel($"[{source}] {data}");
+
+            var match = System.Text.RegularExpressions.Regex.Match(data, @"https?://playit\.gg/claim/[a-zA-Z0-9_-]+");
+            if (match.Success)
             {
-                App.Log($"[PLAYIT-CLAIM-OUT] {e.Data}");
-                var match = System.Text.RegularExpressions.Regex.Match(e.Data, @"https?://playit\.gg/claim/\S+");
-                if (match.Success)
-                {
-                    tcsUrl.TrySetResult(match.Value);
-                }
+                var url = match.Value;
+                LogTunnel($"Claim URL detected in {source}: {url}");
+                tcsUrl.TrySetResult(url);
             }
-        };
-        proc.ErrorDataReceived += (s, e) =>
-        {
-            if (e.Data != null)
-            {
-                App.Log($"[PLAYIT-CLAIM-ERR] {e.Data}");
-                var match = System.Text.RegularExpressions.Regex.Match(e.Data, @"https?://playit\.gg/claim/\S+");
-                if (match.Success)
-                {
-                    tcsUrl.TrySetResult(match.Value);
-                }
-            }
-        };
+        }
+
+        proc.OutputDataReceived += (s, e) => HandleProcessOutput(e.Data, "PLAYIT-CLAIM-OUT");
+        proc.ErrorDataReceived += (s, e) => HandleProcessOutput(e.Data, "PLAYIT-CLAIM-ERR");
 
         if (!proc.Start())
         {
-            return null;
+            LogTunnel("[ERROR] Failed to start playit agent process.");
+            throw new InvalidOperationException("Не удалось запустить процесс playit.");
         }
 
         proc.BeginOutputReadLine();
@@ -231,43 +290,79 @@ public class PlayitTunnelProvider : ITunnelProvider
             AssignProcessToJobObject(_jobHandle, proc.Handle);
         }
 
-        // Ждем получения claim URL (до 10 секунд)
-        var urlTimeout = Task.Delay(10000, ct);
-        var completed = await Task.WhenAny(tcsUrl.Task, urlTimeout);
-        if (completed == tcsUrl.Task)
+        try
         {
-            string url = await tcsUrl.Task;
-            onUrlReady?.Invoke(url);
-            try
-            {
-                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-            }
-            catch { }
-        }
+            // Ждем получения claim URL (до 30 секунд согласно ТЗ)
+            LogTunnel("Awaiting claim URL from process output (30s timeout)...");
+            var urlTimeoutTask = Task.Delay(TimeSpan.FromSeconds(30), ct);
+            var completedTask = await Task.WhenAny(tcsUrl.Task, urlTimeoutTask);
 
-        // Ждем появления файла playit.secret (таймаут 120 секунд)
-        for (int i = 0; i < 240; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (File.Exists(_secretFilePath) && new FileInfo(_secretFilePath).Length > 10)
+            if (completedTask != tcsUrl.Task)
             {
-                try
+                LogTunnel("[TIMEOUT] Claim URL was not received within 30 seconds.");
+                throw new TimeoutException("Не удалось получить ссылку привязки за 30 секунд. Проверьте интернет-соединение.");
+            }
+
+            string url = await tcsUrl.Task;
+            LogTunnel($"Claim URL obtained: {url}. Calling onUrlReady callback.");
+            onUrlReady?.Invoke(url);
+
+            // Автоматическое открытие в браузере по умолчанию
+            OpenBrowser(url);
+
+            // Ждем подтверждения пользователя и появления playit.secret (таймаут до 5 минут = 300 сек)
+            // Процесс агента держим живым все это время
+            LogTunnel("Awaiting secret creation in playit.secret (up to 5 minutes)...");
+            var maxWait = TimeSpan.FromMinutes(5);
+            var startTime = DateTime.UtcNow;
+
+            while (DateTime.UtcNow - startTime < maxWait)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                if (proc.HasExited)
                 {
-                    string sec = (await File.ReadAllTextAsync(_secretFilePath, ct)).Trim();
-                    if (!string.IsNullOrWhiteSpace(sec))
+                    LogTunnel($"[WARN] Playit agent exited with code {proc.ExitCode} while waiting for secret.");
+                }
+
+                if (File.Exists(_secretFilePath) && new FileInfo(_secretFilePath).Length > 10)
+                {
+                    try
                     {
-                        SaveSecret(sec);
-                        try { proc.Kill(true); } catch { }
-                        return sec;
+                        string sec = (await File.ReadAllTextAsync(_secretFilePath, ct)).Trim();
+                        if (!string.IsNullOrWhiteSpace(sec))
+                        {
+                            LogTunnel("Found playit.secret file! Encrypting with DPAPI and saving...");
+                            SaveSecret(sec);
+                            LogTunnel("Secret saved with DPAPI successfully.");
+                            return sec;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogTunnel($"[WARN] Error reading secret file: {ex.Message}");
                     }
                 }
-                catch { }
-            }
-            await Task.Delay(500, ct);
-        }
 
-        try { proc.Kill(true); } catch { }
-        return null;
+                await Task.Delay(500, ct);
+            }
+
+            LogTunnel("[TIMEOUT] Confirmation timeout reached (5 minutes).");
+            throw new TimeoutException("Время ожидания подтверждения истекло (5 минут).");
+        }
+        finally
+        {
+            try
+            {
+                if (!proc.HasExited)
+                {
+                    LogTunnel("Terminating claim agent process.");
+                    proc.Kill(true);
+                }
+            }
+            catch { }
+            proc.Dispose();
+        }
     }
 
     public async Task<(string? Host, int? Port)> ResolveTunnelAddressAsync(CancellationToken ct = default)
@@ -364,7 +459,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         {
             if (e.Data != null)
             {
-                App.Log($"[PLAYIT-OUT] {e.Data}");
+                LogTunnel($"[PLAYIT-OUT] {e.Data}");
                 if (e.Data.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
                     e.Data.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
                 {
@@ -376,7 +471,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         {
             if (e.Data != null)
             {
-                App.Log($"[PLAYIT-ERR] {e.Data}");
+                LogTunnel($"[PLAYIT-ERR] {e.Data}");
                 if (e.Data.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
                     e.Data.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
                 {
@@ -405,7 +500,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         var completed = await Task.WhenAny(tcsConnected.Task, connectTimeout);
         if (completed == connectTimeout && !tcsConnected.Task.IsCompleted)
         {
-            App.Log("[PLAYIT] Warning: connection line not observed within 12s, proceeding with port test...");
+            LogTunnel("[PLAYIT] Warning: connection line not observed within 12s, proceeding with port test...");
         }
 
         // Разрешаем публичный адрес динамически из аккаунта игрока
@@ -420,13 +515,13 @@ public class PlayitTunnelProvider : ITunnelProvider
         bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort.Value, 6000, ct);
         if (!tcpSuccess)
         {
-            App.Log($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} failed!");
+            LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} failed!");
             _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Туннель не поднялся");
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
 
-        App.Log($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
+        LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
         _currentInfo = new TunnelInfo(publicHost, publicPort.Value, TunnelStatus.Active);
         StatusChanged?.Invoke(_currentInfo);
         return _currentInfo;

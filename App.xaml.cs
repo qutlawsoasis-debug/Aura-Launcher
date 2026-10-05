@@ -124,6 +124,11 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.LiveTestLobbyAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
             });
         }
         else if (isSelfTest)

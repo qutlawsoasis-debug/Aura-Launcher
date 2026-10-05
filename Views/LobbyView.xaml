@@ -95,10 +95,128 @@
                                     <TextBlock Text="Создай лобби и пригласи друзей" FontSize="12" Foreground="#9AA3B2" />
                                 </StackPanel>
                             </StackPanel>
-                            <Button Command="{Binding ClaimTunnelCommand}"
-                                    Style="{StaticResource PrimaryNeonBtn}"
-                                    Visibility="{Binding ShowClaimTunnelButton, Converter={StaticResource BoolToVis}}"
-                                    Height="42" Content="ПРИВЯЗАТЬ ТУННЕЛЬ" FontSize="13" />
+                            <!-- Секция привязки туннеля (если секрета нет) -->
+                            <StackPanel Visibility="{Binding ShowClaimTunnelButton, Converter={StaticResource BoolToVis}}">
+                                <!-- Кнопка первоначальной привязки (когда не идет claim и нет ошибки и нет url) -->
+                                <Button Command="{Binding ClaimTunnelCommand}"
+                                        Height="42" Content="ПРИВЯЗАТЬ ТУННЕЛЬ" FontSize="13">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsClaiming}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasClaimError}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding HasClaimUrl}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+
+                                <!-- Индикатор подготовки ссылки (когда IsClaiming и ссылки еще нет) -->
+                                <Border Background="#132B25" CornerRadius="8" Padding="14,10" Margin="0,0,0,0"
+                                        BorderThickness="1" BorderBrush="#19D3A733">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsClaiming}" Value="True" />
+                                                        <Condition Binding="{Binding HasClaimUrl}" Value="False" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <TextBlock Text="⏳" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <TextBlock Text="Получение ссылки привязки от playit..." FontSize="13" Foreground="#19D3A7" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Блок ссылки привязки (когда ссылка получена) -->
+                                <StackPanel Margin="0,0,0,0">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasClaimUrl}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+
+                                    <TextBlock Text="Ссылка для привязки туннеля:" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,6" />
+                                    <TextBox Text="{Binding ClaimUrl, Mode=OneWay}"
+                                             Style="{StaticResource ModernTextBox}"
+                                             IsReadOnly="True"
+                                             FontSize="12"
+                                             FontFamily="Consolas, Courier New"
+                                             Height="38"
+                                             Margin="0,0,0,10"
+                                             VerticalContentAlignment="Center" />
+
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Column="0"
+                                                Command="{Binding OpenClaimUrlCommand}"
+                                                Style="{StaticResource PrimaryNeonBtn}"
+                                                Height="38" Content="🌐  ОТКРЫТЬ" FontSize="12" FontWeight="SemiBold" />
+                                        <Button Grid.Column="2"
+                                                Command="{Binding CopyClaimUrlCommand}"
+                                                Height="38" FontSize="12" FontWeight="SemiBold">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
+                                                    <Setter Property="Content" Value="📋  КОПИРОВАТЬ" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ClaimCopied}" Value="True">
+                                                            <Setter Property="Content" Value="✅  СКОПИРОВАНО" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                        </Button>
+                                    </Grid>
+
+                                    <TextBlock Text="Подтвердите привязку в браузере (до 5 мин)..."
+                                               FontSize="11" Foreground="#19D3A7" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <!-- Блок ошибки привязки с кнопкой ПОВТОРИТЬ -->
+                                <Border Background="#2D1515" CornerRadius="8" Padding="14,10" Margin="0,0,0,0"
+                                        BorderThickness="1" BorderBrush="#EF444433">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HasClaimError}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding ClaimErrorMessage}"
+                                                   FontSize="12" Foreground="#EF4444" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                        <Button Command="{Binding RetryClaimCommand}"
+                                                Style="{StaticResource StandardBtn}"
+                                                Height="38" Content="🔄  ПОВТОРИТЬ" FontSize="12" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
                             <Button Command="{Binding CreateLobbyCommand}"
                                     Style="{StaticResource PrimaryNeonBtn}"
                                     Visibility="{Binding ShowCreateLobbyButton, Converter={StaticResource BoolToVis}}"
