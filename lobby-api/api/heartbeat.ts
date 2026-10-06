@@ -30,7 +30,7 @@ export default async function handler(req: any, res: any) {
     }
 
     lobby.lastHeartbeat = Date.now();
-    await store.set(lobby, 60);
+    await store.set(lobby, 1800);
 
     return sendJson(res, 200, {
       success: true,

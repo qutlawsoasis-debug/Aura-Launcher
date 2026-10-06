@@ -122,10 +122,17 @@ public class LobbyApiClient : ILobbyApiClient
                 "application/json");
 
             var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/open"), content, cancellationToken);
-            return response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] POST api/lobby/open HTTP {(int)response.StatusCode}: {body}");
+                return false;
+            }
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
+            PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] POST api/lobby/open exception: {ex.Message}");
             return false;
         }
     }

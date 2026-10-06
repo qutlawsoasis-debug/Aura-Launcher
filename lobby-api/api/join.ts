@@ -27,7 +27,7 @@ export default async function handler(req: any, res: any) {
 
     if (!lobby.players.includes(playerName)) {
       lobby.players.push(playerName);
-      await store.set(lobby, 60);
+      await store.set(lobby, 1800);
     }
 
     return sendJson(res, 200, {

@@ -139,7 +139,7 @@ export const server = http.createServer(async (req, res) => {
                 lastHeartbeat: Date.now(),
                 players: [hostName]
             };
-            await store.set(lobby, 60);
+            await store.set(lobby, 1800);
             sendJson(res, 201, {
                 code,
                 hostToken,
@@ -160,7 +160,7 @@ export const server = http.createServer(async (req, res) => {
             }
             if (!lobby.players.includes(playerName)) {
                 lobby.players.push(playerName);
-                await store.set(lobby, 60);
+                await store.set(lobby, 1800);
             }
             sendJson(res, 200, {
                 success: true,
@@ -200,23 +200,42 @@ export const server = http.createServer(async (req, res) => {
             const code = (body.code || '').toUpperCase().trim();
             const hostToken = body.hostToken;
             const tunnelAddress = body.tunnelAddress;
-            const lobby = await store.get(code);
-            if (!lobby) {
-                sendJson(res, 404, { error: 'Lobby not found' });
+            if (!code) {
+                sendJson(res, 400, { error: 'code is required' });
                 return;
             }
-            if (lobby.hostToken !== hostToken) {
-                sendJson(res, 403, { error: 'Unauthorized: invalid host token' });
+            if (!hostToken) {
+                sendJson(res, 400, { error: 'hostToken is required' });
                 return;
             }
             if (!tunnelAddress) {
                 sendJson(res, 400, { error: 'tunnelAddress is required' });
                 return;
             }
-            lobby.status = 'open';
-            lobby.tunnelAddress = tunnelAddress;
-            lobby.lastHeartbeat = Date.now();
-            await store.set(lobby, 60);
+            let lobby = await store.get(code);
+            if (lobby) {
+                if (lobby.hostToken !== hostToken) {
+                    sendJson(res, 403, { error: 'Unauthorized: invalid host token' });
+                    return;
+                }
+                lobby.status = 'open';
+                lobby.tunnelAddress = tunnelAddress;
+                lobby.lastHeartbeat = Date.now();
+            }
+            else {
+                // Recreate lobby if it expired during slow world/tunnel startup
+                lobby = {
+                    code,
+                    hostToken,
+                    hostName: body.hostName || 'Host',
+                    status: 'open',
+                    tunnelAddress,
+                    createdAt: Date.now(),
+                    lastHeartbeat: Date.now(),
+                    players: [body.hostName || 'Host']
+                };
+            }
+            await store.set(lobby, 7200);
             sendJson(res, 200, {
                 success: true,
                 code: lobby.code,
@@ -240,7 +259,7 @@ export const server = http.createServer(async (req, res) => {
                 return;
             }
             lobby.lastHeartbeat = Date.now();
-            await store.set(lobby, 60);
+            await store.set(lobby, 1800);
             sendJson(res, 200, {
                 success: true,
                 code: lobby.code,

@@ -227,12 +227,24 @@ public class LobbyService : ILobbyService, IDisposable
         {
             try
             {
+                int heartbeatTick = 0;
                 while (!ct.IsCancellationRequested)
                 {
                     try
                     {
                         await Task.Delay(1500, ct);
                         if (ct.IsCancellationRequested) break;
+
+                        heartbeatTick++;
+                        if (IsHost && !string.IsNullOrWhiteSpace(CurrentLobbyCode) && !string.IsNullOrWhiteSpace(CurrentHostToken) && heartbeatTick % 10 == 0)
+                        {
+                            try
+                            {
+                                await _apiClient.HeartbeatAsync(CurrentLobbyCode, CurrentHostToken, ct);
+                            }
+                            catch { }
+                        }
+
                         await RefreshGuestStatusAsync(ct);
                         if (CurrentStatus.Equals("closed", StringComparison.OrdinalIgnoreCase))
                         {

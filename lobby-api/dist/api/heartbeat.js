@@ -23,7 +23,7 @@ export default async function handler(req, res) {
             return sendJson(res, 403, { error: 'Unauthorized: invalid host token' });
         }
         lobby.lastHeartbeat = Date.now();
-        await store.set(lobby, 60);
+        await store.set(lobby, 1800);
         return sendJson(res, 200, {
             success: true,
             code: lobby.code,
