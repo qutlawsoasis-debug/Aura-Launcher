@@ -21,6 +21,7 @@ public class LobbyService : ILobbyService, IDisposable
 
     public event Action<string>? StatusChanged;
     public event Action<string>? TunnelAddressReady;
+    public event Action<LobbyStatusResponse>? LobbyStatusUpdated;
 
     public LobbyService(ILobbyApiClient apiClient, ITunnelProvider? tunnelProvider = null)
     {
@@ -41,6 +42,7 @@ public class LobbyService : ILobbyService, IDisposable
         IsHost = true;
 
         StatusChanged?.Invoke(CurrentStatus);
+        StartGuestPolling();
         return CurrentLobbyCode;
     }
 
@@ -209,6 +211,8 @@ public class LobbyService : ILobbyService, IDisposable
             {
                 TunnelAddressReady?.Invoke(CurrentTunnelAddress);
             }
+
+            LobbyStatusUpdated?.Invoke(status);
         }
         return status;
     }

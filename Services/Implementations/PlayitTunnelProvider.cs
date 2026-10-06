@@ -189,7 +189,7 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public void SetSecret(string? secret)
     {
-        InMemorySecret = secret?.Trim();
+        InMemorySecret = secret?.Trim('\uFEFF', '\u200B', ' ', '\r', '\n', '\t');
     }
 
     public void SaveSecret(string rawSecret)
@@ -265,29 +265,28 @@ public class PlayitTunnelProvider : ITunnelProvider
     {
         try
         {
-            var processes = Process.GetProcessesByName("playit-0.15.26");
+            var currentPid = Process.GetCurrentProcess().Id;
+            var processes = Process.GetProcesses()
+                .Where(p => p.Id != currentPid && p.ProcessName.StartsWith("playit", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
             foreach (var p in processes)
             {
                 try
                 {
-                    LogTunnel($"Killing stale process playit-0.15.26 (PID: {p.Id})");
+                    LogTunnel($"Killing stale playit process {p.ProcessName} (PID: {p.Id})");
                     p.Kill(true);
                 }
-                catch { }
-            }
-
-            var legacy = Process.GetProcessesByName("playit");
-            foreach (var p in legacy)
-            {
-                try
+                catch (Exception ex)
                 {
-                    LogTunnel($"Killing stale process playit (PID: {p.Id})");
-                    p.Kill(true);
+                    LogTunnel($"[PROCESS: WARN] Failed to kill process {p.ProcessName} PID {p.Id}: {ex.Message}");
                 }
-                catch { }
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            LogTunnel($"[PROCESS: ERROR] Error finding stale playit processes: {ex.Message}");
+        }
     }
 
     public bool HasSecret => !string.IsNullOrWhiteSpace(LoadSecret());
@@ -528,7 +527,8 @@ public class PlayitTunnelProvider : ITunnelProvider
             catch { }
 
             _activeTempSecretFile = Path.Combine(Path.GetTempPath(), $"playit_{Guid.NewGuid():N}.secret");
-            File.WriteAllText(_activeTempSecretFile, secret.Trim());
+            var cleanSecret = (InMemorySecret ?? secret).Trim('\uFEFF', '\u200B', ' ', '\r', '\n', '\t');
+            File.WriteAllText(_activeTempSecretFile, cleanSecret, new UTF8Encoding(false));
             LogTunnel($"[PLAYIT] Using temporary secret file: {_activeTempSecretFile}");
 
             var tcsConnected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -591,25 +591,37 @@ public class PlayitTunnelProvider : ITunnelProvider
             StartPipeReader(proc.StandardOutput, "PLAYIT-OUT", line =>
             {
                 LogTunnel($"[PLAYIT-OUT] {line}");
-                if (line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
+                if (line.Contains("agent has", StringComparison.OrdinalIgnoreCase) ||
+                    (line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) && !line.Contains("0 tunnels", StringComparison.OrdinalIgnoreCase)) ||
                     line.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
                 {
                     tcsConnected.TrySetResult(true);
+                }
+                else if (line.Contains("0 tunnels registered", StringComparison.OrdinalIgnoreCase) ||
+                         line.Contains("Visit link to setup", StringComparison.OrdinalIgnoreCase))
+                {
+                    LogTunnel($"[PLAYIT: WARN] Playit agent indicates unlinked or 0 tunnels registered: {line}");
                 }
             }, readerCt);
 
             StartPipeReader(proc.StandardError, "PLAYIT-ERR", line =>
             {
                 LogTunnel($"[PLAYIT-ERR] {line}");
-                if (line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
+                if (line.Contains("agent has", StringComparison.OrdinalIgnoreCase) ||
+                    (line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) && !line.Contains("0 tunnels", StringComparison.OrdinalIgnoreCase)) ||
                     line.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
                 {
                     tcsConnected.TrySetResult(true);
                 }
+                else if (line.Contains("0 tunnels registered", StringComparison.OrdinalIgnoreCase) ||
+                         line.Contains("Visit link to setup", StringComparison.OrdinalIgnoreCase))
+                {
+                    LogTunnel($"[PLAYIT: WARN] Playit agent indicates unlinked or 0 tunnels registered: {line}");
+                }
             }, readerCt);
 
-            // Ждём подключения агента или преждевременного завершения (таймаут 4 секунды)
-            var connectTimeout = Task.Delay(4000, ct);
+            // Ждём подключения агента или преждевременного завершения (таймаут 6 секунд)
+            var connectTimeout = Task.Delay(15000, ct);
             var finished = await Task.WhenAny(tcsConnected.Task, processExitTcs.Task, connectTimeout);
 
             if (finished == processExitTcs.Task)
@@ -640,6 +652,20 @@ public class PlayitTunnelProvider : ITunnelProvider
                     continue;
                 }
                 _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, $"Процесс туннеля playit завершился с кодом {exitCode}.");
+                StatusChanged?.Invoke(_currentInfo);
+                return _currentInfo;
+            }
+
+            if (!tcsConnected.Task.IsCompleted)
+            {
+                LogTunnel($"[PLAYIT: WARN] Agent startup timeout without tunnel registration confirmation on attempt {attempt}.");
+                if (attempt < maxAttempts)
+                {
+                    try { proc.Kill(true); } catch { }
+                    await Task.Delay(1000, ct);
+                    continue;
+                }
+                _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Туннель playit не подтвердил регистрацию за отведенное время.");
                 StatusChanged?.Invoke(_currentInfo);
                 return _currentInfo;
             }
@@ -723,7 +749,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         }, ct);
     }
 
-    private static async Task<bool> TestTcpConnectAsync(string host, int port, int timeoutMs, CancellationToken ct)
+    public static async Task<bool> TestTcpConnectAsync(string host, int port, int timeoutMs, CancellationToken ct)
     {
         for (int retry = 0; retry < 2; retry++)
         {

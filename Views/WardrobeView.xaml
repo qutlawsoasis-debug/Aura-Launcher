@@ -2,99 +2,102 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="478" d:DesignWidth="980">
+             d:DesignHeight="478" d:DesignWidth="980"
+             Background="Transparent">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <Grid Background="#0F1115">
-        <!-- Блок превью + блок управления выровнены как ОДНА группа по центру окна (по горизонтали и вертикали) -->
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-            
-            <!-- 1. Блок 2D-превью (вид спереди и сзади рядом, масштаб 10x, NearestNeighbor) -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- Вид спереди (10x: 160x320) -->
-                <StackPanel HorizontalAlignment="Center" Margin="0,0,24,0">
-                    <Grid Width="160" Height="330">
-                        <!-- Плоская тень под ногами -->
-                        <Ellipse Width="110" Height="8" Fill="#171A21"
-                                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+    <Grid Background="Transparent">
+        <!-- Блок превью + блок управления в CardPanel -->
+        <Border Style="{StaticResource CardPanel}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32,24" Margin="0,16">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                
+                <!-- 1. Блок 2D-превью (вид спереди и сзади рядом, масштаб 10x, NearestNeighbor) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Вид спереди (10x: 160x320) -->
+                    <StackPanel HorizontalAlignment="Center" Margin="0,0,24,0">
+                        <Grid Width="160" Height="330">
+                            <!-- Плоская тень под ногами -->
+                            <Ellipse Width="110" Height="8" Fill="#10141A"
+                                     HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
 
-                        <!-- Превью спереди: 10x масштаб, NearestNeighbor, прозрачность сохранена -->
-                        <Image Source="{Binding SkinFrontPreview}"
-                               Width="160" Height="320"
-                               VerticalAlignment="Top"
-                               RenderOptions.BitmapScalingMode="NearestNeighbor"
-                               RenderOptions.EdgeMode="Aliased"
-                               Stretch="Fill" />
-                    </Grid>
-                    <!-- Подпись без рамок -->
-                    <TextBlock Text="Спереди" FontSize="11" Foreground="#9AA3B2"
-                               HorizontalAlignment="Center" Margin="0,8,0,0" />
+                            <!-- Превью спереди: 10x масштаб, NearestNeighbor, прозрачность сохранена -->
+                            <Image Source="{Binding SkinFrontPreview}"
+                                   Width="160" Height="320"
+                                   VerticalAlignment="Top"
+                                   RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                   RenderOptions.EdgeMode="Aliased"
+                                   Stretch="Fill" />
+                        </Grid>
+                        <!-- Подпись без рамок -->
+                        <TextBlock Text="Спереди" FontSize="11" Foreground="#9AA3B2"
+                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
+                    </StackPanel>
+
+                    <!-- Вид сзади (10x: 160x320) -->
+                    <StackPanel HorizontalAlignment="Center">
+                        <Grid Width="160" Height="330">
+                            <!-- Плоская тень под ногами -->
+                            <Ellipse Width="110" Height="8" Fill="#10141A"
+                                     HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+
+                            <!-- Превью сзади: 10x масштаб, NearestNeighbor, прозрачность сохранена -->
+                            <Image Source="{Binding SkinBackPreview}"
+                                   Width="160" Height="320"
+                                   VerticalAlignment="Top"
+                                   RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                   RenderOptions.EdgeMode="Aliased"
+                                   Stretch="Fill" />
+                        </Grid>
+                        <!-- Подпись без рамок -->
+                        <TextBlock Text="Сзади" FontSize="11" Foreground="#9AA3B2"
+                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
+                    </StackPanel>
                 </StackPanel>
 
-                <!-- Вид сзади (10x: 160x320) -->
-                <StackPanel HorizontalAlignment="Center">
-                    <Grid Width="160" Height="330">
-                        <!-- Плоская тень под ногами -->
-                        <Ellipse Width="110" Height="8" Fill="#171A21"
-                                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+                <!-- 2. Блок управления (расстояние от превью ровно 48 px) -->
+                <StackPanel Margin="48,0,0,0" VerticalAlignment="Center">
+                    <!-- Заголовок -->
+                    <TextBlock Text="СКИН" FontFamily="{StaticResource PixelFont}" FontSize="24" FontWeight="Bold" Foreground="#E8EAED" Margin="0,0,0,6" />
 
-                        <!-- Превью сзади: 10x масштаб, NearestNeighbor, прозрачность сохранена -->
-                        <Image Source="{Binding SkinBackPreview}"
-                               Width="160" Height="320"
-                               VerticalAlignment="Top"
-                               RenderOptions.BitmapScalingMode="NearestNeighbor"
-                               RenderOptions.EdgeMode="Aliased"
-                               Stretch="Fill" />
-                    </Grid>
-                    <!-- Подпись без рамок -->
-                    <TextBlock Text="Сзади" FontSize="11" Foreground="#9AA3B2"
-                               HorizontalAlignment="Center" Margin="0,8,0,0" />
+                    <!-- Исходное имя файла (SkinOriginalName) или 'Стандартный' -->
+                    <TextBlock Text="{Binding SkinDisplayName}" FontSize="13" Foreground="#9AA3B2" Margin="0,0,0,24" />
+
+                    <!-- Кнопки: вторичная 'Выбрать файл…' и текстовая 'Сбросить' -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
+                        <Button Command="{Binding SelectSkinCommand}"
+                                Style="{StaticResource StandardBtn}"
+                                Content="Выбрать файл…"
+                                Height="38" Padding="18,0" Margin="0,0,12,0" />
+
+                        <Button Command="{Binding ResetSkinCommand}"
+                                Style="{StaticResource GhostBtn}"
+                                Content="Сбросить"
+                                Height="38" Padding="14,0" />
+                    </StackPanel>
+
+                    <!-- Одиночная серая строка подсказки -->
+                    <TextBlock Text="PNG 64×64 или 64×32" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,12" />
+
+                    <!-- Переключатель модели: Тонкие руки (slim) -->
+                    <CheckBox Content="Тонкие руки (Alex / Slim)"
+                              IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
+                              Foreground="#E8EAED"
+                              FontSize="13"
+                              Margin="0,0,0,16" />
+
+                    <!-- Однострочное уведомление об ошибке или успехе -->
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="{Binding StatusBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}"
+                               TextWrapping="Wrap" MaxWidth="360" />
                 </StackPanel>
             </StackPanel>
-
-            <!-- 2. Блок управления (расстояние от превью ровно 48 px) -->
-            <StackPanel Margin="48,0,0,0" VerticalAlignment="Center">
-                <!-- Заголовок -->
-                <TextBlock Text="Скин" FontSize="24" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,6" />
-
-                <!-- Исходное имя файла (SkinOriginalName) или 'Стандартный' -->
-                <TextBlock Text="{Binding SkinDisplayName}" FontSize="13" Foreground="#9AA3B2" Margin="0,0,0,24" />
-
-                <!-- Кнопки: вторичная 'Выбрать файл…' и текстовая 'Сбросить' -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
-                    <Button Command="{Binding SelectSkinCommand}"
-                            Style="{StaticResource StandardBtn}"
-                            Content="Выбрать файл…"
-                            Height="38" Padding="18,0" Margin="0,0,12,0" />
-
-                    <Button Command="{Binding ResetSkinCommand}"
-                            Style="{StaticResource GhostBtn}"
-                            Content="Сбросить"
-                            Height="38" Padding="14,0" />
-                </StackPanel>
-
-                <!-- Одиночная серая строка подсказки -->
-                <TextBlock Text="PNG 64×64 или 64×32" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,12" />
-
-                <!-- Переключатель модели: Тонкие руки (slim) -->
-                <CheckBox Content="Тонкие руки (Alex / Slim)"
-                          IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
-                          Foreground="#E8EAED"
-                          FontSize="13"
-                          Margin="0,0,0,16" />
-
-                <!-- Однострочное уведомление об ошибке или успехе -->
-                <TextBlock Text="{Binding StatusMessage}"
-                           Foreground="{Binding StatusBrush}"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}"
-                           TextWrapping="Wrap" MaxWidth="360" />
-            </StackPanel>
-        </StackPanel>
+        </Border>
     </Grid>
 </UserControl>

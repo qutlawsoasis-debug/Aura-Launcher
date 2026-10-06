@@ -4,99 +4,102 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="478" d:DesignWidth="980">
+             d:DesignHeight="478" d:DesignWidth="980"
+             Background="Transparent">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <Grid Background="#0F1115" Margin="48,16,48,16">
+    <Grid Background="Transparent" Margin="48,16,48,16">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel VerticalAlignment="Top" MaxWidth="620" HorizontalAlignment="Left">
-                <TextBlock Text="Настройки" FontSize="24" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,16" />
+            <Border Style="{StaticResource CardPanel}" VerticalAlignment="Top" MaxWidth="620" HorizontalAlignment="Left" Padding="28,20">
+                <StackPanel>
+                    <TextBlock Text="НАСТРОЙКИ" FontFamily="{StaticResource PixelFont}" FontSize="20" FontWeight="Bold" Foreground="#E8EAED" Margin="0,0,0,16" />
 
-                <!-- 1. Nickname (Save on valid input or Enter) -->
-                <TextBlock Text="Игровой никнейм" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" />
-                <TextBox Style="{StaticResource ModernTextBox}"
-                         Text="{Binding Nickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         MaxLength="16"
-                         KeyDown="OnTextBoxKeyDown"
-                         Margin="0,0,0,4" />
-                <TextBlock Text="{Binding NicknameErrorText}"
-                           Foreground="#EF4444"
-                           FontSize="11"
-                           Margin="2,0,0,10"
-                           TextWrapping="Wrap"
-                           Visibility="{Binding HasNicknameError, Converter={StaticResource BoolToVis}}" />
-
-                <!-- 2. RAM Allocation with ModernSlider & Pills -->
-                <Grid Margin="0,0,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Выделение оперативной памяти" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
-                        <TextBlock.Text>
-                            <MultiBinding StringFormat="{}{0} МБ ({1} ГБ)">
-                                <Binding Path="RamMb" />
-                                <Binding Path="RamGb" />
-                            </MultiBinding>
-                        </TextBlock.Text>
-                    </TextBlock>
-                </Grid>
-
-                <Slider Style="{StaticResource ModernSlider}"
-                        Minimum="2" Maximum="16" SmallChange="1" LargeChange="2" TickFrequency="1"
-                        IsSnapToTickEnabled="True"
-                        Value="{Binding RamGb, Mode=TwoWay}"
-                        Margin="0,2,0,10" Height="26" />
-
-                <!-- RAM Quick Select Pills -->
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                    <RadioButton Content="4 ГБ" IsChecked="{Binding IsRam4, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                    <RadioButton Content="6 ГБ" IsChecked="{Binding IsRam6, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                    <RadioButton Content="8 ГБ" IsChecked="{Binding IsRam8, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                    <RadioButton Content="12 ГБ" IsChecked="{Binding IsRam12, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                </StackPanel>
-
-                <!-- 3. Game Directory (Save on LostFocus, Enter, or folder pick) -->
-                <TextBlock Text="Рабочая папка игры" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" />
-                <Grid Margin="0,0,0,16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                    <!-- 1. Nickname (Save on valid input or Enter) -->
+                    <TextBlock Text="Игровой никнейм" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" />
                     <TextBox Style="{StaticResource ModernTextBox}"
-                             Text="{Binding GameDir, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             Text="{Binding Nickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             MaxLength="16"
                              KeyDown="OnTextBoxKeyDown"
-                             VerticalAlignment="Center" />
-                    <Button Grid.Column="1"
-                            Command="{Binding SelectGameFolderCommand}"
-                            Style="{StaticResource StandardBtn}"
-                            Content="Обзор..."
-                            Height="38" Padding="18,0" Margin="10,0,0,0"
-                            VerticalAlignment="Center" />
-                </Grid>
+                             Margin="0,0,0,4" />
+                    <TextBlock Text="{Binding NicknameErrorText}"
+                               Foreground="#EF4444"
+                               FontSize="11"
+                               Margin="2,0,0,10"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding HasNicknameError, Converter={StaticResource BoolToVis}}" />
 
-                <!-- 4. Advanced Settings (Expander, collapsed by default) -->
-                <Expander Style="{StaticResource ModernExpander}" Header="Расширенные" IsExpanded="False" Margin="0,0,0,18">
-                    <StackPanel Margin="0,8,0,0">
-                        <TextBlock Text="Репозиторий GitHub для обновлений" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4" />
-                        <TextBlock Text="Формат: owner/repo (например, username/aura-client)" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,8" />
-                        <TextBox Style="{StaticResource ModernTextBox}"
-                                 Text="{Binding PackRepo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <!-- 2. RAM Allocation with ModernSlider & Pills -->
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Выделение оперативной памяти" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} МБ ({1} ГБ)">
+                                    <Binding Path="RamMb" />
+                                    <Binding Path="RamGb" />
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </Grid>
+
+                    <Slider Style="{StaticResource ModernSlider}"
+                            Minimum="2" Maximum="16" SmallChange="1" LargeChange="2" TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            Value="{Binding RamGb, Mode=TwoWay}"
+                            Margin="0,2,0,10" Height="26" />
+
+                    <!-- RAM Quick Select Pills -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <RadioButton Content="4 ГБ" IsChecked="{Binding IsRam4, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
+                        <RadioButton Content="6 ГБ" IsChecked="{Binding IsRam6, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
+                        <RadioButton Content="8 ГБ" IsChecked="{Binding IsRam8, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
+                        <RadioButton Content="12 ГБ" IsChecked="{Binding IsRam12, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
                     </StackPanel>
-                </Expander>
 
-                <!-- Error Notification (single line if saving fails) -->
-                <TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="{StaticResource ErrorBrush}"
-                           FontSize="12"
-                           FontWeight="SemiBold"
-                           Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}"
-                           Margin="0,8,0,0" />
-            </StackPanel>
+                    <!-- 3. Game Directory (Save on LostFocus, Enter, or folder pick) -->
+                    <TextBlock Text="Рабочая папка игры" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <Grid Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Style="{StaticResource ModernTextBox}"
+                                 Text="{Binding GameDir, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                 KeyDown="OnTextBoxKeyDown"
+                                 VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Command="{Binding SelectGameFolderCommand}"
+                                Style="{StaticResource StandardBtn}"
+                                Content="Обзор..."
+                                Height="38" Padding="18,0" Margin="10,0,0,0"
+                                VerticalAlignment="Center" />
+                    </Grid>
+
+                    <!-- 4. Advanced Settings (Expander, collapsed by default) -->
+                    <Expander Style="{StaticResource ModernExpander}" Header="Расширенные" IsExpanded="False" Margin="0,0,0,18">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock Text="Репозиторий GitHub для обновлений" Foreground="#9AA3B2" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBlock Text="Формат: owner/repo (например, username/aura-client)" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,8" />
+                            <TextBox Style="{StaticResource ModernTextBox}"
+                                     Text="{Binding PackRepo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        </StackPanel>
+                    </Expander>
+
+                    <!-- Error Notification (single line if saving fails) -->
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="{StaticResource ErrorBrush}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}"
+                               Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
         </ScrollViewer>
     </Grid>
 </UserControl>

@@ -186,12 +186,37 @@ public class FabricGameLaunchService : IGameLaunchService
         {
             var configDir = Path.Combine(gameDir, "config");
             var lspPath = Path.Combine(configDir, "lsp.json");
+            Directory.CreateDirectory(configDir);
+
             if (!File.Exists(lspPath))
             {
-                Directory.CreateDirectory(configDir);
                 var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
                 File.WriteAllText(lspPath, content, new UTF8Encoding(false));
                 LogLauncherEvent($"[CONFIG] Создан файл конфигурации по умолчанию (lsp.json): {lspPath}");
+            }
+            else
+            {
+                var existingText = File.ReadAllText(lspPath);
+                if (!existingText.Contains("\"defaultPort\": 25565") || !existingText.Contains("\"enablePreference\": true"))
+                {
+                    try
+                    {
+                        var doc = System.Text.Json.Nodes.JsonNode.Parse(existingText)?.AsObject();
+                        if (doc != null)
+                        {
+                            doc["enablePreference"] = true;
+                            doc["defaultPort"] = 25565;
+                            File.WriteAllText(lspPath, doc.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+                            LogLauncherEvent($"[CONFIG] Обновлен lsp.json для принудительного порта 25565: {lspPath}");
+                        }
+                    }
+                    catch
+                    {
+                        var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
+                        File.WriteAllText(lspPath, content, new UTF8Encoding(false));
+                        LogLauncherEvent($"[CONFIG] Перезаписан поврежденный lsp.json: {lspPath}");
+                    }
+                }
             }
         }
         catch (Exception ex)

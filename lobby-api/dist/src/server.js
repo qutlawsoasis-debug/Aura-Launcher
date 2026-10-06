@@ -58,7 +58,8 @@ export const server = http.createServer(async (req, res) => {
                 sendJson(res, 403, { error: 'Forbidden: invalid client' });
                 return;
             }
-            const secret = process.env.PLAYIT_SECRET;
+            const rawSecret = process.env.PLAYIT_SECRET || '';
+            const secret = rawSecret.replace(/^\ufeff/, '').trim();
             if (!secret) {
                 sendJson(res, 500, { error: 'PLAYIT_SECRET not configured on server' });
                 return;
@@ -135,6 +136,8 @@ export const server = http.createServer(async (req, res) => {
                 status: lobby.status,
                 tunnelAddress: lobby.tunnelAddress,
                 playerCount: lobby.players.length,
+                players: lobby.players,
+                hostName: lobby.hostName,
                 lastHeartbeat: lobby.lastHeartbeat
             });
             return;

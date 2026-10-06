@@ -13,7 +13,7 @@
         FontFamily="Segoe UI, -apple-system, sans-serif">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="0" CornerRadius="4" CaptionHeight="46" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
+        <WindowChrome GlassFrameThickness="0" CornerRadius="6" CaptionHeight="46" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -35,169 +35,191 @@
     </Window.Resources>
 
     <!-- Внешний плоский контейнер окна -->
-    <Border Background="#0F1115" BorderThickness="1" BorderBrush="#252A33" CornerRadius="4" ClipToBounds="True">
+    <Border Background="#0F1115" BorderThickness="1" BorderBrush="#1B3B2B" CornerRadius="6" ClipToBounds="True">
         <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="46" />
-                <!-- 1. Header Bar -->
-                <RowDefinition Height="*" />
-                <!-- 2. Main Dynamic Content Area -->
-                <RowDefinition Height="96" />
-                <!-- 3. Bottom Launch Deck -->
-            </Grid.RowDefinitions>
+            <!-- 0. Background World Image on ALL tabs -->
+            <Image Source="{StaticResource WorldBackgroundBitmap}"
+                   Stretch="UniformToFill"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
 
-            <!-- ============================================== -->
-            <!-- 1. TOP HEADER BAR                              -->
-            <!-- ============================================== -->
-            <Border Grid.Row="0" Background="#171A21" CornerRadius="3,3,0,0" Panel.ZIndex="10" BorderThickness="0,0,0,1" BorderBrush="#252A33">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Логотип (Draggable) -->
-                        <ColumnDefinition Width="*" />
-                        <!-- Вкладки (Кликабельные) -->
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Управление окном -->
-                    </Grid.ColumnDefinitions>
+            <!-- Moderate Darkening Overlay (not pure black: mountains, forest clearly visible) -->
+            <Border Background="#C40E1218" />
 
-                    <!-- Логотип и версия (Draggable зона) -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0" Background="Transparent">
-                        <Image Source="pack://application:,,,/AuraLauncher;component/app_icon.png" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                        <TextBlock Text="AURA" FontSize="14" FontWeight="SemiBold" Foreground="#E8EAED" VerticalAlignment="Center" Margin="0,0,8,0" />
-                        <Border Background="#20242E" CornerRadius="4" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding LauncherVersionText}" FontSize="11" FontWeight="SemiBold" Foreground="#19D3A7" />
-                        </Border>
-                        <TextBlock Text="Fabric 1.20.1" FontSize="12" Foreground="#9AA3B2" VerticalAlignment="Center" />
-                    </StackPanel>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="46" />
+                    <!-- 1. Header Bar -->
+                    <RowDefinition Height="*" />
+                    <!-- 2. Main Dynamic Content Area -->
+                    <RowDefinition Height="96" />
+                    <!-- 3. Bottom Launch Deck -->
+                </Grid.RowDefinitions>
 
-                    <!-- Вкладки навигации -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
-                                WindowChrome.IsHitTestVisibleInChrome="True">
-                        <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Overview"
-                                     IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
-                                     GroupName="HeaderTabs"
-                                     Style="{StaticResource NavTabRadio}" Content="ИГРАТЬ" />
-                        <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
-                                     IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
-                                     GroupName="HeaderTabs"
-                                     Style="{StaticResource NavTabRadio}" Content="СКИН" />
-                        <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Lobby"
-                                     IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
-                                     GroupName="HeaderTabs"
-                                     Style="{StaticResource NavTabRadio}" Content="ЛОББИ" />
-                        <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Settings"
-                                     IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
-                                     GroupName="HeaderTabs"
-                                     Style="{StaticResource NavTabRadio}" Content="НАСТРОЙКИ" />
-                    </StackPanel>
+                <!-- ============================================== -->
+                <!-- 1. TOP HEADER BAR                              -->
+                <!-- ============================================== -->
+                <Border Grid.Row="0" Background="#E0141820" CornerRadius="5,5,0,0" Panel.ZIndex="10" BorderThickness="0,0,0,1" BorderBrush="#1B3B2B">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Логотип (Draggable) -->
+                            <ColumnDefinition Width="*" />
+                            <!-- Вкладки (Кликабельные) -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Управление окном -->
+                        </Grid.ColumnDefinitions>
 
-                    <!-- Кнопки управления окном (Свернуть / Закрыть) -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal"
-                                WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" />
-                        <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" />
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <!-- ============================================== -->
-            <!-- 2. MAIN DYNAMIC CONTENT AREA (ContentControl)  -->
-            <!-- ============================================== -->
-            <Grid Grid.Row="1" Panel.ZIndex="1">
-                <ContentControl Content="{Binding CurrentView}" />
-
-                <!-- Плавающее уведомление об обновлении (Toast / Banner) -->
-                <Border VerticalAlignment="Top" HorizontalAlignment="Center"
-                        Margin="0,16,0,0" Panel.ZIndex="50"
-                        Background="#EE171A21" BorderBrush="#252A33" BorderThickness="1"
-                        CornerRadius="10" Padding="16,12"
-                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
-                        Effect="{x:Null}">
-                    <Border.Resources>
-                        <DropShadowEffect x:Key="ToastShadow" BlurRadius="20" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.5" />
-                    </Border.Resources>
-                    <Border.Style>
-                        <Style TargetType="Border">
-                            <Setter Property="Effect" Value="{StaticResource ToastShadow}" />
-                        </Style>
-                    </Border.Style>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Иконка или индикатор -->
-                        <Border Width="8" Height="8" CornerRadius="4" Background="#19D3A7" Margin="0,0,12,0" VerticalAlignment="Center" />
-                        
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-                            <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="#E8EAED" FontSize="12" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0" />
+                        <!-- Логотип и версия (Draggable зона) -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0" Background="Transparent">
+                            <Image Source="pack://application:,,,/AuraLauncher;component/app_icon.png" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <TextBlock Text="AURA" FontFamily="{StaticResource PixelFont}" FontSize="15" FontWeight="Bold" Foreground="#19D3A7" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Border Background="#1B3B2B" CornerRadius="4" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding LauncherVersionText}" FontSize="11" FontWeight="SemiBold" Foreground="#19D3A7" />
+                            </Border>
+                            <TextBlock Text="Fabric 1.20.1" FontSize="12" Foreground="#9AA3B2" VerticalAlignment="Center" />
                         </StackPanel>
 
-                        <!-- Кнопка действия -->
-                        <Button Command="{Binding ApplyBannerUpdateCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Height="30" Padding="14,0" FontSize="11" FontWeight="SemiBold"
-                                Content="{Binding UpdateBannerButtonText}"
-                                Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <!-- Вкладки навигации -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
+                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Overview"
+                                         IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
+                                         GroupName="HeaderTabs"
+                                         Style="{StaticResource NavTabRadio}" Content="ИГРАТЬ" />
+                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
+                                         IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
+                                         GroupName="HeaderTabs"
+                                         Style="{StaticResource NavTabRadio}" Content="СКИН" />
+                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Lobby"
+                                         IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
+                                         GroupName="HeaderTabs"
+                                         Style="{StaticResource NavTabRadio}" Content="ЛОББИ" />
+                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Settings"
+                                         IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
+                                         GroupName="HeaderTabs"
+                                         Style="{StaticResource NavTabRadio}" Content="НАСТРОЙКИ" />
+                        </StackPanel>
 
-                        <!-- Кнопка закрытия тоста -->
-                        <Button Command="{Binding DismissBannerCommand}"
-                                Style="{StaticResource WinCloseBtn}"
-                                Width="26" Height="26" FontSize="11"
-                                Content="✕" ToolTip="Закрыть уведомление"
+                        <!-- Кнопки управления окном (Свернуть / Закрыть) -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                                    WindowChrome.IsHitTestVisibleInChrome="True">
+                            <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" />
+                            <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ============================================== -->
+                <!-- 2. MAIN DYNAMIC CONTENT AREA (ContentControl)  -->
+                <!-- ============================================== -->
+                <Grid Grid.Row="1" Panel.ZIndex="1">
+                    <ContentControl Content="{Binding CurrentView, NotifyOnTargetUpdated=True}" Panel.ZIndex="1">
+                        <ContentControl.Triggers>
+                            <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.0" To="1.0" Duration="0:0:0.200" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </EventTrigger>
+                        </ContentControl.Triggers>
+                    </ContentControl>
+
+                    <!-- Плавающее уведомление об обновлении (Toast / Banner) -->
+                    <Border VerticalAlignment="Top" HorizontalAlignment="Center"
+                            Margin="0,16,0,0" Panel.ZIndex="50"
+                            Background="#EE171A21" BorderBrush="#252A33" BorderThickness="1"
+                            CornerRadius="10" Padding="16,12"
+                            Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
+                            Effect="{x:Null}">
+                        <Border.Resources>
+                            <DropShadowEffect x:Key="ToastShadow" BlurRadius="20" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.5" />
+                        </Border.Resources>
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Effect" Value="{StaticResource ToastShadow}" />
+                            </Style>
+                        </Border.Style>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- Иконка или индикатор -->
+                            <Border Width="8" Height="8" CornerRadius="4" Background="#19D3A7" Margin="0,0,12,0" VerticalAlignment="Center" />
+                            
+                            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                                <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="#E8EAED" FontSize="12" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0" />
+                            </StackPanel>
+
+                            <!-- Кнопка действия -->
+                            <Button Command="{Binding ApplyBannerUpdateCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="30" Padding="14,0" FontSize="11" FontWeight="SemiBold"
+                                    Content="{Binding UpdateBannerButtonText}"
+                                    Margin="0,0,10,0" VerticalAlignment="Center" />
+
+                            <!-- Кнопка закрытия тоста -->
+                            <Button Command="{Binding DismissBannerCommand}"
+                                    Style="{StaticResource WinCloseBtn}"
+                                    Width="26" Height="26" FontSize="11"
+                                    Content="✕" ToolTip="Закрыть уведомление"
+                                    VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ============================================== -->
+                <!-- 3. BOTTOM LAUNCH DECK                          -->
+                <!-- ============================================== -->
+                <Border Grid.Row="2" Background="#E4141820" CornerRadius="0,0,5,5" Panel.ZIndex="10" BorderThickness="0,1,0,0" BorderBrush="#1B3B2B" Padding="24,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Инфо об игроке -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Селектор ОЗУ -->
+                            <ColumnDefinition Width="*" />
+                            <!-- Цитаты и статус/прогресс -->
+                            <ColumnDefinition Width="Auto" />
+                            <!-- Кнопка «Играть» -->
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 1. Инфо об игроке (Ник и динамическая аватарка головы) -->
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
+                            <Border Width="40" Height="40" Background="#171A21" BorderThickness="1" BorderBrush="#1B3B2B" CornerRadius="6" ClipToBounds="True" Margin="0,0,12,0">
+                                <Image Source="{Binding PlayerAvatar}" Width="36" Height="36" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
+                            </Border>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Игрок" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,1" />
+                                <TextBlock Text="{Binding PlayerNickname}" Foreground="#E8EAED" FontSize="14" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 2. Индикатор ОЗУ -->
+                        <TextBlock Grid.Column="1" Text="{Binding RamFormatted}" Foreground="#9AA3B2" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,24,0" />
+
+                        <!-- 3. Статус стейт-машины и прогресс-бар -->
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,24,0">
+                            <TextBlock Text="{Binding StateTitle}" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding StatusText}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0"
+                                       TextTrimming="CharacterEllipsis" />
+                            <ProgressBar Height="4" Margin="0,6,0,0"
+                                         Style="{StaticResource NeonProgressBar}"
+                                         Value="{Binding ProgressPercentage}"
+                                         Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+
+                        <!-- 4. Кнопка «ИГРАТЬ» / «ОТМЕНА» -->
+                        <Button Grid.Column="3"
+                                Command="{Binding LaunchOrCancelCommand}"
+                                Style="{StaticResource PrimaryNeonBtn}"
+                                Width="200" Height="46"
+                                Content="{Binding LaunchButtonText}"
                                 VerticalAlignment="Center" />
-                    </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
-
-            <!-- ============================================== -->
-            <!-- 3. BOTTOM LAUNCH DECK                          -->
-            <!-- ============================================== -->
-            <Border Grid.Row="2" Background="#171A21" CornerRadius="0,0,3,3" Panel.ZIndex="10" BorderThickness="0,1,0,0" BorderBrush="#252A33" Padding="24,14">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Инфо об игроке -->
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Селектор ОЗУ -->
-                        <ColumnDefinition Width="*" />
-                        <!-- Цитаты и статус/прогресс -->
-                        <ColumnDefinition Width="Auto" />
-                        <!-- Кнопка «Играть» -->
-                    </Grid.ColumnDefinitions>
-
-                    <!-- 1. Инфо об игроке (Ник и динамическая аватарка головы) -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
-                        <Border Width="40" Height="40" Background="#171A21" BorderThickness="1" BorderBrush="#252A33" CornerRadius="4" ClipToBounds="True" Margin="0,0,12,0">
-                            <Image Source="{Binding PlayerAvatar}" Width="36" Height="36" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="Игрок" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,1" />
-                            <TextBlock Text="{Binding PlayerNickname}" Foreground="#E8EAED" FontSize="14" FontWeight="SemiBold" />
-                        </StackPanel>
-                    </StackPanel>
-
-                    <!-- 2. Индикатор ОЗУ -->
-                    <TextBlock Grid.Column="1" Text="{Binding RamFormatted}" Foreground="#9AA3B2" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,24,0" />
-
-                    <!-- 3. Статус стейт-машины и прогресс-бар -->
-                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,24,0">
-                        <TextBlock Text="{Binding StateTitle}" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding StatusText}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0"
-                                   TextTrimming="CharacterEllipsis" />
-                        <ProgressBar Height="4" Margin="0,6,0,0"
-                                     Style="{StaticResource NeonProgressBar}"
-                                     Value="{Binding ProgressPercentage}"
-                                     Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
-                    </StackPanel>
-
-                    <!-- 4. Кнопка «ИГРАТЬ» / «ОТМЕНА» -->
-                    <Button Grid.Column="3"
-                            Command="{Binding LaunchOrCancelCommand}"
-                            Style="{StaticResource PrimaryNeonBtn}"
-                            Width="200" Height="46"
-                            Content="{Binding LaunchButtonText}"
-                            VerticalAlignment="Center" />
-                </Grid>
-            </Border>
         </Grid>
     </Border>
 </Window>

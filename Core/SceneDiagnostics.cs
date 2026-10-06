@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using AuraLauncher.Services.Interfaces;
 using AuraLauncher.Services.Implementations;
 using AuraLauncher.ViewModels;
+using AuraLauncher.Models;
 
 namespace AuraLauncher.Core;
 
@@ -426,7 +427,7 @@ public static class SceneDiagnostics
             App.Log("[LIVE-TEST-LOBBY] Started local TCP listener on 127.0.0.1:25565");
 
             var lobbyService = App.Services.GetRequiredService<ILobbyService>();
-            bool opened = await lobbyService.HostOpenWorldAsync(localPort: 25565);
+            bool opened = await lobbyService.HostOpenWorldAsync(localPort: 25565, customTunnelAddress: "pgsql-jill.tun.ply.gg:38062");
             App.Log($"[LIVE-TEST-LOBBY] HostOpenWorldAsync result: {opened}");
 
             await Task.Delay(2000);
@@ -750,8 +751,25 @@ public static class SceneDiagnostics
             listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
             listener.Start();
             var lobbyService = App.Services.GetRequiredService<ILobbyService>();
-            await lobbyService.HostOpenWorldAsync(localPort: 25565);
+            await lobbyService.HostOpenWorldAsync(localPort: 25565, customTunnelAddress: "pgsql-jill.tun.ply.gg:38062");
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.LobbyVM.IsWorldOpen = true;
+                mainVm.LobbyVM.HostStatusText = "Лобби открыто!";
+            });
             await Task.Delay(1000);
+            window.Dispatcher.Invoke(() =>
+            {
+                if (mainVm.LobbyVM.LobbyPlayers.Count < 2)
+                {
+                    mainVm.LobbyVM.LobbyPlayers.Add(new LobbyPlayerItem
+                    {
+                        Nickname = "Friend",
+                        IsHost = false,
+                        Avatar = SkinService.LoadDefaultSteveBitmap()
+                    });
+                }
+            });
             SaveShot($"{prefix}_tab_lobby_open.png");
 
             // Leave lobby

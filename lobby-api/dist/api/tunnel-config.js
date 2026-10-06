@@ -14,7 +14,8 @@ export default async function handler(req, res) {
         if (clientHeader !== 'launcher') {
             return sendJson(res, 403, { error: 'Forbidden: invalid client' });
         }
-        const secret = process.env.PLAYIT_SECRET;
+        const rawSecret = process.env.PLAYIT_SECRET || '';
+        const secret = rawSecret.replace(/^\ufeff/, '').trim();
         if (!secret) {
             return sendJson(res, 500, { error: 'PLAYIT_SECRET not configured on server' });
         }

@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using AuraLauncher.Core;
+using AuraLauncher.Models;
 using AuraLauncher.Services.Interfaces;
 using AuraLauncher.Services.Implementations;
 
@@ -22,6 +27,9 @@ public class LobbyViewModel : ObservableObject
     private readonly ITunnelProvider? _tunnelProvider;
     private readonly ISkinService? _skinService;
     private readonly ILobbyApiClient? _lobbyApiClient;
+
+    // === Список игроков лобби ===
+    public ObservableCollection<LobbyPlayerItem> LobbyPlayers { get; } = new();
 
     // === Общее состояние ===
     private bool _isInLobby;
@@ -130,6 +138,7 @@ public class LobbyViewModel : ObservableObject
         // Подписка на события LobbyService
         _lobbyService.StatusChanged += OnLobbyStatusChanged;
         _lobbyService.TunnelAddressReady += OnTunnelAddressReady;
+        _lobbyService.LobbyStatusUpdated += OnLobbyStatusUpdated;
 
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
@@ -159,7 +168,7 @@ public class LobbyViewModel : ObservableObject
     public string StatusText
     {
         get => _statusText;
-        set => SetProperty(ref _statusText, value);
+        set { if (SetProperty(ref _statusText, value)) NotifyStatusStateChanged(); }
     }
 
     public string StatusIcon
@@ -191,7 +200,7 @@ public class LobbyViewModel : ObservableObject
     public string HostStatusText
     {
         get => _hostStatusText;
-        private set => SetProperty(ref _hostStatusText, value);
+        internal set { if (SetProperty(ref _hostStatusText, value)) NotifyStatusStateChanged(); }
     }
 
     public bool IsLobbyCreated
@@ -209,7 +218,7 @@ public class LobbyViewModel : ObservableObject
     public bool IsWorldOpen
     {
         get => _isWorldOpen;
-        private set => SetProperty(ref _isWorldOpen, value);
+        internal set { if (SetProperty(ref _isWorldOpen, value)) { RaiseAllCommands(); NotifyStatusStateChanged(); } }
     }
 
     public bool CodeCopied
@@ -252,7 +261,7 @@ public class LobbyViewModel : ObservableObject
     public string GuestStatusText
     {
         get => _guestStatusText;
-        private set => SetProperty(ref _guestStatusText, value);
+        private set { if (SetProperty(ref _guestStatusText, value)) NotifyStatusStateChanged(); }
     }
 
     public bool CanGuestConnect
@@ -263,8 +272,30 @@ public class LobbyViewModel : ObservableObject
             if (SetProperty(ref _canGuestConnect, value))
             {
                 RaiseAllCommands();
+                NotifyStatusStateChanged();
             }
         }
+    }
+
+    public bool IsStatusOpen => IsInLobby && (IsHost ? IsWorldOpen : CanGuestConnect);
+    public bool IsStatusWaiting => IsInLobby && !IsStatusOpen;
+
+    public string CombinedStatusText
+    {
+        get
+        {
+            if (!IsInLobby) return StatusText;
+            if (IsHost) return HostStatusText;
+            return GuestStatusText;
+        }
+    }
+
+    private void NotifyStatusStateChanged()
+    {
+        OnPropertyChanged(nameof(IsStatusOpen));
+        OnPropertyChanged(nameof(IsStatusWaiting));
+        OnPropertyChanged(nameof(CombinedStatusText));
+        OnPropertyChanged(nameof(IsHost));
     }
 
     private async Task CreateLobbyAsync()
@@ -325,6 +356,15 @@ public class LobbyViewModel : ObservableObject
                 HostStatusText = "Ожидание мира...";
                 StatusText = "Лобби создано! Отправь код другу и нажми «ОТКРЫТЬ МИР»";
                 StatusIcon = "👑";
+
+                LobbyPlayers.Clear();
+                ImageSource? hostAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
+                LobbyPlayers.Add(new LobbyPlayerItem
+                {
+                    Nickname = hostName,
+                    IsHost = true,
+                    Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap()
+                });
             }
             else
             {
@@ -409,7 +449,7 @@ public class LobbyViewModel : ObservableObject
             {
                 if (port != 25565)
                 {
-                    var msg = $"Игра слушает порт {port} вместо 25565 (проверьте lsp.json).";
+                    var msg = $"Мир открыт на порту {port}, а нужен 25565";
                     PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
                     Dispatch(() =>
                     {
@@ -419,7 +459,30 @@ public class LobbyViewModel : ObservableObject
                         ShowTunnelFailedLogButton = true;
                         TunnelFailureReason = msg;
                     });
-                    await _lobbyService.CloseLobbyAsHostAsync();
+                    return;
+                }
+
+                // Проверяем, что java реально слушает 25565
+                bool javaListening = false;
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    javaListening = await PlayitTunnelProvider.TestTcpConnectAsync("127.0.0.1", 25565, 1000, CancellationToken.None);
+                    if (javaListening) break;
+                    await Task.Delay(300);
+                }
+
+                if (!javaListening)
+                {
+                    var msg = "Игра не слушает локальный порт 25565";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg} (TCP connect failed).");
+                    Dispatch(() =>
+                    {
+                        HostStatusText = "Порт 25565 недоступен";
+                        StatusText = msg;
+                        StatusIcon = "❌";
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = msg;
+                    });
                     return;
                 }
 
@@ -705,6 +768,7 @@ public class LobbyViewModel : ObservableObject
         StatusText = "Создайте лобби или введите код друга";
         StatusIcon = "⚡";
 
+        LobbyPlayers.Clear();
         OnPropertyChanged(nameof(IsHost));
     }
 
@@ -797,6 +861,47 @@ public class LobbyViewModel : ObservableObject
                 StatusIcon = "⚡";
                 break;
         }
+    }
+
+    private void OnLobbyStatusUpdated(LobbyStatusResponse status)
+    {
+        _ = RefreshLobbyPlayersAsync(status.Players, status.HostName);
+    }
+
+    public async Task RefreshLobbyPlayersAsync(string[]? players, string? hostName)
+    {
+        if (players == null || players.Length == 0) return;
+
+        var items = new List<LobbyPlayerItem>();
+        foreach (var player in players)
+        {
+            var isHost = string.Equals(player, hostName, StringComparison.OrdinalIgnoreCase);
+            ImageSource avatar;
+            if (_skinService != null)
+            {
+                avatar = await _skinService.GetAvatarForPlayerAsync(player);
+            }
+            else
+            {
+                avatar = SkinService.LoadDefaultSteveBitmap();
+            }
+
+            items.Add(new LobbyPlayerItem
+            {
+                Nickname = player,
+                IsHost = isHost,
+                Avatar = avatar
+            });
+        }
+
+        Dispatch(() =>
+        {
+            LobbyPlayers.Clear();
+            foreach (var item in items)
+            {
+                LobbyPlayers.Add(item);
+            }
+        });
     }
 
     private void RaiseAllCommands()

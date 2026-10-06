@@ -22,6 +22,7 @@ public class LobbyViewModelTests
 
         public event Action<string>? StatusChanged;
         public event Action<string>? TunnelAddressReady;
+        public event Action<LobbyStatusResponse>? LobbyStatusUpdated;
 
         public Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default)
         {

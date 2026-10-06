@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using AuraLauncher.Core;
@@ -53,10 +54,25 @@ public class OverviewViewModel : ObservableObject
         private set => SetProperty(ref _isEnvironmentInstalled, value);
     }
 
+    public RelayCommand OpenPatchNotesCommand { get; }
+
     public OverviewViewModel(IConfigService configService, IGameLaunchService launchService)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
+
+        OpenPatchNotesCommand = new RelayCommand(_ =>
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://github.com/magnev/Aura-Launcher/releases",
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        });
 
         RefreshStats();
 

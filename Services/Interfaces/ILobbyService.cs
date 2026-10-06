@@ -16,6 +16,7 @@ public interface ILobbyService
 
     event Action<string>? StatusChanged;
     event Action<string>? TunnelAddressReady;
+    event Action<LobbyStatusResponse>? LobbyStatusUpdated;
 
     Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default);
     Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, int localPort = 25565, CancellationToken cancellationToken = default);

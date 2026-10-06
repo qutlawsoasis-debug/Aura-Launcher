@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -356,7 +357,7 @@ public class SkinService : ISkinService
         }
     }
 
-    private static BitmapSource LoadDefaultSteveBitmap()
+    public static BitmapSource LoadDefaultSteveBitmap()
     {
         try
         {
@@ -630,6 +631,88 @@ public class SkinService : ISkinService
         catch (Exception ex)
         {
             FabricGameLaunchService.LogLauncherEvent($"[CSL-CONFIG: ERROR] {ex.Message}");
+        }
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource> _avatarCache = new(StringComparer.OrdinalIgnoreCase);
+
+    public async Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nickname))
+        {
+            return LoadDefaultSteveBitmap();
+        }
+
+        if (_avatarCache.TryGetValue(nickname, out var cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            var url = $"https://lobby-api.vercel.app/csl/{Uri.EscapeDataString(nickname)}.json";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            using var resp = await _httpClient.SendAsync(req, cancellationToken);
+            if (resp.IsSuccessStatusCode)
+            {
+                var json = await resp.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                if (doc.RootElement.TryGetProperty("skins", out var skinsProp))
+                {
+                    string? textureUrl = null;
+                    if (skinsProp.TryGetProperty("default", out var defProp) && defProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        textureUrl = defProp.GetString();
+                    }
+                    else if (skinsProp.TryGetProperty("slim", out var slimProp) && slimProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        textureUrl = slimProp.GetString();
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(textureUrl))
+                    {
+                        byte[] pngBytes = await _httpClient.GetByteArrayAsync(textureUrl, cancellationToken);
+                        using var ms = new MemoryStream(pngBytes);
+                        var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                        var frame = decoder.Frames[0];
+                        var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                        if (converted.CanFreeze) converted.Freeze();
+
+                        var avatar = ExtractHeadAvatarFromBitmap(converted);
+                        _avatarCache[nickname] = avatar;
+                        return avatar;
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        var fallback = LoadDefaultSteveBitmap();
+        _avatarCache[nickname] = fallback;
+        return fallback;
+    }
+
+    private ImageSource ExtractHeadAvatarFromBitmap(BitmapSource skinBmp)
+    {
+        try
+        {
+            var dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
+            {
+                DrawSubRect(dc, skinBmp, new Int32Rect(8, 8, 8, 8), new Rect(0, 0, 8, 8));
+                DrawSubRect(dc, skinBmp, new Int32Rect(40, 8, 8, 8), new Rect(0, 0, 8, 8));
+            }
+
+            var rtb = new RenderTargetBitmap(8, 8, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(dv);
+            if (rtb.CanFreeze) rtb.Freeze();
+            return rtb;
+        }
+        catch
+        {
+            return LoadDefaultSteveBitmap();
         }
     }
 }

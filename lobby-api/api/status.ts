@@ -31,6 +31,8 @@ export default async function handler(req: any, res: any) {
       status: lobby.status,
       tunnelAddress: lobby.tunnelAddress,
       playerCount: lobby.players.length,
+      players: lobby.players,
+      hostName: lobby.hostName,
       lastHeartbeat: lobby.lastHeartbeat
     });
   } catch (err: any) {

@@ -4,34 +4,53 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DesignHeight="478" d:DesignWidth="980">
+             d:DesignHeight="478" d:DesignWidth="980"
+             Background="Transparent">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
-
-        <Style x:Key="InverseBoolToVisStyle" TargetType="FrameworkElement">
-            <Setter Property="Visibility" Value="Collapsed" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding}" Value="False">
-                    <Setter Property="Visibility" Value="Visible" />
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
     </UserControl.Resources>
 
-    <!-- Сплошной темный фон без изображения, без блюра и стекла -->
-    <Grid Background="#0F1115">
+    <Grid Background="Transparent">
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="440" Margin="0,32">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="480" Margin="0,20">
 
-                <!-- Заголовок и одна строка статуса -->
-                <TextBlock Text="ЛОББИ" FontSize="18" FontWeight="SemiBold" Foreground="#E8EAED"
-                           HorizontalAlignment="Center" Margin="0,0,0,6" />
-                <TextBlock Text="{Binding StatusText}" FontSize="12" Foreground="#9AA3B2"
-                           TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,24" />
+                <!-- Заголовок ЛОББИ -->
+                <TextBlock Text="ЛОББИ" FontFamily="{StaticResource PixelFont}" FontSize="20" FontWeight="Bold" Foreground="#E8EAED"
+                           HorizontalAlignment="Center" Margin="0,0,0,8" />
 
-                <!-- Основная плоская карточка-форма -->
-                <Border Background="#171A21" BorderBrush="#252A33" BorderThickness="1" CornerRadius="4" Padding="24">
+                <!-- Статус одной строкой с цветной точкой -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+                    <Ellipse Width="10" Height="10" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <Ellipse.Style>
+                            <Style TargetType="Ellipse">
+                                <Setter Property="Fill" Value="#556277" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsStatusOpen}" Value="True">
+                                        <Setter Property="Fill" Value="#19D3A7" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsStatusWaiting}" Value="True">
+                                        <Setter Property="Fill" Value="#9AA3B2" />
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard x:Name="PulseStoryboard">
+                                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.25" To="1.0" Duration="0:0:0.7" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <StopStoryboard BeginStoryboardName="PulseStoryboard" />
+                                        </DataTrigger.ExitActions>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Ellipse.Style>
+                    </Ellipse>
+                    <TextBlock Text="{Binding CombinedStatusText}" FontSize="13" FontWeight="SemiBold" Foreground="#E8EAED" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Основная карточка-форма -->
+                <Border Style="{StaticResource CardPanel}" Padding="24">
                     <Grid>
                         <!-- ============================================== -->
                         <!-- 1. НЕ В ЛОББИ: СОЗДАТЬ ИЛИ ВОЙТИ ПО КОДУ      -->
@@ -52,10 +71,10 @@
                             <TextBlock Text="Создать лобби" FontSize="13" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,8" />
                             <Button Command="{Binding CreateLobbyCommand}"
                                     Style="{StaticResource PrimaryNeonBtn}"
-                                    Height="38" Content="СОЗДАТЬ ЛОББИ" />
+                                    Height="40" Content="СОЗДАТЬ ЛОББИ" />
 
                             <!-- Ошибка создания с кнопкой копирования лога -->
-                            <Border Background="#241416" BorderBrush="#EF444433" BorderThickness="1" CornerRadius="4"
+                            <Border Background="#241416" BorderBrush="#EF444433" BorderThickness="1" CornerRadius="6"
                                     Padding="12,10" Margin="0,12,0,0">
                                 <Border.Style>
                                     <Style TargetType="Border">
@@ -87,7 +106,7 @@
                             </Border>
 
                             <!-- Разделитель -->
-                            <Border Height="1" Background="#252A33" Margin="0,20" />
+                            <Border Height="1" Background="#1B3B2B" Margin="0,20" />
 
                             <!-- Блок гостя: ввод кода и вход -->
                             <TextBlock Text="Войти по коду" FontSize="13" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,8" />
@@ -99,14 +118,14 @@
                                 <TextBox Grid.Column="0"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="{Binding GuestCodeInput, UpdateSourceTrigger=PropertyChanged}"
-                                         FontSize="15" FontWeight="SemiBold" FontFamily="Consolas, Courier New"
-                                         MaxLength="6" Height="38"
+                                         FontSize="16" FontWeight="Bold" FontFamily="{StaticResource PixelFont}"
+                                         MaxLength="6" Height="40"
                                          TextAlignment="Center"
                                          CharacterCasing="Upper" />
                                 <Button Grid.Column="1"
-                                        Command="{Binding JoinLobbyCommand}"
-                                        Style="{StaticResource StandardBtn}"
-                                        Content="ВОЙТИ" Height="38" Width="90" Margin="8,0,0,0" />
+                                         Command="{Binding JoinLobbyCommand}"
+                                         Style="{StaticResource StandardBtn}"
+                                         Content="ВОЙТИ" Height="40" Width="90" Margin="8,0,0,0" />
                             </Grid>
                         </StackPanel>
 
@@ -129,23 +148,19 @@
                                 </Style>
                             </StackPanel.Style>
 
-                            <!-- Статус одной строкой -->
-                            <TextBlock Text="{Binding HostStatusText}" FontSize="13" FontWeight="SemiBold"
-                                       Foreground="#19D3A7" Margin="0,0,0,14" TextAlignment="Center" />
-
-                            <!-- Код лобби и копирование -->
-                            <Border Background="#0F1115" BorderBrush="#252A33" BorderThickness="1" CornerRadius="4"
-                                    Padding="14,10" Margin="0,0,0,16">
+                            <!-- Крупный код лобби пиксельным шрифтом с кнопкой копирования -->
+                            <Border Background="#10141A" BorderBrush="#1B3B2B" BorderThickness="1" CornerRadius="6"
+                                    Padding="16,12" Margin="0,0,0,16">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="{Binding LobbyCode, StringFormat='КОД: {0}'}"
-                                               FontSize="20" FontWeight="Bold" FontFamily="Consolas, Courier New"
+                                               FontSize="22" FontWeight="Bold" FontFamily="{StaticResource PixelFont}"
                                                Foreground="#19D3A7" VerticalAlignment="Center" />
                                     <Button Grid.Column="1" Command="{Binding CopyCodeCommand}"
-                                            Height="32" Padding="12,0" FontSize="11">
+                                            Height="34" Padding="14,0" FontSize="11">
                                         <Button.Style>
                                             <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
                                                 <Setter Property="Content" Value="Копировать" />
@@ -160,12 +175,41 @@
                                 </Grid>
                             </Border>
 
+                            <!-- Список игроков с аватарками голов -->
+                            <TextBlock Text="ИГРОКИ В ЛОББИ" FontFamily="{StaticResource PixelFont}" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,8" />
+                            <ItemsControl ItemsSource="{Binding LobbyPlayers}" Margin="0,0,0,16">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#10141A" BorderBrush="#1B3B2B" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <!-- Аватарка 32x32 -->
+                                                <Border Grid.Column="0" Width="32" Height="32" Background="#171A21" CornerRadius="4" ClipToBounds="True" Margin="0,0,10,0">
+                                                    <Image Source="{Binding Avatar}" Width="32" Height="32" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
+                                                </Border>
+                                                <!-- Никнейм -->
+                                                <TextBlock Grid.Column="1" Text="{Binding Nickname}" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <!-- Бейдж ХОСТ -->
+                                                <Border Grid.Column="2" Background="#1B3B2B" CornerRadius="4" Padding="6,2" VerticalAlignment="Center"
+                                                        Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="ХОСТ" FontFamily="{StaticResource PixelFont}" FontSize="10" Foreground="#19D3A7" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
                             <TextBlock Text="Отправьте код другу, затем откройте мир для сети в игре."
-                                       FontSize="11" Foreground="#9AA3B2" TextWrapping="Wrap" Margin="0,0,0,16" />
+                                       FontSize="11" Foreground="#9AA3B2" TextWrapping="Wrap" Margin="0,0,0,14" />
 
                             <!-- Кнопка «Открыть мир» -->
                             <Button Command="{Binding OpenWorldCommand}"
-                                    Height="38">
+                                    Height="40">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
                                         <Setter Property="Content" Value="ОТКРЫТЬ МИР" />
@@ -180,7 +224,7 @@
                             </Button>
 
                             <!-- Ошибка туннеля с кнопкой копирования лога -->
-                            <Border Background="#241416" BorderBrush="#EF444433" BorderThickness="1" CornerRadius="4"
+                            <Border Background="#241416" BorderBrush="#EF444433" BorderThickness="1" CornerRadius="6"
                                     Padding="12,10" Margin="0,12,0,0">
                                 <Border.Style>
                                     <Style TargetType="Border">
@@ -214,7 +258,7 @@
                             <Button Command="{Binding LeaveLobbyCommand}"
                                     Style="{StaticResource GhostBtn}"
                                     Content="Выйти из лобби" Height="34" FontSize="12"
-                                    Foreground="#EF4444" Margin="0,8,0,0" />
+                                    Foreground="#EF4444" Margin="0,10,0,0" />
                         </StackPanel>
 
                         <!-- ============================================== -->
@@ -236,20 +280,46 @@
                                 </Style>
                             </StackPanel.Style>
 
-                            <!-- Статус гостя одной строкой -->
-                            <TextBlock Text="{Binding GuestStatusText}" FontSize="13" FontWeight="SemiBold"
-                                       Foreground="#19D3A7" Margin="0,0,0,16" TextAlignment="Center" />
-
-                            <Border Background="#0F1115" BorderBrush="#252A33" BorderThickness="1" CornerRadius="4"
-                                    Padding="14,10" Margin="0,0,0,16">
+                            <!-- Крупный код лобби -->
+                            <Border Background="#10141A" BorderBrush="#1B3B2B" BorderThickness="1" CornerRadius="6"
+                                    Padding="16,12" Margin="0,0,0,16">
                                 <TextBlock Text="{Binding LobbyCode, StringFormat='ЛОББИ: {0}'}"
-                                           FontSize="16" FontWeight="SemiBold" FontFamily="Consolas, Courier New"
+                                           FontSize="22" FontWeight="Bold" FontFamily="{StaticResource PixelFont}"
                                            Foreground="#E8EAED" HorizontalAlignment="Center" />
                             </Border>
 
+                            <!-- Список игроков с аватарками голов -->
+                            <TextBlock Text="ИГРОКИ В ЛОББИ" FontFamily="{StaticResource PixelFont}" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,8" />
+                            <ItemsControl ItemsSource="{Binding LobbyPlayers}" Margin="0,0,0,16">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="#10141A" BorderBrush="#1B3B2B" BorderThickness="1" CornerRadius="4" Padding="8,6" Margin="0,0,0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <!-- Аватарка 32x32 -->
+                                                <Border Grid.Column="0" Width="32" Height="32" Background="#171A21" CornerRadius="4" ClipToBounds="True" Margin="0,0,10,0">
+                                                    <Image Source="{Binding Avatar}" Width="32" Height="32" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
+                                                </Border>
+                                                <!-- Никнейм -->
+                                                <TextBlock Grid.Column="1" Text="{Binding Nickname}" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <!-- Бейдж ХОСТ -->
+                                                <Border Grid.Column="2" Background="#1B3B2B" CornerRadius="4" Padding="6,2" VerticalAlignment="Center"
+                                                        Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="ХОСТ" FontFamily="{StaticResource PixelFont}" FontSize="10" Foreground="#19D3A7" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
                             <!-- Кнопка «Подключиться к игре» -->
                             <Button Command="{Binding ConnectToGameCommand}"
-                                    Height="38" FontSize="13">
+                                    Height="40" FontSize="13">
                                 <Button.Style>
                                     <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
                                         <Setter Property="Content" Value="ОЖИДАНИЕ ХОСТА..." />
@@ -267,7 +337,7 @@
                             <Button Command="{Binding LeaveLobbyCommand}"
                                     Style="{StaticResource GhostBtn}"
                                     Content="Выйти из лобби" Height="34" FontSize="12"
-                                    Foreground="#EF4444" Margin="0,8,0,0" />
+                                    Foreground="#EF4444" Margin="0,10,0,0" />
                         </StackPanel>
                     </Grid>
                 </Border>

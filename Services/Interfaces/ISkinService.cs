@@ -53,6 +53,11 @@ public interface ISkinService
     Task<SkinUploadResult> UploadSkinToLobbyApiAsync(string? skinPath, string nickname, string model, string? ownerToken, string? baseUrl = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Получение аватара головы игрока по никнейму (из lobby-api /csl/{nick}.json или дефолтный Стив).
+    /// </summary>
+    Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Мерж конфига CustomSkinLoader.json: добавление AuraLobby первым источником в loadlist.
     /// </summary>
     void EnsureCustomSkinLoaderConfig(string gameDir);

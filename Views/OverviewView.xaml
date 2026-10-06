@@ -4,41 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d" 
-             d:DesignHeight="620" d:DesignWidth="980">
-    <!-- Background spans entire window under header and footer (-46 top, -96 bottom) -->
-    <Grid Margin="0,-46,0,-96">
-        <!-- 1. Background World Image (Static Resource from UiTheme with DecodePixelWidth 1920) -->
-        <Image Source="{StaticResource WorldBackgroundBitmap}"
-               Stretch="UniformToFill"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               RenderOptions.BitmapScalingMode="HighQuality" />
+             d:DesignHeight="620" d:DesignWidth="980"
+             Background="Transparent">
 
-        <!-- 2. Top Darkening Vignette (for Top Header Bar readability) -->
-        <Border VerticalAlignment="Top" Height="140" IsHitTestVisible="False">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#E60F1115" Offset="0.0" />
-                    <GradientStop Color="#990F1115" Offset="0.45" />
-                    <GradientStop Color="#000F1115" Offset="1.0" />
-                </LinearGradientBrush>
-            </Border.Background>
-        </Border>
-
-        <!-- 3. Bottom Darkening Vignette (for Bottom Launch Deck and Info Cards) -->
-        <Border VerticalAlignment="Bottom" Height="320" IsHitTestVisible="False">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#000F1115" Offset="0.0" />
-                    <GradientStop Color="#550F1115" Offset="0.30" />
-                    <GradientStop Color="#D90F1115" Offset="0.75" />
-                    <GradientStop Color="#F20F1115" Offset="1.0" />
-                </LinearGradientBrush>
-            </Border.Background>
-        </Border>
-
-        <!-- 4. Foreground Modpack Info & Stats Cards (sitting above the bottom launch deck) -->
-        <Grid Margin="36,0,36,124" VerticalAlignment="Bottom">
+    <Grid Background="Transparent">
+        <!-- Foreground Modpack Info & Stats Cards (sitting above the bottom launch deck) -->
+        <Grid Margin="36,0,36,32" VerticalAlignment="Bottom">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -46,25 +17,28 @@
 
             <!-- Hero Typography -->
             <StackPanel VerticalAlignment="Bottom">
-                <!-- Clean gray single line version text without pill border -->
                 <TextBlock Text="{Binding VersionInfo}" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,8" />
 
-                <!-- Build Title "Aura" SemiBold flat -->
-                <TextBlock Text="{Binding BuildName}" FontSize="44" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,6" />
+                <!-- Build Title "Aura" Pixel Font -->
+                <TextBlock Text="{Binding BuildName}" FontFamily="{StaticResource PixelFont}" FontSize="46" FontWeight="Bold" Foreground="#19D3A7" Margin="0,0,0,6" />
 
                 <!-- Sub-headline -->
                 <TextBlock Text="Клиентская сборка с оптимизацией и модами" FontSize="13" Foreground="#9AA3B2" />
             </StackPanel>
 
-            <!-- Build Parameters Card: Borderless, flat surface, thin divider lines -->
+            <!-- Build Parameters / News Card -->
             <Border Grid.Column="1" VerticalAlignment="Bottom"
-                    Background="#D9171A21" CornerRadius="4" BorderThickness="0" Padding="18,14">
-                <StackPanel MinWidth="220">
-                    <TextBlock Text="Параметры сборки" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" />
-                    <Border Height="1" Background="#252A33" Margin="0,8" />
-                    <TextBlock Text="{Binding ModsCountText}" Foreground="#E8EAED" FontSize="12" />
-                    <Border Height="1" Background="#252A33" Margin="0,8" />
-                    <TextBlock Text="{Binding LastUpdateText}" Foreground="#9AA3B2" FontSize="12" />
+                    Style="{StaticResource CardPanel}" Padding="20,16">
+                <StackPanel MinWidth="240">
+                    <TextBlock Text="Новости / Статус" FontFamily="{StaticResource PixelFont}" FontSize="13" FontWeight="Bold" Foreground="#E8EAED" />
+                    <Border Height="1" Background="#1B3B2B" Margin="0,10" />
+                    <TextBlock Text="{Binding VersionInfo}" Foreground="#19D3A7" FontSize="12" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding ModsCountText}" Foreground="#E8EAED" FontSize="12" Margin="0,0,0,6" />
+                    <Border Height="1" Background="#1B3B2B" Margin="0,10" />
+                    <TextBlock Text="{Binding LastUpdateText}" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,10" />
+                    <Button Command="{Binding OpenPatchNotesCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Content="Список изменений" Height="28" FontSize="11" />
                 </StackPanel>
             </Border>
         </Grid>
