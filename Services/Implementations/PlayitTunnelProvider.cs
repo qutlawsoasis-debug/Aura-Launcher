@@ -30,6 +30,7 @@ public class PlayitTunnelProvider : ITunnelProvider
     private IntPtr _jobHandle = IntPtr.Zero;
     private CancellationTokenSource? _activeReadersCts;
     private int _runtimeRestartCount;
+    private volatile bool _isStopping;
 
     public TunnelInfo CurrentInfo => _currentInfo;
     public event Action<TunnelInfo>? StatusChanged;
@@ -62,6 +63,8 @@ public class PlayitTunnelProvider : ITunnelProvider
         _toolsDir = toolsDir ?? Path.Combine(baseDir, "tools");
         _playitExePath = Path.Combine(_toolsDir, "playit-0.15.26.exe");
         _secretFilePath = Path.Combine(_toolsDir, "playit.secret");
+
+        PurgeLegacyLocalSecrets();
     }
 
     /// <summary>
@@ -136,68 +139,67 @@ public class PlayitTunnelProvider : ITunnelProvider
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    /// <summary>
-    /// Сохранение секрета в защищенном виде с использованием DPAPI.
-    /// </summary>
-    public void SaveSecret(string rawSecret)
+    public string? InMemorySecret { get; set; }
+    private string? _activeTempSecretFile;
+
+    public bool IsProcessRunning => _process != null && !_process.HasExited;
+
+    public static void PurgeLegacyLocalSecrets()
     {
-        var rawBytes = Encoding.UTF8.GetBytes(rawSecret.Trim());
-        var protectedBytes = ProtectedData.Protect(rawBytes, null, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(_secretFilePath + ".enc", protectedBytes);
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var targets = new List<string>
+            {
+                Path.Combine(appData, ".aura", "tools", "playit.secret.enc"),
+                Path.Combine(appData, ".aura", "tools", "playit.secret")
+            };
+
+            var profilesDir = Path.Combine(appData, "Aura", "profiles");
+            if (Directory.Exists(profilesDir))
+            {
+                foreach (var dir in Directory.GetDirectories(profilesDir))
+                {
+                    targets.Add(Path.Combine(dir, "tools", "playit.secret.enc"));
+                    targets.Add(Path.Combine(dir, "tools", "playit.secret"));
+                }
+            }
+
+            foreach (var target in targets)
+            {
+                if (File.Exists(target))
+                {
+                    try
+                    {
+                        File.Delete(target);
+                        LogTunnel($"[CLEANUP] Deleted legacy local secret: {target}");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogTunnel($"[CLEANUP: WARN] Failed to delete legacy secret {target}: {ex.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogTunnel($"[CLEANUP: ERROR] PurgeLegacyLocalSecrets: {ex.Message}");
+        }
     }
 
-    /// <summary>
-    /// Получение расшифрованного секрета через DPAPI.
-    /// </summary>
+    public void SetSecret(string? secret)
+    {
+        InMemorySecret = secret?.Trim();
+    }
+
+    public void SaveSecret(string rawSecret)
+    {
+        SetSecret(rawSecret);
+    }
+
     public string? LoadSecret()
     {
-        var encPath = _secretFilePath + ".enc";
-        if (File.Exists(encPath))
-        {
-            try
-            {
-                var protectedBytes = File.ReadAllBytes(encPath);
-                var rawBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(rawBytes);
-            }
-            catch { }
-        }
-
-        // Резервный поиск в глобальном %APPDATA%\.aura\tools
-        var globalEncPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "tools", "playit.secret.enc");
-        if (File.Exists(globalEncPath) && !string.Equals(encPath, globalEncPath, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var protectedBytes = File.ReadAllBytes(globalEncPath);
-                var rawBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(rawBytes);
-            }
-            catch { }
-        }
-
-        if (File.Exists(_secretFilePath))
-        {
-            try
-            {
-                var secret = File.ReadAllText(_secretFilePath).Trim();
-                if (!string.IsNullOrWhiteSpace(secret)) return secret;
-            }
-            catch { }
-        }
-
-        var globalPlainPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "tools", "playit.secret");
-        if (File.Exists(globalPlainPath) && !string.Equals(_secretFilePath, globalPlainPath, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var secret = File.ReadAllText(globalPlainPath).Trim();
-                if (!string.IsNullOrWhiteSpace(secret)) return secret;
-            }
-            catch { }
-        }
-
-        return null;
+        return InMemorySecret;
     }
 
     public static void LogTunnel(string message)
@@ -482,6 +484,8 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public async Task<TunnelInfo> StartAsync(int localPort, CancellationToken ct = default)
     {
+        _isStopping = false;
+        PurgeLegacyLocalSecrets();
         await EnsureBinaryDownloadedAsync(ct);
 
         _currentInfo = new TunnelInfo(null, null, TunnelStatus.Starting);
@@ -490,12 +494,10 @@ public class PlayitTunnelProvider : ITunnelProvider
         var secret = LoadSecret();
         if (string.IsNullOrWhiteSpace(secret))
         {
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Секрет туннеля не найден. Проверьте соединение с сервером.");
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Секрет туннеля не получен с сервера (/api/tunnel-config).");
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
-
-        File.WriteAllText(_secretFilePath, secret.Trim());
 
         if (localPort != 25565)
         {
@@ -515,13 +517,27 @@ public class PlayitTunnelProvider : ITunnelProvider
             KillStalePlayitProcesses();
             InitJobObject();
 
+            // Создаем временный файл секрета на время работы агента
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(_activeTempSecretFile) && File.Exists(_activeTempSecretFile))
+                {
+                    File.Delete(_activeTempSecretFile);
+                }
+            }
+            catch { }
+
+            _activeTempSecretFile = Path.Combine(Path.GetTempPath(), $"playit_{Guid.NewGuid():N}.secret");
+            File.WriteAllText(_activeTempSecretFile, secret.Trim());
+            LogTunnel($"[PLAYIT] Using temporary secret file: {_activeTempSecretFile}");
+
             var tcsConnected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var processExitTcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var psi = new ProcessStartInfo
             {
                 FileName = _playitExePath,
-                Arguments = $"--secret_path \"{_secretFilePath}\" start",
+                Arguments = $"--secret_path \"{_activeTempSecretFile}\" start",
                 WorkingDirectory = _toolsDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -554,6 +570,8 @@ public class PlayitTunnelProvider : ITunnelProvider
                 StatusChanged?.Invoke(_currentInfo);
                 return _currentInfo;
             }
+
+            LogTunnel($"[PLAYIT] Agent process started successfully (PID: {proc.Id}).");
 
             if (_jobHandle != IntPtr.Zero)
             {
@@ -610,20 +628,6 @@ public class PlayitTunnelProvider : ITunnelProvider
                 return _currentInfo;
             }
 
-            var publicHost = PublicHost;
-            var publicPort = PublicPort;
-
-            // Тестируем доступность публичного туннеля через TCP-подключение
-            bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort, 3000, ct);
-            if (!tcpSuccess)
-            {
-                LogTunnel($"[PLAYIT: WARN] TCP Connect to {publicHost}:{publicPort} did not succeed from local host (NAT loopback or proxy routing). Agent process is active.");
-            }
-            else
-            {
-                LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
-            }
-
             if (proc.HasExited)
             {
                 int exitCode = -1;
@@ -640,6 +644,9 @@ public class PlayitTunnelProvider : ITunnelProvider
                 return _currentInfo;
             }
 
+            var publicHost = PublicHost;
+            var publicPort = PublicPort;
+
             _runtimeRestartCount = 0;
             _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
             StatusChanged?.Invoke(_currentInfo);
@@ -653,7 +660,7 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     private void OnActiveProcessExited(int exitCode)
     {
-        if (_currentInfo.Status != TunnelStatus.Active) return;
+        if (_isStopping || _currentInfo.Status != TunnelStatus.Active) return;
 
         LogTunnel($"[PLAYIT: WARN] Active agent process died with code {exitCode}.");
 
@@ -746,6 +753,7 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public Task StopAsync(CancellationToken ct = default)
     {
+        _isStopping = true;
         try
         {
             _activeReadersCts?.Cancel();
@@ -765,6 +773,20 @@ public class PlayitTunnelProvider : ITunnelProvider
         {
             LogTunnel($"[EXCEPTION] StopAsync Kill: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
         }
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_activeTempSecretFile) && File.Exists(_activeTempSecretFile))
+            {
+                File.Delete(_activeTempSecretFile);
+                LogTunnel($"[PLAYIT] Cleaned up temporary secret file: {_activeTempSecretFile}");
+            }
+        }
+        catch (Exception ex)
+        {
+            LogTunnel($"[PLAYIT: WARN] Failed to delete temp secret file: {ex.Message}");
+        }
+        _activeTempSecretFile = null;
 
         _process = null;
         _currentInfo = new TunnelInfo(null, null, TunnelStatus.Inactive);

@@ -133,6 +133,7 @@ public class LobbyViewModel : ObservableObject
 
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
+        _worldWatcher.WorldClosed += OnLanWorldClosed;
 
         // Подписка на изменение статуса туннеля
         if (_tunnelProvider != null)
@@ -276,6 +277,8 @@ public class LobbyViewModel : ObservableObject
 
         try
         {
+            PlayitTunnelProvider.PurgeLegacyLocalSecrets();
+
             var playit = _tunnelProvider as PlayitTunnelProvider;
             if (playit == null)
             {
@@ -292,14 +295,14 @@ public class LobbyViewModel : ObservableObject
 
             if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
             {
-                PlayitTunnelProvider.LogTunnel("Tunnel configuration received. Saving secret with DPAPI...");
-                playit.SaveSecret(cfg.Secret);
+                PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
+                playit.SetSecret(cfg.Secret);
                 if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
                 if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
             }
-            else if (!playit.HasSecret)
+            else
             {
-                PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server and no local secret found.");
+                PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
                 StatusText = "Ошибка получения конфигурации туннеля";
                 StatusIcon = "❌";
                 ShowTunnelFailedLogButton = true;
@@ -474,6 +477,62 @@ public class LobbyViewModel : ObservableObject
                 }
             }
         });
+    }
+
+    private void OnLanWorldClosed()
+    {
+        if (!_lobbyService.IsHost || !IsInLobby) return;
+
+        PlayitTunnelProvider.LogTunnel("[LOBBY] World closed detected in latest.log. Resetting lobby to waiting/closed.");
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _lobbyService.CloseLobbyAsHostAsync();
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] OnLanWorldClosed CloseLobby: {ex.Message}");
+            }
+            finally
+            {
+                Dispatch(() =>
+                {
+                    LeaveLobby();
+                    StatusText = "Мир был закрыт хостом. Лобби закрыто.";
+                    StatusIcon = "ℹ️";
+                });
+            }
+        });
+    }
+
+    public void OnGameExited()
+    {
+        _worldWatcher.Stop();
+        if (_lobbyService.IsHost && IsInLobby)
+        {
+            PlayitTunnelProvider.LogTunnel("[LOBBY] Game process exited. Closing lobby as host.");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _lobbyService.CloseLobbyAsHostAsync();
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] OnGameExited CloseLobby: {ex.Message}");
+                }
+                finally
+                {
+                    Dispatch(() =>
+                    {
+                        LeaveLobby();
+                        StatusText = "Игра закрыта. Лобби сброшено.";
+                        StatusIcon = "ℹ️";
+                    });
+                }
+            });
+        }
     }
 
     private void OnTunnelStatusChanged(TunnelInfo info)

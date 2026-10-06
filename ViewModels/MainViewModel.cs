@@ -264,7 +264,42 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _updateBannerButtonText, value);
     }
 
-    public string LauncherVersionText => $"v{_launcherUpdateService.CurrentVersion}";
+    public string LauncherVersionText
+    {
+        get
+        {
+            try
+            {
+                var candidates = new[]
+                {
+                    System.IO.Path.Combine(AppContext.BaseDirectory, "version.json"),
+                    System.IO.Path.Combine(Environment.CurrentDirectory, "version.json")
+                };
+                foreach (var path in candidates)
+                {
+                    if (System.IO.File.Exists(path))
+                    {
+                        var json = System.IO.File.ReadAllText(path);
+                        using var doc = System.Text.Json.JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("userFacingVersion", out var prop))
+                        {
+                            var val = prop.GetString();
+                            if (!string.IsNullOrWhiteSpace(val)) return val;
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            var cur = _launcherUpdateService.CurrentVersion;
+            var parts = cur.Split('.');
+            if (parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8)
+            {
+                return $"beta 1.0.{patch - 8}";
+            }
+            return $"v{cur}";
+        }
+    }
 
     // Команды
     public RelayCommand LaunchOrCancelCommand { get; }
@@ -652,6 +687,7 @@ public class MainViewModel : ObservableObject
                     {
                         IsGameRunning = false;
                         OverviewVM.RefreshStats();
+                        LobbyVM.OnGameExited();
                         if (exitCode != 0)
                         {
                             SetLauncherState(LauncherState.Error, $"Игра завершилась с ошибкой (код {exitCode}). Лог: {logPath}");

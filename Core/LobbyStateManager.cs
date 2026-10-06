@@ -31,8 +31,8 @@ public class LobbyStateManager : IDisposable
 
     public LobbyState State { get; private set; } = LobbyState.Idle;
     public int? LocalPort => _worldWatcher.CurrentPort;
-    public string? PublicAddress => _tunnelProvider.CurrentInfo.PublicAddress;
-    public int? PublicPort => _tunnelProvider.CurrentInfo.PublicPort;
+    public string? PublicAddress => State == LobbyState.TunnelActive ? _tunnelProvider.CurrentInfo.PublicAddress : null;
+    public int? PublicPort => State == LobbyState.TunnelActive ? _tunnelProvider.CurrentInfo.PublicPort : null;
     public string? LastError { get; private set; }
 
     public event Action<LobbyState>? StateChanged;

@@ -68,7 +68,7 @@ public class LanWorldWatcherTests
         watcher.WorldOpened += p => detectedPort = p;
         watcher.WorldClosed += () => closed = true;
 
-        watcher.Start(sampleLog);
+        watcher.Start(sampleLog, readFromEnd: false);
 
         Assert.Equal(25565, detectedPort);
         Assert.True(closed);
@@ -85,7 +85,7 @@ public class LanWorldWatcherTests
         bool opened = false;
         watcher.WorldOpened += _ => opened = true;
 
-        watcher.Start(sampleLog);
+        watcher.Start(sampleLog, readFromEnd: false);
 
         Assert.False(opened);
         Assert.False(watcher.IsWorldOpen);
@@ -102,7 +102,7 @@ public class LanWorldWatcherTests
         bool closed = false;
         watcher.WorldClosed += () => closed = true;
 
-        watcher.Start(sampleLog);
+        watcher.Start(sampleLog, readFromEnd: false);
 
         Assert.True(closed);
         Assert.False(watcher.IsWorldOpen);
@@ -115,7 +115,7 @@ public class LanWorldWatcherTests
         Assert.True(File.Exists(sampleLog));
 
         using var watcher = new LanWorldWatcher();
-        watcher.Start(sampleLog);
+        watcher.Start(sampleLog, readFromEnd: false);
 
         Assert.True(watcher.IsWorldOpen);
         Assert.Equal(25565, watcher.CurrentPort);
@@ -153,4 +153,38 @@ public class LanWorldWatcherTests
             if (File.Exists(tempFile)) File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public void PollLogFile_DefaultSkipsPriorLines_OnlyReadsNewLines()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            // Старая сессия записала открытие мира
+            File.WriteAllText(tempFile, "[10:00:00] [Render thread/INFO]: Started serving on 25565\n");
+
+            using var watcher = new LanWorldWatcher();
+            int openedPort = 0;
+            watcher.WorldOpened += p => openedPort = p;
+
+            // По умолчанию Start() запускается с readFromEnd = true
+            watcher.Start(tempFile);
+
+            // Старая строка должна быть проигнорирована
+            Assert.False(watcher.IsWorldOpen);
+            Assert.Equal(0, openedPort);
+
+            // Новая сессия открывает мир
+            File.AppendAllText(tempFile, "[10:05:00] [Render thread/INFO]: Started serving on 25565\n");
+            watcher.PollLogFile();
+
+            Assert.True(watcher.IsWorldOpen);
+            Assert.Equal(25565, openedPort);
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
 }
+

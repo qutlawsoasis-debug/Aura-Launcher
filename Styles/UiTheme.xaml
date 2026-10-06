@@ -75,43 +75,27 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Grid x:Name="RootGrid" RenderTransformOrigin="0.5,0.5">
-                        <Grid.RenderTransform>
-                            <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
-                        </Grid.RenderTransform>
-
-                        <Border x:Name="BtnBrd"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="8">
-                            <TextBlock x:Name="BtnTxt"
-                                       Text="{Binding Path=Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                       Foreground="#0F1115"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                    </Grid>
+                    <Border x:Name="BtnBrd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4">
+                        <TextBlock x:Name="BtnTxt"
+                                   Text="{Binding Path=Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Foreground="#0F1115"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
 
                     <ControlTemplate.Triggers>
-                        <!-- Hover: Background becomes #33FFD6, subtle scale 1.02 -->
+                        <!-- Hover: Background becomes #33FFD6 -->
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="BtnBrd" Property="Background" Value="{StaticResource AccentHoverBrush}" />
-                            <Setter TargetName="RootGrid" Property="RenderTransform">
-                                <Setter.Value>
-                                    <ScaleTransform ScaleX="1.02" ScaleY="1.02" />
-                                </Setter.Value>
-                            </Setter>
                         </Trigger>
 
-                        <!-- Pressed: Background #129E7D, scale 0.98 -->
+                        <!-- Pressed: Background #129E7D -->
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="BtnBrd" Property="Background" Value="{StaticResource AccentPressedBrush}" />
-                            <Setter TargetName="RootGrid" Property="RenderTransform">
-                                <Setter.Value>
-                                    <ScaleTransform ScaleX="0.98" ScaleY="0.98" />
-                                </Setter.Value>
-                            </Setter>
                         </Trigger>
 
                         <!-- Disabled: Background #252A33, Foreground #525768 -->
@@ -142,7 +126,7 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="1"
                             BorderBrush="{StaticResource BorderBrush}"
-                            CornerRadius="8"
+                            CornerRadius="4"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -187,7 +171,7 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="1"
                             BorderBrush="Transparent"
-                            CornerRadius="8"
+                            CornerRadius="4"
                             Padding="{TemplateBinding Padding}">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
@@ -388,7 +372,7 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             BorderBrush="{TemplateBinding BorderBrush}"
-                            CornerRadius="8">
+                            CornerRadius="4">
                         <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -426,7 +410,7 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="1"
                             BorderBrush="{StaticResource BorderBrush}"
-                            CornerRadius="8">
+                            CornerRadius="4">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>

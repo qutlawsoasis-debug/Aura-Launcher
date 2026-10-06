@@ -18,13 +18,9 @@
                 <!-- Вид спереди (10x: 160x320) -->
                 <StackPanel HorizontalAlignment="Center" Margin="0,0,24,0">
                     <Grid Width="160" Height="330">
-                        <!-- Тень под ногами (opacity 0.6) -->
-                        <Ellipse Width="110" Height="14" Fill="#000000" Opacity="0.6"
-                                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2">
-                            <Ellipse.Effect>
-                                <BlurEffect Radius="6" />
-                            </Ellipse.Effect>
-                        </Ellipse>
+                        <!-- Плоская тень под ногами -->
+                        <Ellipse Width="110" Height="8" Fill="#171A21"
+                                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
 
                         <!-- Превью спереди: 10x масштаб, NearestNeighbor, прозрачность сохранена -->
                         <Image Source="{Binding SkinFrontPreview}"
@@ -42,13 +38,9 @@
                 <!-- Вид сзади (10x: 160x320) -->
                 <StackPanel HorizontalAlignment="Center">
                     <Grid Width="160" Height="330">
-                        <!-- Тень под ногами (opacity 0.6) -->
-                        <Ellipse Width="110" Height="14" Fill="#000000" Opacity="0.6"
-                                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2">
-                            <Ellipse.Effect>
-                                <BlurEffect Radius="6" />
-                            </Ellipse.Effect>
-                        </Ellipse>
+                        <!-- Плоская тень под ногами -->
+                        <Ellipse Width="110" Height="8" Fill="#171A21"
+                                 HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
 
                         <!-- Превью сзади: 10x масштаб, NearestNeighbor, прозрачность сохранена -->
                         <Image Source="{Binding SkinBackPreview}"

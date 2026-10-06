@@ -579,6 +579,197 @@ public static class SceneDiagnostics
         }
     }
 
+    public static async Task<bool> RunLobbyLifecycleTestAsync(MainWindow window)
+    {
+        System.Net.Sockets.TcpListener? listener = null;
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var globalToolsDir = Path.Combine(appData, ".aura", "tools");
+            Directory.CreateDirectory(globalToolsDir);
+            var dummySecretFile = Path.Combine(globalToolsDir, "playit.secret.enc");
+
+            // 1. Subplant an empty playit.secret.enc
+            File.WriteAllText(dummySecretFile, "");
+            PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE] Subplanted dummy empty secret at: {dummySecretFile}");
+
+            // 2. Verify purge
+            PlayitTunnelProvider.PurgeLegacyLocalSecrets();
+            bool wasPurged = !File.Exists(dummySecretFile);
+            PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE] PurgeLegacyLocalSecrets executed: dummy file deleted = {wasPurged}");
+
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
+            await Task.Delay(500);
+
+            // 3. Create lobby as host (fetches /api/tunnel-config)
+            PlayitTunnelProvider.LogTunnel("[TEST-LIFECYCLE] Invoking CreateLobbyCommand (fetching /api/tunnel-config)...");
+            window.Dispatcher.Invoke(() => mainVm.LobbyVM.CreateLobbyCommand.Execute(null));
+
+            string? code = null;
+            for (int i = 0; i < 40; i++)
+            {
+                await Task.Delay(300);
+                code = window.Dispatcher.Invoke(() => mainVm.LobbyVM.LobbyCode);
+                if (!string.IsNullOrWhiteSpace(code)) break;
+            }
+
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                PlayitTunnelProvider.LogTunnel("[TEST-LIFECYCLE: FAIL] Lobby creation timed out!");
+                return false;
+            }
+
+            PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE] Lobby created with code: {code}");
+
+            // 4. Scenario 1: Game running, world NOT open -> status=waiting, tunnelAddress=null
+            var apiClient = App.Services.GetRequiredService<ILobbyApiClient>();
+            var statusWaiting = await apiClient.GetStatusAsync(code);
+            PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE: SCENARIO-1] GET /status -> status={statusWaiting?.Status}, tunnelAddress={(statusWaiting?.TunnelAddress ?? "null")}");
+
+            if (!string.Equals(statusWaiting?.Status, "waiting", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(statusWaiting?.TunnelAddress))
+            {
+                PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE: FAIL] Scenario 1 mismatch! Expected status=waiting, tunnelAddress=null. Got status={statusWaiting?.Status}, tunnelAddress={statusWaiting?.TunnelAddress}");
+                return false;
+            }
+
+            // 5. Scenario 2: World is opened!
+            PlayitTunnelProvider.LogTunnel("[TEST-LIFECYCLE] Starting TCP listener on 127.0.0.1:25565...");
+            listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
+            listener.Start();
+
+            PlayitTunnelProvider.LogTunnel("[TEST-LIFECYCLE] Triggering LanWorldWatcher 'Started serving on 25565'...");
+            var watcher = typeof(LobbyViewModel).GetField("_worldWatcher", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(mainVm.LobbyVM) as ILanWorldWatcher;
+            if (watcher is LanWorldWatcher lww)
+            {
+                lww.ProcessLine("Started serving on 25565");
+            }
+            else
+            {
+                var method = typeof(LobbyViewModel).GetMethod("OnLanWorldOpened", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                method?.Invoke(mainVm.LobbyVM, new object[] { 25565 });
+            }
+
+            bool isOpen = false;
+            for (int i = 0; i < 60; i++)
+            {
+                await Task.Delay(500);
+                isOpen = window.Dispatcher.Invoke(() => mainVm.LobbyVM.IsWorldOpen);
+                if (isOpen) break;
+            }
+
+            if (!isOpen)
+            {
+                PlayitTunnelProvider.LogTunnel("[TEST-LIFECYCLE: FAIL] World did not transition to open on host UI!");
+                return false;
+            }
+
+            var statusOpen = await apiClient.GetStatusAsync(code);
+            PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE: SCENARIO-2] GET /status -> status={statusOpen?.Status}, tunnelAddress={(statusOpen?.TunnelAddress ?? "null")}");
+
+            if (!string.Equals(statusOpen?.Status, "open", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(statusOpen?.TunnelAddress))
+            {
+                PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE: FAIL] Scenario 2 mismatch! Expected status=open, tunnelAddress!=null. Got status={statusOpen?.Status}, tunnelAddress={statusOpen?.TunnelAddress}");
+                return false;
+            }
+
+            // 6. Cleanup
+            PlayitTunnelProvider.LogTunnel("[TEST-LIFECYCLE] Cleaning up test session and leaving lobby...");
+            window.Dispatcher.Invoke(() => mainVm.LobbyVM.LeaveLobbyCommand.Execute(null));
+            await Task.Delay(1000);
+
+            PlayitTunnelProvider.LogTunnel("=== [TEST-LIFECYCLE: PASSED] All scenarios verified successfully! ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[TEST-LIFECYCLE: ERROR] {ex}");
+            return false;
+        }
+        finally
+        {
+            try { listener?.Stop(); } catch { }
+        }
+    }
+
+    public static async Task<bool> CaptureAllScreenshotsAsync(MainWindow window, string prefix)
+    {
+        System.Net.Sockets.TcpListener? listener = null;
+        try
+        {
+            await Task.Delay(1000);
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            string shotsDir = ResolveShotsDir();
+            var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+
+            void SaveShot(string fileName)
+            {
+                string path = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(window, path);
+                if (Directory.Exists(artifactDir))
+                {
+                    try { File.Copy(path, Path.Combine(artifactDir, fileName), true); } catch { }
+                }
+            }
+
+            // 1. Играть
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
+            await Task.Delay(500);
+            SaveShot($"{prefix}_tab_play.png");
+
+            // 2. Скин
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));
+            await Task.Delay(500);
+            SaveShot($"{prefix}_tab_skin.png");
+
+            // 3. Настройки
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Settings"));
+            await Task.Delay(500);
+            SaveShot($"{prefix}_tab_settings.png");
+
+            // 4. Лобби - пусто
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
+            await Task.Delay(500);
+            SaveShot($"{prefix}_tab_lobby_empty.png");
+
+            // 5. Лобби - ожидание хоста (создаем лобби)
+            window.Dispatcher.Invoke(() => mainVm.LobbyVM.CreateLobbyCommand.Execute(null));
+            for (int i = 0; i < 40; i++)
+            {
+                await Task.Delay(300);
+                if (window.Dispatcher.Invoke(() => mainVm.LobbyVM.IsLobbyCreated && !string.IsNullOrWhiteSpace(mainVm.LobbyVM.LobbyCode))) break;
+            }
+            await Task.Delay(500);
+            SaveShot($"{prefix}_tab_lobby_waiting.png");
+
+            // 6. Лобби - мир открыт
+            listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
+            listener.Start();
+            var lobbyService = App.Services.GetRequiredService<ILobbyService>();
+            await lobbyService.HostOpenWorldAsync(localPort: 25565);
+            await Task.Delay(1000);
+            SaveShot($"{prefix}_tab_lobby_open.png");
+
+            // Leave lobby
+            window.Dispatcher.Invoke(() => mainVm.LobbyVM.LeaveLobbyCommand.Execute(null));
+            await Task.Delay(500);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[CAPTURE-SHOTS: ERROR] {ex}");
+            return false;
+        }
+        finally
+        {
+            try { listener?.Stop(); } catch { }
+        }
+    }
+
     private static string ResolveShotsDir()
     {
         var args = Environment.GetCommandLineArgs();

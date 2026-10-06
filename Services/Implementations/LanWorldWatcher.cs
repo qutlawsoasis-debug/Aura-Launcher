@@ -38,7 +38,7 @@ public class LanWorldWatcher : ILanWorldWatcher
     public bool IsWorldOpen { get; private set; }
     public int? CurrentPort { get; private set; }
 
-    public void Start(string logFilePath)
+    public void Start(string logFilePath, bool readFromEnd = true)
     {
         if (string.IsNullOrWhiteSpace(logFilePath))
             throw new ArgumentNullException(nameof(logFilePath));
@@ -47,7 +47,7 @@ public class LanWorldWatcher : ILanWorldWatcher
         {
             StopInternal();
             _logFilePath = logFilePath;
-            _lastPosition = 0;
+            _lastPosition = (readFromEnd && File.Exists(logFilePath)) ? new FileInfo(logFilePath).Length : 0;
             _lineBuffer.Clear();
             IsWorldOpen = false;
             CurrentPort = null;

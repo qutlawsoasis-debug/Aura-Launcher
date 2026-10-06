@@ -25,6 +25,7 @@ public record TunnelInfo(
 public interface ITunnelProvider : IDisposable
 {
     TunnelInfo CurrentInfo { get; }
+    bool IsProcessRunning { get; }
     event Action<TunnelInfo>? StatusChanged;
 
     Task<TunnelInfo> StartAsync(int localPort, CancellationToken ct = default);

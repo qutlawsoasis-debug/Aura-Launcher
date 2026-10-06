@@ -13,6 +13,7 @@ public class FakeTunnelProvider : ITunnelProvider
     private TunnelInfo _currentInfo = new(null, null, TunnelStatus.Inactive);
 
     public TunnelInfo CurrentInfo => _currentInfo;
+    public bool IsProcessRunning => _currentInfo.Status == TunnelStatus.Active;
 
     public event Action<TunnelInfo>? StatusChanged;
 

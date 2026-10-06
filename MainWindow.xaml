@@ -13,7 +13,7 @@
         FontFamily="Segoe UI, -apple-system, sans-serif">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="0" CornerRadius="12" CaptionHeight="46" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
+        <WindowChrome GlassFrameThickness="0" CornerRadius="4" CaptionHeight="46" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -34,8 +34,8 @@
         </DataTemplate>
     </Window.Resources>
 
-    <!-- Внешний закругленный контейнер окна -->
-    <Border Background="#0F1115" BorderThickness="1" BorderBrush="#252A33" CornerRadius="12" ClipToBounds="True">
+    <!-- Внешний плоский контейнер окна -->
+    <Border Background="#0F1115" BorderThickness="1" BorderBrush="#252A33" CornerRadius="4" ClipToBounds="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="46" />
@@ -49,7 +49,7 @@
             <!-- ============================================== -->
             <!-- 1. TOP HEADER BAR                              -->
             <!-- ============================================== -->
-            <Border Grid.Row="0" Background="#E6171A21" CornerRadius="11,11,0,0" Panel.ZIndex="10" BorderThickness="0,0,0,1" BorderBrush="#252A33">
+            <Border Grid.Row="0" Background="#171A21" CornerRadius="3,3,0,0" Panel.ZIndex="10" BorderThickness="0,0,0,1" BorderBrush="#252A33">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -150,7 +150,7 @@
             <!-- ============================================== -->
             <!-- 3. BOTTOM LAUNCH DECK                          -->
             <!-- ============================================== -->
-            <Border Grid.Row="2" Background="#F2171A21" CornerRadius="0,0,11,11" Panel.ZIndex="10" BorderThickness="0,1,0,0" BorderBrush="#252A33" Padding="24,14">
+            <Border Grid.Row="2" Background="#171A21" CornerRadius="0,0,3,3" Panel.ZIndex="10" BorderThickness="0,1,0,0" BorderBrush="#252A33" Padding="24,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -165,7 +165,7 @@
 
                     <!-- 1. Инфо об игроке (Ник и динамическая аватарка головы) -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
-                        <Border Width="40" Height="40" Background="#171A21" BorderThickness="1" BorderBrush="#252A33" CornerRadius="8" ClipToBounds="True" Margin="0,0,12,0">
+                        <Border Width="40" Height="40" Background="#171A21" BorderThickness="1" BorderBrush="#252A33" CornerRadius="4" ClipToBounds="True" Margin="0,0,12,0">
                             <Image Source="{Binding PlayerAvatar}" Width="36" Height="36" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
                         </Border>
                         <StackPanel VerticalAlignment="Center">

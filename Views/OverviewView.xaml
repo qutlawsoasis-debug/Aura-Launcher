@@ -49,24 +49,16 @@
                 <!-- Clean gray single line version text without pill border -->
                 <TextBlock Text="{Binding VersionInfo}" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,8" />
 
-                <!-- Build Title "Aura" SemiBold with light drop shadow -->
-                <TextBlock Text="{Binding BuildName}" FontSize="44" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,6">
-                    <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="#000000" />
-                    </TextBlock.Effect>
-                </TextBlock>
+                <!-- Build Title "Aura" SemiBold flat -->
+                <TextBlock Text="{Binding BuildName}" FontSize="44" FontWeight="SemiBold" Foreground="#E8EAED" Margin="0,0,0,6" />
 
                 <!-- Sub-headline -->
-                <TextBlock Text="Клиентская сборка с оптимизацией и модами" FontSize="13" Foreground="#9AA3B2">
-                    <TextBlock.Effect>
-                        <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.4" Color="#000000" />
-                    </TextBlock.Effect>
-                </TextBlock>
+                <TextBlock Text="Клиентская сборка с оптимизацией и модами" FontSize="13" Foreground="#9AA3B2" />
             </StackPanel>
 
-            <!-- Build Parameters Card: Borderless, single surface with light opacity, thin divider lines -->
+            <!-- Build Parameters Card: Borderless, flat surface, thin divider lines -->
             <Border Grid.Column="1" VerticalAlignment="Bottom"
-                    Background="#D9171A21" CornerRadius="10" BorderThickness="0" Padding="18,14">
+                    Background="#D9171A21" CornerRadius="4" BorderThickness="0" Padding="18,14">
                 <StackPanel MinWidth="220">
                     <TextBlock Text="Параметры сборки" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold" />
                     <Border Height="1" Background="#252A33" Margin="0,8" />

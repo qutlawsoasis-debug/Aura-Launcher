@@ -53,9 +53,20 @@ public partial class App : Application
         };
 
         // Режим самодиагностики (--selftest, --selftest-shots, --selftest-lobby или --selftest-kill-playit) или отдельный профиль
+        string? captureShotsPrefix = null;
+        for (int i = 0; i < e.Args.Length - 1; i++)
+        {
+            if (e.Args[i].Equals("--capture-shots", StringComparison.OrdinalIgnoreCase))
+            {
+                captureShotsPrefix = e.Args[i + 1];
+                break;
+            }
+        }
+
         bool isKillPlayitTest = Array.Exists(e.Args, a => a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
         bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = isKillPlayitTest || isLobbyTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isLifecycleTest = Array.Exists(e.Args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || isKillPlayitTest || isLobbyTest || isLifecycleTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -85,6 +96,7 @@ public partial class App : Application
 
         // Убиваем зависшие процессы playit* (в т.ч. claim exchange)
         PlayitTunnelProvider.KillStalePlayitProcesses();
+        PlayitTunnelProvider.PurgeLegacyLocalSecrets();
 
         base.OnStartup(e);
 
@@ -119,12 +131,36 @@ public partial class App : Application
             _ = mainVM.InitializeAsync();
         }
 
-        // Проверка режима самодиагностики (--selftest-kill-playit, --selftest-lobby, --selftest или --selftest-shots)
-        if (isKillPlayitTest)
+        // Проверка режима самодиагностики (--capture-shots, --selftest-kill-playit, --selftest-lobby, --selftest или --selftest-shots)
+        if (!string.IsNullOrWhiteSpace(captureShotsPrefix))
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.CaptureAllScreenshotsAsync(mainWindow, captureShotsPrefix);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isKillPlayitTest)
         {
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.LiveTestKillPlayitAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isLifecycleTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunLobbyLifecycleTestAsync(mainWindow);
                 if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
                 {
                     await Task.Delay(1000);

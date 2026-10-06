@@ -54,6 +54,20 @@ public class LobbyService : ILobbyService, IDisposable
 
         try
         {
+            bool isFakeTunnel = string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
+
+            // Условие (б): TCP-connect на 127.0.0.1:localPort успешен
+            if (!isFakeTunnel)
+            {
+                bool tcpOk = await CheckLocalTcpPortAsync("127.0.0.1", localPort, timeoutMs: 3000, cancellationToken);
+                if (!tcpOk)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] Local TCP connect to 127.0.0.1:{localPort} failed. World is not open or not accepting connections.");
+                    return false;
+                }
+            }
+
             string tunnelAddr;
             if (!string.IsNullOrWhiteSpace(customTunnelAddress))
             {
@@ -65,6 +79,13 @@ public class LobbyService : ILobbyService, IDisposable
                 if (tunnelResult.Status != TunnelStatus.Active || string.IsNullOrWhiteSpace(tunnelResult.PublicAddress))
                 {
                     PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] Tunnel StartAsync failed: status={tunnelResult.Status}, error={tunnelResult.ErrorMessage}");
+                    return false;
+                }
+
+                // Условие (в): агент playit поднят
+                if (!_tunnelProvider.IsProcessRunning && !isFakeTunnel)
+                {
+                    PlayitTunnelProvider.LogTunnel("[HOST-OPEN: ERROR] Playit agent process is not running.");
                     return false;
                 }
 
@@ -93,6 +114,26 @@ public class LobbyService : ILobbyService, IDisposable
             PlayitTunnelProvider.LogTunnel($"[EXCEPTION] HostOpenWorldAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
             return false;
         }
+    }
+
+    private static async Task<bool> CheckLocalTcpPortAsync(string host, int port, int timeoutMs, CancellationToken ct)
+    {
+        try
+        {
+            using var client = new System.Net.Sockets.TcpClient();
+            var connectTask = client.ConnectAsync(host, port);
+            var completedTask = await Task.WhenAny(connectTask, Task.Delay(timeoutMs, ct)).ConfigureAwait(false);
+            if (completedTask == connectTask)
+            {
+                await connectTask.ConfigureAwait(false);
+                return client.Connected;
+            }
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: DEBUG] TCP check to {host}:{port} failed: {ex.Message}");
+        }
+        return false;
     }
 
     public async Task CloseLobbyAsHostAsync(CancellationToken cancellationToken = default)
