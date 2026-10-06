@@ -67,7 +67,8 @@ public partial class App : Application
         bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
         bool isLifecycleTest = Array.Exists(e.Args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
         bool isAnthemTest = Array.Exists(e.Args, a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isRapidNavTest = Array.Exists(e.Args, a => a.Equals("--selftest-rapid", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -198,6 +199,18 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunAnthemTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isRapidNavTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunRapidTabSwitchStressTestAsync(mainWindow);
                 if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
                 {
                     await Task.Delay(1000);

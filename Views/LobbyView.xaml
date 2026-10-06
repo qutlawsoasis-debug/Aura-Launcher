@@ -301,13 +301,23 @@
                                      VerticalAlignment="Stretch" />
                         </Grid>
 
-                        <!-- "Войти" button (height 58, disabled until 6 chars) -->
+                        <!-- "Войти" button (height 58, disabled until 6 chars, shows "Входим…" while joining) -->
                         <Button Command="{Binding JoinLobbyCommand}"
                                 Style="{StaticResource StandardBtn}"
                                 Height="58"
-                                Content="Войти"
+                                Content="{Binding JoinButtonText}"
                                 Margin="0,0,0,8" />
                     </WrapPanel>
+
+                    <!-- Error message under code line: 13px, #FF8A7A, disappears on typing -->
+                    <TextBlock Text="{Binding JoinErrorMessage}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="13"
+                               FontWeight="Medium"
+                               Foreground="#FF8A7A"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,16"
+                               Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
 
                 <!-- ============================================== -->

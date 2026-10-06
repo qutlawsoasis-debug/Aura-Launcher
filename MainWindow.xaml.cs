@@ -59,74 +59,91 @@ public partial class MainWindow : Window
             _ => ViewOverview
         };
 
-        if (targetView == null || targetView == _currentActiveView) return;
+        if (targetView == null) return;
 
-        var outgoingView = _currentActiveView;
+        // Единый контроллер навигации: «последний запрос побеждает».
+        // 1. При новом переключении все идущие Storyboard ОСТАНАВЛИВАТЬ (Stop, не ждать Completed).
+        if (_activeTransitionStoryboard != null)
+        {
+            _activeTransitionStoryboard.Stop();
+            _activeTransitionStoryboard = null;
+        }
+
+        var allScreens = new FrameworkElement[] { ViewOverview, ViewLobby, ViewWardrobe, ViewSettings };
+
+        // 2. Уходящему экрану сразу ставить Opacity 0 и Visibility=Collapsed.
+        // Все неактивные экраны: Visibility=Collapsed, IsHitTestVisible=False.
+        foreach (var screen in allScreens)
+        {
+            if (screen == null) continue;
+            if (screen != targetView)
+            {
+                screen.BeginAnimation(UIElement.OpacityProperty, null);
+                screen.Opacity = 0.0;
+                screen.Visibility = Visibility.Collapsed;
+                screen.IsHitTestVisible = false;
+                if (screen.RenderTransform is TranslateTransform tt)
+                {
+                    tt.BeginAnimation(TranslateTransform.YProperty, null);
+                    tt.Y = 0.0;
+                }
+            }
+        }
+
         _currentActiveView = targetView;
 
-        _activeTransitionStoryboard?.Stop();
-        _activeTransitionStoryboard = null;
+        // 3. Одновременно виден и кликабелен ровно один экран
+        targetView.Visibility = Visibility.Visible;
+        targetView.IsHitTestVisible = true;
 
-        if (!animate || outgoingView == null)
+        if (!animate)
         {
-            if (outgoingView != null)
-            {
-                outgoingView.Visibility = Visibility.Collapsed;
-                outgoingView.Opacity = 0.0;
-            }
-            targetView.Visibility = Visibility.Visible;
+            targetView.BeginAnimation(UIElement.OpacityProperty, null);
             targetView.Opacity = 1.0;
             if (targetView.RenderTransform is TranslateTransform tt)
             {
+                tt.BeginAnimation(TranslateTransform.YProperty, null);
                 tt.Y = 0.0;
             }
             return;
         }
 
-        // Честный Storyboard перехода:
-        // - Уходящий экран: Opacity 1 -> 0 за 100 мс.
-        // - Приходящий экран: Opacity 0 -> 1 за 220 мс, TranslateTransform.Y 8 -> 0 за 220 мс (CubicEase EaseOut).
-        // - Visibility приходящего включать ДО анимации, уходящего — скрывать (Collapsed) по Completed.
-        // - Анимировать СТРОГО Opacity и RenderTransform (TranslateTransform).
-        targetView.Visibility = Visibility.Visible;
-        targetView.Opacity = 0.0;
+        // Входящий анимировать с текущего состояния
+        double currentOpacity = targetView.Opacity;
+        if (currentOpacity < 0.0 || currentOpacity >= 1.0) currentOpacity = 0.0;
+
+        double currentY = 8.0;
         if (targetView.RenderTransform is TranslateTransform inTrans)
         {
-            inTrans.Y = 8.0;
+            currentY = inTrans.Y;
+            if (currentY < 0.0 || currentY > 8.0) currentY = 8.0;
+        }
+        else
+        {
+            inTrans = new TranslateTransform(0, currentY);
+            targetView.RenderTransform = inTrans;
         }
 
         var sb = new Storyboard();
 
-        // Уходящий: Opacity 1 -> 0 за 100 мс
-        var outAnim = new DoubleAnimation
-        {
-            To = 0.0,
-            Duration = TimeSpan.FromMilliseconds(100)
-        };
-        Storyboard.SetTarget(outAnim, outgoingView);
-        Storyboard.SetTargetProperty(outAnim, new PropertyPath(UIElement.OpacityProperty));
-        sb.Children.Add(outAnim);
-
-        // Приходящий: Opacity 0 -> 1 за 220 мс (с задержкой 100 мс)
+        // Приходящий экран: Opacity с текущего состояния -> 1 за 220 мс
         var inOpacityAnim = new DoubleAnimation
         {
-            From = 0.0,
+            From = currentOpacity,
             To = 1.0,
             Duration = TimeSpan.FromMilliseconds(220),
-            BeginTime = TimeSpan.FromMilliseconds(100),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         Storyboard.SetTarget(inOpacityAnim, targetView);
         Storyboard.SetTargetProperty(inOpacityAnim, new PropertyPath(UIElement.OpacityProperty));
         sb.Children.Add(inOpacityAnim);
 
-        // Приходящий: TranslateTransform.Y 8 -> 0 за 220 мс (с задержкой 100 мс)
+        // Приходящий экран: TranslateTransform.Y с текущего состояния -> 0 за 220 мс
         var inSlideAnim = new DoubleAnimation
         {
-            From = 8.0,
+            From = currentY,
             To = 0.0,
             Duration = TimeSpan.FromMilliseconds(220),
-            BeginTime = TimeSpan.FromMilliseconds(100),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         Storyboard.SetTarget(inSlideAnim, targetView);
@@ -135,15 +152,22 @@ public partial class MainWindow : Window
 
         sb.Completed += (s, e) =>
         {
-            outgoingView.Visibility = Visibility.Collapsed;
-            outgoingView.Opacity = 0.0;
-            targetView.Opacity = 1.0;
-            if (targetView.RenderTransform is TranslateTransform finishedTrans)
-            {
-                finishedTrans.Y = 0.0;
-            }
             if (_activeTransitionStoryboard == sb)
             {
+                targetView.Opacity = 1.0;
+                if (targetView.RenderTransform is TranslateTransform finishedTrans)
+                {
+                    finishedTrans.Y = 0.0;
+                }
+                foreach (var screen in allScreens)
+                {
+                    if (screen != null && screen != targetView)
+                    {
+                        screen.Visibility = Visibility.Collapsed;
+                        screen.IsHitTestVisible = false;
+                        screen.Opacity = 0.0;
+                    }
+                }
                 _activeTransitionStoryboard = null;
             }
         };

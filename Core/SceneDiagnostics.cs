@@ -697,6 +697,122 @@ public static class SceneDiagnostics
         }
     }
 
+    public static async Task<bool> RunRapidTabSwitchStressTestAsync(MainWindow window)
+    {
+        App.Log("[STRESS_TEST] Starting rapid tab switch stress test (60 switches over 1500ms)...");
+        var tabs = new[] { "Overview", "Lobby", "Wardrobe", "Settings" };
+        var random = new Random(42);
+        string lastTab = "Overview";
+
+        var sw = Stopwatch.StartNew();
+        for (int i = 0; i < 60; i++)
+        {
+            string targetTab = tabs[random.Next(tabs.Length)];
+            lastTab = targetTab;
+            window.Dispatcher.Invoke(() =>
+            {
+                if (window.DataContext is MainViewModel vm)
+                {
+                    vm.SwitchTab(targetTab);
+                }
+            });
+            await Task.Delay(25); // 60 * 25ms = 1500ms
+        }
+        sw.Stop();
+
+        // Небольшая задержка для завершения анимации последнего экрана
+        await Task.Delay(300);
+
+        int visibleCount = 0;
+        int collapsedCount = 0;
+        string visibleScreenName = "";
+        FrameworkElement? activeScreenElement = null;
+
+        window.Dispatcher.Invoke(() =>
+        {
+            var screens = new (string Name, FrameworkElement Element)[]
+            {
+                ("Overview", window.ViewOverview),
+                ("Lobby", window.ViewLobby),
+                ("Wardrobe", window.ViewWardrobe),
+                ("Settings", window.ViewSettings)
+            };
+
+            foreach (var (name, elem) in screens)
+            {
+                if (elem.Visibility == Visibility.Visible)
+                {
+                    visibleCount++;
+                    visibleScreenName = name;
+                    activeScreenElement = elem;
+                }
+                else if (elem.Visibility == Visibility.Collapsed)
+                {
+                    collapsedCount++;
+                }
+            }
+        });
+
+        App.Log($"[STRESS_TEST] 60 switches completed in {sw.ElapsedMilliseconds}ms. Final Target='{lastTab}'.");
+        App.Log($"[STRESS_TEST] Visible screens count: {visibleCount} (Active: '{visibleScreenName}'), Collapsed screens count: {collapsedCount}");
+
+        // Программно нажимаем кнопку на активном экране через UIAutomation (IInvokeProvider.Invoke())
+        bool invokedSuccessfully = false;
+        string buttonClickedName = "";
+
+        window.Dispatcher.Invoke(() =>
+        {
+            if (activeScreenElement != null)
+            {
+                var button = FindVisualChild<Button>(activeScreenElement);
+                if (button != null)
+                {
+                    buttonClickedName = (button.Content as string) ?? button.Name ?? button.GetType().Name;
+                    var oldCommand = button.Command;
+                    bool commandExecuted = false;
+                    RoutedEventHandler clickHandler = (s, e) =>
+                    {
+                        commandExecuted = true;
+                    };
+                    button.AddHandler(Button.ClickEvent, clickHandler, true);
+
+                    try
+                    {
+                        button.Command = new RelayCommand(_ =>
+                        {
+                            commandExecuted = true;
+                        });
+
+                        var peer = System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(button);
+                        if (peer?.GetPattern(System.Windows.Automation.Peers.PatternInterface.Invoke) is System.Windows.Automation.Provider.IInvokeProvider invoker)
+                        {
+                            invoker.Invoke();
+
+                            // Прокачиваем очередь сообщений Dispatcher для обработки DispatcherPriority.Input
+                            var frame = new DispatcherFrame();
+                            Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new DispatcherOperationCallback(f =>
+                            {
+                                ((DispatcherFrame)f).Continue = false;
+                                return null;
+                            }), frame);
+                            Dispatcher.PushFrame(frame);
+
+                            invokedSuccessfully = commandExecuted;
+                        }
+                    }
+                    finally
+                    {
+                        button.RemoveHandler(Button.ClickEvent, clickHandler);
+                        button.Command = oldCommand;
+                    }
+                }
+            }
+        });
+
+        App.Log($"[STRESS_TEST] UIAutomation IInvokeProvider.Invoke() on active screen ('{visibleScreenName}') button '{buttonClickedName}': ConfirmedClick={invokedSuccessfully}");
+        return visibleCount == 1 && collapsedCount == 3 && invokedSuccessfully;
+    }
+
     public static async Task<bool> CaptureAllScreenshotsAsync(MainWindow window, string prefix)
     {
         System.Net.Sockets.TcpListener? listener = null;
@@ -705,6 +821,9 @@ public static class SceneDiagnostics
             await Task.Delay(1000);
             var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
             if (mainVm == null) return false;
+
+            // 0. Стресс-тест быстрого переключения вкладок
+            await RunRapidTabSwitchStressTestAsync(window);
 
             string shotsDir = ResolveShotsDir();
             var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
@@ -798,11 +917,26 @@ public static class SceneDiagnostics
             await Task.Delay(500);
             SaveShot($"{prefix}_tab_lobby_empty.png");
 
-            // 4b. ЛОББИ - гость ждет (симуляция гостя)
+            // 4b. ЛОББИ - ошибка ввода несуществующего кода 111111 (HTTP 404)
+            App.Log("[TEST-LOBBY-GUEST-ERROR] Testing JoinLobby with non-existent code 111111...");
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.LobbyVM.GuestCodeInput = "111111";
+            });
+            await window.Dispatcher.InvokeAsync(async () =>
+            {
+                await mainVm.LobbyVM.JoinLobbyAsync();
+            });
+            await Task.Delay(500);
+            SaveShot($"{prefix}_tab_lobby_guest_error.png");
+            App.Log($"[TEST-LOBBY-GUEST-ERROR] Error displayed: '{window.Dispatcher.Invoke(() => mainVm.LobbyVM.JoinErrorMessage)}', HasJoinError={window.Dispatcher.Invoke(() => mainVm.LobbyVM.HasJoinError)}");
+
+            // 4c. ЛОББИ - очистка ошибки при начале ввода
             window.Dispatcher.Invoke(() =>
             {
                 mainVm.LobbyVM.GuestCodeInput = "ABC123";
             });
+            App.Log($"[TEST-LOBBY-GUEST-ERROR] After entering new code ABC123: HasJoinError={window.Dispatcher.Invoke(() => mainVm.LobbyVM.HasJoinError)}");
             await Task.Delay(200);
             SaveShot($"{prefix}_tab_lobby_guest_input.png");
 

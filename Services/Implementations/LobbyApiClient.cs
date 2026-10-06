@@ -93,6 +93,25 @@ public class LobbyApiClient : ILobbyApiClient
         }
     }
 
+    public async Task<(System.Net.HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(GetRequestUri($"api/lobby/status?code={Uri.EscapeDataString(code)}"), cancellationToken);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                var parsed = JsonSerializer.Deserialize<LobbyStatusResponse>(json, _jsonOptions);
+                return (response.StatusCode, parsed, json);
+            }
+            return (response.StatusCode, null, json);
+        }
+        catch
+        {
+            return (null, null, string.Empty);
+        }
+    }
+
     public async Task<bool> OpenLobbyAsync(string code, string hostToken, string tunnelAddress, CancellationToken cancellationToken = default)
     {
         try

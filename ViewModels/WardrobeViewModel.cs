@@ -23,8 +23,8 @@ public class WardrobeViewModel : ObservableObject
     private string _statusMessage = string.Empty;
     private bool _isStatusError;
 
-    private static readonly SolidColorBrush SuccessBrush = new(Color.FromRgb(0x19, 0xD3, 0xA7));
-    private static readonly SolidColorBrush ErrorBrush = new(Color.FromRgb(0xEF, 0x44, 0x44));
+    private static readonly SolidColorBrush SuccessBrush = new(Color.FromRgb(0x5F, 0xD3, 0x9A));
+    private static readonly SolidColorBrush ErrorBrush = new(Color.FromRgb(0xFF, 0x8A, 0x7A));
 
     static WardrobeViewModel()
     {
@@ -133,7 +133,10 @@ public class WardrobeViewModel : ObservableObject
                 _configService.CurrentConfig.SkinModel = newModel;
                 OnPropertyChanged();
                 _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
-                _ = UploadCurrentSkinAsync();
+                if (!string.IsNullOrWhiteSpace(_configService.CurrentConfig.SkinPath) && File.Exists(_configService.CurrentConfig.SkinPath))
+                {
+                    _ = UploadCurrentSkinAsync();
+                }
             }
         }
     }
@@ -215,7 +218,8 @@ public class WardrobeViewModel : ObservableObject
                     await _configService.SaveConfigAsync(cfg);
                 }
                 IsStatusError = false;
-                StatusMessage = "Скин успешно загружен и применен!";
+                StatusMessage = "Скин успешно загружен и применён!";
+                ScheduleStatusMessageClear();
             }
             else
             {
@@ -228,6 +232,26 @@ public class WardrobeViewModel : ObservableObject
             IsStatusError = true;
             StatusMessage = $"Ошибка отправки скина: {ex.Message}";
         }
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _statusMessageTimer;
+
+    private void ScheduleStatusMessageClear()
+    {
+        _statusMessageTimer?.Stop();
+        _statusMessageTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(3)
+        };
+        _statusMessageTimer.Tick += (s, e) =>
+        {
+            _statusMessageTimer.Stop();
+            if (!_isStatusError)
+            {
+                StatusMessage = string.Empty;
+            }
+        };
+        _statusMessageTimer.Start();
     }
 
     public async Task ResetSkinToDefaultAsync()

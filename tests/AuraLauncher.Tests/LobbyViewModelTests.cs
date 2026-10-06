@@ -149,4 +149,91 @@ public class LobbyViewModelTests
         vm.GuestCodeInput = "abc123456";
         Assert.Equal("ABC123", vm.GuestCodeInput);
     }
+
+    private class MockLobbyApiClient : ILobbyApiClient
+    {
+        public System.Net.HttpStatusCode? DetailedStatusCode { get; set; } = System.Net.HttpStatusCode.OK;
+        public LobbyStatusResponse? DetailedStatusResponse { get; set; }
+        public string DetailedRawBody { get; set; } = "";
+
+        public Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, CancellationToken cancellationToken = default) => Task.FromResult<LobbyCreateResponse?>(null);
+        public Task<LobbyJoinResponse?> JoinLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default) => Task.FromResult<LobbyJoinResponse?>(null);
+        public Task<LobbyStatusResponse?> GetStatusAsync(string code, CancellationToken cancellationToken = default) => Task.FromResult<LobbyStatusResponse?>(null);
+        public Task<(System.Net.HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult((DetailedStatusCode, DetailedStatusResponse, DetailedRawBody));
+        }
+        public Task<bool> OpenLobbyAsync(string code, string hostToken, string tunnelAddress, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<bool> HeartbeatAsync(string code, string hostToken, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<bool> CloseLobbyAsync(string code, string hostToken, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<TunnelConfigResponse?> GetTunnelConfigAsync(CancellationToken cancellationToken = default) => Task.FromResult<TunnelConfigResponse?>(null);
+    }
+
+    [Fact]
+    public async Task Guest_Join_NotFound_ShowsNotFoundErrorMessage_AndClearsOnTyping()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService("C:\\AuraTest");
+        var launchService = new TestLaunchService();
+        var mockApi = new MockLobbyApiClient
+        {
+            DetailedStatusCode = System.Net.HttpStatusCode.NotFound,
+            DetailedRawBody = "{\"error\":\"Lobby not found\"}"
+        };
+
+        var vm = new LobbyViewModel(mockLobby, launchService, configService, lobbyApiClient: mockApi);
+        vm.GuestCodeInput = "111111";
+
+        await vm.JoinLobbyCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasJoinError);
+        Assert.Contains("Лобби с кодом 111111 не найдено", vm.JoinErrorMessage);
+        Assert.Equal("Войти", vm.JoinButtonText);
+
+        // При вводе символа ошибка пропадает
+        vm.GuestCodeInput = "111112";
+        Assert.False(vm.HasJoinError);
+        Assert.Empty(vm.JoinErrorMessage);
+    }
+
+    [Fact]
+    public async Task Guest_Join_ClosedLobby_ShowsClosedErrorMessage()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService("C:\\AuraTest");
+        var launchService = new TestLaunchService();
+        var mockApi = new MockLobbyApiClient
+        {
+            DetailedStatusCode = System.Net.HttpStatusCode.OK,
+            DetailedStatusResponse = new LobbyStatusResponse("222222", "closed", null, 1, 0)
+        };
+
+        var vm = new LobbyViewModel(mockLobby, launchService, configService, lobbyApiClient: mockApi);
+        vm.GuestCodeInput = "222222";
+
+        await vm.JoinLobbyCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasJoinError);
+        Assert.Contains("Это лобби закрыто", vm.JoinErrorMessage);
+    }
+
+    [Fact]
+    public async Task Guest_Join_NetworkError_ShowsNetworkErrorMessage()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService("C:\\AuraTest");
+        var launchService = new TestLaunchService();
+        var mockApi = new MockLobbyApiClient
+        {
+            DetailedStatusCode = null
+        };
+
+        var vm = new LobbyViewModel(mockLobby, launchService, configService, lobbyApiClient: mockApi);
+        vm.GuestCodeInput = "333333";
+
+        await vm.JoinLobbyCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasJoinError);
+        Assert.Contains("Нет связи с сервером лобби", vm.JoinErrorMessage);
+    }
 }
