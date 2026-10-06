@@ -66,10 +66,10 @@ public class IntegrationTests
         Trace.WriteLine($"Shaders count: {shaders.Length}");
         Trace.WriteLine($"Resourcepacks count: {rps.Length}");
 
-        Assert.Equal(175, packFiles.Count);
-        Assert.Equal(61, mods.Length);
+        Assert.Equal(213, packFiles.Count);
+        Assert.Equal(97, mods.Length);
         Assert.Equal(4, shaders.Length);
-        Assert.Equal(3, rps.Length);
+        Assert.Equal(5, rps.Length);
         Assert.True(File.Exists(optionsPath));
         var optionsText = File.ReadAllText(optionsPath);
         Assert.Contains("lang:ru_ru", optionsText);

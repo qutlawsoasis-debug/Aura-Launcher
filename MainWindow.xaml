@@ -408,217 +408,198 @@
                         <TranslateTransform Y="0" />
                     </views:SettingsView.RenderTransform>
                 </views:SettingsView>
-
-                <!-- Update Toast: правый верхний угол области контента, ширина 300px, сплошной фон #0F1B22, рамка 1px (белый 14%), слева полоса 3px ember, радиус 3px -->
-                <!-- Внутри заголовок «Вышло обновление beta 1.0.N» (Onest 600 14px), под ним «Обновление скачается...» (12px dim), кнопки «Обновить» (32px) и ссылка «Позже» -->
-                <Border x:Name="UpdateToastBorder"
-                        VerticalAlignment="Top" HorizontalAlignment="Right"
-                        Width="300" Panel.ZIndex="100"
-                        Background="#0F1B22"
-                        BorderBrush="{StaticResource LineInkBrush}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        ClipToBounds="True"
-                        Margin="0,8,0,0"
-                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
-                        RenderTransformOrigin="0.5,0.5">
-                    <Border.RenderTransform>
-                        <TranslateTransform x:Name="ToastTransform" X="0" />
-                    </Border.RenderTransform>
-                    <Grid>
-                        <!-- Левая полоса 3px ember -->
-                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
-
-                        <!-- Внутреннее содержимое с отступами -->
-                        <StackPanel Margin="14,10,12,10">
-                            <!-- Заголовок: Onest 600 14px -->
-                            <TextBlock Text="{Binding UpdateBannerTitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="SemiBold"
-                                       FontSize="14"
-                                       Foreground="{StaticResource InkBrush}"
-                                       TextWrapping="Wrap" />
-
-                            <!-- Описание: 12px dim -->
-                            <TextBlock Text="{Binding UpdateBannerMessage}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="Normal"
-                                       FontSize="12"
-                                       Foreground="{StaticResource DimInkBrush}"
-                                       TextWrapping="Wrap"
-                                       Margin="0,3,0,8" />
-
-                            <!-- Кнопки: «Обновить» и ссылка «Позже» -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Command="{Binding ApplyBannerUpdateCommand}"
-                                        IsEnabled="{Binding CanApplyUpdate}"
-                                        Style="{StaticResource PrimaryNeonBtn}"
-                                        Height="30" Padding="14,0" FontSize="13"
-                                        Content="{Binding UpdateBannerButtonText}"
-                                        Margin="0,0,12,0" VerticalAlignment="Center" />
-
-                                <TextBlock VerticalAlignment="Center">
-                                    <Hyperlink Command="{Binding DismissBannerCommand}"
-                                               Foreground="{StaticResource MuteBrush}"
-                                               TextDecorations="None">
-                                        <Run Text="Позже" FontFamily="{StaticResource MainFont}" FontSize="12" />
-                                    </Hyperlink>
-                                </TextBlock>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Invite Toast: правый верхний угол области контента, ширина 300px, сплошной фон #0F1B22, рамка 1px, слева полоса 3px ember -->
-                <Border x:Name="InviteToastBorder"
-                        VerticalAlignment="Top" HorizontalAlignment="Right"
-                        Width="300" Panel.ZIndex="101"
-                        Background="#0F1B22"
-                        BorderBrush="{StaticResource LineInkBrush}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        ClipToBounds="True"
-                        Margin="0,8,0,0"
-                        Visibility="{Binding IsInviteToastVisible, Converter={StaticResource BoolToVis}}"
-                        RenderTransformOrigin="0.5,0.5">
-                    <Border.RenderTransform>
-                        <TranslateTransform x:Name="InviteToastTransform" X="0" />
-                    </Border.RenderTransform>
-                    <Grid>
-                        <!-- Левая полоса 3px ember -->
-                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
-
-                        <!-- Внутреннее содержимое с отступами -->
-                        <StackPanel Margin="14,10,12,10">
-                            <!-- Заголовок: Onest 600 14px -->
-                            <TextBlock Text="{Binding InviteToastTitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="SemiBold"
-                                       FontSize="14"
-                                       Foreground="{StaticResource InkBrush}"
-                                       TextWrapping="Wrap" />
-
-                            <!-- Описание: 12px dim -->
-                            <TextBlock Text="{Binding InviteToastSubtitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="Normal"
-                                       FontSize="12"
-                                       Foreground="{StaticResource DimInkBrush}"
-                                       TextWrapping="Wrap"
-                                       Margin="0,3,0,8" />
-
-                            <!-- Кнопки: «Принять» и ссылка «Отклонить» -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Command="{Binding AcceptInviteCommand}"
-                                        Style="{StaticResource PrimaryNeonBtn}"
-                                        Height="30" Padding="14,0" FontSize="13"
-                                        Content="Принять"
-                                        Margin="0,0,12,0" VerticalAlignment="Center" />
-
-                                <TextBlock VerticalAlignment="Center">
-                                    <Hyperlink Command="{Binding DeclineInviteCommand}"
-                                               Foreground="{StaticResource MuteBrush}"
-                                               TextDecorations="None">
-                                        <Run Text="Отклонить" FontFamily="{StaticResource MainFont}" FontSize="12" />
-                                    </Hyperlink>
-                                </TextBlock>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Protocol Action Prompt Toast: правый верхний угол, ширина 310px, сплошной фон #0F1B22, рамка 1px, слева полоса 3px ember -->
-                <Border x:Name="ProtocolPromptBorder"
-                        VerticalAlignment="Top" HorizontalAlignment="Right"
-                        Width="310" Panel.ZIndex="102"
-                        Background="#0F1B22"
-                        BorderBrush="{StaticResource LineInkBrush}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        ClipToBounds="True"
-                        Margin="0,8,0,0"
-                        Visibility="{Binding IsProtocolPromptVisible, Converter={StaticResource BoolToVis}}">
-                    <Grid>
-                        <!-- Левая полоса 3px ember -->
-                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
-
-                        <!-- Внутреннее содержимое с отступами -->
-                        <StackPanel Margin="14,10,12,10">
-                            <!-- Заголовок: Onest 600 14px -->
-                            <TextBlock Text="{Binding ProtocolPromptTitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="SemiBold"
-                                       FontSize="14"
-                                       Foreground="{StaticResource InkBrush}"
-                                       TextWrapping="Wrap" />
-
-                            <!-- Описание: 12px dim -->
-                            <TextBlock Text="{Binding ProtocolPromptSubtitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="Normal"
-                                       FontSize="12"
-                                       Foreground="{StaticResource DimInkBrush}"
-                                       TextWrapping="Wrap"
-                                       Margin="0,3,0,8" />
-
-                            <!-- Кнопки: «Войти»/«Отправить» и ссылка «Отмена» -->
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Command="{Binding ConfirmProtocolPromptCommand}"
-                                        Style="{StaticResource PrimaryNeonBtn}"
-                                        Height="30" Padding="14,0" FontSize="13"
-                                        Content="{Binding ProtocolPromptConfirmText}"
-                                        Margin="0,0,12,0" VerticalAlignment="Center" />
-
-                                <TextBlock VerticalAlignment="Center">
-                                    <Hyperlink Command="{Binding CancelProtocolPromptCommand}"
-                                               Foreground="{StaticResource MuteBrush}"
-                                               TextDecorations="None">
-                                        <Run Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="12" />
-                                    </Hyperlink>
-                                </TextBlock>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <!-- Info Toast: правый верхний угол, ширина 300px, сплошной фон #0F1B22, рамка 1px, слева полоса 3px ember -->
-                <Border x:Name="InfoToastBorder"
-                        VerticalAlignment="Top" HorizontalAlignment="Right"
-                        Width="300" Panel.ZIndex="103"
-                        Background="#0F1B22"
-                        BorderBrush="{StaticResource LineInkBrush}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        ClipToBounds="True"
-                        Margin="0,8,0,0"
-                        Visibility="{Binding IsInfoToastVisible, Converter={StaticResource BoolToVis}}">
-                    <Grid>
-                        <!-- Левая полоса 3px ember -->
-                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
-
-                        <!-- Внутреннее содержимое с отступами -->
-                        <StackPanel Margin="14,10,12,10">
-                            <!-- Заголовок: Onest 600 14px -->
-                            <TextBlock Text="{Binding InfoToastTitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="SemiBold"
-                                       FontSize="14"
-                                       Foreground="{StaticResource InkBrush}"
-                                       TextWrapping="Wrap" />
-
-                            <!-- Описание: 12px dim -->
-                            <TextBlock Text="{Binding InfoToastSubtitle}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontWeight="Normal"
-                                       FontSize="12"
-                                       Foreground="{StaticResource DimInkBrush}"
-                                       TextWrapping="Wrap"
-                                       Margin="0,3,0,0"
-                                       Visibility="{Binding HasInfoToastSubtitle, Converter={StaticResource BoolToVis}}" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
             </Grid>
+
+            <!-- ============================================== -->
+            <!-- TOAST NOTIFICATIONS (TOP-RIGHT CORNER OF WINDOW)-->
+            <!-- ============================================== -->
+            <!-- Update Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
+            <Border x:Name="UpdateToastBorder"
+                    VerticalAlignment="Top" HorizontalAlignment="Right"
+                    Width="290" Panel.ZIndex="150"
+                    Background="#0F1B22"
+                    BorderBrush="{StaticResource LineInkBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    ClipToBounds="True"
+                    Margin="0,48,20,0"
+                    Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ToastTransform" X="0" />
+                </Border.RenderTransform>
+                <Grid>
+                    <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+                    <StackPanel Margin="14,10,12,10">
+                        <TextBlock Text="{Binding UpdateBannerTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding UpdateBannerMessage}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,8" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding ApplyBannerUpdateCommand}"
+                                    IsEnabled="{Binding CanApplyUpdate}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="28" Padding="12,0" FontSize="12"
+                                    Content="{Binding UpdateBannerButtonText}"
+                                    Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Command="{Binding DismissBannerCommand}"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextDecorations="None">
+                                    <Run Text="Позже" FontFamily="{StaticResource MainFont}" FontSize="12" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Invite Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
+            <Border x:Name="InviteToastBorder"
+                    VerticalAlignment="Top" HorizontalAlignment="Right"
+                    Width="290" Panel.ZIndex="151"
+                    Background="#0F1B22"
+                    BorderBrush="{StaticResource LineInkBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    ClipToBounds="True"
+                    Margin="0,48,20,0"
+                    Visibility="{Binding IsInviteToastVisible, Converter={StaticResource BoolToVis}}"
+                    RenderTransformOrigin="0.5,0.5">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="InviteToastTransform" X="0" />
+                </Border.RenderTransform>
+                <Grid>
+                    <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+                    <StackPanel Margin="14,10,12,10">
+                        <TextBlock Text="{Binding InviteToastTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding InviteToastSubtitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,8" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding AcceptInviteCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="28" Padding="12,0" FontSize="12"
+                                    Content="Принять"
+                                    Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Command="{Binding DeclineInviteCommand}"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextDecorations="None">
+                                    <Run Text="Отклонить" FontFamily="{StaticResource MainFont}" FontSize="12" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Protocol Action Prompt Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
+            <Border x:Name="ProtocolPromptBorder"
+                    VerticalAlignment="Top" HorizontalAlignment="Right"
+                    Width="290" Panel.ZIndex="152"
+                    Background="#0F1B22"
+                    BorderBrush="{StaticResource LineInkBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    ClipToBounds="True"
+                    Margin="0,48,20,0"
+                    Visibility="{Binding IsProtocolPromptVisible, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                </Border.Effect>
+                <Grid>
+                    <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+                    <StackPanel Margin="14,10,12,10">
+                        <TextBlock Text="{Binding ProtocolPromptTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ProtocolPromptSubtitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,8" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding ConfirmProtocolPromptCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="28" Padding="12,0" FontSize="12"
+                                    Content="{Binding ProtocolPromptConfirmText}"
+                                    Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Command="{Binding CancelProtocolPromptCommand}"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextDecorations="None">
+                                    <Run Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="12" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Info Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
+            <Border x:Name="InfoToastBorder"
+                    VerticalAlignment="Top" HorizontalAlignment="Right"
+                    Width="290" Panel.ZIndex="153"
+                    Background="#0F1B22"
+                    BorderBrush="{StaticResource LineInkBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    ClipToBounds="True"
+                    Margin="0,48,20,0"
+                    Visibility="{Binding IsInfoToastVisible, Converter={StaticResource BoolToVis}}">
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                </Border.Effect>
+                <Grid>
+                    <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+                    <StackPanel Margin="14,10,12,10">
+                        <TextBlock Text="{Binding InfoToastTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding InfoToastSubtitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,0"
+                                   Visibility="{Binding HasInfoToastSubtitle, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
 
             <!-- 3.5 CHANGELOG MODAL OVERLAY (СПИСОК ИЗМЕНЕНИЙ СБОРКИ МОДОВ) -->
             <Grid Panel.ZIndex="120"
@@ -701,6 +682,10 @@
                                         <TextBlock Text="• Subtle Effects &amp; Particle Rain &amp; Inventory Particles — капли дождя, мягкие частицы в интерфейсе и тонкие визуальные детали." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
                                         <TextBlock Text="• Teleport Animation (Grand Teleport) — кинематографичный переход камеры при телепортации вместо резкого экрана." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
                                         <TextBlock Text="• Inventory Profiles Next (+ libIPN) — умная сортировка и организация инвентаря в один клик." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
+                                        <TextBlock Text="• Player Locator Plus — удобный индикатор и поиск направления к друзьям в мире." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
+                                        <TextBlock Text="• Enhanced Doors — плавная кинематическая анимация открывания и закрывания дверей." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
+                                        <TextBlock Text="• Fresh Animations (+ EMF, ETF) — детальные и живые анимации мобов, взглядов и эмоций." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
+                                        <TextBlock Text="• Dungeons UI &amp; Ancient City Panorama — обновлённое панорамное главное меню и фэнтезийный интерфейс." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
