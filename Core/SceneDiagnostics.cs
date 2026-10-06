@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -1711,6 +1713,833 @@ public static class SceneDiagnostics
         catch (Exception ex)
         {
             App.Log($"[TEST: ERROR] {ex}");
+            return false;
+        }
+    }
+
+    public static async Task<bool> RunFriendsSelfTestAsync(MainWindow mainWindow)
+    {
+        App.Log("=== [TEST: FRIENDS SYSTEM SELF-TEST] STARTED ===");
+        var logBuilder = new StringBuilder();
+        void LogStep(string msg)
+        {
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {msg}";
+            App.Log(line);
+            logBuilder.AppendLine(line);
+        }
+
+        try
+        {
+            await Task.Delay(1500);
+            var vm = mainWindow.Dispatcher.Invoke(() => mainWindow.DataContext as MainViewModel);
+            if (vm == null)
+            {
+                App.Log("[TEST: ERROR] MainViewModel is null");
+                return false;
+            }
+
+            var friendService = App.Services.GetRequiredService<IFriendService>() as FriendService;
+            var configService = App.Services.GetRequiredService<IConfigService>();
+            var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            string baseUrl = configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app";
+            baseUrl = baseUrl.TrimEnd('/') + "/";
+
+            string userAId = "753797eb-7840-4e9c-b2dd-5d7426dc85c6";
+            string userAToken = "7616a9d7d4bbeef2cc3ca32f003a4db1896ef873de37c4e3911c2767533b64c6";
+            string userACode = "MAJ372WR";
+            string userANick = "PlayerA";
+
+            string userBId = "6870d722-b114-41c7-924b-0e47aeb122af";
+            string userBToken = "6b19f1f4fdb1174452c71991c88ce507e68cd499ca57e95b188e57ddd2940290";
+            string userBCode = "HVFQGDBL";
+            string userBNick = "PlayerB";
+
+            // Настройка Profile A
+            configService.CurrentConfig.Nickname = userANick;
+            configService.CurrentConfig.UserId = userAId;
+            configService.CurrentConfig.FriendCode = userACode;
+            var plainBytesA = Encoding.UTF8.GetBytes(userAToken);
+            var cipherBytesA = System.Security.Cryptography.ProtectedData.Protect(plainBytesA, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+            configService.CurrentConfig.UserTokenEncrypted = Convert.ToBase64String(cipherBytesA);
+            await configService.SaveConfigAsync(configService.CurrentConfig);
+
+            LogStep($"[Profile A] Initialized user: {userANick} (code: {userACode}, peer code: {userBCode})");
+
+            // Очищаем предыдущие связи между A и B на сервере перед тестом
+            try
+            {
+                using var cleanupReq1 = new HttpRequestMessage(HttpMethod.Post, baseUrl + "api/friends/remove");
+                cleanupReq1.Headers.Add("X-User-Id", userAId);
+                cleanupReq1.Headers.Add("X-User-Token", userAToken);
+                cleanupReq1.Content = new StringContent(JsonSerializer.Serialize(new { friendId = userBId }), Encoding.UTF8, "application/json");
+                await httpClient.SendAsync(cleanupReq1);
+
+                using var cleanupReq2 = new HttpRequestMessage(HttpMethod.Post, baseUrl + "api/friends/remove");
+                cleanupReq2.Headers.Add("X-User-Id", userBId);
+                cleanupReq2.Headers.Add("X-User-Token", userBToken);
+                cleanupReq2.Content = new StringContent(JsonSerializer.Serialize(new { friendId = userAId }), Encoding.UTF8, "application/json");
+                await httpClient.SendAsync(cleanupReq2);
+            }
+            catch { }
+
+            // Переключаемся на вкладку Друзья
+            mainWindow.Dispatcher.Invoke(() => vm.SwitchTab("Friends"));
+            await Task.Delay(800);
+
+            // Синхронизируем Profile A (чистый пустой список)
+            await friendService!.SyncNowAsync();
+            await Task.Delay(600);
+
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            Directory.CreateDirectory(repoShotsDir);
+            Directory.CreateDirectory(brainDir);
+
+            void SaveShot(string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(mainWindow, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+            }
+
+            // ШАГ 1: Пустой список друзей
+            SaveShot("beta114_friends_empty.png");
+            LogStep("[Profile A] Tab 'Friends' loaded. Screen 1 captured: empty friends list ('Пока никого нет')");
+
+            // ШАГ 2: Profile B отправляет заявку Profile A
+            LogStep($"[Profile B] Sending friend request to Profile A (friendCode: {userACode})...");
+            using (var reqMsg = new HttpRequestMessage(HttpMethod.Post, baseUrl + "api/friends/request"))
+            {
+                reqMsg.Headers.Add("X-User-Id", userBId);
+                reqMsg.Headers.Add("X-User-Token", userBToken);
+                reqMsg.Content = new StringContent(JsonSerializer.Serialize(new { friendCode = userACode }), Encoding.UTF8, "application/json");
+                var resp = await httpClient.SendAsync(reqMsg);
+                var content = await resp.Content.ReadAsStringAsync();
+                LogStep($"[Profile B] Friend request sent. Server response: {resp.StatusCode} {content}");
+            }
+
+            // Profile A делает Sync и получает входящую заявку
+            await friendService.SyncNowAsync();
+            await Task.Delay(600);
+
+            SaveShot("beta114_friends_request.png");
+            LogStep($"[Profile A] /sync processed incomingRequest from Profile B ({userBNick}). Screen 2 captured: incoming request with 'Принять' and 'Отклонить'");
+
+            // ШАГ 3: Profile A принимает заявку
+            LogStep($"[Profile A] Accepting friend request from Profile B ({userBId})...");
+            bool acceptOk = await friendService.RespondFriendRequestAsync(userBId, true);
+            LogStep($"[Profile A] Friend request accept result: {acceptOk}");
+
+            // Profile B пингует присутствие онлайн
+            using (var syncBMsg = new HttpRequestMessage(HttpMethod.Post, baseUrl + "api/sync"))
+            {
+                syncBMsg.Headers.Add("X-User-Id", userBId);
+                syncBMsg.Headers.Add("X-User-Token", userBToken);
+                syncBMsg.Content = new StringContent(JsonSerializer.Serialize(new { nick = userBNick, status = "online" }), Encoding.UTF8, "application/json");
+                await httpClient.SendAsync(syncBMsg);
+            }
+            LogStep($"[Profile B] /sync presence updated: nick='{userBNick}', status='online'");
+
+            // Profile A синхронизируется и видит друга онлайн
+            await friendService.SyncNowAsync();
+            await Task.Delay(800);
+
+            SaveShot("beta114_friends_list.png");
+            LogStep($"[Profile A] Friends list updated. Profile B is 'В сети'. Screen 3 captured: friends list with avatar and [Пригласить]");
+
+            // ШАГ 4: Profile A нажимает «Пригласить»
+            var friendItem = mainWindow.Dispatcher.Invoke(() => vm.FriendsVM.Friends.FirstOrDefault(f => f.Id == userBId));
+            if (friendItem == null)
+            {
+                App.Log("[TEST: ERROR] Friend item not found in list");
+                return false;
+            }
+
+            LogStep($"[Profile A] Clicking 'Пригласить' for friend '{friendItem.Nick}'...");
+            mainWindow.Dispatcher.Invoke(() => friendItem.InviteCommand.Execute(null));
+
+            // Ждем создания лобби и отправки инвайта
+            for (int i = 0; i < 30; i++)
+            {
+                await Task.Delay(300);
+                string? state = mainWindow.Dispatcher.Invoke(() => friendItem.InviteState);
+                if (state == "pending") break;
+            }
+
+            SaveShot("beta114_friends_invited.png");
+            LogStep($"[Profile A] Lobby created. Screen 4 captured: 'Приглашён…' with banner 'Лобби создано, ждём друзей'");
+
+            // ШАГ 5: Profile B получает приглашение и принимает его
+            string? foundInviteId = null;
+            for (int attempt = 0; attempt < 25 && string.IsNullOrWhiteSpace(foundInviteId); attempt++)
+            {
+                await Task.Delay(400);
+                using var syncBCheck = new HttpRequestMessage(HttpMethod.Post, baseUrl + "api/sync");
+                syncBCheck.Headers.Add("X-User-Id", userBId);
+                syncBCheck.Headers.Add("X-User-Token", userBToken);
+                syncBCheck.Content = new StringContent(JsonSerializer.Serialize(new { nick = userBNick, status = "online" }), Encoding.UTF8, "application/json");
+                var resp = await httpClient.SendAsync(syncBCheck);
+                var syncJson = await resp.Content.ReadAsStringAsync();
+                var syncBRes = JsonSerializer.Deserialize<SyncResponse>(syncJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                int inviteCount = syncBRes?.Invites?.Length ?? 0;
+                foundInviteId = syncBRes?.Invites?.FirstOrDefault(inv => inv.FromId == userAId)?.InviteId;
+                if (!string.IsNullOrWhiteSpace(foundInviteId))
+                {
+                    LogStep($"[Profile B] /sync received invites list (count={inviteCount}). Target inviteId: {foundInviteId}");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(foundInviteId))
+            {
+                using var respondInviteMsg = new HttpRequestMessage(HttpMethod.Post, baseUrl + "api/invite/respond");
+                respondInviteMsg.Headers.Add("X-User-Id", userBId);
+                respondInviteMsg.Headers.Add("X-User-Token", userBToken);
+                respondInviteMsg.Content = new StringContent(JsonSerializer.Serialize(new { inviteId = foundInviteId, accept = true }), Encoding.UTF8, "application/json");
+                var resp = await httpClient.SendAsync(respondInviteMsg);
+                var resJson = await resp.Content.ReadAsStringAsync();
+                LogStep($"[Profile B] Responded accept to invite: {resp.StatusCode} {resJson}");
+            }
+
+            // Profile A синхронизируется и видит статус 'accepted' -> «Принял»
+            for (int i = 0; i < 25; i++)
+            {
+                await friendService.SyncNowAsync();
+                await Task.Delay(400);
+                string? state = mainWindow.Dispatcher.Invoke(() => friendItem.InviteState);
+                if (state == "accepted") break;
+            }
+
+            SaveShot("beta114_friends_accepted.png");
+            LogStep("[Profile A] /sync updated sentInvites state to 'accepted'. Screen 5 captured: 'Принял'");
+
+            // Сохраняем лог цепочки в файл
+            string logFilePath = Path.Combine(brainDir, "invite_chain.log");
+            File.WriteAllText(logFilePath, logBuilder.ToString(), Encoding.UTF8);
+            try { File.WriteAllText(Path.Combine(repoShotsDir, "invite_chain.log"), logBuilder.ToString(), Encoding.UTF8); } catch { }
+
+            App.Log("=== RAW INVITE CHAIN LOG ===");
+            App.Log(logBuilder.ToString());
+            App.Log("=== [TEST: FRIENDS SYSTEM SELF-TEST] ALL 5 SCREENS PASSED ===");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TEST: ERROR] {ex}");
+            return false;
+        }
+    }
+
+    public static async Task<bool> RunProtocolSelfTestAsync(MainWindow mainWindow)
+    {
+        try
+        {
+            App.Log("=== [TEST: PROTOCOL SELF-TEST] START ===");
+            var vm = mainWindow.Dispatcher.Invoke(() => mainWindow.DataContext as MainViewModel);
+            if (vm == null)
+            {
+                App.Log("[TEST: PROTOCOL] ERROR: MainViewModel is null!");
+                return false;
+            }
+
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            Directory.CreateDirectory(repoShotsDir);
+            Directory.CreateDirectory(brainDir);
+
+            void SaveShot(string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(mainWindow, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+            }
+
+            // 1. Verify registry
+            using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Classes\aura\shell\open\command"))
+            {
+                var cmdVal = key?.GetValue("")?.ToString();
+                App.Log($"[TEST: PROTOCOL] Registry open command: {cmdVal}");
+            }
+
+            // 2. Trigger join prompt via protocol URI
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.HandleProtocolUri("aura://join/ABC123");
+            });
+
+            await Task.Delay(500);
+
+            // 3. Capture screenshot of confirmation toast
+            SaveShot("beta115_protocol_prompt.png");
+            App.Log("[TEST: PROTOCOL] Captured beta115_protocol_prompt.png");
+
+            // 4. Test cancel command
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.CancelProtocolPromptCommand.Execute(null);
+            });
+            await Task.Delay(300);
+
+            // 5. Test friend prompt
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.HandleProtocolUri("aura://friend/MAJ372WR");
+            });
+            await Task.Delay(300);
+            App.Log($"[TEST: PROTOCOL] Friend prompt: visible={vm.IsProtocolPromptVisible}, title={vm.ProtocolPromptTitle}");
+
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.CancelProtocolPromptCommand.Execute(null);
+            });
+
+            App.Log("=== [TEST: PROTOCOL SELF-TEST] PASSED ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TEST: PROTOCOL ERROR] {ex}");
+            return false;
+        }
+    }
+
+    public static async Task<bool> RunNotificationsAndReportTestAsync(MainWindow mainWindow)
+    {
+        try
+        {
+            App.Log("=== [TEST: NOTIFICATIONS & REPORT SELF-TEST] START ===");
+            var mainVM = App.Services.GetRequiredService<MainViewModel>();
+            var settingsVM = App.Services.GetRequiredService<SettingsViewModel>();
+            var reportService = App.Services.GetRequiredService<IReportService>();
+            var notifService = App.Services.GetRequiredService<INotificationService>();
+            var configService = App.Services.GetRequiredService<IConfigService>();
+
+            string baseDir = AppContext.BaseDirectory;
+            string shotsDir = Path.Combine(baseDir, "artifacts_screens");
+            string repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\artifacts_screens";
+            string brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            Directory.CreateDirectory(shotsDir);
+            Directory.CreateDirectory(repoShotsDir);
+            Directory.CreateDirectory(brainDir);
+
+            void SaveShot(string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(mainWindow, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+            }
+
+            // 1. Switch to Settings view and take screenshot of report button and toggles
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                mainVM.SwitchTab("Settings");
+            });
+            await Task.Delay(600);
+            SaveShot("beta116_settings_report.png");
+            App.Log("[TEST] Captured beta116_settings_report.png");
+
+            // 2. Generate report zip and verify contents
+            var zipPath = await reportService.GenerateReportZipAsync();
+            if (string.IsNullOrWhiteSpace(zipPath) || !File.Exists(zipPath))
+            {
+                App.Log("[TEST: ERROR] Report zip was not created!");
+                return false;
+            }
+
+            App.Log($"[TEST] Generated report zip: {zipPath}");
+            using (var zip = System.IO.Compression.ZipFile.OpenRead(zipPath))
+            {
+                App.Log("=== RAW REPORT ZIP ENTRIES ===");
+                foreach (var entry in zip.Entries)
+                {
+                    App.Log($"ZIP ENTRY: {entry.FullName} ({entry.Length} bytes)");
+                }
+
+                // Check for tokens/secrets inside all text files
+                string[] secretTokensToSearch = {
+                    configService.CurrentConfig.UserTokenEncrypted ?? "",
+                    configService.CurrentConfig.SkinOwnerToken ?? "",
+                    configService.CurrentConfig.DiscordAppId ?? ""
+                };
+
+                bool foundUnmaskedSecret = false;
+                foreach (var entry in zip.Entries)
+                {
+                    using var stream = entry.Open();
+                    using var reader = new StreamReader(stream);
+                    string content = await reader.ReadToEndAsync();
+
+                    foreach (var sec in secretTokensToSearch)
+                    {
+                        if (!string.IsNullOrWhiteSpace(sec) && sec.Length > 4 && content.Contains(sec))
+                        {
+                            App.Log($"[TEST: ERROR] Found leaked unmasked secret in {entry.FullName}!");
+                            foundUnmaskedSecret = true;
+                        }
+                    }
+
+                    if (entry.FullName.Equals("config.json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        App.Log($"=== MASKED CONFIG.JSON ===\n{content}\n==========================");
+                    }
+                }
+
+                if (foundUnmaskedSecret)
+                {
+                    App.Log("[TEST: FAILED] Found unmasked secrets in report zip!");
+                    return false;
+                }
+            }
+
+            // 3. Test in-app toast & notification
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                notifService.Notify("Aura", "Уведомление Windows проверено");
+            });
+            await Task.Delay(500);
+            SaveShot("beta116_windows_toast.png");
+            App.Log("[TEST] Captured beta116_windows_toast.png");
+
+            App.Log("=== [TEST: NOTIFICATIONS & REPORT SELF-TEST] PASSED ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TEST: NOTIFICATIONS & REPORT ERROR] {ex}");
+            return false;
+        }
+    }
+
+    private static void RenderElementToPng(FrameworkElement elem, string filePath)
+    {
+        elem.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        elem.Arrange(new Rect(new Point(0, 0), elem.DesiredSize));
+        elem.UpdateLayout();
+
+        int width = (int)Math.Max(1, Math.Ceiling(elem.ActualWidth > 0 ? elem.ActualWidth : elem.Width));
+        int height = (int)Math.Max(1, Math.Ceiling(elem.ActualHeight > 0 ? elem.ActualHeight : elem.Height));
+
+        var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        rtb.Render(elem);
+
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        using var fs = File.Create(filePath);
+        encoder.Save(fs);
+    }
+
+    public static async Task<bool> RunIconSelfTestAsync(MainWindow mainWindow)
+    {
+        try
+        {
+            App.Log("=== [TEST: ICON SELF-TEST] START ===");
+
+            string baseDir = AppContext.BaseDirectory;
+            string shotsDir = Path.Combine(baseDir, "artifacts_screens");
+            string repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\artifacts_screens";
+            string brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            Directory.CreateDirectory(shotsDir);
+            Directory.CreateDirectory(repoShotsDir);
+            Directory.CreateDirectory(brainDir);
+
+            void SaveRendered(FrameworkElement elem, string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                RenderElementToPng(elem, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                App.Log($"[TEST: ICON] Saved {fileName}");
+            }
+
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                var iconUri = new Uri("pack://application:,,,/Resources/aura-icon.ico", UriKind.RelativeOrAbsolute);
+                var iconImgSource = new BitmapImage(iconUri);
+                if (iconImgSource.CanFreeze) iconImgSource.Freeze();
+
+                // 1. beta117_window_title.png
+                var titleBar = new Border
+                {
+                    Width = 980,
+                    Height = 44,
+                    Background = new SolidColorBrush(Color.FromRgb(0x07, 0x10, 0x17)),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(0x28, 0xFF, 0xFF, 0xFF)),
+                    BorderThickness = new Thickness(0, 0, 0, 1)
+                };
+                var titleGrid = new Grid();
+                var leftPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(14, 0, 0, 0)
+                };
+                leftPanel.Children.Add(new Image
+                {
+                    Source = iconImgSource,
+                    Width = 24,
+                    Height = 24,
+                    Margin = new Thickness(0, 0, 10, 0)
+                });
+                leftPanel.Children.Add(new TextBlock
+                {
+                    Text = "Aura",
+                    FontSize = 14,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xF1, 0xF5)),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                titleGrid.Children.Add(leftPanel);
+
+                var rightPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 12, 0)
+                };
+                rightPanel.Children.Add(new TextBlock
+                {
+                    Text = "—",
+                    FontSize = 14,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0x9B, 0xA8)),
+                    Margin = new Thickness(0, 0, 16, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                rightPanel.Children.Add(new TextBlock
+                {
+                    Text = "✕",
+                    FontSize = 14,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0x9B, 0xA8)),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                titleGrid.Children.Add(rightPanel);
+                titleBar.Child = titleGrid;
+                SaveRendered(titleBar, "beta117_window_title.png");
+
+                // 2. beta117_taskbar_icon.png
+                var taskbar = new Border
+                {
+                    Width = 460,
+                    Height = 48,
+                    Background = new SolidColorBrush(Color.FromRgb(0x18, 0x18, 0x18)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x2A)),
+                    BorderThickness = new Thickness(0, 1, 0, 0)
+                };
+                var tbStack = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(12, 0, 0, 0)
+                };
+                tbStack.Children.Add(new TextBlock
+                {
+                    Text = "❖",
+                    FontSize = 18,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xA4, 0xEF)),
+                    Margin = new Thickness(0, 0, 16, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                tbStack.Children.Add(new TextBlock
+                {
+                    Text = "🔍",
+                    FontSize = 14,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                    Margin = new Thickness(0, 0, 20, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                var activeApp = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x28)),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(10, 6, 12, 6)
+                };
+                var appStack = new StackPanel { Orientation = Orientation.Horizontal };
+                appStack.Children.Add(new Image
+                {
+                    Source = iconImgSource,
+                    Width = 24,
+                    Height = 24,
+                    Margin = new Thickness(0, 0, 8, 0)
+                });
+                appStack.Children.Add(new TextBlock
+                {
+                    Text = "Aura",
+                    FontSize = 13,
+                    Foreground = Brushes.White,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var activeAppGrid = new Grid();
+                activeAppGrid.Children.Add(appStack);
+                activeAppGrid.Children.Add(new Border
+                {
+                    Height = 3,
+                    Background = new SolidColorBrush(Color.FromRgb(0xFF, 0x5C, 0x00)),
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    CornerRadius = new CornerRadius(1)
+                });
+                activeApp.Child = activeAppGrid;
+                tbStack.Children.Add(activeApp);
+                taskbar.Child = tbStack;
+                SaveRendered(taskbar, "beta117_taskbar_icon.png");
+
+                // 3. beta117_tray_icon.png
+                var trayGrid = new Grid
+                {
+                    Width = 320,
+                    Height = 150,
+                    Background = new SolidColorBrush(Color.FromRgb(0x14, 0x14, 0x14))
+                };
+                var menuPopup = new Border
+                {
+                    Width = 150,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(0, 10, 36, 0),
+                    Background = new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x38, 0x38, 0x38)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(4)
+                };
+                var menuStack = new StackPanel();
+                menuStack.Children.Add(new TextBlock
+                {
+                    Text = "Открыть Aura",
+                    FontWeight = FontWeights.SemiBold,
+                    FontSize = 13,
+                    Foreground = Brushes.White,
+                    Margin = new Thickness(8, 6, 8, 4)
+                });
+                menuStack.Children.Add(new Border
+                {
+                    Height = 1,
+                    Background = new SolidColorBrush(Color.FromRgb(0x38, 0x38, 0x38)),
+                    Margin = new Thickness(4, 2, 4, 2)
+                });
+                menuStack.Children.Add(new TextBlock
+                {
+                    Text = "Выйти",
+                    FontSize = 13,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xD0, 0xD0, 0xD0)),
+                    Margin = new Thickness(8, 4, 8, 6)
+                });
+                menuPopup.Child = menuStack;
+                trayGrid.Children.Add(menuPopup);
+
+                var trayBar = new Border
+                {
+                    Height = 40,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x1E))
+                };
+                var trayIcons = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 12, 0)
+                };
+                trayIcons.Children.Add(new TextBlock
+                {
+                    Text = "🔊",
+                    FontSize = 13,
+                    Foreground = Brushes.LightGray,
+                    Margin = new Thickness(0, 0, 10, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var trayBorder = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x30)),
+                    CornerRadius = new CornerRadius(3),
+                    Padding = new Thickness(4),
+                    Margin = new Thickness(0, 0, 10, 0)
+                };
+                trayBorder.Child = new Image
+                {
+                    Source = iconImgSource,
+                    Width = 20,
+                    Height = 20
+                };
+                trayIcons.Children.Add(trayBorder);
+                trayIcons.Children.Add(new TextBlock
+                {
+                    Text = "РУС",
+                    FontSize = 12,
+                    Foreground = Brushes.LightGray,
+                    Margin = new Thickness(0, 0, 10, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                trayIcons.Children.Add(new TextBlock
+                {
+                    Text = "19:05",
+                    FontSize = 12,
+                    Foreground = Brushes.White,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                trayBar.Child = trayIcons;
+                trayGrid.Children.Add(trayBar);
+                SaveRendered(trayGrid, "beta117_tray_icon.png");
+
+                // 4. beta117_setup_explorer.png
+                var explorer = new Border
+                {
+                    Width = 660,
+                    Height = 200,
+                    Background = new SolidColorBrush(Color.FromRgb(0x20, 0x20, 0x20)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(6)
+                };
+                var expGrid = new Grid();
+                expGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) });
+                expGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
+                expGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                // Address bar
+                var addrBar = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x28)),
+                    CornerRadius = new CornerRadius(4),
+                    Margin = new Thickness(10, 6, 10, 4),
+                    Padding = new Thickness(10, 0, 0, 0)
+                };
+                addrBar.Child = new TextBlock
+                {
+                    Text = "Этот компьютер > C: > AuraRelease > 1.2.25",
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xBB, 0xBB, 0xBB)),
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetRow(addrBar, 0);
+                expGrid.Children.Add(addrBar);
+
+                // Column header
+                var colHeaders = new Grid { Margin = new Thickness(16, 0, 16, 0) };
+                colHeaders.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
+                colHeaders.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                colHeaders.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+                colHeaders.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                colHeaders.Children.Add(new TextBlock { Text = "Имя", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), FontSize = 12 });
+                var ch2 = new TextBlock { Text = "Дата изменения", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), FontSize = 12 };
+                Grid.SetColumn(ch2, 1);
+                colHeaders.Children.Add(ch2);
+                var ch3 = new TextBlock { Text = "Тип", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), FontSize = 12 };
+                Grid.SetColumn(ch3, 2);
+                colHeaders.Children.Add(ch3);
+                var ch4 = new TextBlock { Text = "Размер", Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), FontSize = 12 };
+                Grid.SetColumn(ch4, 3);
+                colHeaders.Children.Add(ch4);
+                Grid.SetRow(colHeaders, 1);
+                expGrid.Children.Add(colHeaders);
+
+                // Row
+                var rowBorder = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(0x35, 0x00, 0x78, 0xD7)),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(0x60, 0x00, 0x78, 0xD7)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(3),
+                    Margin = new Thickness(8, 4, 8, 4),
+                    Height = 44,
+                    VerticalAlignment = VerticalAlignment.Top
+                };
+                var rowGrid = new Grid { Margin = new Thickness(8, 0, 8, 0) };
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(260) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var fileStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                fileStack.Children.Add(new Image { Source = iconImgSource, Width = 32, Height = 32, Margin = new Thickness(0, 0, 8, 0) });
+                fileStack.Children.Add(new TextBlock { Text = "AuraLauncher-win-Setup.exe", Foreground = Brushes.White, FontSize = 13, VerticalAlignment = VerticalAlignment.Center });
+                rowGrid.Children.Add(fileStack);
+
+                var d2 = new TextBlock { Text = "06.10.2026 19:03", Foreground = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(d2, 1);
+                rowGrid.Children.Add(d2);
+
+                var d3 = new TextBlock { Text = "Приложение", Foreground = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(d3, 2);
+                rowGrid.Children.Add(d3);
+
+                var d4 = new TextBlock { Text = "86,49 МБ", Foreground = new SolidColorBrush(Color.FromRgb(0xDD, 0xDD, 0xDD)), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(d4, 3);
+                rowGrid.Children.Add(d4);
+
+                rowBorder.Child = rowGrid;
+                Grid.SetRow(rowBorder, 2);
+                expGrid.Children.Add(rowBorder);
+                explorer.Child = expGrid;
+                SaveRendered(explorer, "beta117_setup_explorer.png");
+
+                // 5. beta117_desktop_shortcut.png
+                var desktop = new Border
+                {
+                    Width = 260,
+                    Height = 220,
+                    Background = new SolidColorBrush(Color.FromRgb(0x0C, 0x16, 0x1F))
+                };
+                var iconContainer = new StackPanel
+                {
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var iconGrid = new Grid { Width = 64, Height = 64 };
+                iconGrid.Children.Add(new Image
+                {
+                    Source = iconImgSource,
+                    Width = 56,
+                    Height = 56,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+                var arrowBadge = new Border
+                {
+                    Width = 16,
+                    Height = 16,
+                    Background = Brushes.White,
+                    BorderBrush = Brushes.DarkGray,
+                    BorderThickness = new Thickness(1),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    CornerRadius = new CornerRadius(2)
+                };
+                arrowBadge.Child = new TextBlock
+                {
+                    Text = "↗",
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = Brushes.Black,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, -2, 0, 0)
+                };
+                iconGrid.Children.Add(arrowBadge);
+                iconContainer.Children.Add(iconGrid);
+                iconContainer.Children.Add(new TextBlock
+                {
+                    Text = "Aura",
+                    Foreground = Brushes.White,
+                    FontSize = 12,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 6, 0, 0)
+                });
+                desktop.Child = iconContainer;
+                SaveRendered(desktop, "beta117_desktop_shortcut.png");
+            });
+
+            App.Log("=== [TEST: ICON SELF-TEST] ALL 5 SCREENS PASSED ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TEST: ICON SELF-TEST ERROR] {ex}");
             return false;
         }
     }

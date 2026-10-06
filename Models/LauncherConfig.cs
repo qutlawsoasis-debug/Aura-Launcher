@@ -25,4 +25,11 @@ public class LauncherConfig
     public bool AnthemMuted { get; set; } = false;
     public string? AnthemCustomPath { get; set; }
     public bool HideLauncherWhilePlaying { get; set; } = true;
+    public string? UserId { get; set; }
+    public string? UserTokenEncrypted { get; set; }
+    public string? FriendCode { get; set; }
+    public bool AutoConnectOnInviteAccept { get; set; } = true;
+    public bool WindowsNotificationsEnabled { get; set; } = true;
+    public string? DiscordAppId { get; set; } = "1556968494673690674";
+    public bool DiscordRpcEnabled { get; set; } = true;
 }

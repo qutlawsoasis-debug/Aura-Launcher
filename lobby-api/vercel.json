@@ -4,6 +4,8 @@
     { "source": "/api/lobby/status", "destination": "/api/status" },
     { "source": "/api/lobby/open", "destination": "/api/open" },
     { "source": "/api/lobby/heartbeat", "destination": "/api/heartbeat" },
-    { "source": "/api/lobby/close", "destination": "/api/close" }
+    { "source": "/api/lobby/close", "destination": "/api/close" },
+    { "source": "/j/:code", "destination": "/api/landing?type=join&code=:code" },
+    { "source": "/f/:code", "destination": "/api/landing?type=friend&code=:code" }
   ]
 }

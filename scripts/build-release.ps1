@@ -101,7 +101,10 @@ try {
     }
 
     Write-Host "Step 2: Packaging release with Velopack vpk CLI..." -ForegroundColor Yellow
-    $iconPath = Join-Path $repoRoot "app_icon.ico"
+    $iconPath = Join-Path $repoRoot "Resources\aura-icon.ico"
+    if (-not (Test-Path $iconPath)) {
+        $iconPath = Join-Path $repoRoot "app_icon.ico"
+    }
     $splashPath = Join-Path $repoRoot "splash.png"
     $vpkArgs = @(
         "pack",

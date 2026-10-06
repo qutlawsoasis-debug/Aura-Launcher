@@ -11,6 +11,7 @@ public static class Program
     public static void Main(string[] args)
     {
         StartupArgs = args;
+        try { App.Log($"[PROGRAM MAIN] args: '{string.Join(' ', args)}'"); } catch { }
 
         VelopackApp.Build().Run();
 

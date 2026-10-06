@@ -1,0 +1,368 @@
+<UserControl x:Class="AuraLauncher.Views.FriendsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             Focusable="False"
+             FocusVisualStyle="{x:Null}"
+             ClipToBounds="False"
+             Background="Transparent">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="FriendCodeCellStyle" TargetType="Border">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="50" />
+            <Setter Property="Background" Value="#12FFFFFF" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="BorderThickness" Value="0,0,0,3" />
+            <Setter Property="BorderBrush" Value="#99F2A63C" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+
+        <Style x:Key="CodeCharText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- Header & Code Section -->
+            <RowDefinition Height="*" />    <!-- Lists Section (Scrollable) -->
+        </Grid.RowDefinitions>
+
+        <!-- Top Header & Controls -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,16">
+            <!-- Header Title: Oswald 600 60px -->
+            <TextBlock Text="Друзья"
+                       FontFamily="{StaticResource HeadingFont}"
+                       FontSize="60"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource InkBrush}"
+                       LineHeight="66"
+                       LineStackingStrategy="BlockLineHeight"
+                       Margin="0,6,0,14">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                </TextBlock.Effect>
+            </TextBlock>
+
+            <!-- Banner: "Лобби создано, ждём друзей" со ссылкой "Открыть лобби" -->
+            <Border Background="#142129" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
+                    CornerRadius="3" Height="40" Margin="0,0,0,16"
+                    Visibility="{Binding IsLobbyActiveBannerVisible, Converter={StaticResource BoolToVis}}">
+                <Grid Margin="12,0">
+                    <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" Margin="-12,0,0,0" />
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Лобби создано, ждём друзей — "
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock>
+                            <Hyperlink Command="{Binding OpenLobbyCommand}"
+                                       Foreground="{StaticResource EmberBrush}"
+                                       TextDecorations="None">
+                                <Run Text="Открыть лобби" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="SemiBold" />
+                            </Hyperlink>
+                        </TextBlock>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- SECTION 1: МОЙ КОД ДРУГА -->
+            <TextBlock Text="Мой код друга"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="13"
+                       Foreground="{StaticResource MuteBrush}"
+                       Margin="0,0,0,8" />
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
+                <!-- 8 visual cells for the friend code -->
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar0}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar1}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar2}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar3}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar4}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar5}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}">
+                    <TextBlock Text="{Binding CodeChar6}" Style="{StaticResource CodeCharText}" />
+                </Border>
+                <Border Style="{StaticResource FriendCodeCellStyle}" Margin="0,0,16,0">
+                    <TextBlock Text="{Binding CodeChar7}" Style="{StaticResource CodeCharText}" />
+                </Border>
+
+                <!-- Button "Копировать" -->
+                <Button Command="{Binding CopyCodeCommand}"
+                        Style="{StaticResource StandardBtn}"
+                        Height="50"
+                        Padding="18,0"
+                        Margin="0,0,10,0"
+                        Content="{Binding CopyButtonText}" />
+
+                <!-- Button "Копировать ссылку" -->
+                <Button Command="{Binding CopyLinkCommand}"
+                        Height="50"
+                        Padding="16,0">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
+                            <Setter Property="Content" Value="{Binding CopyLinkButtonText}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </StackPanel>
+
+            <!-- SECTION 2: ДОБАВИТЬ ДРУГА -->
+            <TextBlock Text="Добавить друга"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="13"
+                       Foreground="{StaticResource MuteBrush}"
+                       Margin="0,0,0,8" />
+
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
+                <TextBox Text="{Binding AddCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         MaxLength="8"
+                         Width="180" Height="40"
+                         FontFamily="{StaticResource HeadingFont}"
+                         FontSize="22"
+                         FontWeight="SemiBold"
+                         Foreground="{StaticResource InkBrush}"
+                         Background="#12FFFFFF"
+                         BorderBrush="{StaticResource LineInkBrush}"
+                         BorderThickness="1"
+                         VerticalContentAlignment="Center"
+                         Padding="10,0"
+                         Margin="0,0,12,0" />
+
+                <Button Command="{Binding AddFriendCommand}"
+                        IsEnabled="{Binding CanAddFriend}"
+                        Style="{StaticResource PrimaryNeonBtn}"
+                        Height="40"
+                        Padding="20,0"
+                        Content="Добавить" />
+            </StackPanel>
+
+            <!-- Error under add friend field (#FF8A7A) -->
+            <TextBlock Text="{Binding AddFriendErrorMessage}"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="13"
+                       FontWeight="Medium"
+                       Foreground="#FF8A7A"
+                       Margin="0,4,0,8"
+                       Visibility="{Binding HasAddFriendError, Converter={StaticResource BoolToVis}}" />
+
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,12,0,12" />
+        </StackPanel>
+
+        <!-- Main Content Area: Requests and Friends list -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="0,0,8,16">
+
+                <!-- SECTION 3: ЗАЯВКИ (показываются только когда есть) -->
+                <StackPanel Visibility="{Binding HasIncomingRequests, Converter={StaticResource BoolToVis}}" Margin="0,0,0,20">
+                    <TextBlock Text="Входящие заявки"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="13"
+                               Foreground="{StaticResource MuteBrush}"
+                               Margin="0,0,0,10" />
+
+                    <ItemsControl ItemsSource="{Binding IncomingRequests}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1" Padding="0,10,0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Nick}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkBrush}"
+                                                   VerticalAlignment="Center" />
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Command="{Binding AcceptCommand}"
+                                                    Style="{StaticResource PrimaryNeonBtn}"
+                                                    Height="32"
+                                                    Padding="14,0"
+                                                    Content="Принять"
+                                                    Margin="0,0,10,0" />
+
+                                            <Button Command="{Binding DeclineCommand}"
+                                                    Style="{StaticResource StandardBtn}"
+                                                    Height="32"
+                                                    Padding="14,0"
+                                                    Content="Отклонить" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- SECTION 4: СПИСОК ДРУЗЕЙ -->
+                <TextBlock Text="Друзья"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="13"
+                           Foreground="{StaticResource MuteBrush}"
+                           Margin="0,0,0,8" />
+
+                <!-- Empty list text -->
+                <TextBlock Text="Пока никого нет. Отправьте другу свой код или введите его код."
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           Foreground="{StaticResource MuteBrush}"
+                           Margin="0,12,0,0"
+                           Visibility="{Binding IsEmptyList, Converter={StaticResource BoolToVis}}" />
+
+                <ItemsControl ItemsSource="{Binding Friends}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1"
+                                    Opacity="{Binding RowOpacity}"
+                                    Padding="0,10,0,10"
+                                    Background="Transparent">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" /> <!-- Avatar -->
+                                        <ColumnDefinition Width="*" />    <!-- Nick & Status -->
+                                        <ColumnDefinition Width="Auto" /> <!-- Action: Invite / Status / Delete -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 40px Head Avatar -->
+                                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="2"
+                                            ClipToBounds="True" Background="#141E26" Margin="0,0,14,0"
+                                            VerticalAlignment="Center">
+                                        <Image Source="{Binding Avatar}" Width="40" Height="40"
+                                               RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                               RenderOptions.EdgeMode="Aliased"
+                                               Stretch="UniformToFill" />
+                                    </Border>
+
+                                    <!-- Nick & Status -->
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Nick}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource InkBrush}" />
+
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2,0,0">
+                                            <!-- Status dot -->
+                                            <Border Width="6" Height="6" CornerRadius="3" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource MuteBrush}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Online}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource OkBrush}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Status}" Value="lobby">
+                                                                <Setter Property="Background" Value="{StaticResource EmberBrush}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+
+                                            <!-- Status Text -->
+                                            <TextBlock Text="{Binding StatusText}"
+                                                       FontFamily="{StaticResource MainFont}"
+                                                       FontSize="13"
+                                                       Foreground="{StaticResource DimInkBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- Right Action Panel -->
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+
+                                        <!-- Invite State Text (Приглашён… / Принял / Отклонил / Не ответил) -->
+                                        <TextBlock Text="{Binding InviteStateText}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="13"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource EmberBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,14,0"
+                                                   Visibility="{Binding HasInviteState, Converter={StaticResource BoolToVis}}" />
+
+                                        <!-- Button "Пригласить" (только у online не в моем лобби) -->
+                                        <Button Command="{Binding InviteCommand}"
+                                                Style="{StaticResource PrimaryNeonBtn}"
+                                                Height="32"
+                                                Padding="14,0"
+                                                Content="Пригласить"
+                                                Margin="0,0,14,0"
+                                                Visibility="{Binding CanInvite, Converter={StaticResource BoolToVis}}" />
+
+                                        <!-- Delete action: on hover / inline confirmation -->
+                                        <Grid VerticalAlignment="Center">
+                                            <!-- Normal delete link (visible when not confirming) -->
+                                            <Button Command="{Binding StartDeleteCommand}"
+                                                    Content="Удалить"
+                                                    Foreground="{StaticResource MuteBrush}"
+                                                    FontSize="12">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GhostBtn}">
+                                                        <Setter Property="Opacity" Value="0.6" />
+                                                        <Style.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter Property="Opacity" Value="1.0" />
+                                                                <Setter Property="Foreground" Value="#FF8A7A" />
+                                                            </Trigger>
+                                                            <DataTrigger Binding="{Binding IsConfirmingDelete}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+
+                                            <!-- Inline Confirmation: "Удалить?" [Да] [Отмена] -->
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                        Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="Удалить?" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="#FF8A7A" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                <Button Command="{Binding ConfirmDeleteCommand}" Style="{StaticResource GhostBtn}" Content="Да" Foreground="#FF8A7A" FontWeight="SemiBold" FontSize="12" Margin="0,0,6,0" />
+                                                <Button Command="{Binding CancelDeleteCommand}" Style="{StaticResource GhostBtn}" Content="Отмена" Foreground="{StaticResource MuteBrush}" FontSize="12" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

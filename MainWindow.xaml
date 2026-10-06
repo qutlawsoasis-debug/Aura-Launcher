@@ -10,7 +10,7 @@
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
-        Icon="app_icon.ico"
+        Icon="pack://application:,,,/Resources/aura-icon.ico"
         FontFamily="{StaticResource MainFont}"
         FocusVisualStyle="{x:Null}">
 
@@ -281,10 +281,10 @@
                     </TextBlock.Effect>
                 </TextBlock>
 
-                <!-- Game Menu (4 words: Играть, Лобби, Скин, Настройки):
-                     x=50, bottom edge 128px from bottom (i.e. top = 620 - 128 - 4*50 = 292) -->
+                <!-- Game Menu (5 words: Играть, Лобби, Друзья, Скин, Настройки):
+                     x=50, top=242 -->
                 <StackPanel x:Name="GameMenuPanel"
-                            Canvas.Left="50" Canvas.Top="292"
+                            Canvas.Left="50" Canvas.Top="242"
                             Width="250"
                             WindowChrome.IsHitTestVisibleInChrome="True">
                     
@@ -302,14 +302,21 @@
                                  Style="{StaticResource GameMenuRadio}"
                                  MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 3. Скин -->
+                    <!-- 3. Друзья -->
+                    <RadioButton x:Name="MenuBtnFriends" Content="Друзья"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Friends"
+                                 IsChecked="{Binding IsFriendsActive, Mode=TwoWay}"
+                                 Style="{StaticResource GameMenuRadio}"
+                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+
+                    <!-- 4. Скин -->
                     <RadioButton x:Name="MenuBtnSkin" Content="Скин"
                                  Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
                                  IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
                                  Style="{StaticResource GameMenuRadio}"
                                  MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 4. Настройки -->
+                    <!-- 5. Настройки -->
                     <RadioButton x:Name="MenuBtnSettings" Content="Настройки"
                                  Command="{Binding NavigateCommand}" CommandParameter="Settings"
                                  IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
@@ -368,6 +375,17 @@
                         <TranslateTransform Y="0" />
                     </views:LobbyView.RenderTransform>
                 </views:LobbyView>
+
+                <views:FriendsView x:Name="ViewFriends"
+                                   DataContext="{Binding FriendsVM}"
+                                   Visibility="Collapsed"
+                                   Opacity="0.0"
+                                   Focusable="False"
+                                   FocusVisualStyle="{x:Null}">
+                    <views:FriendsView.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </views:FriendsView.RenderTransform>
+                </views:FriendsView>
 
                 <views:WardrobeView x:Name="ViewWardrobe"
                                     DataContext="{Binding WardrobeVM}"
@@ -446,6 +464,156 @@
                                     </Hyperlink>
                                 </TextBlock>
                             </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Invite Toast: правый нижний угол области контента, ширина 320px, сплошной фон #0F1B22, рамка 1px, слева полоса 3px ember -->
+                <Border x:Name="InviteToastBorder"
+                        VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Width="320" Panel.ZIndex="101"
+                        Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,44"
+                        Visibility="{Binding IsInviteToastVisible, Converter={StaticResource BoolToVis}}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="InviteToastTransform" X="0" />
+                    </Border.RenderTransform>
+                    <Grid>
+                        <!-- Левая полоса 3px ember -->
+                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+
+                        <!-- Внутреннее содержимое с отступами -->
+                        <StackPanel Margin="16,14,14,14">
+                            <!-- Заголовок: Onest 600 15px -->
+                            <TextBlock Text="{Binding InviteToastTitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="SemiBold"
+                                       FontSize="15"
+                                       Foreground="{StaticResource InkBrush}"
+                                       TextWrapping="Wrap" />
+
+                            <!-- Описание: 13px dim -->
+                            <TextBlock Text="{Binding InviteToastSubtitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="Normal"
+                                       FontSize="13"
+                                       Foreground="{StaticResource DimInkBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12" />
+
+                            <!-- Кнопки: «Принять» (главная, маленькая 36px) и ссылка «Отклонить» -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Command="{Binding AcceptInviteCommand}"
+                                        Style="{StaticResource PrimaryNeonBtn}"
+                                        Height="36" Padding="18,0" FontSize="14"
+                                        Content="Принять"
+                                        Margin="0,0,14,0" VerticalAlignment="Center" />
+
+                                <TextBlock VerticalAlignment="Center">
+                                    <Hyperlink Command="{Binding DeclineInviteCommand}"
+                                               Foreground="{StaticResource MuteBrush}"
+                                               TextDecorations="None">
+                                        <Run Text="Отклонить" FontFamily="{StaticResource MainFont}" FontSize="13" />
+                                    </Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Protocol Action Prompt Toast: правый нижний угол, ширина 340px, сплошной фон #0F1B22, рамка 1px, слева полоса 3px ember -->
+                <Border x:Name="ProtocolPromptBorder"
+                        VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Width="340" Panel.ZIndex="102"
+                        Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,44"
+                        Visibility="{Binding IsProtocolPromptVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <!-- Левая полоса 3px ember -->
+                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+
+                        <!-- Внутреннее содержимое с отступами -->
+                        <StackPanel Margin="16,14,14,14">
+                            <!-- Заголовок: Onest 600 15px -->
+                            <TextBlock Text="{Binding ProtocolPromptTitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="SemiBold"
+                                       FontSize="15"
+                                       Foreground="{StaticResource InkBrush}"
+                                       TextWrapping="Wrap" />
+
+                            <!-- Описание: 13px dim -->
+                            <TextBlock Text="{Binding ProtocolPromptSubtitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="Normal"
+                                       FontSize="13"
+                                       Foreground="{StaticResource DimInkBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12" />
+
+                            <!-- Кнопки: «Войти»/«Отправить» (главная, маленькая 36px) и ссылка «Отмена» -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Command="{Binding ConfirmProtocolPromptCommand}"
+                                        Style="{StaticResource PrimaryNeonBtn}"
+                                        Height="36" Padding="18,0" FontSize="14"
+                                        Content="{Binding ProtocolPromptConfirmText}"
+                                        Margin="0,0,14,0" VerticalAlignment="Center" />
+
+                                <TextBlock VerticalAlignment="Center">
+                                    <Hyperlink Command="{Binding CancelProtocolPromptCommand}"
+                                               Foreground="{StaticResource MuteBrush}"
+                                               TextDecorations="None">
+                                        <Run Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="13" />
+                                    </Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Info Toast: правый нижний угол, ширина 320px, сплошной фон #0F1B22, рамка 1px, слева полоса 3px ember -->
+                <Border x:Name="InfoToastBorder"
+                        VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Width="320" Panel.ZIndex="103"
+                        Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,44"
+                        Visibility="{Binding IsInfoToastVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <!-- Левая полоса 3px ember -->
+                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+
+                        <!-- Внутреннее содержимое с отступами -->
+                        <StackPanel Margin="16,14,14,14">
+                            <!-- Заголовок: Onest 600 15px -->
+                            <TextBlock Text="{Binding InfoToastTitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="SemiBold"
+                                       FontSize="15"
+                                       Foreground="{StaticResource InkBrush}"
+                                       TextWrapping="Wrap" />
+
+                            <!-- Описание: 13px dim -->
+                            <TextBlock Text="{Binding InfoToastSubtitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="Normal"
+                                       FontSize="13"
+                                       Foreground="{StaticResource DimInkBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0"
+                                       Visibility="{Binding HasInfoToastSubtitle, Converter={StaticResource BoolToVis}}" />
                         </StackPanel>
                     </Grid>
                 </Border>

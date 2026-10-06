@@ -127,6 +127,12 @@ public class JsonConfigService : IConfigService
                 needSave = true;
             }
 
+            if (string.IsNullOrWhiteSpace(_currentConfig.DiscordAppId))
+            {
+                _currentConfig.DiscordAppId = "1556968494673690674";
+                needSave = true;
+            }
+
             if (needSave)
             {
                 await SaveInternalAsync(_currentConfig, cancellationToken).ConfigureAwait(false);

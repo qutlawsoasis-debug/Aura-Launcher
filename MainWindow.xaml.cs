@@ -78,6 +78,13 @@ public partial class MainWindow : Window
                         AnimateToastEntrance();
                     }
                 }
+                else if (args.PropertyName == nameof(MainViewModel.IsInviteToastVisible))
+                {
+                    if (vm.IsInviteToastVisible)
+                    {
+                        AnimateInviteToastEntrance();
+                    }
+                }
             };
             TransitionToTab(vm.CurrentTabName, animate: false);
             UpdateScreenOverlay(vm.IsOverviewActive);
@@ -85,7 +92,38 @@ public partial class MainWindow : Window
             {
                 AnimateToastEntrance();
             }
+            if (vm.IsInviteToastVisible)
+            {
+                AnimateInviteToastEntrance();
+            }
         }
+    }
+
+    public void AnimateInviteToastEntrance()
+    {
+        if (InviteToastBorder == null || InviteToastTransform == null) return;
+
+        InviteToastBorder.Opacity = 0.0;
+        InviteToastTransform.X = 16.0;
+
+        var sb = new Storyboard();
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(240))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(fadeIn, InviteToastBorder);
+        Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(fadeIn);
+
+        var slideIn = new DoubleAnimation(16.0, 0.0, TimeSpan.FromMilliseconds(240))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(slideIn, InviteToastTransform);
+        Storyboard.SetTargetProperty(slideIn, new PropertyPath(TranslateTransform.XProperty));
+        sb.Children.Add(slideIn);
+
+        sb.Begin();
     }
 
     public void AnimateToastEntrance()
@@ -120,6 +158,7 @@ public partial class MainWindow : Window
         FrameworkElement? targetView = tabName switch
         {
             "Lobby" => ViewLobby,
+            "Friends" => ViewFriends,
             "Wardrobe" => ViewWardrobe,
             "Settings" => ViewSettings,
             _ => ViewOverview
@@ -135,7 +174,7 @@ public partial class MainWindow : Window
             _activeTransitionStoryboard = null;
         }
 
-        var allScreens = new FrameworkElement[] { ViewOverview, ViewLobby, ViewWardrobe, ViewSettings };
+        var allScreens = new FrameworkElement[] { ViewOverview, ViewLobby, ViewFriends, ViewWardrobe, ViewSettings };
 
         // 2. Уходящему экрану сразу ставить Opacity 0 и Visibility=Collapsed.
         // Все неактивные экраны: Visibility=Collapsed, IsHitTestVisible=False.
@@ -346,11 +385,17 @@ public partial class MainWindow : Window
                 Visibility = Visibility.Collapsed
             };
 
-            // Загрузка иконки из app_icon.ico
+            // Загрузка иконки из Resources/aura-icon.ico
             try
             {
-                var iconUri = new Uri("pack://application:,,,/app_icon.ico", UriKind.RelativeOrAbsolute);
+                var iconUri = new Uri("pack://application:,,,/Resources/aura-icon.ico", UriKind.RelativeOrAbsolute);
                 var streamInfo = System.Windows.Application.GetResourceStream(iconUri);
+                if (streamInfo == null)
+                {
+                    iconUri = new Uri("pack://application:,,,/app_icon.ico", UriKind.RelativeOrAbsolute);
+                    streamInfo = System.Windows.Application.GetResourceStream(iconUri);
+                }
+
                 if (streamInfo != null)
                 {
                     using var stream = streamInfo.Stream;
@@ -359,7 +404,12 @@ public partial class MainWindow : Window
             }
             catch
             {
-                var localIco = Path.Combine(AppContext.BaseDirectory, "app_icon.ico");
+                var localIco = Path.Combine(AppContext.BaseDirectory, "Resources", "aura-icon.ico");
+                if (!File.Exists(localIco))
+                {
+                    localIco = Path.Combine(AppContext.BaseDirectory, "app_icon.ico");
+                }
+
                 if (File.Exists(localIco))
                 {
                     _trayIcon.Icon = new System.Drawing.Icon(localIco);

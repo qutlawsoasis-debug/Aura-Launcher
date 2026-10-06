@@ -100,6 +100,9 @@ public class AnthemServiceTests
         public string CurrentVersion => "1.2.11";
         public Task<LauncherUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default)
             => Task.FromResult(new LauncherUpdateResult(LauncherUpdateStatus.UpToDate, "OK"));
+        public Task<string?> CheckForUpdatesAsync(CancellationToken ct = default) => Task.FromResult<string?>(null);
+        public Task<LauncherUpdateResult> DownloadAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default)
+            => Task.FromResult(new LauncherUpdateResult(LauncherUpdateStatus.UpToDate, "OK"));
     }
 
     private class MockPackUpdateService : IPackUpdateService

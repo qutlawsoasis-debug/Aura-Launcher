@@ -448,6 +448,23 @@
                             </Button.Style>
                         </Button>
 
+                        <!-- "Копировать ссылку" Button -->
+                        <Button Command="{Binding CopyLinkCommand}"
+                                Height="48"
+                                Padding="16,0"
+                                Margin="0,0,12,8">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
+                                    <Setter Property="Content" Value="{Binding CopyLinkButtonText}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                            <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <!-- "Выйти из лобби" link in bad color -->
                         <Button Command="{Binding LeaveLobbyCommand}"
                                 Style="{StaticResource BadLinkBtn}"

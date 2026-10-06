@@ -12,6 +12,7 @@ import {
   handleInvite,
   handleInviteRespond
 } from './friendRoutes.js';
+import { generateLandingHtml } from './landing.js';
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -63,6 +64,27 @@ export const server = http.createServer(async (req, res) => {
 
   try {
     const store = getStore();
+
+    // Task 34: Landing pages for /j/:code, /f/:code, and /api/landing rewrite
+    if (req.method === 'GET' && (pathname.startsWith('/j/') || pathname.startsWith('/f/') || pathname === '/api/landing')) {
+      let isFriend = pathname.startsWith('/f/');
+      let code = '';
+      if (pathname === '/api/landing') {
+        isFriend = parsedUrl.query.type === 'friend';
+        code = typeof parsedUrl.query.code === 'string' ? parsedUrl.query.code : '';
+      } else {
+        code = pathname.substring(3);
+      }
+      const html = generateLandingHtml(isFriend ? 'friend' : 'join', code);
+      if (!html) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Not Found');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+      return;
+    }
 
     // Task 32: Users & Friends & Invites
     if (pathname === '/api/user/register') {

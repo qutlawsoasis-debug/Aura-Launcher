@@ -10,7 +10,7 @@
         Background="Transparent"
         ResizeMode="NoResize"
         ShowInTaskbar="True"
-        Icon="pack://application:,,,/app_icon.ico"
+        Icon="pack://application:,,,/Resources/aura-icon.ico"
         FontFamily="{StaticResource MainFont}"
         MouseDown="Window_MouseDown">
 

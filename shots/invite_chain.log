@@ -1,0 +1,14 @@
+﻿[2026-10-06 13:20:58.065] [Profile A] Initialized user: PlayerA (code: MAJ372WR, peer code: HVFQGDBL)
+[2026-10-06 13:21:00.060] [Profile A] Tab 'Friends' loaded. Screen 1 captured: empty friends list ('Пока никого нет')
+[2026-10-06 13:21:00.060] [Profile B] Sending friend request to Profile A (friendCode: MAJ372WR)...
+[2026-10-06 13:21:00.220] [Profile B] Friend request sent. Server response: OK {"ok":true}
+[2026-10-06 13:21:01.074] [Profile A] /sync processed incomingRequest from Profile B (PlayerB). Screen 2 captured: incoming request with 'Принять' and 'Отклонить'
+[2026-10-06 13:21:01.074] [Profile A] Accepting friend request from Profile B (6870d722-b114-41c7-924b-0e47aeb122af)...
+[2026-10-06 13:21:01.224] [Profile A] Friend request accept result: True
+[2026-10-06 13:21:01.397] [Profile B] /sync presence updated: nick='PlayerB', status='online'
+[2026-10-06 13:21:02.423] [Profile A] Friends list updated. Profile B is 'В сети'. Screen 3 captured: friends list with avatar and [Пригласить]
+[2026-10-06 13:21:02.424] [Profile A] Clicking 'Пригласить' for friend 'PlayerB_9528'...
+[2026-10-06 13:21:03.120] [Profile A] Lobby created. Screen 4 captured: 'Приглашён…' with banner 'Лобби создано, ждём друзей'
+[2026-10-06 13:21:03.707] [Profile B] /sync received invites list (count=1). Target inviteId: 62ec1d93-4331-4aa2-b993-323967e4690c
+[2026-10-06 13:21:03.854] [Profile B] Responded accept to invite: OK {"lobbyCode":"M32VQ6"}
+[2026-10-06 13:21:04.481] [Profile A] /sync updated sentInvites state to 'accepted'. Screen 5 captured: 'Принял'

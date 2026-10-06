@@ -2,11 +2,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Toolkit.Uwp.Notifications;
 using AuraLauncher.Services.Interfaces;
 using AuraLauncher.Services.Implementations;
 using AuraLauncher.ViewModels;
@@ -53,48 +55,58 @@ public partial class App : Application
             args.SetObserved();
         };
 
+        string[] args = (e.Args != null && e.Args.Length > 0)
+            ? e.Args
+            : ((Program.StartupArgs != null && Program.StartupArgs.Length > 0)
+                ? Program.StartupArgs
+                : Environment.GetCommandLineArgs().Skip(1).ToArray());
+
         // Режим самодиагностики (--selftest, --selftest-shots, --selftest-lobby или --selftest-kill-playit) или отдельный профиль
         string? captureShotsPrefix = null;
-        for (int i = 0; i < e.Args.Length - 1; i++)
+        for (int i = 0; i < args.Length - 1; i++)
         {
-            if (e.Args[i].Equals("--capture-shots", StringComparison.OrdinalIgnoreCase))
+            if (args[i].Equals("--capture-shots", StringComparison.OrdinalIgnoreCase))
             {
-                captureShotsPrefix = e.Args[i + 1];
+                captureShotsPrefix = args[i + 1];
                 break;
             }
         }
 
         string? fakeUpdateUiMode = null;
-        for (int i = 0; i < e.Args.Length; i++)
+        for (int i = 0; i < args.Length; i++)
         {
-            if (e.Args[i].StartsWith("--fake-update-ui=", StringComparison.OrdinalIgnoreCase))
+            if (args[i].StartsWith("--fake-update-ui=", StringComparison.OrdinalIgnoreCase))
             {
-                fakeUpdateUiMode = e.Args[i].Substring("--fake-update-ui=".Length);
+                fakeUpdateUiMode = args[i].Substring("--fake-update-ui=".Length);
                 break;
             }
-            if (e.Args[i].Equals("--fake-update-ui", StringComparison.OrdinalIgnoreCase) && i < e.Args.Length - 1)
+            if (args[i].Equals("--fake-update-ui", StringComparison.OrdinalIgnoreCase) && i < args.Length - 1)
             {
-                fakeUpdateUiMode = e.Args[i + 1];
+                fakeUpdateUiMode = args[i + 1];
                 break;
             }
         }
 
-        bool isKillPlayitTest = Array.Exists(e.Args, a => a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
-        bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
-        bool isLifecycleTest = Array.Exists(e.Args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
-        bool isAnthemTest = Array.Exists(e.Args, a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase));
-        bool isRapidNavTest = Array.Exists(e.Args, a => a.Equals("--selftest-rapid", StringComparison.OrdinalIgnoreCase));
-        bool isTrayTest = Array.Exists(e.Args, a => a.Equals("--selftest-tray", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isKillPlayitTest = Array.Exists(args, a => a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
+        bool isLobbyTest = Array.Exists(args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
+        bool isLifecycleTest = Array.Exists(args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
+        bool isAnthemTest = Array.Exists(args, a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase));
+        bool isRapidNavTest = Array.Exists(args, a => a.Equals("--selftest-rapid", StringComparison.OrdinalIgnoreCase));
+        bool isTrayTest = Array.Exists(args, a => a.Equals("--selftest-tray", StringComparison.OrdinalIgnoreCase));
+        bool isFriendsTest = Array.Exists(args, a => a.Equals("--selftest-friends", StringComparison.OrdinalIgnoreCase));
+        bool isProtocolTest = Array.Exists(args, a => a.Equals("--selftest-protocol", StringComparison.OrdinalIgnoreCase));
+        bool isNotificationsReportTest = Array.Exists(args, a => a.Equals("--selftest-notifications-report", StringComparison.OrdinalIgnoreCase));
+        bool isIconTest = Array.Exists(args, a => a.Equals("--selftest-icon", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
         {
-            for (int i = 0; i < e.Args.Length - 1; i++)
+            for (int i = 0; i < args.Length - 1; i++)
             {
-                if (string.Equals(e.Args[i], "--profile", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(args[i], "--profile", StringComparison.OrdinalIgnoreCase))
                 {
-                    profileArg = e.Args[i + 1];
+                    profileArg = args[i + 1];
                     break;
                 }
             }
@@ -108,11 +120,17 @@ public partial class App : Application
             ? "Aura.Launcher.Pipe"
             : $"Aura.Launcher.Pipe.{profileArg.Replace('\\', '_').Replace(':', '_').Replace('/', '_')}";
 
+        RegisterAuraProtocol();
+
+        string? protocolArg = Array.Find(args, a => a.StartsWith("aura://", StringComparison.OrdinalIgnoreCase));
+
         // Именованный Mutex для контроля единого экземпляра приложения
         _singleInstanceMutex = new Mutex(true, mutexName, out bool isNewInstance);
+        Log($"[STARTUP] args: '{string.Join(' ', args)}', isNewInstance={isNewInstance}, isSelfTest={isSelfTest}");
         if (!isNewInstance && !isSelfTest)
         {
-            SignalExistingInstanceViaPipe(pipeName);
+            Log($"[STARTUP] Second instance detected. Signaling pipe: {pipeName}, uri: {protocolArg}");
+            SignalExistingInstanceViaPipe(pipeName, protocolArg);
             BringExistingInstanceToFront();
             Shutdown();
             return;
@@ -155,7 +173,44 @@ public partial class App : Application
         if (mainWindow.DataContext is MainViewModel mainVM)
         {
             _ = mainVM.InitializeAsync();
+            if (!string.IsNullOrWhiteSpace(protocolArg))
+            {
+                mainVM.HandleProtocolUri(protocolArg);
+            }
         }
+
+        try
+        {
+            ToastNotificationManagerCompat.OnActivated += toastArgs =>
+            {
+                var toastArguments = ToastArguments.Parse(toastArgs.Argument);
+                Application.Current?.Dispatcher?.InvokeAsync(() =>
+                {
+                    var win = Application.Current.MainWindow;
+                    if (win != null)
+                    {
+                        if (!win.IsVisible)
+                        {
+                            win.Show();
+                            win.ShowInTaskbar = true;
+                        }
+                        if (win.WindowState == WindowState.Minimized)
+                        {
+                            win.WindowState = WindowState.Normal;
+                        }
+                        win.Activate();
+                        win.Focus();
+                    }
+
+                    if (toastArguments.TryGetValue("tab", out var tab) && !string.IsNullOrWhiteSpace(tab))
+                    {
+                        var mv = Services?.GetService<MainViewModel>();
+                        mv?.SwitchTab(tab);
+                    }
+                });
+            };
+        }
+        catch { }
 
         // Инициализация сервиса гимна (воспроизведение при первом старте, если не mute)
         try
@@ -265,6 +320,54 @@ public partial class App : Application
                 }
             });
         }
+        else if (isFriendsTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunFriendsSelfTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isProtocolTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunProtocolSelfTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isNotificationsReportTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunNotificationsAndReportTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isIconTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunIconSelfTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
         else if (isSelfTest)
         {
             _ = Task.Run(async () =>
@@ -298,6 +401,10 @@ public partial class App : Application
         services.AddSingleton<ILobbyService, LobbyService>();
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();
         services.AddSingleton<IAnthemService, AnthemService>();
+        services.AddSingleton<IFriendService, FriendService>();
+        services.AddSingleton<INotificationService, NotificationService>();
+        services.AddSingleton<IDiscordRpcService, DiscordRpcService>();
+        services.AddSingleton<IReportService, ReportService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
@@ -310,7 +417,10 @@ public partial class App : Application
             sp.GetRequiredService<ILanWorldWatcher>(),
             sp.GetRequiredService<ITunnelProvider>(),
             sp.GetRequiredService<ISkinService>(),
-            sp.GetRequiredService<ILobbyApiClient>()));
+            sp.GetRequiredService<ILobbyApiClient>(),
+            sp.GetRequiredService<INotificationService>(),
+            sp.GetRequiredService<IDiscordRpcService>()));
+        services.AddSingleton<FriendsViewModel>();
         services.AddSingleton<MainViewModel>();
     }
 
@@ -359,14 +469,46 @@ public partial class App : Application
         catch { }
     }
 
-    private static void SignalExistingInstanceViaPipe(string pipeName)
+    private static void RegisterAuraProtocol()
+    {
+        try
+        {
+            string? exePath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(exePath)) return;
+
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Classes\aura");
+            if (key != null)
+            {
+                key.SetValue("", "URL:Aura Protocol");
+                key.SetValue("URL Protocol", "");
+                using var commandKey = key.CreateSubKey(@"shell\open\command");
+                if (commandKey != null)
+                {
+                    commandKey.SetValue("", $"\"{exePath}\" \"%1\"");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"Failed to register aura:// protocol: {ex.Message}");
+        }
+    }
+
+    private static void SignalExistingInstanceViaPipe(string pipeName, string? protocolArg = null)
     {
         try
         {
             using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
             client.Connect(1500); // таймаут 1.5 секунды
             using var writer = new StreamWriter(client) { AutoFlush = true };
-            writer.WriteLine("SHOW");
+            if (!string.IsNullOrWhiteSpace(protocolArg))
+            {
+                writer.WriteLine($"URI:{protocolArg.Trim()}");
+            }
+            else
+            {
+                writer.WriteLine("SHOW");
+            }
         }
         catch { }
     }
@@ -389,11 +531,19 @@ public partial class App : Application
                     await server.WaitForConnectionAsync();
                     using var reader = new StreamReader(server);
                     var msg = await reader.ReadLineAsync();
-                    if (string.Equals(msg, "SHOW", StringComparison.OrdinalIgnoreCase))
+                    if (!string.IsNullOrWhiteSpace(msg))
                     {
                         mainWindow.Dispatcher.Invoke(() =>
                         {
                             mainWindow.RestoreFromTray();
+                            if (msg.StartsWith("URI:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string uri = msg.Substring(4).Trim();
+                                if (mainWindow.DataContext is MainViewModel mainVM)
+                                {
+                                    mainVM.HandleProtocolUri(uri);
+                                }
+                            }
                         });
                     }
                 }

@@ -249,6 +249,87 @@
                           Style="{StaticResource AlexToggleSwitch}"
                           VerticalAlignment="Center" />
             </Grid>
+
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+
+            <!-- ROW 5: "Подключаться автоматически после принятия приглашения" -->
+            <Grid MinHeight="40" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Подключаться автоматически после принятия приглашения"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           VerticalAlignment="Center" />
+
+                <CheckBox Grid.Column="1"
+                          IsChecked="{Binding AutoConnectOnInviteAccept, Mode=TwoWay}"
+                          Style="{StaticResource AlexToggleSwitch}"
+                          VerticalAlignment="Center" />
+            </Grid>
+
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+
+            <!-- ROW 6: "Уведомления Windows" -->
+            <Grid MinHeight="40" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Уведомления Windows"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           VerticalAlignment="Center" />
+
+                <CheckBox Grid.Column="1"
+                          IsChecked="{Binding WindowsNotificationsEnabled, Mode=TwoWay}"
+                          Style="{StaticResource AlexToggleSwitch}"
+                          VerticalAlignment="Center" />
+            </Grid>
+
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+
+            <!-- ROW 7: "Показывать статус в Discord" -->
+            <Grid MinHeight="40" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Показывать статус в Discord"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           VerticalAlignment="Center" />
+
+                <CheckBox Grid.Column="1"
+                          IsChecked="{Binding DiscordRpcEnabled, Mode=TwoWay}"
+                          Style="{StaticResource AlexToggleSwitch}"
+                          VerticalAlignment="Center" />
+            </Grid>
+
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+
+            <!-- ROW 8: "Собрать отчёт" -->
+            <Grid MinHeight="50" Margin="0,4,0,20">
+                <Button Command="{Binding GenerateReportCommand}"
+                        Style="{StaticResource PrimaryNeonBtn}"
+                        Height="44" Padding="28,0" FontSize="14"
+                        HorizontalAlignment="Left"
+                        Content="Собрать отчёт" />
+            </Grid>
         </StackPanel>
     </Grid>
 </UserControl>

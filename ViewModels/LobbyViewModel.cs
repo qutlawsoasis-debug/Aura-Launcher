@@ -27,6 +27,10 @@ public class LobbyViewModel : ObservableObject
     private readonly ITunnelProvider? _tunnelProvider;
     private readonly ISkinService? _skinService;
     private readonly ILobbyApiClient? _lobbyApiClient;
+    private readonly INotificationService? _notificationService;
+    private readonly IDiscordRpcService? _discordRpcService;
+    private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
+    private bool _previousWorldIsOpen;
 
     // === Список игроков лобби ===
     public ObservableCollection<LobbyPlayerItem> LobbyPlayers { get; } = new();
@@ -52,6 +56,7 @@ public class LobbyViewModel : ObservableObject
     // === Гость ===
     private string _guestCodeInput = string.Empty;
     private bool _isGuestJoined;
+    public bool WasInvited { get; set; }
     private string _guestStatusText = "Введите 6-значный код лобби";
     private bool _canGuestConnect;
     private string _joinErrorMessage = string.Empty;
@@ -119,7 +124,9 @@ public class LobbyViewModel : ObservableObject
         ILanWorldWatcher? worldWatcher = null,
         ITunnelProvider? tunnelProvider = null,
         ISkinService? skinService = null,
-        ILobbyApiClient? lobbyApiClient = null)
+        ILobbyApiClient? lobbyApiClient = null,
+        INotificationService? notificationService = null,
+        IDiscordRpcService? discordRpcService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
@@ -128,10 +135,13 @@ public class LobbyViewModel : ObservableObject
         _tunnelProvider = tunnelProvider;
         _skinService = skinService;
         _lobbyApiClient = lobbyApiClient;
+        _notificationService = notificationService;
+        _discordRpcService = discordRpcService;
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6 && !IsJoiningLobby);
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
+        CopyLinkCommand = new RelayCommand(_ => CopyLobbyLink(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         ConnectToGameCommand = new AsyncRelayCommand(ConnectToGameAsync, () => !IsBusy && CanGuestConnect);
         OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && _lobbyService.IsHost);
         LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
@@ -265,6 +275,22 @@ public class LobbyViewModel : ObservableObject
         private set => SetProperty(ref _codeCopied, value);
     }
 
+    private bool _isLinkCopied;
+    public bool IsLinkCopied
+    {
+        get => _isLinkCopied;
+        private set
+        {
+            if (SetProperty(ref _isLinkCopied, value))
+            {
+                OnPropertyChanged(nameof(CopyLinkButtonText));
+            }
+        }
+    }
+
+    public string CopyLinkButtonText => IsLinkCopied ? "Скопировано!" : "Копировать ссылку";
+    public RelayCommand CopyLinkCommand { get; }
+
     public bool IsHost => _lobbyService.IsHost;
 
     // --- Гость ---
@@ -392,7 +418,7 @@ public class LobbyViewModel : ObservableObject
         OnPropertyChanged(nameof(IsHost));
     }
 
-    private async Task CreateLobbyAsync()
+    public async Task<string?> CreateLobbyAsync()
     {
         IsBusy = true;
         StatusText = "Создание лобби...";
@@ -432,7 +458,7 @@ public class LobbyViewModel : ObservableObject
                 StatusIcon = "❌";
                 ShowTunnelFailedLogButton = true;
                 TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
-                return;
+                return null;
             }
 
             var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
@@ -451,14 +477,21 @@ public class LobbyViewModel : ObservableObject
                 StatusText = "Лобби создано! Отправь код другу и нажми «ОТКРЫТЬ МИР»";
                 StatusIcon = "👑";
 
-                LobbyPlayers.Clear();
                 ImageSource? hostAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
-                LobbyPlayers.Add(new LobbyPlayerItem
+                _knownPlayerNicks.Clear();
+                _knownPlayerNicks.Add(hostName);
+                _discordRpcService?.SetInLobby(1);
+                Dispatch(() =>
                 {
-                    Nickname = hostName,
-                    IsHost = true,
-                    Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap()
+                    LobbyPlayers.Clear();
+                    LobbyPlayers.Add(new LobbyPlayerItem
+                    {
+                        Nickname = hostName,
+                        IsHost = true,
+                        Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap()
+                    });
                 });
+                return code;
             }
             else
             {
@@ -466,6 +499,7 @@ public class LobbyViewModel : ObservableObject
                 StatusIcon = "❌";
                 ShowTunnelFailedLogButton = true;
                 TunnelFailureReason = "Сервер лобби вернул ошибку при создании лобби.";
+                return null;
             }
         }
         catch (Exception ex)
@@ -475,6 +509,7 @@ public class LobbyViewModel : ObservableObject
             StatusIcon = "❌";
             ShowTunnelFailedLogButton = true;
             TunnelFailureReason = ex.Message;
+            return null;
         }
         finally
         {
@@ -811,6 +846,7 @@ public class LobbyViewModel : ObservableObject
             {
                 IsGuestJoined = true;
                 IsInLobby = true;
+                _discordRpcService?.SetInLobby(1);
                 UpdateGuestStatus();
             }
             else
@@ -840,6 +876,19 @@ public class LobbyViewModel : ObservableObject
         {
             IsJoiningLobby = false;
         }
+    }
+
+    public async Task<bool> JoinByCodeAsync(string code, bool fromInvite = false)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return false;
+        WasInvited = fromInvite;
+        GuestCodeInput = code.Trim().ToUpperInvariant();
+        await JoinLobbyAsync();
+        if (IsInLobby && IsStatusOpen && WasInvited && _configService.CurrentConfig.AutoConnectOnInviteAccept)
+        {
+            _ = ConnectToGameAsync();
+        }
+        return IsInLobby;
     }
 
     private Task ConnectToGameAsync()
@@ -905,6 +954,27 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
+    private void CopyLobbyLink()
+    {
+        if (!string.IsNullOrWhiteSpace(LobbyCode))
+        {
+            try
+            {
+                string url = $"https://lobby-api.vercel.app/j/{LobbyCode}";
+                Clipboard.SetText(url);
+                IsLinkCopied = true;
+                _ = Task.Delay(2000).ContinueWith(_ =>
+                {
+                    Application.Current?.Dispatcher?.InvokeAsync(() => IsLinkCopied = false);
+                });
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[UI: ERROR] Failed to copy lobby link: {ex.Message}");
+            }
+        }
+    }
+
     private void LeaveLobby()
     {
         if (_lobbyService.IsHost)
@@ -939,6 +1009,10 @@ public class LobbyViewModel : ObservableObject
         GuestStatusText = "Введите 6-значный код лобби";
         StatusText = "Создайте лобби или введите код друга";
         StatusIcon = "⚡";
+
+        _discordRpcService?.SetInLauncher();
+        _knownPlayerNicks.Clear();
+        _previousWorldIsOpen = false;
 
         LobbyPlayers.Clear();
         JoinErrorMessage = string.Empty;
@@ -1000,6 +1074,11 @@ public class LobbyViewModel : ObservableObject
                 GuestStatusText = "Хост открыл мир — можно подключаться!";
                 StatusText = "Мир готов! Нажми «Подключиться к игре»";
                 StatusIcon = "✅";
+
+                if (WasInvited && _configService.CurrentConfig.AutoConnectOnInviteAccept)
+                {
+                    _ = ConnectToGameAsync();
+                }
             }
         });
     }
@@ -1039,6 +1118,36 @@ public class LobbyViewModel : ObservableObject
 
     private void OnLobbyStatusUpdated(LobbyStatusResponse status)
     {
+        if (IsInLobby && status.Players != null && status.Players.Length > 0)
+        {
+            _discordRpcService?.SetInLobby(status.Players.Length);
+        }
+
+        if (_lobbyService.IsHost && status.Players != null)
+        {
+            var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
+            foreach (var p in status.Players)
+            {
+                if (!string.Equals(p, myNick, StringComparison.OrdinalIgnoreCase) && _knownPlayerNicks.Add(p))
+                {
+                    _notificationService?.NotifyPlayerJoinedLobby(p);
+                }
+            }
+        }
+
+        if (!_lobbyService.IsHost && string.Equals(status.Status, "open", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!_previousWorldIsOpen)
+            {
+                _previousWorldIsOpen = true;
+                _notificationService?.NotifyHostOpenedWorld();
+            }
+        }
+        else if (string.Equals(status.Status, "waiting", StringComparison.OrdinalIgnoreCase))
+        {
+            _previousWorldIsOpen = false;
+        }
+
         _ = RefreshLobbyPlayersAsync(status.Players, status.HostName);
     }
 
@@ -1139,6 +1248,7 @@ public class LobbyViewModel : ObservableObject
         OpenWorldCommand.RaiseCanExecuteChanged();
         LeaveLobbyCommand.RaiseCanExecuteChanged();
         CopyCodeCommand.RaiseCanExecuteChanged();
+        CopyLinkCommand.RaiseCanExecuteChanged();
         CopyTunnelLogCommand.RaiseCanExecuteChanged();
     }
 

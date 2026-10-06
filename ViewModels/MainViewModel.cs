@@ -55,6 +55,20 @@ public class MainViewModel : ObservableObject
     private bool _hasUpdateDot;
     private bool _isToastDismissedForSession;
     private string? _pendingNewVersion;
+    private readonly IFriendService? _friendService;
+    private readonly INotificationService? _notificationService;
+    private readonly IDiscordRpcService? _discordRpcService;
+
+    private bool _isInviteToastVisible;
+    private string _inviteToastTitle = string.Empty;
+    private string _inviteToastSubtitle = string.Empty;
+    private IncomingInviteItem? _activeInvite;
+    private CancellationTokenSource? _inviteToastCts;
+
+    private bool _isInfoToastVisible;
+    private string _infoToastTitle = string.Empty;
+    private string _infoToastSubtitle = string.Empty;
+    private CancellationTokenSource? _infoToastCts;
 
     public event EventHandler<Process>? GameStarted;
     public event EventHandler<int>? GameExited;
@@ -63,6 +77,112 @@ public class MainViewModel : ObservableObject
     public SettingsViewModel SettingsVM { get; }
     public WardrobeViewModel WardrobeVM { get; }
     public LobbyViewModel LobbyVM { get; }
+    public FriendsViewModel FriendsVM { get; }
+
+    public bool IsInviteToastVisible
+    {
+        get => _isInviteToastVisible;
+        set => SetProperty(ref _isInviteToastVisible, value);
+    }
+
+    public string InviteToastTitle
+    {
+        get => _inviteToastTitle;
+        set => SetProperty(ref _inviteToastTitle, value);
+    }
+
+    public string InviteToastSubtitle
+    {
+        get => _inviteToastSubtitle;
+        set => SetProperty(ref _inviteToastSubtitle, value);
+    }
+
+    public bool IsInfoToastVisible
+    {
+        get => _isInfoToastVisible;
+        set => SetProperty(ref _isInfoToastVisible, value);
+    }
+
+    public string InfoToastTitle
+    {
+        get => _infoToastTitle;
+        set => SetProperty(ref _infoToastTitle, value);
+    }
+
+    public string InfoToastSubtitle
+    {
+        get => _infoToastSubtitle;
+        set
+        {
+            if (SetProperty(ref _infoToastSubtitle, value))
+            {
+                OnPropertyChanged(nameof(HasInfoToastSubtitle));
+            }
+        }
+    }
+
+    public bool HasInfoToastSubtitle => !string.IsNullOrWhiteSpace(_infoToastSubtitle);
+
+    public void ShowInfoToast(string title, string? subtitle = null, int autoDismissMs = 4000)
+    {
+        _infoToastCts?.Cancel();
+        _infoToastCts = new CancellationTokenSource();
+        var ct = _infoToastCts.Token;
+
+        InfoToastTitle = title;
+        InfoToastSubtitle = subtitle ?? string.Empty;
+        IsInfoToastVisible = true;
+
+        if (autoDismissMs > 0)
+        {
+            _ = Task.Delay(autoDismissMs, ct).ContinueWith(t =>
+            {
+                if (!t.IsCanceled)
+                {
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    {
+                        IsInfoToastVisible = false;
+                    });
+                }
+            }, ct);
+        }
+    }
+
+    private bool _isProtocolPromptVisible;
+    private string _protocolPromptTitle = string.Empty;
+    private string _protocolPromptSubtitle = string.Empty;
+    private string _protocolPromptConfirmText = "Войти";
+    private Func<Task>? _pendingProtocolAction;
+
+    public bool IsProtocolPromptVisible
+    {
+        get => _isProtocolPromptVisible;
+        set => SetProperty(ref _isProtocolPromptVisible, value);
+    }
+
+    public string ProtocolPromptTitle
+    {
+        get => _protocolPromptTitle;
+        set => SetProperty(ref _protocolPromptTitle, value);
+    }
+
+    public string ProtocolPromptSubtitle
+    {
+        get => _protocolPromptSubtitle;
+        set => SetProperty(ref _protocolPromptSubtitle, value);
+    }
+
+    public string ProtocolPromptConfirmText
+    {
+        get => _protocolPromptConfirmText;
+        set => SetProperty(ref _protocolPromptConfirmText, value);
+    }
+
+    public AsyncRelayCommand ConfirmProtocolPromptCommand { get; }
+    public RelayCommand CancelProtocolPromptCommand { get; }
+
+    public AsyncRelayCommand AcceptInviteCommand { get; }
+    public AsyncRelayCommand DeclineInviteCommand { get; }
 
     public object CurrentView
     {
@@ -80,6 +200,7 @@ public class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsOverviewActive));
                 OnPropertyChanged(nameof(IsWardrobeActive));
                 OnPropertyChanged(nameof(IsLobbyActive));
+                OnPropertyChanged(nameof(IsFriendsActive));
                 OnPropertyChanged(nameof(IsSettingsActive));
             }
         }
@@ -112,6 +233,15 @@ public class MainViewModel : ObservableObject
         }
     }
 
+    public bool IsFriendsActive
+    {
+        get => CurrentTabName.Equals("Friends", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value) SwitchTab("Friends");
+        }
+    }
+
     public bool IsSettingsActive
     {
         get => CurrentTabName.Equals("Settings", StringComparison.OrdinalIgnoreCase);
@@ -124,6 +254,12 @@ public class MainViewModel : ObservableObject
     public void SwitchTab(string viewName)
     {
         if (string.IsNullOrWhiteSpace(viewName)) return;
+
+        if (CurrentTabName.Equals("Friends", StringComparison.OrdinalIgnoreCase) && !viewName.Equals("Friends", StringComparison.OrdinalIgnoreCase))
+        {
+            FriendsVM?.OnTabDeactivated();
+        }
+
         CurrentTabName = viewName;
         if (viewName.Equals("Settings", StringComparison.OrdinalIgnoreCase))
         {
@@ -136,6 +272,11 @@ public class MainViewModel : ObservableObject
         else if (viewName.Equals("Lobby", StringComparison.OrdinalIgnoreCase))
         {
             CurrentView = LobbyVM;
+        }
+        else if (viewName.Equals("Friends", StringComparison.OrdinalIgnoreCase))
+        {
+            FriendsVM?.OnTabActivated();
+            CurrentView = FriendsVM!;
         }
         else
         {
@@ -393,8 +534,12 @@ public class MainViewModel : ObservableObject
         SettingsViewModel settingsViewModel,
         WardrobeViewModel wardrobeViewModel,
         LobbyViewModel? lobbyViewModel = null,
+        FriendsViewModel? friendsViewModel = null,
+        IFriendService? friendService = null,
         IServerListSyncService? serverListSyncService = null,
-        IAnthemService? anthemService = null)
+        IAnthemService? anthemService = null,
+        INotificationService? notificationService = null,
+        IDiscordRpcService? discordRpcService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -402,15 +547,97 @@ public class MainViewModel : ObservableObject
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
+        _notificationService = notificationService;
+        _discordRpcService = discordRpcService;
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
-        LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService);
+        LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService);
+        
+        _friendService = friendService;
+        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), new LobbyService(new LobbyApiClient()), _skinService, LobbyVM);
+        FriendsVM.OpenLobbyRequested += () => SwitchTab("Lobby");
+
+        if (_notificationService != null)
+        {
+            _notificationService.RegisterInAppToastHandler((title, subtitle) =>
+            {
+                System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                {
+                    ShowInfoToast(title, subtitle);
+                });
+            });
+        }
+
+        if (_friendService != null)
+        {
+            _friendService.InviteReceived += OnInviteReceived;
+            _friendService.FriendRequestReceived += req =>
+            {
+                _notificationService?.NotifyFriendRequest(req.Nick, req.Id);
+            };
+        }
+
+        _discordRpcService?.Initialize();
+        _discordRpcService?.SetInLauncher();
+
+        ConfirmProtocolPromptCommand = new AsyncRelayCommand(async () =>
+        {
+            IsProtocolPromptVisible = false;
+            var action = _pendingProtocolAction;
+            _pendingProtocolAction = null;
+            if (action != null)
+            {
+                await action();
+            }
+        });
+
+        CancelProtocolPromptCommand = new RelayCommand(_ =>
+        {
+            IsProtocolPromptVisible = false;
+            _pendingProtocolAction = null;
+        });
+
+        AcceptInviteCommand = new AsyncRelayCommand(async () =>
+        {
+            _inviteToastCts?.Cancel();
+            IsInviteToastVisible = false;
+            if (_activeInvite == null || _friendService == null) return;
+
+            var inv = _activeInvite;
+            _activeInvite = null;
+
+            var (success, lobbyCode, error) = await _friendService.RespondInviteAsync(inv.InviteId, accept: true);
+            if (success && !string.IsNullOrWhiteSpace(lobbyCode))
+            {
+                SwitchTab("Lobby");
+                await LobbyVM.JoinByCodeAsync(lobbyCode, fromInvite: true);
+            }
+        });
+
+        DeclineInviteCommand = new AsyncRelayCommand(async () =>
+        {
+            _inviteToastCts?.Cancel();
+            IsInviteToastVisible = false;
+            if (_activeInvite == null || _friendService == null) return;
+
+            var inv = _activeInvite;
+            _activeInvite = null;
+
+            await _friendService.RespondInviteAsync(inv.InviteId, accept: false);
+        });
+
         LobbyVM.PropertyChanged += (s, e) =>
         {
             if (e.PropertyName == nameof(LobbyViewModel.IsLobbyCreated))
             {
                 OnPropertyChanged(nameof(UpdateBannerMessage));
+            }
+            if (_friendService != null && (e.PropertyName == nameof(LobbyViewModel.IsInLobby) || e.PropertyName == nameof(LobbyViewModel.LobbyCode)))
+            {
+                _friendService.IsInLobby = LobbyVM.IsInLobby;
+                _friendService.CurrentLobbyCode = LobbyVM.LobbyCode;
+                _ = _friendService.SyncNowAsync();
             }
         };
         AnthemService = anthemService;
@@ -522,7 +749,126 @@ public class MainViewModel : ObservableObject
             UpdateAvatar();
             OverviewVM.RefreshStats();
             UpdateIdleState();
+            _ = _friendService?.SyncNowAsync();
         };
+    }
+
+    private void OnInviteReceived(IncomingInviteItem invite)
+    {
+        _notificationService?.NotifyLobbyInvite(invite.FromNick, invite.InviteId);
+
+        System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+        {
+            _activeInvite = invite;
+            InviteToastTitle = $"{invite.FromNick} приглашает вас в лобби";
+            InviteToastSubtitle = "Приглашение действительно 2 мин";
+            IsInviteToastVisible = true;
+
+            _inviteToastCts?.Cancel();
+            _inviteToastCts = new CancellationTokenSource();
+            var token = _inviteToastCts.Token;
+            _ = Task.Delay(TimeSpan.FromSeconds(120), token).ContinueWith(_ =>
+            {
+                if (!token.IsCancellationRequested)
+                {
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    {
+                        if (_activeInvite?.InviteId == invite.InviteId)
+                        {
+                            IsInviteToastVisible = false;
+                            _activeInvite = null;
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    private void Dispatch(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher == null || dispatcher.CheckAccess())
+        {
+            action();
+        }
+        else
+        {
+            dispatcher.InvokeAsync(action);
+        }
+    }
+
+    public void HandleProtocolUri(string? rawUri)
+    {
+        if (string.IsNullOrWhiteSpace(rawUri)) return;
+
+        FabricGameLaunchService.LogLauncherEvent($"[PROTOCOL] Received URI: {rawUri}");
+
+        try
+        {
+            var cleaned = rawUri.Trim().Trim('"', '\'').Trim();
+            if (cleaned.StartsWith("aura://", StringComparison.OrdinalIgnoreCase))
+            {
+                cleaned = cleaned.Substring(7);
+            }
+            else if (cleaned.StartsWith("aura:", StringComparison.OrdinalIgnoreCase))
+            {
+                cleaned = cleaned.Substring(5);
+            }
+
+            cleaned = cleaned.Trim('/');
+            var parts = cleaned.Split('/', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[PROTOCOL: WARN] Insufficient URI parts: {cleaned}");
+                return;
+            }
+
+            string action = parts[0].Trim().ToLowerInvariant();
+            string code = parts[1].Trim().ToUpperInvariant();
+
+            // Проверка кода по ^[A-Z0-9]{6,8}$
+            if (!System.Text.RegularExpressions.Regex.IsMatch(code, "^[A-Z0-9]{6,8}$"))
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[PROTOCOL: WARN] Invalid code format: {code}");
+                return;
+            }
+
+            Dispatch(() =>
+            {
+                if (action == "join")
+                {
+                    ProtocolPromptTitle = $"Войти в лобби {code}?";
+                    ProtocolPromptSubtitle = "Подключиться к игре хоста по ссылке?";
+                    ProtocolPromptConfirmText = "Войти";
+                    _pendingProtocolAction = async () =>
+                    {
+                        SwitchTab("Lobby");
+                        await LobbyVM.JoinByCodeAsync(code);
+                    };
+                    IsProtocolPromptVisible = true;
+                }
+                else if (action == "friend")
+                {
+                    ProtocolPromptTitle = $"Отправить заявку в друзья по коду {code}?";
+                    ProtocolPromptSubtitle = "Добавить игрока в список друзей?";
+                    ProtocolPromptConfirmText = "Отправить";
+                    _pendingProtocolAction = async () =>
+                    {
+                        SwitchTab("Friends");
+                        FriendsVM.AddCodeInput = code;
+                        if (_friendService != null)
+                        {
+                            await _friendService.SendFriendRequestAsync(code);
+                        }
+                    };
+                    IsProtocolPromptVisible = true;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[PROTOCOL: ERROR] Error handling URI: {ex.Message}");
+        }
     }
 
     public async Task InitializeAsync()
@@ -531,6 +877,7 @@ public class MainViewModel : ObservableObject
         await _configService.LoadConfigAsync();
         OverviewVM.RefreshStats();
         UpdateAvatar();
+        _friendService?.Start();
 
         var initialNickValidation = NicknameValidator.Validate(_configService.CurrentConfig.Nickname);
         if (!initialNickValidation.IsValid)
@@ -807,6 +1154,19 @@ public class MainViewModel : ObservableObject
 
                         try
                         {
+                            if (_friendService != null)
+                            {
+                                _friendService.IsGameRunning = false;
+                                _ = _friendService.SyncNowAsync();
+                            }
+                            if (LobbyVM.IsInLobby && LobbyVM.LobbyPlayers.Count > 0)
+                            {
+                                _discordRpcService?.SetInLobby(LobbyVM.LobbyPlayers.Count);
+                            }
+                            else
+                            {
+                                _discordRpcService?.SetInLauncher();
+                            }
                             GameExited?.Invoke(this, exitCode);
                         }
                         catch { }
@@ -825,6 +1185,12 @@ public class MainViewModel : ObservableObject
 
             try
             {
+                if (_friendService != null)
+                {
+                    _friendService.IsGameRunning = true;
+                    _ = _friendService.SyncNowAsync();
+                }
+                _discordRpcService?.SetPlayingGame(DateTime.UtcNow);
                 GameStarted?.Invoke(this, process);
             }
             catch { }

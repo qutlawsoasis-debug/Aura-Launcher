@@ -18,6 +18,8 @@ public class SettingsViewModel : ObservableObject
 {
     private readonly IConfigService _configService;
     private readonly ISkinService _skinService;
+    private readonly IDiscordRpcService? _discordRpcService;
+    private readonly IReportService? _reportService;
     private CancellationTokenSource? _debounceCts;
     private string _errorMessage = string.Empty;
     private string _nickname = string.Empty;
@@ -199,6 +201,49 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
+    public bool AutoConnectOnInviteAccept
+    {
+        get => _configService.CurrentConfig.AutoConnectOnInviteAccept;
+        set
+        {
+            if (_configService.CurrentConfig.AutoConnectOnInviteAccept != value)
+            {
+                _configService.CurrentConfig.AutoConnectOnInviteAccept = value;
+                OnPropertyChanged();
+                _ = SaveImmediatelyAsync();
+            }
+        }
+    }
+
+    public bool WindowsNotificationsEnabled
+    {
+        get => _configService.CurrentConfig.WindowsNotificationsEnabled;
+        set
+        {
+            if (_configService.CurrentConfig.WindowsNotificationsEnabled != value)
+            {
+                _configService.CurrentConfig.WindowsNotificationsEnabled = value;
+                OnPropertyChanged();
+                _ = SaveImmediatelyAsync();
+            }
+        }
+    }
+
+    public bool DiscordRpcEnabled
+    {
+        get => _configService.CurrentConfig.DiscordRpcEnabled;
+        set
+        {
+            if (_configService.CurrentConfig.DiscordRpcEnabled != value)
+            {
+                _configService.CurrentConfig.DiscordRpcEnabled = value;
+                OnPropertyChanged();
+                _ = SaveImmediatelyAsync();
+                _discordRpcService?.UpdateSettings();
+            }
+        }
+    }
+
     public string CurrentVersion
     {
         get
@@ -223,11 +268,26 @@ public class SettingsViewModel : ObservableObject
     public bool HasError => !string.IsNullOrWhiteSpace(_errorMessage);
 
     public RelayCommand SelectGameFolderCommand { get; }
+    public AsyncRelayCommand GenerateReportCommand { get; }
 
-    public SettingsViewModel(IConfigService configService, ISkinService skinService)
+    public SettingsViewModel(
+        IConfigService configService,
+        ISkinService skinService,
+        IDiscordRpcService? discordRpcService = null,
+        IReportService? reportService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
+        _discordRpcService = discordRpcService;
+        _reportService = reportService;
+
+        GenerateReportCommand = new AsyncRelayCommand(async () =>
+        {
+            if (_reportService != null)
+            {
+                await _reportService.GenerateReportZipAsync();
+            }
+        });
 
         _nickname = _configService.CurrentConfig.Nickname ?? string.Empty;
         var initialResult = NicknameValidator.Validate(_nickname);

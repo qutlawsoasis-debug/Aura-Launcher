@@ -193,12 +193,37 @@ public class LauncherUpdateService : ILauncherUpdateService
         IProgress<DownloadProgressReport>? progress = null, 
         CancellationToken ct = default)
     {
-        var newVer = await CheckForUpdatesAsync(ct).ConfigureAwait(false);
-        if (newVer == null)
+        if (!IsInstalled)
         {
-            return new LauncherUpdateResult(LauncherUpdateStatus.UpToDate, "Установлена последняя версия лаунчера");
+            return new LauncherUpdateResult(LauncherUpdateStatus.NotInstalled, "Лаунчер запущен в портативном режиме");
         }
 
-        return await DownloadAndApplyAsync(progress, ct).ConfigureAwait(false);
+        if (_launchService.IsGameRunning)
+        {
+            FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Игра сейчас запущена. Обновление лаунчера отложено.");
+            return new LauncherUpdateResult(LauncherUpdateStatus.Skipped, "Игра запущена, обновление отложено");
+        }
+
+        try
+        {
+            var updateInfo = await _updateManager.CheckForUpdatesAsync().ConfigureAwait(false);
+            if (updateInfo == null)
+            {
+                FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Установлена последняя версия лаунчера.");
+                return new LauncherUpdateResult(LauncherUpdateStatus.UpToDate, "Установлена последняя версия лаунчера");
+            }
+            _lastUpdateInfo = updateInfo;
+
+            return await DownloadAndApplyAsync(progress, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: ERROR] Ошибка при проверке/скачивании обновления: {ex.Message}");
+            return new LauncherUpdateResult(LauncherUpdateStatus.Failed, $"Ошибка обновления лаунчера: {ex.Message}");
+        }
     }
 }
