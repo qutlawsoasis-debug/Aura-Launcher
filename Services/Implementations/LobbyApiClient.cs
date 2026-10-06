@@ -146,4 +146,22 @@ public class LobbyApiClient : ILobbyApiClient
             return false;
         }
     }
+
+    public async Task<TunnelConfigResponse?> GetTunnelConfigAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Get, GetRequestUri("api/tunnel-config"));
+            req.Headers.Add("X-Aura-Client", "launcher");
+            var response = await _httpClient.SendAsync(req, cancellationToken);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<TunnelConfigResponse>(json, _jsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

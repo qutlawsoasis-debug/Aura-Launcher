@@ -377,9 +377,10 @@ public static class SceneDiagnostics
 
     public static async Task<bool> LiveTestLobbyAsync(MainWindow window)
     {
+        System.Net.Sockets.TcpListener? listener = null;
         try
         {
-            App.Log("[LIVE-TEST-LOBBY] Starting live test...");
+            App.Log("[LIVE-TEST-LOBBY] Starting live test for CleanHost...");
             await Task.Delay(1000);
             var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
             if (mainVm == null) return false;
@@ -388,69 +389,66 @@ public static class SceneDiagnostics
             await Task.Delay(500);
 
             string shotsDir = ResolveShotsDir();
-            bool hasClaimBtn = window.Dispatcher.Invoke(() => mainVm.LobbyVM.ShowClaimTunnelButton);
-            App.Log($"[LIVE-TEST-LOBBY] HasClaimButton={hasClaimBtn}");
+            var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
 
-            if (hasClaimBtn)
+            string initialShot = Path.Combine(shotsDir, "clean_host_lobby_initial.png");
+            CaptureWindowToPng(window, initialShot);
+            App.Log($"[LIVE-TEST-LOBBY] Captured initial lobby UI: {initialShot}");
+            if (Directory.Exists(artifactDir))
             {
-                string cleanShot = Path.Combine(shotsDir, "clean_host_lobby.png");
-                CaptureWindowToPng(window, cleanShot);
-                App.Log($"[LIVE-TEST-LOBBY] Captured clean host UI with button: {cleanShot}");
-
-                App.Log("[LIVE-TEST-LOBBY] Triggering ClaimTunnelCommand...");
-                window.Dispatcher.Invoke(() => mainVm.LobbyVM.ClaimTunnelCommand.Execute(null));
-
-                // Wait up to 30s for ClaimUrl
-                for (int i = 0; i < 60; i++)
-                {
-                    await Task.Delay(500);
-                    if (window.Dispatcher.Invoke(() => mainVm.LobbyVM.HasClaimUrl))
-                    {
-                        break;
-                    }
-                }
-
-                await Task.Delay(500);
-
-                string claimShot = Path.Combine(shotsDir, "clean_host_lobby_claim.png");
-                CaptureWindowToPng(window, claimShot);
-                App.Log($"[LIVE-TEST-LOBBY] Captured clean host claim UI with URL and buttons: {claimShot}");
-
-                var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
-                if (Directory.Exists(artifactDir))
-                {
-                    try { File.Copy(claimShot, Path.Combine(artifactDir, "clean_host_lobby_claim.png"), true); } catch { }
-                }
-
-                return true;
+                try { File.Copy(initialShot, Path.Combine(artifactDir, "clean_host_lobby_initial.png"), true); } catch { }
             }
 
-            // 1. Create lobby
+            // 1. Create lobby (quietly fetches tunnel-config, saves DPAPI secret, creates lobby)
+            App.Log("[LIVE-TEST-LOBBY] Triggering CreateLobbyCommand...");
             window.Dispatcher.Invoke(() => mainVm.LobbyVM.CreateLobbyCommand.Execute(null));
-            for (int i = 0; i < 50; i++)
+
+            for (int i = 0; i < 60; i++)
             {
-                await Task.Delay(200);
+                await Task.Delay(500);
                 if (window.Dispatcher.Invoke(() => mainVm.LobbyVM.IsLobbyCreated && !string.IsNullOrWhiteSpace(mainVm.LobbyVM.LobbyCode))) break;
             }
 
-            string code = window.Dispatcher.Invoke(() => mainVm.LobbyVM.LobbyCode);
+            string code = window.Dispatcher.Invoke(() => mainVm.LobbyVM.LobbyCode) ?? "";
             App.Log($"[LIVE-TEST-LOBBY] Lobby Created: {code}");
 
+            string createdShot = Path.Combine(shotsDir, "clean_host_lobby_created.png");
+            CaptureWindowToPng(window, createdShot);
+            App.Log($"[LIVE-TEST-LOBBY] Captured lobby created UI: {createdShot}");
+            if (Directory.Exists(artifactDir))
+            {
+                try { File.Copy(createdShot, Path.Combine(artifactDir, "clean_host_lobby_created.png"), true); } catch { }
+            }
+
             // 2. Open World (localPort 25565 with a fake listener simulating Minecraft LAN)
-            var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
+            listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
             listener.Start();
+            App.Log("[LIVE-TEST-LOBBY] Started local TCP listener on 127.0.0.1:25565");
 
             var lobbyService = App.Services.GetRequiredService<ILobbyService>();
             bool opened = await lobbyService.HostOpenWorldAsync(localPort: 25565);
             App.Log($"[LIVE-TEST-LOBBY] HostOpenWorldAsync result: {opened}");
 
-            await Task.Delay(1500);
+            await Task.Delay(2000);
+
+            string openShot = Path.Combine(shotsDir, "clean_host_lobby_open.png");
+            CaptureWindowToPng(window, openShot);
+            App.Log($"[LIVE-TEST-LOBBY] Captured lobby open UI: {openShot}");
+            if (Directory.Exists(artifactDir))
+            {
+                try { File.Copy(openShot, Path.Combine(artifactDir, "clean_host_lobby_open.png"), true); } catch { }
+            }
+
             return opened;
         }
         catch (Exception ex)
         {
             App.Log($"[LIVE-TEST-LOBBY: ERROR] {ex}");
             return false;
+        }
+        finally
+        {
+            try { listener?.Stop(); } catch { }
         }
     }
 

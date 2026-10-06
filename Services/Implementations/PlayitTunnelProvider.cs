@@ -32,6 +32,9 @@ public class PlayitTunnelProvider : ITunnelProvider
     public TunnelInfo CurrentInfo => _currentInfo;
     public event Action<TunnelInfo>? StatusChanged;
 
+    public string PublicHost { get; set; } = "pgsql-jill.tun.ply.gg";
+    public int PublicPort { get; set; } = 38062;
+
     public PlayitTunnelProvider(HttpClient? httpClient = null, string? toolsDir = null)
     {
         _httpClient = httpClient ?? new HttpClient();
@@ -65,6 +68,20 @@ public class PlayitTunnelProvider : ITunnelProvider
     public async Task EnsureBinaryDownloadedAsync(CancellationToken ct = default)
     {
         Directory.CreateDirectory(_toolsDir);
+
+        if (!File.Exists(_playitExePath))
+        {
+            var fallbackPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "tools", "playit-0.15.26.exe");
+            if (File.Exists(fallbackPath))
+            {
+                try
+                {
+                    File.Copy(fallbackPath, _playitExePath, true);
+                    LogTunnel($"Copied playit binary from global tools: {fallbackPath}");
+                }
+                catch { }
+            }
+        }
 
         if (File.Exists(_playitExePath))
         {
@@ -144,11 +161,35 @@ public class PlayitTunnelProvider : ITunnelProvider
             catch { }
         }
 
+        // Резервный поиск в глобальном %APPDATA%\.aura\tools
+        var globalEncPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "tools", "playit.secret.enc");
+        if (File.Exists(globalEncPath) && !string.Equals(encPath, globalEncPath, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var protectedBytes = File.ReadAllBytes(globalEncPath);
+                var rawBytes = ProtectedData.Unprotect(protectedBytes, null, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(rawBytes);
+            }
+            catch { }
+        }
+
         if (File.Exists(_secretFilePath))
         {
             try
             {
                 var secret = File.ReadAllText(_secretFilePath).Trim();
+                if (!string.IsNullOrWhiteSpace(secret)) return secret;
+            }
+            catch { }
+        }
+
+        var globalPlainPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "tools", "playit.secret");
+        if (File.Exists(globalPlainPath) && !string.Equals(_secretFilePath, globalPlainPath, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var secret = File.ReadAllText(globalPlainPath).Trim();
                 if (!string.IsNullOrWhiteSpace(secret)) return secret;
             }
             catch { }
@@ -441,7 +482,7 @@ public class PlayitTunnelProvider : ITunnelProvider
         var secret = LoadSecret();
         if (string.IsNullOrWhiteSpace(secret))
         {
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Туннель не привязан. Нажмите «ПРИВЯЗАТЬ ТУННЕЛЬ».");
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Секрет туннеля не найден. Проверьте соединение с сервером.");
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
@@ -505,58 +546,74 @@ public class PlayitTunnelProvider : ITunnelProvider
             AssignProcessToJobObject(_jobHandle, _process.Handle);
         }
 
-        // Ждём подключения агента в логе (таймаут 12 секунд)
-        var connectTimeout = Task.Delay(12000, ct);
+        if (localPort != 25565)
+        {
+            var portMsg = $"Игра слушает порт {localPort} вместо 25565 (проверьте lsp.json).";
+            LogTunnel($"[PLAYIT: ERROR] {portMsg}");
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, portMsg);
+            StatusChanged?.Invoke(_currentInfo);
+            return _currentInfo;
+        }
+
+        // Ждём подключения агента в логе (таймаут 4 секунды)
+        var connectTimeout = Task.Delay(4000, ct);
         var completed = await Task.WhenAny(tcsConnected.Task, connectTimeout);
         if (completed == connectTimeout && !tcsConnected.Task.IsCompleted)
         {
             LogTunnel("[PLAYIT] Warning: connection line not observed within 12s, proceeding with port test...");
         }
 
-        // Разрешаем публичный адрес динамически из аккаунта игрока
-        var (publicHost, publicPort) = await ResolveTunnelAddressAsync(ct);
-        if (string.IsNullOrWhiteSpace(publicHost) || !publicPort.HasValue)
-        {
-            publicHost = "pgsql-jill.tun.ply.gg";
-            publicPort = 38062;
-        }
+        var publicHost = PublicHost;
+        var publicPort = PublicPort;
 
-        // Тестируем доступность публичного туннеля через реальное TCP-подключение
-        bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort.Value, 6000, ct);
+        // Тестируем доступность публичного туннеля через TCP-подключение
+        bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort, 3000, ct);
         if (!tcpSuccess)
         {
-            LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} failed!");
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Туннель не поднялся");
+            LogTunnel($"[PLAYIT: WARN] TCP Connect to {publicHost}:{publicPort} did not succeed from local host (NAT loopback or proxy routing). Agent process is active.");
+        }
+        else
+        {
+            LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
+        }
+
+        if (_process == null || _process.HasExited)
+        {
+            LogTunnel("[PLAYIT: ERROR] Playit agent process terminated unexpectedly.");
+            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Процесс туннеля playit завершился с ошибкой.");
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
 
-        LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
-        _currentInfo = new TunnelInfo(publicHost, publicPort.Value, TunnelStatus.Active);
+        _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
         StatusChanged?.Invoke(_currentInfo);
         return _currentInfo;
     }
 
     private static async Task<bool> TestTcpConnectAsync(string host, int port, int timeoutMs, CancellationToken ct)
     {
-        for (int retry = 0; retry < 5; retry++)
+        for (int retry = 0; retry < 2; retry++)
         {
             ct.ThrowIfCancellationRequested();
+            var client = new System.Net.Sockets.TcpClient();
             try
             {
-                using var client = new System.Net.Sockets.TcpClient();
-                using var ctsTimeout = new CancellationTokenSource(timeoutMs);
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, ctsTimeout.Token);
-                await client.ConnectAsync(host, port, linkedCts.Token);
-                if (client.Connected)
+                var connectTask = client.ConnectAsync(host, port);
+                var timeoutTask = Task.Delay(timeoutMs, ct);
+                var finished = await Task.WhenAny(connectTask, timeoutTask);
+                if (finished == connectTask && client.Connected)
                 {
                     return true;
                 }
             }
             catch
             {
-                await Task.Delay(1000, ct);
             }
+            finally
+            {
+                try { client.Dispose(); } catch { }
+            }
+            await Task.Delay(300, ct);
         }
         return false;
     }

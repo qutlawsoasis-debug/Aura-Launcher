@@ -32,7 +32,7 @@ function sendJson(res, statusCode, data) {
         'Content-Type': 'application/json; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aura-Client'
     });
     res.end(json);
 }
@@ -41,7 +41,7 @@ export const server = http.createServer(async (req, res) => {
         res.writeHead(204, {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aura-Client'
         });
         res.end();
         return;
@@ -51,6 +51,25 @@ export const server = http.createServer(async (req, res) => {
     console.log(`[LOBBY-API] ${req.method} ${pathname}`);
     try {
         const store = getStore();
+        // 0. GET /api/tunnel-config
+        if (req.method === 'GET' && pathname === '/api/tunnel-config') {
+            const clientHeader = req.headers['x-aura-client'];
+            if (clientHeader !== 'launcher') {
+                sendJson(res, 403, { error: 'Forbidden: invalid client' });
+                return;
+            }
+            const secret = process.env.PLAYIT_SECRET;
+            if (!secret) {
+                sendJson(res, 500, { error: 'PLAYIT_SECRET not configured on server' });
+                return;
+            }
+            sendJson(res, 200, {
+                secret,
+                publicAddress: 'pgsql-jill.tun.ply.gg',
+                publicPort: 38062
+            });
+            return;
+        }
         // 1. POST /api/lobby
         if (req.method === 'POST' && pathname === '/api/lobby') {
             const body = await parseBody(req);

@@ -21,7 +21,7 @@ public class LobbyViewModel : ObservableObject
     private readonly ILanWorldWatcher _worldWatcher;
     private readonly ITunnelProvider? _tunnelProvider;
     private readonly ISkinService? _skinService;
-    private bool _hasPlayitSecret;
+    private readonly ILobbyApiClient? _lobbyApiClient;
 
     // === Общее состояние ===
     private bool _isInLobby;
@@ -36,88 +36,42 @@ public class LobbyViewModel : ObservableObject
     private bool _isWorldOpen;
     private bool _codeCopied;
 
+    // === Ошибка туннеля и копирование лога ===
+    private bool _showTunnelFailedLogButton;
+    private string? _tunnelFailureReason;
+    private bool _tunnelLogCopied;
+
     // === Гость ===
     private string _guestCodeInput = string.Empty;
     private bool _isGuestJoined;
     private string _guestStatusText = "Введите 6-значный код лобби";
     private bool _canGuestConnect;
 
-    // === Привязка туннеля ===
-    private string? _claimUrl;
-    private bool _hasClaimUrl;
-    private bool _isClaiming;
-    private bool _hasClaimError;
-    private string? _claimErrorMessage;
-    private bool _claimCopied;
-
-    public bool HasPlayitSecret
+    public bool ShowTunnelFailedLogButton
     {
-        get => _hasPlayitSecret;
-        private set
-        {
-            if (SetProperty(ref _hasPlayitSecret, value))
-            {
-                OnPropertyChanged(nameof(ShowClaimTunnelButton));
-                OnPropertyChanged(nameof(ShowCreateLobbyButton));
-            }
-        }
+        get => _showTunnelFailedLogButton;
+        private set => SetProperty(ref _showTunnelFailedLogButton, value);
     }
 
-    public bool ShowClaimTunnelButton => !HasPlayitSecret;
-    public bool ShowCreateLobbyButton => HasPlayitSecret;
-
-    public string? ClaimUrl
+    public string? TunnelFailureReason
     {
-        get => _claimUrl;
-        private set
-        {
-            if (SetProperty(ref _claimUrl, value))
-            {
-                HasClaimUrl = !string.IsNullOrWhiteSpace(value);
-            }
-        }
+        get => _tunnelFailureReason;
+        private set => SetProperty(ref _tunnelFailureReason, value);
     }
 
-    public bool HasClaimUrl
+    public bool TunnelLogCopied
     {
-        get => _hasClaimUrl;
-        private set => SetProperty(ref _hasClaimUrl, value);
+        get => _tunnelLogCopied;
+        private set => SetProperty(ref _tunnelLogCopied, value);
     }
 
-    public bool IsClaiming
-    {
-        get => _isClaiming;
-        private set
-        {
-            if (SetProperty(ref _isClaiming, value))
-            {
-                RaiseAllCommands();
-            }
-        }
-    }
-
-    public bool HasClaimError
-    {
-        get => _hasClaimError;
-        private set => SetProperty(ref _hasClaimError, value);
-    }
-
-    public string? ClaimErrorMessage
-    {
-        get => _claimErrorMessage;
-        private set => SetProperty(ref _claimErrorMessage, value);
-    }
-
-    public bool ClaimCopied
-    {
-        get => _claimCopied;
-        private set => SetProperty(ref _claimCopied, value);
-    }
-
-    public AsyncRelayCommand ClaimTunnelCommand { get; }
-    public RelayCommand OpenClaimUrlCommand { get; }
-    public RelayCommand CopyClaimUrlCommand { get; }
-    public AsyncRelayCommand RetryClaimCommand { get; }
+    public AsyncRelayCommand CreateLobbyCommand { get; }
+    public AsyncRelayCommand JoinLobbyCommand { get; }
+    public RelayCommand CopyCodeCommand { get; }
+    public AsyncRelayCommand ConnectToGameCommand { get; }
+    public AsyncRelayCommand OpenWorldCommand { get; }
+    public RelayCommand LeaveLobbyCommand { get; }
+    public RelayCommand CopyTunnelLogCommand { get; }
 
     public LobbyViewModel(
         ILobbyService lobbyService,
@@ -125,7 +79,8 @@ public class LobbyViewModel : ObservableObject
         IConfigService configService,
         ILanWorldWatcher? worldWatcher = null,
         ITunnelProvider? tunnelProvider = null,
-        ISkinService? skinService = null)
+        ISkinService? skinService = null,
+        ILobbyApiClient? lobbyApiClient = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
@@ -133,35 +88,7 @@ public class LobbyViewModel : ObservableObject
         _worldWatcher = worldWatcher ?? new LanWorldWatcher();
         _tunnelProvider = tunnelProvider;
         _skinService = skinService;
-
-        UpdateSecretState();
-
-        ClaimTunnelCommand = new AsyncRelayCommand(ClaimTunnelAsync, () => !IsClaiming && !IsInLobby);
-        RetryClaimCommand = new AsyncRelayCommand(ClaimTunnelAsync, () => !IsClaiming && !IsInLobby);
-        OpenClaimUrlCommand = new RelayCommand(_ =>
-        {
-            if (!string.IsNullOrWhiteSpace(ClaimUrl))
-            {
-                PlayitTunnelProvider.OpenBrowser(ClaimUrl);
-            }
-        }, _ => !string.IsNullOrWhiteSpace(ClaimUrl));
-        CopyClaimUrlCommand = new RelayCommand(_ =>
-        {
-            if (!string.IsNullOrWhiteSpace(ClaimUrl))
-            {
-                try
-                {
-                    Clipboard.SetText(ClaimUrl);
-                    ClaimCopied = true;
-                    PlayitTunnelProvider.LogTunnel($"[UI] Claim URL copied to clipboard: {ClaimUrl}");
-                    _ = Task.Delay(2000).ContinueWith(_ => Dispatch(() => ClaimCopied = false));
-                }
-                catch (Exception ex)
-                {
-                    PlayitTunnelProvider.LogTunnel($"[UI: ERROR] Failed to copy URL to clipboard: {ex.Message}");
-                }
-            }
-        }, _ => !string.IsNullOrWhiteSpace(ClaimUrl));
+        _lobbyApiClient = lobbyApiClient;
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6);
@@ -169,6 +96,36 @@ public class LobbyViewModel : ObservableObject
         ConnectToGameCommand = new AsyncRelayCommand(ConnectToGameAsync, () => !IsBusy && CanGuestConnect);
         OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && _lobbyService.IsHost);
         LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
+
+        CopyTunnelLogCommand = new RelayCommand(_ =>
+        {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var logPath = System.IO.Path.Combine(appData, ".aura", "logs", "tunnel.log");
+                string text;
+                if (System.IO.File.Exists(logPath))
+                {
+                    var lines = System.IO.File.ReadAllLines(logPath);
+                    var takeCount = Math.Min(50, lines.Length);
+                    var last50 = new string[takeCount];
+                    Array.Copy(lines, lines.Length - takeCount, last50, 0, takeCount);
+                    text = string.Join(Environment.NewLine, last50);
+                }
+                else
+                {
+                    text = "tunnel.log не найден.";
+                }
+
+                Clipboard.SetText(text);
+                TunnelLogCopied = true;
+                _ = Task.Delay(2000).ContinueWith(_ => Dispatch(() => TunnelLogCopied = false));
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[UI: ERROR] Failed to copy tunnel log: {ex.Message}");
+            }
+        });
 
         // Подписка на события LobbyService
         _lobbyService.StatusChanged += OnLobbyStatusChanged;
@@ -303,106 +260,63 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
-    // === Команды ===
-
-    public AsyncRelayCommand CreateLobbyCommand { get; }
-    public AsyncRelayCommand JoinLobbyCommand { get; }
-    public RelayCommand CopyCodeCommand { get; }
-    public AsyncRelayCommand ConnectToGameCommand { get; }
-    public AsyncRelayCommand OpenWorldCommand { get; }
-    public RelayCommand LeaveLobbyCommand { get; }
-
-    public void UpdateSecretState()
-    {
-        if (_tunnelProvider is PlayitTunnelProvider playit)
-        {
-            HasPlayitSecret = playit.HasSecret;
-        }
-        else
-        {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
-            var playitDefault = new PlayitTunnelProvider(null, toolsDir);
-            HasPlayitSecret = playitDefault.HasSecret;
-        }
-    }
-
-    private async Task ClaimTunnelAsync()
-    {
-        IsClaiming = true;
-        HasClaimError = false;
-        ClaimErrorMessage = null;
-        ClaimUrl = null;
-        ClaimCopied = false;
-        StatusText = "Подготовка ссылки привязки...";
-        StatusIcon = "⏳";
-
-        try
-        {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
-            var provider = _tunnelProvider as PlayitTunnelProvider ?? new PlayitTunnelProvider(null, toolsDir);
-
-            var secret = await provider.ClaimTunnelAsync(url =>
-            {
-                Dispatch(() =>
-                {
-                    ClaimUrl = url;
-                    StatusText = "Подтвердите привязку в браузере";
-                    StatusIcon = "🌐";
-                    RaiseAllCommands();
-                });
-            });
-
-            if (!string.IsNullOrWhiteSpace(secret))
-            {
-                UpdateSecretState();
-                ClaimUrl = null;
-                HasClaimError = false;
-                ClaimErrorMessage = null;
-                StatusText = "Туннель успешно привязан! Теперь можно создать лобби.";
-                StatusIcon = "✅";
-            }
-            else
-            {
-                HasClaimError = true;
-                ClaimErrorMessage = "Туннель не привязан (время ожидания истекло).";
-                StatusText = "Туннель не привязан";
-                StatusIcon = "❌";
-            }
-        }
-        catch (Exception ex)
-        {
-            PlayitTunnelProvider.LogTunnel($"[CLAIM: EXCEPTION] {ex}");
-            HasClaimError = true;
-            ClaimErrorMessage = ex.Message;
-            StatusText = $"Ошибка привязки: {ex.Message}";
-            StatusIcon = "❌";
-        }
-        finally
-        {
-            IsClaiming = false;
-            RaiseAllCommands();
-        }
-    }
-
     private async Task CreateLobbyAsync()
     {
-        UpdateSecretState();
-        if (!HasPlayitSecret)
-        {
-            StatusText = "Сначала нажмите «ПРИВЯЗАТЬ ТУННЕЛЬ»";
-            StatusIcon = "⚠️";
-            return;
-        }
-
         IsBusy = true;
         StatusText = "Создание лобби...";
         StatusIcon = "⏳";
+        ShowTunnelFailedLogButton = false;
+        TunnelFailureReason = null;
 
         try
         {
-            var hostName = _configService.CurrentConfig.Nickname;
+            var playit = _tunnelProvider as PlayitTunnelProvider;
+            if (playit == null)
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
+                playit = new PlayitTunnelProvider(null, toolsDir);
+            }
+
+            if (!playit.HasSecret)
+            {
+                StatusText = "Получение конфигурации сервера...";
+                PlayitTunnelProvider.LogTunnel("Local secret not found. Requesting /api/tunnel-config from lobby-api...");
+
+                var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+                var cfg = await client.GetTunnelConfigAsync();
+
+                if (cfg == null || string.IsNullOrWhiteSpace(cfg.Secret))
+                {
+                    PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server.");
+                    StatusText = "Ошибка получения конфигурации туннеля";
+                    StatusIcon = "❌";
+                    ShowTunnelFailedLogButton = true;
+                    TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
+                    return;
+                }
+
+                PlayitTunnelProvider.LogTunnel("Tunnel configuration received. Saving secret with DPAPI...");
+                playit.SaveSecret(cfg.Secret);
+                if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
+                if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
+            }
+            else
+            {
+                try
+                {
+                    var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+                    var cfg = await client.GetTunnelConfigAsync();
+                    if (cfg != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
+                        if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
+                    }
+                }
+                catch { }
+            }
+
+            var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
 
             // Автоматически перезаливаем текущий скин под актуальным ником
             _ = EnsureSkinUploadedAsync();
@@ -415,19 +329,24 @@ public class LobbyViewModel : ObservableObject
                 IsLobbyCreated = true;
                 IsInLobby = true;
                 HostStatusText = "Ожидание мира...";
-                StatusText = "Лобби создано! Отправь код другу и открой мир в Minecraft";
-                StatusIcon = "🎮";
+                StatusText = "Лобби создано! Отправь код другу и нажми «ОТКРЫТЬ МИР»";
+                StatusIcon = "👑";
             }
             else
             {
                 StatusText = "Не удалось создать лобби. Проверь lobby-api сервер";
                 StatusIcon = "❌";
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = "Сервер лобби вернул ошибку при создании лобби.";
             }
         }
         catch (Exception ex)
         {
+            PlayitTunnelProvider.LogTunnel($"[CREATE-LOBBY: ERROR] {ex.Message}");
             StatusText = $"Ошибка: {ex.Message}";
             StatusIcon = "❌";
+            ShowTunnelFailedLogButton = true;
+            TunnelFailureReason = ex.Message;
         }
         finally
         {
@@ -492,31 +411,45 @@ public class LobbyViewModel : ObservableObject
     {
         Dispatch(async () =>
         {
-            HostStatusText = $"Мир открыт на порту {port}! Подключение туннеля...";
+            if (port != 25565)
+            {
+                HostStatusText = $"Ошибка: порт {port} вместо 25565";
+                StatusText = $"Мир открыт на порту {port}, но туннель ожидает 25565 (проверьте lsp.json).";
+                StatusIcon = "❌";
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = $"Неверный порт: игра слушает {port}, а туннель ожидает 25565.";
+                return;
+            }
+
+            HostStatusText = "Мир открыт на порту 25565! Подключение туннеля...";
             try
             {
-                var success = await _lobbyService.HostOpenWorldAsync(localPort: port);
+                var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565);
                 if (success)
                 {
                     IsWorldOpen = true;
                     HostStatusText = "Лобби открыто!";
-                    StatusText = $"Мир открыт (порт {port}) — друзья могут подключиться!";
+                    StatusText = "Мир готов — друзья могут подключаться!";
                     StatusIcon = "✅";
+                    ShowTunnelFailedLogButton = false;
+                    TunnelFailureReason = null;
                 }
                 else
                 {
                     HostStatusText = "Ошибка: туннель не поднялся";
-                    StatusText = "Туннель не поднялся. Лобби отменено.";
+                    StatusText = "Туннель не поднялся. Друзья не смогут подключиться.";
                     StatusIcon = "❌";
-                    try { await _lobbyService.CloseLobbyAsHostAsync(); } catch { }
+                    ShowTunnelFailedLogButton = true;
+                    TunnelFailureReason = "Туннель playit не смог подтвердить TCP-соединение на публичный адрес.";
                 }
             }
             catch (Exception ex)
             {
-                HostStatusText = "Ошибка";
+                HostStatusText = "Ошибка туннеля";
                 StatusText = $"Ошибка туннеля: {ex.Message}";
                 StatusIcon = "❌";
-                try { await _lobbyService.CloseLobbyAsHostAsync(); } catch { }
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = ex.Message;
             }
         });
     }
@@ -750,10 +683,9 @@ public class LobbyViewModel : ObservableObject
         JoinLobbyCommand.RaiseCanExecuteChanged();
         ConnectToGameCommand.RaiseCanExecuteChanged();
         OpenWorldCommand.RaiseCanExecuteChanged();
-        ClaimTunnelCommand.RaiseCanExecuteChanged();
-        RetryClaimCommand.RaiseCanExecuteChanged();
-        OpenClaimUrlCommand.RaiseCanExecuteChanged();
-        CopyClaimUrlCommand.RaiseCanExecuteChanged();
+        LeaveLobbyCommand.RaiseCanExecuteChanged();
+        CopyCodeCommand.RaiseCanExecuteChanged();
+        CopyTunnelLogCommand.RaiseCanExecuteChanged();
     }
 
     private async Task EnsureSkinUploadedAsync()

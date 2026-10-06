@@ -174,7 +174,8 @@ public partial class App : Application
             sp.GetRequiredService<IConfigService>(),
             sp.GetRequiredService<ILanWorldWatcher>(),
             sp.GetRequiredService<ITunnelProvider>(),
-            sp.GetRequiredService<ISkinService>()));
+            sp.GetRequiredService<ISkinService>(),
+            sp.GetRequiredService<ILobbyApiClient>()));
         services.AddSingleton<MainViewModel>();
     }
 
