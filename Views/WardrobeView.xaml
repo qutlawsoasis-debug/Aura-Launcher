@@ -53,51 +53,37 @@
             </Grid.ColumnDefinitions>
 
             <!-- ============================================== -->
-            <!-- LEFT: 144x288 figure (front/back with drag     -->
-            <!-- rotation), soft oval shadow, caption           -->
+            <!-- LEFT: 170x290 3D Viewport figure, soft oval    -->
+            <!-- shadow, caption                                -->
             <!-- ============================================== -->
             <StackPanel Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Grid x:Name="SkinDragArea"
-                      Width="144" Height="300"
+                      Width="170" Height="290"
                       Background="Transparent"
                       Cursor="Hand"
                       MouseDown="Skin_MouseDown"
                       MouseMove="Skin_MouseMove"
                       MouseUp="Skin_MouseUp">
-                    
+
                     <!-- Soft oval shadow under feet -->
                     <Ellipse Width="110" Height="10"
                              Fill="#40000000"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Bottom"
-                             Margin="0,0,0,8" />
+                             Margin="0,0,0,26" />
 
-                    <!-- Rotating Figure Container with ScaleX RenderTransform -->
-                    <Grid Width="144" Height="288"
-                          HorizontalAlignment="Center"
-                          VerticalAlignment="Top"
-                          RenderTransformOrigin="0.5,0.5">
-                        <Grid.RenderTransform>
-                            <ScaleTransform x:Name="FigureScale" ScaleX="1.0" />
-                        </Grid.RenderTransform>
-
-                        <!-- Front View -->
-                        <Image x:Name="ImgFront"
-                               Source="{Binding SkinFrontPreview}"
-                               Width="144" Height="288"
-                               RenderOptions.BitmapScalingMode="NearestNeighbor"
-                               RenderOptions.EdgeMode="Aliased"
-                               Stretch="Fill" />
-
-                        <!-- Back View (shown when rotated past 90 degrees) -->
-                        <Image x:Name="ImgBack"
-                               Source="{Binding SkinBackPreview}"
-                               Width="144" Height="288"
-                               Opacity="0"
-                               RenderOptions.BitmapScalingMode="NearestNeighbor"
-                               RenderOptions.EdgeMode="Aliased"
-                               Stretch="Fill" />
-                    </Grid>
+                    <!-- 3D Viewport for Player Model -->
+                    <Viewport3D x:Name="SkinViewport"
+                                Width="170" Height="290"
+                                ClipToBounds="False">
+                        <Viewport3D.Camera>
+                            <PerspectiveCamera Position="0,0,52"
+                                               LookDirection="0,0,-1"
+                                               UpDirection="0,1,0"
+                                               FieldOfView="45" />
+                        </Viewport3D.Camera>
+                        <ModelVisual3D x:Name="PlayerModelVisual" />
+                    </Viewport3D>
                 </Grid>
 
                 <!-- Label "Потяните, чтобы повернуть" 12px mute -->

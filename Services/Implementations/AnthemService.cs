@@ -92,15 +92,7 @@ public class AnthemService : IAnthemService
 
     public void Initialize()
     {
-        LauncherConfig config;
-        try
-        {
-            config = _configService.LoadConfigAsync().GetAwaiter().GetResult();
-        }
-        catch
-        {
-            config = _configService.CurrentConfig;
-        }
+        LauncherConfig config = _configService.CurrentConfig;
 
         _volumePercent = Math.Clamp(config.AnthemVolume, 0, 100);
         _isMuted = config.AnthemMuted;

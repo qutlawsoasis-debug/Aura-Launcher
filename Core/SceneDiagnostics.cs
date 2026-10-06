@@ -876,36 +876,58 @@ public static class SceneDiagnostics
             });
             await Task.Delay(200);
 
-            // 2. СКИН - спереди
+            // 2. СКИН - 3D вид спереди (по умолчанию 0°)
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));
             await Task.Delay(500);
-            window.Dispatcher.Invoke(() =>
-            {
-                if (mainVm.CurrentView is WardrobeViewModel)
-                {
-                    // front is default
-                }
-            });
-            SaveShot($"{prefix}_tab_skin.png");
-            SaveShot($"{prefix}_tab_skin_front.png");
-
-            // 2b. СКИН - сзади
-            await Task.Delay(200);
-            window.Dispatcher.Invoke(() =>
-            {
-                var wardrobeView = FindVisualChild<WardrobeView>(window);
-                wardrobeView?.RotateToBack();
-            });
-            await Task.Delay(600);
-            SaveShot($"{prefix}_tab_skin_back.png");
-
-            // Return to front
             window.Dispatcher.Invoke(() =>
             {
                 var wardrobeView = FindVisualChild<WardrobeView>(window);
                 wardrobeView?.RotateToFront();
             });
             await Task.Delay(300);
+            SaveShot($"{prefix}_tab_skin.png");
+            SaveShot($"{prefix}_tab_skin_front.png");
+
+            // 2b. СКИН - повёрнутый на 90° (виден бок)
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                wardrobeView?.RotateToSide();
+            });
+            await Task.Delay(400);
+            SaveShot($"{prefix}_tab_skin_side.png");
+
+            // 2c. СКИН - вид сзади (180°)
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                wardrobeView?.RotateToBack();
+            });
+            await Task.Delay(400);
+            SaveShot($"{prefix}_tab_skin_back.png");
+
+            // 2d. СКИН - с включёнными тонкими руками (Alex)
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                wardrobeView?.RotateToFront();
+                if (mainVm.CurrentView is WardrobeViewModel wvm)
+                {
+                    wvm.IsSlimModel = true;
+                }
+            });
+            await Task.Delay(400);
+            SaveShot($"{prefix}_tab_skin_slim.png");
+
+            // Возврат к стандартной модели
+            window.Dispatcher.Invoke(() =>
+            {
+                if (mainVm.CurrentView is WardrobeViewModel wvm)
+                {
+                    wvm.IsSlimModel = false;
+                }
+            });
+            await Task.Delay(200);
 
             // 3. НАСТРОЙКИ
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Settings"));
