@@ -17,8 +17,8 @@ export default async function handler(req: any, res: any) {
     const urlStr = req.url || '';
     const cleanUrl = urlStr.split('?')[0];
 
-    // Check if this is a raw texture request: /csl/raw/{hash}.png or /api/csl/raw/{hash}.png
-    const rawMatch = cleanUrl.match(/\/raw\/([a-fA-F0-9]+?)(?:\.png)?$/);
+    // Check if this is a texture request: /csl/textures/{hash} or /csl/raw/{hash} (with or without .png)
+    const rawMatch = cleanUrl.match(/\/(?:raw|textures)\/([a-fA-F0-9]+?)(?:\.png)?$/);
     if (rawMatch) {
       const sha1 = rawMatch[1].toLowerCase();
       const store = getStore();
@@ -71,18 +71,17 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 404, { error: 'Skin not found' });
     }
 
-    const proto = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers['host'] || 'lobby-api.vercel.app';
-    const baseUrl = `${proto}://${host}`;
-    const textureUrl = `${baseUrl}/csl/raw/${skinRecord.sha1}.png`;
-
     const isSlim = skinRecord.model === 'slim';
+    const textureHash = skinRecord.sha1;
 
+    // Per CustomSkinAPI specification:
+    // skins / textures dictionary maps model ("default" / "slim") to texture unique identifier (hash)
+    // CustomSkinLoader requests: {root}/textures/{identifier}
     const cslResponse = {
       username: skinRecord.nickname,
       skins: {
-        default: isSlim ? null : textureUrl,
-        slim: isSlim ? textureUrl : null
+        default: isSlim ? null : textureHash,
+        slim: isSlim ? textureHash : null
       },
       cape: null
     };

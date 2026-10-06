@@ -374,7 +374,7 @@ export const server = http.createServer(async (req, res) => {
 
     // 8. GET /csl/{username}.json
     const cslMatch = pathname.match(/^\/csl\/([^/]+?)(?:\.json)?$/);
-    if (req.method === 'GET' && cslMatch && !pathname.startsWith('/csl/raw/')) {
+    if (req.method === 'GET' && cslMatch && !pathname.startsWith('/csl/raw/') && !pathname.startsWith('/csl/textures/')) {
       const username = cslMatch[1].trim();
       const skinRecord = await store.getSkin(username.toLowerCase());
       if (!skinRecord) {
@@ -382,24 +382,22 @@ export const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const host = req.headers['host'] || '127.0.0.1:3000';
-      const proto = req.headers['x-forwarded-proto'] || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https');
-      const textureUrl = `${proto}://${host}/csl/raw/${skinRecord.sha1}.png`;
       const isSlim = skinRecord.model === 'slim';
+      const textureHash = skinRecord.sha1;
 
       sendJson(res, 200, {
         username: skinRecord.nickname,
         skins: {
-          default: isSlim ? null : textureUrl,
-          slim: isSlim ? textureUrl : null
+          default: isSlim ? null : textureHash,
+          slim: isSlim ? textureHash : null
         },
         cape: null
       });
       return;
     }
 
-    // 9. GET /csl/raw/{sha1}.png
-    const rawMatch = pathname.match(/^\/csl\/raw\/([a-fA-F0-9]+?)(?:\.png)?$/);
+    // 9. GET /csl/raw/{sha1}.png or /csl/textures/{sha1}
+    const rawMatch = pathname.match(/^\/csl\/(?:raw|textures)\/([a-fA-F0-9]+?)(?:\.png)?$/);
     if (req.method === 'GET' && rawMatch) {
       const sha1 = rawMatch[1].toLowerCase();
       const pngBuffer = await store.getSkinByHash(sha1);
