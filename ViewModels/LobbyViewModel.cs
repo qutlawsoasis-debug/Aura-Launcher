@@ -116,6 +116,9 @@ public class LobbyViewModel : ObservableObject
     public AsyncRelayCommand OpenWorldCommand { get; }
     public RelayCommand LeaveLobbyCommand { get; }
     public RelayCommand CopyTunnelLogCommand { get; }
+    public RelayCommand SendReportCommand { get; }
+
+    public event Action<string?>? SendReportRequested;
 
     public LobbyViewModel(
         ILobbyService lobbyService,
@@ -174,6 +177,12 @@ public class LobbyViewModel : ObservableObject
             {
                 PlayitTunnelProvider.LogTunnel($"[UI: ERROR] Failed to copy tunnel log: {ex.Message}");
             }
+        });
+
+        SendReportCommand = new RelayCommand(_ =>
+        {
+            var err = !string.IsNullOrWhiteSpace(TunnelFailureReason) ? TunnelFailureReason : JoinErrorMessage;
+            SendReportRequested?.Invoke(err);
         });
 
         // Подписка на события LobbyService

@@ -122,6 +122,56 @@ public class WardrobeViewModel : ObservableObject
 
     public SolidColorBrush StatusBrush => _isStatusError ? ErrorBrush : SuccessBrush;
 
+    private readonly IFriendService? _friendService;
+    private string _nicknameInput = string.Empty;
+    private string _nicknameErrorText = string.Empty;
+    private bool _isProfileIdCopied;
+
+    public string NicknameInput
+    {
+        get => _nicknameInput;
+        set
+        {
+            if (SetProperty(ref _nicknameInput, value ?? string.Empty))
+            {
+                ValidateNicknameInput(value);
+            }
+        }
+    }
+
+    public string NicknameErrorText
+    {
+        get => _nicknameErrorText;
+        private set
+        {
+            if (SetProperty(ref _nicknameErrorText, value))
+            {
+                OnPropertyChanged(nameof(HasNicknameError));
+            }
+        }
+    }
+
+    public bool HasNicknameError => !string.IsNullOrWhiteSpace(_nicknameErrorText);
+
+    public string ProfileId => _friendService?.CurrentFriendCode ?? _configService.CurrentConfig.FriendCode ?? "--------";
+
+    public bool IsProfileIdCopied
+    {
+        get => _isProfileIdCopied;
+        private set
+        {
+            if (SetProperty(ref _isProfileIdCopied, value))
+            {
+                OnPropertyChanged(nameof(CopyProfileIdText));
+            }
+        }
+    }
+
+    public string CopyProfileIdText => IsProfileIdCopied ? "Скопировано!" : "Копировать";
+
+    public RelayCommand CopyProfileIdCommand { get; }
+    public RelayCommand SaveNicknameCommand { get; }
+
     public bool IsSlimModel
     {
         get => _configService.CurrentConfig.SkinModel == "slim";
@@ -144,23 +194,102 @@ public class WardrobeViewModel : ObservableObject
     public RelayCommand SelectSkinCommand { get; }
     public RelayCommand ResetSkinCommand { get; }
 
-    public WardrobeViewModel(ISkinService skinService, IConfigService configService)
+    public WardrobeViewModel(ISkinService skinService, IConfigService configService, IFriendService? friendService = null)
     {
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _friendService = friendService;
+
+        _nicknameInput = _configService.CurrentConfig.Nickname ?? "Player";
 
         SelectSkinCommand = new RelayCommand(_ => SelectSkinFile());
         ResetSkinCommand = new RelayCommand(async _ => await ResetSkinToDefaultAsync());
+        CopyProfileIdCommand = new RelayCommand(_ => CopyProfileId());
+        SaveNicknameCommand = new RelayCommand(async _ => await ApplyNicknameChangeAsync());
 
         UpdateSkinPreviews();
 
         _configService.ConfigChanged += (s, cfg) =>
         {
             OnPropertyChanged(nameof(Nickname));
+            if (_nicknameInput != cfg.Nickname && !HasNicknameError)
+            {
+                _nicknameInput = cfg.Nickname;
+                OnPropertyChanged(nameof(NicknameInput));
+            }
+            OnPropertyChanged(nameof(ProfileId));
             OnPropertyChanged(nameof(SkinPath));
             OnPropertyChanged(nameof(IsSlimModel));
             UpdateSkinPreviews();
         };
+    }
+
+    private void ValidateNicknameInput(string? val)
+    {
+        var result = NicknameValidator.Validate(val);
+        if (result.IsValid)
+        {
+            NicknameErrorText = string.Empty;
+        }
+        else
+        {
+            NicknameErrorText = "Ник: от 3 до 16 символов, латиница, цифры и _.";
+        }
+    }
+
+    public async Task ApplyNicknameChangeAsync()
+    {
+        var clean = (_nicknameInput ?? string.Empty).Trim();
+        var validation = NicknameValidator.Validate(clean);
+        if (!validation.IsValid)
+        {
+            NicknameErrorText = "Ник: от 3 до 16 символов, латиница, цифры и _.";
+            return;
+        }
+
+        var oldNick = _configService.CurrentConfig.Nickname;
+        if (string.Equals(oldNick, clean, StringComparison.Ordinal))
+        {
+            NicknameErrorText = string.Empty;
+            return;
+        }
+
+        if (_friendService != null)
+        {
+            var res = await _friendService.ChangeNicknameAsync(clean);
+            if (!res.Success)
+            {
+                NicknameErrorText = res.ErrorMessage ?? "Ошибка смены ника";
+                return;
+            }
+        }
+
+        NicknameErrorText = string.Empty;
+        _configService.CurrentConfig.Nickname = clean;
+        await _configService.SaveConfigAsync(_configService.CurrentConfig);
+
+        var cfg = _configService.CurrentConfig;
+        await _skinService.SyncSkinToGameAsync(cfg.SkinPath, clean, cfg.GameDir);
+        _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
+
+        OnPropertyChanged(nameof(Nickname));
+    }
+
+    private void CopyProfileId()
+    {
+        var code = ProfileId;
+        if (string.IsNullOrWhiteSpace(code) || code.Contains('-')) return;
+
+        try
+        {
+            System.Windows.Clipboard.SetText(code);
+            IsProfileIdCopied = true;
+            _ = Task.Delay(1600).ContinueWith(_ =>
+            {
+                System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => IsProfileIdCopied = false);
+            });
+        }
+        catch { }
     }
 
     public void SelectSkinFile()

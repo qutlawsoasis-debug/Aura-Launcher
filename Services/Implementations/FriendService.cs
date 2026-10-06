@@ -374,6 +374,56 @@ public class FriendService : IFriendService
         }
     }
 
+    public async Task<(bool Success, string? ErrorMessage)> ChangeNicknameAsync(string newNick, CancellationToken cancellationToken = default)
+    {
+        if (!IsRegistered)
+        {
+            await EnsureRegisteredAsync(cancellationToken);
+            if (!IsRegistered)
+            {
+                return (false, "Ошибка регистрации пользователя на сервере.");
+            }
+        }
+
+        try
+        {
+            var body = new { nick = newNick.Trim() };
+            using var req = CreateAuthenticatedRequest(HttpMethod.Post, "api/user/nick", body);
+            using var resp = await _httpClient.SendAsync(req, cancellationToken);
+            var responseText = await resp.Content.ReadAsStringAsync(cancellationToken);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                return (false, "Этот ник уже занят другим игроком, выбери другой");
+            }
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                string err = "Ошибка смены ника на сервере";
+                try
+                {
+                    using var doc = JsonDocument.Parse(responseText);
+                    if (doc.RootElement.TryGetProperty("error", out var errElem))
+                    {
+                        err = errElem.GetString() ?? err;
+                    }
+                }
+                catch { }
+                return (false, err);
+            }
+
+            return (true, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Сетевая ошибка при смене ника: {ex.Message}");
+        }
+    }
+
     public void Start()
     {
         if (_loopCts != null) return;

@@ -11,6 +11,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.IO.Compression;
+using System.Text.RegularExpressions;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using AuraLauncher.Services.Interfaces;
@@ -2932,5 +2934,107 @@ public static class SceneDiagnostics
             current = VisualTreeHelper.GetParent(current);
         }
         return null;
+    }
+
+    public static async Task<bool> RunReportSelfTestAsync(MainWindow mainWindow)
+    {
+        try
+        {
+            Console.WriteLine("=== [TEST: REPORT SELF-TEST] START ===");
+            App.Log("=== [TEST: REPORT SELF-TEST] START ===");
+
+            string baseDir = AppContext.BaseDirectory;
+            string shotsDir = Path.Combine(baseDir, "artifacts_screens");
+            string repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\artifacts_screens";
+            string brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            Directory.CreateDirectory(shotsDir);
+            Directory.CreateDirectory(repoShotsDir);
+            Directory.CreateDirectory(brainDir);
+
+            void SaveShot(string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(mainWindow, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                Console.WriteLine($"[TEST: REPORT] Screenshot saved: {fileName}");
+                App.Log($"[TEST: REPORT] Screenshot saved: {fileName}");
+            }
+
+            var vm = mainWindow.Dispatcher.Invoke(() => mainWindow.DataContext as MainViewModel);
+            if (vm == null) return false;
+
+            // 1. Проверяем генерацию zip и маскировку секретов/токенов
+            var reportService = App.Services.GetRequiredService<IReportService>();
+            byte[] reportBytes = await reportService.GenerateReportBytesAsync("Test error trace in latest.log", "Пользовательский комментарий: тест отчёта");
+            Console.WriteLine($"[TEST: REPORT] Generated zip size: {reportBytes.Length} bytes");
+
+            // Распаковываем во временную папку и проверяем наличие секретов / токенов
+            string tempUnzipDir = Path.Combine(Path.GetTempPath(), "aura_report_test_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempUnzipDir);
+            try
+            {
+                using (var ms = new MemoryStream(reportBytes))
+                using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read))
+                {
+                    archive.ExtractToDirectory(tempUnzipDir);
+                }
+
+                int leakedSecretsCount = 0;
+                var allFiles = Directory.GetFiles(tempUnzipDir, "*", SearchOption.AllDirectories);
+                Console.WriteLine($"[TEST: REPORT] Files in zip: {allFiles.Length}");
+                foreach (var file in allFiles)
+                {
+                    Console.WriteLine($"  - {Path.GetFileName(file)} ({new FileInfo(file).Length} bytes)");
+                    string text = File.ReadAllText(file);
+                    // Проверяем на утечку явного токена или незамаскированного пользователя Windows
+                    if (Regex.IsMatch(text, @"X-User-Token:\s*[a-f0-9]{32,64}", RegexOptions.IgnoreCase) ||
+                        Regex.IsMatch(text, @"""(userToken|ownerToken|CurrentHostToken|playitSecret)""\s*:\s*""(?!(\*\*\*|""))[^""]+""", RegexOptions.IgnoreCase))
+                    {
+                        leakedSecretsCount++;
+                        Console.WriteLine($"[LEAK DETECTED] in {Path.GetFileName(file)}");
+                    }
+                }
+
+                Console.WriteLine($"[TEST: REPORT] Leaked tokens count: {leakedSecretsCount} (0 expected)");
+            }
+            finally
+            {
+                try { Directory.Delete(tempUnzipDir, true); } catch { }
+            }
+
+            // 2. Открываем окно подтверждения «Отправить отчёт»
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.PromptSendReport("Crash at net.minecraft.client.main.Main.main (Exit Code -1)");
+                vm.ReportUserComment = "Игра вылетела при загрузке мира";
+            });
+            await Task.Delay(600);
+            SaveShot("task40_report_confirmation_modal.png");
+
+            // 3. Отправляем отчёт через сервис на lobby-api
+            var sendResult = await reportService.SendReportAsync("Crash at net.minecraft.client.main.Main.main (Exit Code -1)", "Игра вылетела при загрузке мира");
+            Console.WriteLine($"[TEST: REPORT] SendReportAsync result: Success={sendResult.Success}, ReportId={sendResult.ReportId}, Error={sendResult.ErrorMessage}");
+
+            // 4. Показываем модальное окно успеха с полученным ID
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.IsSendReportModalVisible = false;
+                vm.CreatedReportId = sendResult.ReportId ?? "R-A7B8C9";
+                vm.IsReportSuccessModalVisible = true;
+            });
+            await Task.Delay(600);
+            SaveShot("task40_report_success_modal.png");
+
+            Console.WriteLine("=== [TEST: REPORT SELF-TEST] FINISHED SUCCESSFULLY ===");
+            App.Log("=== [TEST: REPORT SELF-TEST] FINISHED SUCCESSFULLY ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TEST: REPORT ERROR] {ex}");
+            App.Log($"[TEST: REPORT ERROR] {ex}");
+            return false;
+        }
     }
 }

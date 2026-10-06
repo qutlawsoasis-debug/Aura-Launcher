@@ -309,8 +309,8 @@
                                  Style="{StaticResource GameMenuRadio}"
                                  MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 4. Скин -->
-                    <RadioButton x:Name="MenuBtnSkin" Content="Скин"
+                    <!-- 4. Профиль -->
+                    <RadioButton x:Name="MenuBtnSkin" Content="Профиль"
                                  Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
                                  IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
                                  Style="{StaticResource GameMenuRadio}"
@@ -714,6 +714,186 @@
                                 HorizontalAlignment="Right"
                                 Height="34" Padding="20,0" FontSize="13" />
                     </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 3.6 SEND REPORT CONFIRMATION MODAL -->
+            <Grid Panel.ZIndex="125"
+                  Visibility="{Binding IsSendReportModalVisible, Converter={StaticResource BoolToVis}}"
+                  Background="#99071017">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Width="500" Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        Padding="24,20,24,20">
+                    <StackPanel>
+                        <!-- Title -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Border Width="3" Height="18" Background="{StaticResource EmberBrush}" Margin="0,0,10,0" CornerRadius="1" />
+                            <TextBlock Text="Отправка отчёта"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkBrush}" />
+                        </StackPanel>
+
+                        <!-- Consent text -->
+                        <TextBlock Text="Будут отправлены логи лаунчера и игры, версии и ваш ник. Пароли и токены не отправляются."
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,14" />
+
+                        <!-- User comment label -->
+                        <TextBlock Text="Что произошло (необязательно):"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,0,0,6" />
+
+                        <!-- User comment input (max 300) -->
+                        <TextBox Text="{Binding ReportUserComment, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 MaxLength="300"
+                                 Height="70"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Background="#14212B"
+                                 Foreground="{StaticResource InkBrush}"
+                                 BorderBrush="{StaticResource LineInkBrush}"
+                                 BorderThickness="1"
+                                 Padding="8"
+                                 FontFamily="{StaticResource MainFont}"
+                                 FontSize="13"
+                                 Margin="0,0,0,16" />
+
+                        <!-- Action buttons -->
+                        <Grid>
+                            <Button Command="{Binding CancelSendReportCommand}"
+                                    Style="{StaticResource StandardBtn}"
+                                    Content="Отмена"
+                                    HorizontalAlignment="Left"
+                                    Height="36" Padding="18,0" FontSize="13" />
+
+                            <Button Command="{Binding SubmitReportCommand}"
+                                    HorizontalAlignment="Right"
+                                    Height="36" Padding="20,0" FontSize="13">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
+                                        <Setter Property="Content" Value="Отправить" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSubmittingReport}" Value="True">
+                                                <Setter Property="Content" Value="Отправка…" />
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 3.7 REPORT SUCCESS MODAL -->
+            <Grid Panel.ZIndex="126"
+                  Visibility="{Binding IsReportSuccessModalVisible, Converter={StaticResource BoolToVis}}"
+                  Background="#99071017">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Width="460" Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        Padding="24,20,24,20">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Border Width="3" Height="18" Background="{StaticResource OkBrush}" Margin="0,0,10,0" CornerRadius="1" />
+                            <TextBlock Text="Отчёт отправлен"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkBrush}" />
+                        </StackPanel>
+
+                        <TextBlock Text="Отчёт успешно отправлен разработчикам."
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Margin="0,0,0,10" />
+
+                        <Border Background="#14212B" CornerRadius="3" Padding="12,10" Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="ID отчёта: "
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="14"
+                                           Foreground="{StaticResource DimInkBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding CreatedReportId}"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource EmberBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="4,0,14,0" />
+                                <Button Command="{Binding CopyReportIdCommand}"
+                                        Style="{StaticResource StandardBtn}"
+                                        Height="30" Padding="12,0" FontSize="12"
+                                        Content="Копировать ID" />
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="Назовите этот ID, если вас спросят о вашей проблеме."
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,0,0,16" />
+
+                        <Button Command="{Binding CloseReportSuccessCommand}"
+                                Style="{StaticResource PrimaryNeonBtn}"
+                                Content="Закрыть"
+                                HorizontalAlignment="Right"
+                                Height="34" Padding="20,0" FontSize="13" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 3.8 REPORT FAILED FALLBACK PROMPT -->
+            <Grid Panel.ZIndex="127"
+                  Visibility="{Binding IsReportFailedPromptVisible, Converter={StaticResource BoolToVis}}"
+                  Background="#99071017">
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Width="460" Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1" CornerRadius="4"
+                        Padding="24,20,24,20">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <Border Width="3" Height="18" Background="#FF6B6B" Margin="0,0,10,0" CornerRadius="1" />
+                            <TextBlock Text="Не удалось отправить отчёт"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20" FontWeight="SemiBold"
+                                       Foreground="{StaticResource InkBrush}" />
+                        </StackPanel>
+
+                        <TextBlock Text="Не удалось отправить отчёт на сервер. Сохранить отчёт на рабочий стол?"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,16" />
+
+                        <Grid>
+                            <Button Command="{Binding DismissReportFailedPromptCommand}"
+                                    Style="{StaticResource StandardBtn}"
+                                    Content="Отмена"
+                                    HorizontalAlignment="Left"
+                                    Height="36" Padding="18,0" FontSize="13" />
+
+                            <Button Command="{Binding SaveReportToDesktopCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Content="Сохранить на рабочий стол"
+                                    HorizontalAlignment="Right"
+                                    Height="36" Padding="18,0" FontSize="13" />
+                        </Grid>
+                    </StackPanel>
                 </Border>
             </Grid>
             

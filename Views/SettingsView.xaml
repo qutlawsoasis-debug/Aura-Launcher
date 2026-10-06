@@ -66,63 +66,6 @@
                            Margin="0,0,0,6" />
                 <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,6" />
 
-                <!-- 1.1 "Ник в игре" -->
-                <Grid MinHeight="56" Margin="0,4,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Ник в игре"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="14"
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource InkBrush}" />
-                        <!-- Error note under label if invalid -->
-                        <TextBlock Text="{Binding NicknameErrorText}"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource BadBrush}"
-                                   Margin="0,2,0,0"
-                                   TextWrapping="Wrap"
-                                   Visibility="{Binding HasNicknameError, Converter={StaticResource BoolToVis}}" />
-                    </StackPanel>
-
-                    <Border Grid.Column="1"
-                            BorderBrush="{StaticResource LineInkBrush}"
-                            BorderThickness="0,0,0,2"
-                            Background="Transparent"
-                            Width="200"
-                            VerticalAlignment="Center"
-                            Padding="0,0,0,4">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsFocused, ElementName=NickInputBox}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
-                                    </DataTrigger>
-                                    <DataTrigger Binding="{Binding HasNicknameError}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-
-                        <TextBox x:Name="NickInputBox"
-                                 Text="{Binding Nickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 FontFamily="{StaticResource MainFont}"
-                                 FontSize="16"
-                                 FontWeight="Medium"
-                                 Foreground="{StaticResource InkBrush}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 CaretBrush="{StaticResource EmberBrush}"
-                                 MaxLength="16"
-                                 KeyDown="OnTextBoxKeyDown" />
-                    </Border>
-                </Grid>
 
                 <!-- 1.2 "Память для игры" -->
                 <Grid MinHeight="56" Margin="0,6,0,6">
@@ -341,29 +284,44 @@
                            Margin="0,16,0,6" />
                 <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,12" />
 
-                <!-- 3.1 "Собрать отчёт" -->
-                <Grid Height="56" Margin="0,2,0,8">
+                <!-- 3.1 "Отправить отчёт" и "Сохранить на рабочий стол" -->
+                <Grid Margin="0,2,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <TextBlock Grid.Column="0"
-                               Text="Сбор диагностических данных и логов"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="14"
-                               FontWeight="Normal"
-                               Foreground="{StaticResource DimInkBrush}"
-                               VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Диагностические данные и логи"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Логи лаунчера, игры и системная информация"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
 
-                    <Button Grid.Column="1"
-                            Command="{Binding GenerateReportCommand}"
-                            Style="{StaticResource PrimaryNeonBtn}"
-                            Height="40"
-                            Padding="24,0"
-                            FontSize="14"
-                            Content="Собрать отчёт"
-                            VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Command="{Binding OpenSendReportCommand}"
+                                Style="{StaticResource PrimaryNeonBtn}"
+                                Height="40"
+                                Padding="18,0"
+                                FontSize="13"
+                                Content="Отправить отчёт"
+                                Margin="0,0,10,0"
+                                VerticalAlignment="Center" />
+
+                        <Button Command="{Binding GenerateReportCommand}"
+                                Style="{StaticResource StandardBtn}"
+                                Height="40"
+                                Padding="16,0"
+                                FontSize="13"
+                                Content="Сохранить на рабочий стол"
+                                VerticalAlignment="Center" />
+                    </StackPanel>
                 </Grid>
 
             </StackPanel>

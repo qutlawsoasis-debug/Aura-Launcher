@@ -312,3 +312,55 @@ export async function handleInviteRespond(req, res) {
         return sendJson(res, 200, { ok: true });
     }
 }
+// 8. POST /api/user/nick (Task 39: Nickname change with skin re-binding and conflict check)
+export async function handleUserNick(req, res) {
+    if (req.method !== 'POST')
+        return sendJson(res, 405, { error: 'Method Not Allowed' });
+    const store = getStore();
+    const user = await authenticate(req, res, store);
+    if (!user)
+        return;
+    const body = await parseJson(req);
+    const newNick = typeof body.nick === 'string' ? body.nick.trim() : '';
+    // Validate ^[A-Za-z0-9_]{3,16}$
+    const nickRegex = /^[A-Za-z0-9_]{3,16}$/;
+    if (!nickRegex.test(newNick)) {
+        return sendJson(res, 400, { error: 'Ник: от 3 до 16 символов, латиница, цифры и _.' });
+    }
+    const oldNick = user.nick;
+    const oldNickLower = oldNick.toLowerCase();
+    const newNickLower = newNick.toLowerCase();
+    // If nick hasn't changed at all
+    if (oldNickLower === newNickLower) {
+        if (oldNick !== newNick) {
+            await store.updateUserNick(user.id, newNick);
+        }
+        return sendJson(res, 200, { success: true, nick: newNick });
+    }
+    // Check if newNick is already taken by another registered user
+    const existingUser = await store.getUserByNick(newNickLower);
+    if (existingUser && existingUser.id !== user.id) {
+        return sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+    }
+    // Check if newNick skin belongs to another user
+    const existingSkin = await store.getSkin(newNickLower);
+    if (existingSkin && existingSkin.userId && existingSkin.userId !== user.id) {
+        return sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+    }
+    // Migrate skin if user has one under oldNick
+    const oldSkin = await store.getSkin(oldNickLower);
+    if (oldSkin) {
+        // Rebind skin to newNick
+        const newSkin = {
+            ...oldSkin,
+            nickname: newNick,
+            userId: user.id,
+            updatedAt: Date.now()
+        };
+        await store.setSkin(newSkin);
+        await store.deleteSkin(oldNickLower);
+    }
+    // Update user's nickname in store
+    await store.updateUserNick(user.id, newNick);
+    sendJson(res, 200, { success: true, nick: newNick });
+}

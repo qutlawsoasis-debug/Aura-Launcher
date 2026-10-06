@@ -13,7 +13,8 @@ export interface Lobby {
 
 export interface SkinRecord {
   nickname: string;
-  ownerToken: string;
+  userId?: string;
+  ownerToken?: string;
   model: 'default' | 'slim';
   sha1: string;
   skinBase64: string;
@@ -98,16 +99,19 @@ export interface LobbyStore {
   // Skin storage
   getSkin(nickLower: string): Promise<SkinRecord | null>;
   setSkin(skin: SkinRecord, ttlSeconds?: number): Promise<void>;
+  deleteSkin(nickLower: string): Promise<void>;
   getSkinByHash(sha1: string): Promise<Buffer | null>;
   setSkinByHash(sha1: string, buffer: Buffer, ttlSeconds?: number): Promise<void>;
 
   // Rate limiting (sliding / fixed window)
   checkRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean>;
 
-  // Task 32: Users & Friends & Invites
+  // Task 32/39: Users & Friends & Invites
   generateFriendCode(): Promise<string>;
   createUser(user: UserRecord): Promise<void>;
   getUser(userId: string): Promise<UserRecord | null>;
+  getUserByNick(nick: string): Promise<UserRecord | null>;
+  updateUserNick(userId: string, newNick: string): Promise<void>;
   getUserByFriendCode(code: string): Promise<UserRecord | null>;
   getUsers(userIds: string[]): Promise<Map<string, UserRecord>>;
 
@@ -143,6 +147,7 @@ export class InMemoryStore implements LobbyStore {
 
   // Task 32 in-memory state
   private users = new Map<string, UserRecord>();
+  private nickUsers = new Map<string, string>(); // lowerNick -> userId
   private friendCodes = new Map<string, string>(); // code -> userId
   private presences = new Map<string, { presence: UserPresence; expiresAt: number }>();
   private friends = new Map<string, Set<string>>();
@@ -202,6 +207,10 @@ export class InMemoryStore implements LobbyStore {
     });
   }
 
+  async deleteSkin(nickLower: string): Promise<void> {
+    this.skins.delete(nickLower.toLowerCase());
+  }
+
   async getSkinByHash(sha1: string): Promise<Buffer | null> {
     const entry = this.textures.get(sha1.toLowerCase());
     if (!entry) return null;
@@ -249,11 +258,35 @@ export class InMemoryStore implements LobbyStore {
 
   async createUser(user: UserRecord): Promise<void> {
     this.users.set(user.id, user);
+    this.nickUsers.set(user.nick.toLowerCase(), user.id);
     this.friendCodes.set(user.friendCode.toUpperCase(), user.id);
   }
 
   async getUser(userId: string): Promise<UserRecord | null> {
     return this.users.get(userId) || null;
+  }
+
+  async getUserByNick(nick: string): Promise<UserRecord | null> {
+    const id = this.nickUsers.get(nick.toLowerCase());
+    if (id) {
+      return this.users.get(id) || null;
+    }
+    for (const u of this.users.values()) {
+      if (u.nick.toLowerCase() === nick.toLowerCase()) {
+        this.nickUsers.set(nick.toLowerCase(), u.id);
+        return u;
+      }
+    }
+    return null;
+  }
+
+  async updateUserNick(userId: string, newNick: string): Promise<void> {
+    const user = this.users.get(userId);
+    if (user) {
+      this.nickUsers.delete(user.nick.toLowerCase());
+      user.nick = newNick;
+      this.nickUsers.set(newNick.toLowerCase(), userId);
+    }
   }
 
   async getUserByFriendCode(code: string): Promise<UserRecord | null> {
@@ -550,6 +583,10 @@ export class UpstashStore implements LobbyStore {
     await this.fetchCommand(['SET', `skin:${skin.nickname.toLowerCase()}`, serialized, 'EX', ttlSeconds.toString()]);
   }
 
+  async deleteSkin(nickLower: string): Promise<void> {
+    await this.fetchCommand(['DEL', `skin:${nickLower.toLowerCase()}`]);
+  }
+
   async getSkinByHash(sha1: string): Promise<Buffer | null> {
     const raw = await this.fetchCommand(['GET', `skinhash:${sha1.toLowerCase()}`]);
     if (!raw) return null;
@@ -596,6 +633,7 @@ export class UpstashStore implements LobbyStore {
   async createUser(user: UserRecord): Promise<void> {
     await this.fetchPipeline([
       ['SET', `user:${user.id}`, JSON.stringify(user)],
+      ['SET', `nickuser:${user.nick.toLowerCase()}`, user.id],
       ['SET', `friendcode:${user.friendCode.toUpperCase()}`, user.id]
     ]);
   }
@@ -608,6 +646,26 @@ export class UpstashStore implements LobbyStore {
     } catch {
       return null;
     }
+  }
+
+  async getUserByNick(nick: string): Promise<UserRecord | null> {
+    const userId = await this.fetchCommand(['GET', `nickuser:${nick.toLowerCase()}`]);
+    if (userId) {
+      return this.getUser(userId);
+    }
+    return null;
+  }
+
+  async updateUserNick(userId: string, newNick: string): Promise<void> {
+    const user = await this.getUser(userId);
+    if (!user) return;
+    const oldNick = user.nick;
+    user.nick = newNick;
+    await this.fetchPipeline([
+      ['DEL', `nickuser:${oldNick.toLowerCase()}`],
+      ['SET', `nickuser:${newNick.toLowerCase()}`, userId],
+      ['SET', `user:${userId}`, JSON.stringify(user)]
+    ]);
   }
 
   async getUserByFriendCode(code: string): Promise<UserRecord | null> {

@@ -514,10 +514,46 @@ public class SkinService : ISkinService
 
         try
         {
-            using var response = await _httpClient.PostAsync(endpoint, content, cancellationToken);
+            using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, endpoint)
+            {
+                Content = content
+            };
+
+            // Read auth tokens from %APPDATA%\Aura\config.json via DPAPI if available
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                string cfgPath = Path.Combine(appData, "Aura", "config.json");
+                if (File.Exists(cfgPath))
+                {
+                    var cfgJson = File.ReadAllText(cfgPath);
+                    using var doc = System.Text.Json.JsonDocument.Parse(cfgJson);
+                    if (doc.RootElement.TryGetProperty("UserId", out var uidElem) && uidElem.GetString() is { } uid && !string.IsNullOrWhiteSpace(uid))
+                    {
+                        req.Headers.TryAddWithoutValidation("X-User-Id", uid);
+                    }
+                    if (doc.RootElement.TryGetProperty("UserTokenEncrypted", out var tokElem) && tokElem.GetString() is { } tokEnc && !string.IsNullOrWhiteSpace(tokEnc))
+                    {
+                        try
+                        {
+                            var cipherBytes = Convert.FromBase64String(tokEnc);
+                            var plainBytes = System.Security.Cryptography.ProtectedData.Unprotect(cipherBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                            var plainToken = System.Text.Encoding.UTF8.GetString(plainBytes);
+                            req.Headers.TryAddWithoutValidation("X-User-Token", plainToken);
+                        }
+                        catch
+                        {
+                            req.Headers.TryAddWithoutValidation("X-User-Token", tokEnc);
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            using var response = await _httpClient.SendAsync(req, cancellationToken);
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
 
-            if (response.StatusCode == System.Net.HttpStatusCode.Forbidden)
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 return new SkinUploadResult(false, null, "Этот ник уже занят другим игроком, выбери другой");
             }

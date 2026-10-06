@@ -6,6 +6,7 @@ export class InMemoryStore {
     rateLimits = new Map();
     // Task 32 in-memory state
     users = new Map();
+    nickUsers = new Map(); // lowerNick -> userId
     friendCodes = new Map(); // code -> userId
     presences = new Map();
     friends = new Map();
@@ -61,6 +62,9 @@ export class InMemoryStore {
             expiresAt: Date.now() + ttlSeconds * 1000
         });
     }
+    async deleteSkin(nickLower) {
+        this.skins.delete(nickLower.toLowerCase());
+    }
     async getSkinByHash(sha1) {
         const entry = this.textures.get(sha1.toLowerCase());
         if (!entry)
@@ -105,10 +109,32 @@ export class InMemoryStore {
     }
     async createUser(user) {
         this.users.set(user.id, user);
+        this.nickUsers.set(user.nick.toLowerCase(), user.id);
         this.friendCodes.set(user.friendCode.toUpperCase(), user.id);
     }
     async getUser(userId) {
         return this.users.get(userId) || null;
+    }
+    async getUserByNick(nick) {
+        const id = this.nickUsers.get(nick.toLowerCase());
+        if (id) {
+            return this.users.get(id) || null;
+        }
+        for (const u of this.users.values()) {
+            if (u.nick.toLowerCase() === nick.toLowerCase()) {
+                this.nickUsers.set(nick.toLowerCase(), u.id);
+                return u;
+            }
+        }
+        return null;
+    }
+    async updateUserNick(userId, newNick) {
+        const user = this.users.get(userId);
+        if (user) {
+            this.nickUsers.delete(user.nick.toLowerCase());
+            user.nick = newNick;
+            this.nickUsers.set(newNick.toLowerCase(), userId);
+        }
     }
     async getUserByFriendCode(code) {
         const id = this.friendCodes.get(code.toUpperCase());
@@ -387,6 +413,9 @@ export class UpstashStore {
         const serialized = JSON.stringify(skin);
         await this.fetchCommand(['SET', `skin:${skin.nickname.toLowerCase()}`, serialized, 'EX', ttlSeconds.toString()]);
     }
+    async deleteSkin(nickLower) {
+        await this.fetchCommand(['DEL', `skin:${nickLower.toLowerCase()}`]);
+    }
     async getSkinByHash(sha1) {
         const raw = await this.fetchCommand(['GET', `skinhash:${sha1.toLowerCase()}`]);
         if (!raw)
@@ -432,6 +461,7 @@ export class UpstashStore {
     async createUser(user) {
         await this.fetchPipeline([
             ['SET', `user:${user.id}`, JSON.stringify(user)],
+            ['SET', `nickuser:${user.nick.toLowerCase()}`, user.id],
             ['SET', `friendcode:${user.friendCode.toUpperCase()}`, user.id]
         ]);
     }
@@ -445,6 +475,25 @@ export class UpstashStore {
         catch {
             return null;
         }
+    }
+    async getUserByNick(nick) {
+        const userId = await this.fetchCommand(['GET', `nickuser:${nick.toLowerCase()}`]);
+        if (userId) {
+            return this.getUser(userId);
+        }
+        return null;
+    }
+    async updateUserNick(userId, newNick) {
+        const user = await this.getUser(userId);
+        if (!user)
+            return;
+        const oldNick = user.nick;
+        user.nick = newNick;
+        await this.fetchPipeline([
+            ['DEL', `nickuser:${oldNick.toLowerCase()}`],
+            ['SET', `nickuser:${newNick.toLowerCase()}`, userId],
+            ['SET', `user:${userId}`, JSON.stringify(user)]
+        ]);
     }
     async getUserByFriendCode(code) {
         const userId = await this.fetchCommand(['GET', `friendcode:${code.toUpperCase()}`]);

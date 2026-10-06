@@ -286,6 +286,9 @@ public class SettingsViewModel : ObservableObject
 
     public RelayCommand SelectGameFolderCommand { get; }
     public AsyncRelayCommand GenerateReportCommand { get; }
+    public RelayCommand OpenSendReportCommand { get; }
+
+    public event Action<string?>? SendReportRequested;
 
     public SettingsViewModel(
         IConfigService configService,
@@ -297,6 +300,11 @@ public class SettingsViewModel : ObservableObject
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _discordRpcService = discordRpcService;
         _reportService = reportService;
+
+        OpenSendReportCommand = new RelayCommand(_ =>
+        {
+            SendReportRequested?.Invoke(null);
+        });
 
         GenerateReportCommand = new AsyncRelayCommand(async () =>
         {

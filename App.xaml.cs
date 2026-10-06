@@ -97,8 +97,9 @@ public partial class App : Application
         bool isProtocolTest = Array.Exists(args, a => a.Equals("--selftest-protocol", StringComparison.OrdinalIgnoreCase));
         bool isNotificationsReportTest = Array.Exists(args, a => a.Equals("--selftest-notifications-report", StringComparison.OrdinalIgnoreCase));
         bool isIconTest = Array.Exists(args, a => a.Equals("--selftest-icon", StringComparison.OrdinalIgnoreCase));
+        bool isReportTest = Array.Exists(args, a => a.Equals("--selftest-report", StringComparison.OrdinalIgnoreCase));
         bool isLayoutAudit = Array.Exists(args, a => a.Equals("--layout-audit", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isLayoutAudit || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isReportTest || isLayoutAudit || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -369,6 +370,18 @@ public partial class App : Application
                 }
             });
         }
+        else if (isReportTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunReportSelfTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
         else if (isLayoutAudit)
         {
             _ = Task.Run(async () =>
@@ -418,7 +431,10 @@ public partial class App : Application
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<SettingsViewModel>();
-        services.AddSingleton<WardrobeViewModel>();
+        services.AddSingleton<WardrobeViewModel>(sp => new WardrobeViewModel(
+            sp.GetRequiredService<ISkinService>(),
+            sp.GetRequiredService<IConfigService>(),
+            sp.GetRequiredService<IFriendService>()));
         services.AddSingleton<LobbyViewModel>(sp => new LobbyViewModel(
             sp.GetRequiredService<ILobbyService>(),
             sp.GetRequiredService<IGameLaunchService>(),
@@ -454,11 +470,21 @@ public partial class App : Application
             // Показываем диалог пользователю ТОЛЬКО при фатальных сбоях
             if (isFatal && Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
             {
-                MessageBox.Show(
-                    $"Произошла фатальная ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nПолный стек ошибки сохранен в launcher.log.",
+                var result = MessageBox.Show(
+                    $"Произошла фатальная ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nОтправить отчёт разработчикам?",
                     "AURA Launcher — Фатальная ошибка",
-                    MessageBoxButton.OK,
+                    MessageBoxButton.YesNo,
                     MessageBoxImage.Error);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        var reportService = Services?.GetService<IReportService>();
+                        reportService?.SendReportAsync(ex.ToString(), "Fatal Launcher Crash").GetAwaiter().GetResult();
+                    }
+                    catch { }
+                }
             }
         }
         catch { }

@@ -58,6 +58,22 @@ public class MainViewModel : ObservableObject
     private readonly IFriendService? _friendService;
     private readonly INotificationService? _notificationService;
     private readonly IDiscordRpcService? _discordRpcService;
+    private readonly IReportService? _reportService;
+
+    // Свойства диалога «Отправить отчёт»
+    private bool _isSendReportModalVisible;
+    private string _reportErrorText = string.Empty;
+    private string _reportUserComment = string.Empty;
+    private bool _isSubmittingReport;
+    private string _reportSubmitErrorMessage = string.Empty;
+
+    // Свойства диалога успешной отправки отчёта
+    private bool _isReportSuccessModalVisible;
+    private string _createdReportId = string.Empty;
+    private bool _isReportIdCopied;
+
+    // Свойства диалога ошибки отправки (предложение сохранить на рабочий стол)
+    private bool _isReportFailedPromptVisible;
 
     private bool _isInviteToastVisible;
     private string _inviteToastTitle = string.Empty;
@@ -187,6 +203,73 @@ public class MainViewModel : ObservableObject
 
     public RelayCommand OpenChangelogCommand { get; }
     public RelayCommand CloseChangelogCommand { get; }
+
+    public bool IsSendReportModalVisible
+    {
+        get => _isSendReportModalVisible;
+        set => SetProperty(ref _isSendReportModalVisible, value);
+    }
+
+    public string ReportErrorText
+    {
+        get => _reportErrorText;
+        set => SetProperty(ref _reportErrorText, value);
+    }
+
+    public string ReportUserComment
+    {
+        get => _reportUserComment;
+        set
+        {
+            var val = value ?? string.Empty;
+            if (val.Length > 300) val = val.Substring(0, 300);
+            SetProperty(ref _reportUserComment, val);
+        }
+    }
+
+    public bool IsSubmittingReport
+    {
+        get => _isSubmittingReport;
+        set => SetProperty(ref _isSubmittingReport, value);
+    }
+
+    public string ReportSubmitErrorMessage
+    {
+        get => _reportSubmitErrorMessage;
+        set => SetProperty(ref _reportSubmitErrorMessage, value);
+    }
+
+    public bool IsReportSuccessModalVisible
+    {
+        get => _isReportSuccessModalVisible;
+        set => SetProperty(ref _isReportSuccessModalVisible, value);
+    }
+
+    public string CreatedReportId
+    {
+        get => _createdReportId;
+        set => SetProperty(ref _createdReportId, value);
+    }
+
+    public bool IsReportIdCopied
+    {
+        get => _isReportIdCopied;
+        set => SetProperty(ref _isReportIdCopied, value);
+    }
+
+    public bool IsReportFailedPromptVisible
+    {
+        get => _isReportFailedPromptVisible;
+        set => SetProperty(ref _isReportFailedPromptVisible, value);
+    }
+
+    public RelayCommand OpenSendReportCommand { get; }
+    public RelayCommand CancelSendReportCommand { get; }
+    public AsyncRelayCommand SubmitReportCommand { get; }
+    public RelayCommand CopyReportIdCommand { get; }
+    public RelayCommand CloseReportSuccessCommand { get; }
+    public AsyncRelayCommand SaveReportToDesktopCommand { get; }
+    public RelayCommand DismissReportFailedPromptCommand { get; }
 
     public AsyncRelayCommand ConfirmProtocolPromptCommand { get; }
     public RelayCommand CancelProtocolPromptCommand { get; }
@@ -549,7 +632,8 @@ public class MainViewModel : ObservableObject
         IServerListSyncService? serverListSyncService = null,
         IAnthemService? anthemService = null,
         INotificationService? notificationService = null,
-        IDiscordRpcService? discordRpcService = null)
+        IDiscordRpcService? discordRpcService = null,
+        IReportService? reportService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -559,6 +643,7 @@ public class MainViewModel : ObservableObject
         _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
         _notificationService = notificationService;
         _discordRpcService = discordRpcService;
+        _reportService = reportService ?? new ReportService(configService, notificationService ?? new NotificationService(configService));
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
@@ -653,6 +738,93 @@ public class MainViewModel : ObservableObject
                 _ = _friendService.SyncNowAsync();
             }
         };
+        SettingsVM.SendReportRequested += (err) =>
+        {
+            PromptSendReport(err);
+        };
+
+        LobbyVM.SendReportRequested += (err) =>
+        {
+            PromptSendReport(err);
+        };
+
+        OpenSendReportCommand = new RelayCommand(p =>
+        {
+            var err = p as string;
+            PromptSendReport(err);
+        });
+
+        CancelSendReportCommand = new RelayCommand(_ =>
+        {
+            IsSendReportModalVisible = false;
+        });
+
+        SubmitReportCommand = new AsyncRelayCommand(async () =>
+        {
+            if (_reportService == null || IsSubmittingReport) return;
+
+            IsSubmittingReport = true;
+            ReportSubmitErrorMessage = string.Empty;
+
+            try
+            {
+                var res = await _reportService.SendReportAsync(ReportErrorText, ReportUserComment);
+                if (res.Success && !string.IsNullOrWhiteSpace(res.ReportId))
+                {
+                    IsSendReportModalVisible = false;
+                    CreatedReportId = res.ReportId;
+                    IsReportIdCopied = false;
+                    IsReportSuccessModalVisible = true;
+                }
+                else
+                {
+                    IsSendReportModalVisible = false;
+                    IsReportFailedPromptVisible = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                IsSendReportModalVisible = false;
+                IsReportFailedPromptVisible = true;
+            }
+            finally
+            {
+                IsSubmittingReport = false;
+            }
+        });
+
+        CopyReportIdCommand = new RelayCommand(_ =>
+        {
+            if (!string.IsNullOrWhiteSpace(CreatedReportId))
+            {
+                try
+                {
+                    System.Windows.Clipboard.SetText(CreatedReportId);
+                    IsReportIdCopied = true;
+                }
+                catch { }
+            }
+        });
+
+        CloseReportSuccessCommand = new RelayCommand(_ =>
+        {
+            IsReportSuccessModalVisible = false;
+        });
+
+        SaveReportToDesktopCommand = new AsyncRelayCommand(async () =>
+        {
+            IsReportFailedPromptVisible = false;
+            if (_reportService != null)
+            {
+                await _reportService.GenerateReportZipAsync(ReportErrorText, ReportUserComment);
+            }
+        });
+
+        DismissReportFailedPromptCommand = new RelayCommand(_ =>
+        {
+            IsReportFailedPromptVisible = false;
+        });
+
         AnthemService = anthemService;
 
         ToggleMuteCommand = new RelayCommand(_ =>
@@ -746,6 +918,7 @@ public class MainViewModel : ObservableObject
                     var logsDir = Path.Combine(_launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir), "logs");
                     var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
                     SetLauncherState(LauncherState.Error, $"Игра завершилась с ошибкой (код {exitCode}). Лог: {gameLogPath}");
+                    PromptGameCrashToast(exitCode);
                 }
                 else
                 {
@@ -1473,5 +1646,26 @@ public class MainViewModel : ObservableObject
 
         updateWin.Show();
         _ = updateVm.StartUpdateFlowAsync();
+    }
+
+    public void PromptSendReport(string? errorText = null)
+    {
+        ReportErrorText = errorText ?? string.Empty;
+        ReportUserComment = string.Empty;
+        ReportSubmitErrorMessage = string.Empty;
+        IsSendReportModalVisible = true;
+    }
+
+    private void PromptGameCrashToast(int exitCode)
+    {
+        ProtocolPromptTitle = $"Игра завершилась с ошибкой (код {exitCode})";
+        ProtocolPromptSubtitle = "Отправить отчёт об ошибке разработчикам?";
+        ProtocolPromptConfirmText = "Отчёт";
+        _pendingProtocolAction = () =>
+        {
+            PromptSendReport($"Game exited with error code {exitCode}");
+            return Task.CompletedTask;
+        };
+        IsProtocolPromptVisible = true;
     }
 }

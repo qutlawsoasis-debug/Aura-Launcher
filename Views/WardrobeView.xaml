@@ -25,7 +25,7 @@
 
         <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle (Height=Auto, LineHeight 66, Margin сверху 6px) -->
         <StackPanel Grid.Row="0" Margin="0,0,0,28" Focusable="False">
-            <TextBlock Text="Скин"
+            <TextBlock Text="Профиль"
                        FontFamily="{StaticResource HeadingFont}"
                        FontSize="60"
                        FontWeight="SemiBold"
@@ -38,7 +38,7 @@
                     <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
-            <TextBlock Text="Внешний вид персонажа в сетевой игре"
+            <TextBlock Text="Управление профилем и внешним видом персонажа"
                        FontFamily="{StaticResource MainFont}"
                        FontSize="15"
                        FontWeight="Normal"
@@ -97,43 +97,122 @@
             </StackPanel>
 
             <!-- ============================================== -->
-            <!-- RIGHT: filename, "Выбрать файл", "Сбросить",   -->
-            <!-- toggle "Тонкие руки (Alex)", notes, error      -->
+            <!-- RIGHT: Nickname, Profile ID, Skin controls      -->
             <!-- ============================================== -->
             <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="20,0,0,0">
-                
-                <!-- Filename 14px dim -->
-                <TextBlock Text="{Binding SkinDisplayName}"
+
+                <!-- 1. Ник в игре -->
+                <TextBlock Text="Ник в игре"
                            FontFamily="{StaticResource MainFont}"
                            FontSize="14"
                            FontWeight="Medium"
-                           Foreground="{StaticResource DimInkBrush}"
+                           Foreground="{StaticResource InkBrush}"
+                           Margin="0,0,0,4" />
+
+                <Border BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="0,0,0,2"
+                        Background="Transparent"
+                        MaxWidth="360"
+                        HorizontalAlignment="Left"
+                        Width="360"
+                        Padding="0,0,0,4"
+                        Margin="0,0,0,4">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFocused, ElementName=NickInputBox}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasNicknameError}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+
+                    <TextBox x:Name="NickInputBox"
+                             Text="{Binding NicknameInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             FontFamily="{StaticResource MainFont}"
+                             FontSize="16"
+                             FontWeight="Medium"
+                             Foreground="{StaticResource InkBrush}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             CaretBrush="{StaticResource EmberBrush}"
+                             MaxLength="16"
+                             KeyDown="OnNickInputKeyDown"
+                             LostFocus="OnNickInputLostFocus" />
+                </Border>
+
+                <!-- Ошибка валидации ника -->
+                <TextBlock Text="{Binding NicknameErrorText}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           Foreground="{StaticResource BadBrush}"
+                           Margin="0,0,0,12"
                            TextWrapping="Wrap"
                            MaxWidth="360"
-                           Margin="0,0,0,16" />
+                           Visibility="{Binding HasNicknameError, Converter={StaticResource BoolToVis}}" />
 
-                <!-- Buttons: "Выбрать файл" (StandardBtn) + "Сбросить" (GhostBtn) -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,24">
-                    <Button Command="{Binding SelectSkinCommand}"
-                            Style="{StaticResource StandardBtn}"
-                            Height="48"
-                            Content="Выбрать файл"
-                            Margin="0,0,16,0" />
+                <!-- 2. ID профиля (Код друга, 8 символов + кнопка Копировать) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4,0,18">
+                    <TextBlock Text="ID профиля:"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="14"
+                               FontWeight="Normal"
+                               Foreground="{StaticResource DimInkBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0" />
 
-                    <Button Command="{Binding ResetSkinCommand}"
+                    <TextBlock Text="{Binding ProfileId}"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource EmberBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0" />
+
+                    <Button Command="{Binding CopyProfileIdCommand}"
                             Style="{StaticResource GhostBtn}"
-                            Height="48"
-                            Content="Сбросить"
+                            Height="32"
+                            Padding="12,0"
+                            Content="{Binding CopyProfileIdText}"
                             VerticalAlignment="Center" />
                 </StackPanel>
 
                 <!-- 1px separator line -->
-                <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+                <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,16" />
 
-                <!-- Toggle "Тонкие руки (Alex)" (46x26, radius 3, knob 20x20, ember when checked) -->
+                <!-- Filename 13px dim -->
+                <TextBlock Text="{Binding SkinDisplayName}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="13"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource DimInkBrush}"
+                           TextWrapping="Wrap"
+                           MaxWidth="360"
+                           Margin="0,0,0,12" />
+
+                <!-- Buttons: "Выбрать файл" (StandardBtn) + "Сбросить" (GhostBtn) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
+                    <Button Command="{Binding SelectSkinCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Height="44"
+                            Content="Выбрать файл"
+                            Margin="0,0,14,0" />
+
+                    <Button Command="{Binding ResetSkinCommand}"
+                            Style="{StaticResource GhostBtn}"
+                            Height="44"
+                            Content="Сбросить"
+                            VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Toggle "Тонкие руки (Alex)" -->
                 <CheckBox IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
                           Style="{StaticResource AlexToggleSwitch}"
-                          Margin="0,0,0,20">
+                          Margin="0,0,0,16">
                     <TextBlock Text="Тонкие руки (Alex)"
                                FontFamily="{StaticResource MainFont}"
                                FontSize="14"
@@ -149,7 +228,7 @@
                            Foreground="{StaticResource MuteBrush}"
                            TextWrapping="Wrap"
                            LineHeight="18"
-                           Margin="0,0,0,14" />
+                           Margin="0,0,0,12" />
 
                 <!-- Status message in OkBrush (#5FD39A) for success or BadBrush (#FF8A7A) for error, 13px -->
                 <TextBlock Text="{Binding StatusMessage}"

@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import url from 'url';
 import { getStore } from './store.js';
 import { validatePngSkin, isValidNickname, getClientIp } from './skinUtils.js';
-import { handleRegister, handleSync, handleFriendRequest, handleFriendRespond, handleFriendRemove, handleInvite, handleInviteRespond } from './friendRoutes.js';
+import { handleRegister, handleSync, handleFriendRequest, handleFriendRespond, handleFriendRemove, handleInvite, handleInviteRespond, handleUserNick } from './friendRoutes.js';
+import handleReport from '../api/report.js';
 import { generateLandingHtml } from './landing.js';
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -78,6 +79,9 @@ export const server = http.createServer(async (req, res) => {
         if (pathname === '/api/user/register') {
             return await handleRegister(req, res);
         }
+        if (pathname === '/api/user/nick') {
+            return await handleUserNick(req, res);
+        }
         if (pathname === '/api/sync') {
             return await handleSync(req, res);
         }
@@ -95,6 +99,9 @@ export const server = http.createServer(async (req, res) => {
         }
         if (pathname === '/api/invite/respond') {
             return await handleInviteRespond(req, res);
+        }
+        if (pathname === '/api/report') {
+            return await handleReport(req, res);
         }
         // 0. GET /api/tunnel-config
         if (req.method === 'GET' && pathname === '/api/tunnel-config') {
@@ -279,29 +286,55 @@ export const server = http.createServer(async (req, res) => {
                 sendJson(res, 400, { error: 'Invalid nickname format (3-16 chars, a-zA-Z0-9_)' });
                 return;
             }
+            // Authenticate user via X-User-Id / X-User-Token if provided
+            const userId = (req.headers['x-user-id'] || req.headers['X-User-Id']);
+            const userToken = (req.headers['x-user-token'] || req.headers['X-User-Token']);
+            let authedUser = null;
+            if (userId && userToken) {
+                const user = await store.getUser(userId.trim());
+                if (!user) {
+                    sendJson(res, 401, { error: 'Unauthorized: user not found' });
+                    return;
+                }
+                const tokenHash = crypto.createHash('sha256').update(userToken.trim()).digest('hex');
+                if (user.tokenHash !== tokenHash) {
+                    sendJson(res, 401, { error: 'Unauthorized: invalid token' });
+                    return;
+                }
+                authedUser = user;
+            }
+            const nickLower = nickname.toLowerCase();
+            // Check if nickname belongs to another user
+            const existingNickUser = await store.getUserByNick(nickLower);
+            if (existingNickUser) {
+                if (!authedUser || existingNickUser.id !== authedUser.id) {
+                    sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+                    return;
+                }
+            }
+            const existing = await store.getSkin(nickLower);
+            if (existing) {
+                if (authedUser) {
+                    if (existing.userId && existing.userId !== authedUser.id) {
+                        sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+                        return;
+                    }
+                }
+                else if (existing.ownerToken && existing.ownerToken !== ownerToken) {
+                    sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+                    return;
+                }
+            }
             const skinModel = model === 'slim' ? 'slim' : 'default';
             const validation = validatePngSkin(skinBase64);
             if (!validation.valid || !validation.buffer || !validation.sha1) {
                 sendJson(res, 400, { error: validation.error || 'Invalid skin PNG' });
                 return;
             }
-            const nickLower = nickname.toLowerCase();
-            const existing = await store.getSkin(nickLower);
-            let token = ownerToken;
-            if (existing) {
-                if (!existing.ownerToken || existing.ownerToken !== ownerToken) {
-                    sendJson(res, 403, { error: 'Этот ник уже занят другим игроком, выбери другой' });
-                    return;
-                }
-                token = existing.ownerToken;
-            }
-            else {
-                if (!token) {
-                    token = crypto.randomUUID();
-                }
-            }
+            let token = ownerToken || (authedUser ? authedUser.id : crypto.randomUUID());
             const skinRecord = {
                 nickname,
+                userId: authedUser ? authedUser.id : existing?.userId,
                 ownerToken: token,
                 model: skinModel,
                 sha1: validation.sha1,

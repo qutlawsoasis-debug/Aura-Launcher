@@ -33,6 +33,44 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 400, { error: 'Invalid nickname format (3-16 chars, a-zA-Z0-9_)' });
     }
 
+    // Authenticate user via X-User-Id / X-User-Token if provided
+    const userId = (req.headers['x-user-id'] || req.headers['X-User-Id']) as string | undefined;
+    const userToken = (req.headers['x-user-token'] || req.headers['X-User-Token']) as string | undefined;
+
+    let authedUser = null;
+    if (userId && userToken) {
+      const user = await store.getUser(userId.trim());
+      if (!user) {
+        return sendJson(res, 401, { error: 'Unauthorized: user not found' });
+      }
+      const tokenHash = crypto.createHash('sha256').update(userToken.trim()).digest('hex');
+      if (user.tokenHash !== tokenHash) {
+        return sendJson(res, 401, { error: 'Unauthorized: invalid token' });
+      }
+      authedUser = user;
+    }
+
+    const nickLower = nickname.toLowerCase();
+
+    // Check if nickname belongs to another user
+    const existingNickUser = await store.getUserByNick(nickLower);
+    if (existingNickUser) {
+      if (!authedUser || existingNickUser.id !== authedUser.id) {
+        return sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+      }
+    }
+
+    const existing = await store.getSkin(nickLower);
+    if (existing) {
+      if (authedUser) {
+        if (existing.userId && existing.userId !== authedUser.id) {
+          return sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+        }
+      } else if (existing.ownerToken && existing.ownerToken !== ownerToken) {
+        return sendJson(res, 409, { error: 'Этот ник уже занят другим игроком, выбери другой' });
+      }
+    }
+
     // Validate model
     const skinModel: 'default' | 'slim' = model === 'slim' ? 'slim' : 'default';
 
@@ -42,26 +80,11 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 400, { error: validation.error || 'Invalid skin PNG' });
     }
 
-    const nickLower = nickname.toLowerCase();
-    const existing = await store.getSkin(nickLower);
-
-    let token = ownerToken;
-
-    if (existing) {
-      // Overwriting requires matching ownerToken
-      if (!existing.ownerToken || existing.ownerToken !== ownerToken) {
-        return sendJson(res, 403, { error: 'Этот ник уже занят другим игроком, выбери другой' });
-      }
-      token = existing.ownerToken;
-    } else {
-      // Generate new token on first upload if not supplied or new
-      if (!token) {
-        token = crypto.randomUUID();
-      }
-    }
+    let token = ownerToken || (authedUser ? authedUser.id : crypto.randomUUID());
 
     const skinRecord: SkinRecord = {
       nickname,
+      userId: authedUser ? authedUser.id : existing?.userId,
       ownerToken: token,
       model: skinModel,
       sha1: validation.sha1,

@@ -59,6 +59,32 @@ public partial class WardrobeView : UserControl
         };
     }
 
+    private void OnNickInputKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && sender is TextBox tb)
+        {
+            tb.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            if (DataContext is WardrobeViewModel vm)
+            {
+                _ = vm.ApplyNicknameChangeAsync();
+            }
+            Keyboard.ClearFocus();
+            e.Handled = true;
+        }
+    }
+
+    private void OnNickInputLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb)
+        {
+            tb.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            if (DataContext is WardrobeViewModel vm)
+            {
+                _ = vm.ApplyNicknameChangeAsync();
+            }
+        }
+    }
+
     private void HookViewModel()
     {
         if (_hookedVm != null)

@@ -310,14 +310,19 @@
                     </WrapPanel>
 
                     <!-- Error message under code line: 13px, #FF8A7A, disappears on typing -->
-                    <TextBlock Text="{Binding JoinErrorMessage}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="13"
-                               FontWeight="Medium"
-                               Foreground="#FF8A7A"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,16"
-                               Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}" />
+                    <StackPanel Orientation="Vertical" Margin="0,0,0,16" Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding JoinErrorMessage}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   FontWeight="Medium"
+                                   Foreground="#FF8A7A"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,6" />
+                        <Button Command="{Binding SendReportCommand}"
+                                Style="{StaticResource BadLinkBtn}"
+                                Content="Отправить отчёт об ошибке"
+                                HorizontalAlignment="Left" />
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- ============================================== -->
@@ -401,6 +406,23 @@
                                    FontWeight="Medium"
                                    Foreground="{StaticResource InkBrush}"
                                    VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Ошибка туннеля: кнопка "Отправить отчёт" -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16"
+                                Visibility="{Binding ShowTunnelFailedLogButton, Converter={StaticResource BoolToVis}}">
+                        <Button Command="{Binding SendReportCommand}"
+                                Style="{StaticResource BadLinkBtn}"
+                                Content="Отправить отчёт об ошибке туннеля"
+                                VerticalAlignment="Center"
+                                Margin="0,0,14,0" />
+                        <Button Command="{Binding CopyTunnelLogCommand}"
+                                Style="{StaticResource StandardBtn}"
+                                Height="28"
+                                Padding="12,0"
+                                FontSize="12"
+                                Content="Копировать лог туннеля"
+                                VerticalAlignment="Center" />
                     </StackPanel>
 
                     <!-- Main buttons row in WrapPanel: [Открыть мир / Подключиться к игре] [Копировать] [Выйти из лобби] -->
