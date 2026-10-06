@@ -133,6 +133,12 @@ public class LobbyViewModel : ObservableObject
 
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
+
+        // Подписка на изменение статуса туннеля
+        if (_tunnelProvider != null)
+        {
+            _tunnelProvider.StatusChanged += OnTunnelStatusChanged;
+        }
     }
 
     // === Свойства ===
@@ -278,42 +284,27 @@ public class LobbyViewModel : ObservableObject
                 playit = new PlayitTunnelProvider(null, toolsDir);
             }
 
-            if (!playit.HasSecret)
+            StatusText = "Получение конфигурации сервера...";
+            PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api...");
+
+            var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+            var cfg = await client.GetTunnelConfigAsync();
+
+            if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
             {
-                StatusText = "Получение конфигурации сервера...";
-                PlayitTunnelProvider.LogTunnel("Local secret not found. Requesting /api/tunnel-config from lobby-api...");
-
-                var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
-                var cfg = await client.GetTunnelConfigAsync();
-
-                if (cfg == null || string.IsNullOrWhiteSpace(cfg.Secret))
-                {
-                    PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server.");
-                    StatusText = "Ошибка получения конфигурации туннеля";
-                    StatusIcon = "❌";
-                    ShowTunnelFailedLogButton = true;
-                    TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
-                    return;
-                }
-
                 PlayitTunnelProvider.LogTunnel("Tunnel configuration received. Saving secret with DPAPI...");
                 playit.SaveSecret(cfg.Secret);
                 if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
                 if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
             }
-            else
+            else if (!playit.HasSecret)
             {
-                try
-                {
-                    var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
-                    var cfg = await client.GetTunnelConfigAsync();
-                    if (cfg != null)
-                    {
-                        if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
-                        if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
-                    }
-                }
-                catch { }
+                PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server and no local secret found.");
+                StatusText = "Ошибка получения конфигурации туннеля";
+                StatusIcon = "❌";
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
+                return;
             }
 
             var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
@@ -409,49 +400,111 @@ public class LobbyViewModel : ObservableObject
 
     private void OnLanWorldOpened(int port)
     {
-        Dispatch(async () =>
+        _ = Task.Run(async () =>
         {
-            if (port != 25565)
-            {
-                HostStatusText = $"Ошибка: порт {port} вместо 25565";
-                StatusText = $"Мир открыт на порту {port}, но туннель ожидает 25565 (проверьте lsp.json).";
-                StatusIcon = "❌";
-                ShowTunnelFailedLogButton = true;
-                TunnelFailureReason = $"Неверный порт: игра слушает {port}, а туннель ожидает 25565.";
-                return;
-            }
-
-            HostStatusText = "Мир открыт на порту 25565! Подключение туннеля...";
             try
             {
+                if (port != 25565)
+                {
+                    var msg = $"Игра слушает порт {port} вместо 25565 (проверьте lsp.json).";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
+                    Dispatch(() =>
+                    {
+                        HostStatusText = $"Ошибка: порт {port}";
+                        StatusText = msg;
+                        StatusIcon = "❌";
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = msg;
+                    });
+                    await _lobbyService.CloseLobbyAsHostAsync();
+                    return;
+                }
+
+                Dispatch(() =>
+                {
+                    HostStatusText = "Мир открыт на порту 25565! Подключение туннеля...";
+                });
+
                 var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565);
                 if (success)
                 {
-                    IsWorldOpen = true;
-                    HostStatusText = "Лобби открыто!";
-                    StatusText = "Мир готов — друзья могут подключаться!";
-                    StatusIcon = "✅";
-                    ShowTunnelFailedLogButton = false;
-                    TunnelFailureReason = null;
+                    Dispatch(() =>
+                    {
+                        IsWorldOpen = true;
+                        HostStatusText = "Лобби открыто!";
+                        StatusText = "Мир готов — друзья могут подключаться!";
+                        StatusIcon = "✅";
+                        ShowTunnelFailedLogButton = false;
+                        TunnelFailureReason = null;
+                    });
                 }
                 else
                 {
-                    HostStatusText = "Ошибка: туннель не поднялся";
-                    StatusText = "Туннель не поднялся. Друзья не смогут подключиться.";
-                    StatusIcon = "❌";
-                    ShowTunnelFailedLogButton = true;
-                    TunnelFailureReason = "Туннель playit не смог подтвердить TCP-соединение на публичный адрес.";
+                    var reason = _tunnelProvider?.CurrentInfo.ErrorMessage ?? "Туннель playit не смог запуститься или подтвердить подключение.";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] HostOpenWorldAsync returned false: {reason}");
+                    Dispatch(() =>
+                    {
+                        HostStatusText = "Ошибка туннеля";
+                        StatusText = $"Туннель не поднялся: {reason}";
+                        StatusIcon = "❌";
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = reason;
+                    });
+                    await _lobbyService.CloseLobbyAsHostAsync();
                 }
             }
             catch (Exception ex)
             {
-                HostStatusText = "Ошибка туннеля";
-                StatusText = $"Ошибка туннеля: {ex.Message}";
-                StatusIcon = "❌";
-                ShowTunnelFailedLogButton = true;
-                TunnelFailureReason = ex.Message;
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] OnLanWorldOpened failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                Dispatch(() =>
+                {
+                    HostStatusText = "Ошибка туннеля";
+                    StatusText = $"Ошибка туннеля: {ex.Message}";
+                    StatusIcon = "❌";
+                    ShowTunnelFailedLogButton = true;
+                    TunnelFailureReason = ex.Message;
+                });
+                try
+                {
+                    await _lobbyService.CloseLobbyAsHostAsync();
+                }
+                catch (Exception closeEx)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsHostAsync on error failed: {closeEx.GetType().FullName}: {closeEx.Message}\n{closeEx.StackTrace}");
+                }
             }
         });
+    }
+
+    private void OnTunnelStatusChanged(TunnelInfo info)
+    {
+        if (!_lobbyService.IsHost || !IsInLobby) return;
+
+        if (info.Status == TunnelStatus.Failed)
+        {
+            var reason = info.ErrorMessage ?? "Процесс туннеля playit завершился с ошибкой.";
+            PlayitTunnelProvider.LogTunnel($"[LOBBY: STATUS_CHANGED] Tunnel failed: {reason}. Closing lobby via API.");
+            Dispatch(() =>
+            {
+                HostStatusText = "Ошибка туннеля";
+                StatusText = $"Ошибка туннеля: {reason}";
+                StatusIcon = "❌";
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = reason;
+            });
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _lobbyService.CloseLobbyAsHostAsync();
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsHostAsync on tunnel failure failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
+            });
+        }
     }
 
     private async Task JoinLobbyAsync()
@@ -562,7 +615,17 @@ public class LobbyViewModel : ObservableObject
     {
         if (_lobbyService.IsHost)
         {
-            _ = _lobbyService.CloseLobbyAsHostAsync();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _lobbyService.CloseLobbyAsHostAsync();
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LeaveLobby: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
+            });
         }
         else
         {

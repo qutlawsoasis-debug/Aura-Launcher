@@ -28,6 +28,8 @@ public class PlayitTunnelProvider : ITunnelProvider
     private TunnelInfo _currentInfo = new(null, null, TunnelStatus.Inactive);
     private Process? _process;
     private IntPtr _jobHandle = IntPtr.Zero;
+    private CancellationTokenSource? _activeReadersCts;
+    private int _runtimeRestartCount;
 
     public TunnelInfo CurrentInfo => _currentInfo;
     public event Action<TunnelInfo>? StatusChanged;
@@ -333,16 +335,20 @@ public class PlayitTunnelProvider : ITunnelProvider
             throw new InvalidOperationException("Не удалось запустить процесс playit.");
         }
 
-        proc.BeginOutputReadLine();
-        proc.BeginErrorReadLine();
-
-        if (_jobHandle != IntPtr.Zero)
-        {
-            AssignProcessToJobObject(_jobHandle, proc.Handle);
-        }
-
+        CancellationTokenSource? readersCts = null;
         try
         {
+            readersCts = new CancellationTokenSource();
+            var readerCt = readersCts.Token;
+
+            StartPipeReader(proc.StandardOutput, "PLAYIT-CLAIM-OUT", data => HandleProcessOutput(data, "PLAYIT-CLAIM-OUT"), readerCt);
+            StartPipeReader(proc.StandardError, "PLAYIT-CLAIM-ERR", data => HandleProcessOutput(data, "PLAYIT-CLAIM-ERR"), readerCt);
+
+            if (_jobHandle != IntPtr.Zero)
+            {
+                AssignProcessToJobObject(_jobHandle, proc.Handle);
+            }
+
             // Ждем получения claim URL (до 30 секунд согласно ТЗ)
             LogTunnel("Awaiting claim URL from process output (30s timeout)...");
             var urlTimeoutTask = Task.Delay(TimeSpan.FromSeconds(30), ct);
@@ -403,6 +409,8 @@ public class PlayitTunnelProvider : ITunnelProvider
         }
         finally
         {
+            try { readersCts?.Cancel(); } catch { }
+            try { readersCts?.Dispose(); } catch { }
             try
             {
                 if (!proc.HasExited)
@@ -489,63 +497,6 @@ public class PlayitTunnelProvider : ITunnelProvider
 
         File.WriteAllText(_secretFilePath, secret.Trim());
 
-        KillStalePlayitProcesses();
-        InitJobObject();
-
-        var tcsConnected = new TaskCompletionSource<bool>();
-
-        var psi = new ProcessStartInfo
-        {
-            FileName = _playitExePath,
-            Arguments = $"--secret_path \"{_secretFilePath}\" start",
-            WorkingDirectory = _toolsDir,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        _process = new Process { StartInfo = psi, EnableRaisingEvents = true };
-        _process.OutputDataReceived += (s, e) =>
-        {
-            if (e.Data != null)
-            {
-                LogTunnel($"[PLAYIT-OUT] {e.Data}");
-                if (e.Data.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
-                    e.Data.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
-                {
-                    tcsConnected.TrySetResult(true);
-                }
-            }
-        };
-        _process.ErrorDataReceived += (s, e) =>
-        {
-            if (e.Data != null)
-            {
-                LogTunnel($"[PLAYIT-ERR] {e.Data}");
-                if (e.Data.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
-                    e.Data.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
-                {
-                    tcsConnected.TrySetResult(true);
-                }
-            }
-        };
-
-        if (!_process.Start())
-        {
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Failed to start playit agent");
-            StatusChanged?.Invoke(_currentInfo);
-            return _currentInfo;
-        }
-
-        _process.BeginOutputReadLine();
-        _process.BeginErrorReadLine();
-
-        if (_jobHandle != IntPtr.Zero)
-        {
-            AssignProcessToJobObject(_jobHandle, _process.Handle);
-        }
-
         if (localPort != 25565)
         {
             var portMsg = $"Игра слушает порт {localPort} вместо 25565 (проверьте lsp.json).";
@@ -555,39 +506,214 @@ public class PlayitTunnelProvider : ITunnelProvider
             return _currentInfo;
         }
 
-        // Ждём подключения агента в логе (таймаут 4 секунды)
-        var connectTimeout = Task.Delay(4000, ct);
-        var completed = await Task.WhenAny(tcsConnected.Task, connectTimeout);
-        if (completed == connectTimeout && !tcsConnected.Task.IsCompleted)
+        const int maxAttempts = 2; // 1 исходная попытка + 1 автоматический перезапуск
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            LogTunnel("[PLAYIT] Warning: connection line not observed within 12s, proceeding with port test...");
-        }
+            ct.ThrowIfCancellationRequested();
+            LogTunnel($"[PLAYIT] Starting agent process (attempt {attempt}/{maxAttempts})...");
 
-        var publicHost = PublicHost;
-        var publicPort = PublicPort;
+            KillStalePlayitProcesses();
+            InitJobObject();
 
-        // Тестируем доступность публичного туннеля через TCP-подключение
-        bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort, 3000, ct);
-        if (!tcpSuccess)
-        {
-            LogTunnel($"[PLAYIT: WARN] TCP Connect to {publicHost}:{publicPort} did not succeed from local host (NAT loopback or proxy routing). Agent process is active.");
-        }
-        else
-        {
-            LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
-        }
+            var tcsConnected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var processExitTcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        if (_process == null || _process.HasExited)
-        {
-            LogTunnel("[PLAYIT: ERROR] Playit agent process terminated unexpectedly.");
-            _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Процесс туннеля playit завершился с ошибкой.");
+            var psi = new ProcessStartInfo
+            {
+                FileName = _playitExePath,
+                Arguments = $"--secret_path \"{_secretFilePath}\" start",
+                WorkingDirectory = _toolsDir,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+            _process = proc;
+
+            proc.Exited += (s, e) =>
+            {
+                int exitCode = -1;
+                try { exitCode = proc.ExitCode; } catch { }
+                LogTunnel($"[PLAYIT] Agent process exited with code {exitCode}.");
+                processExitTcs.TrySetResult(exitCode);
+                OnActiveProcessExited(exitCode);
+            };
+
+            if (!proc.Start())
+            {
+                LogTunnel($"[PLAYIT: ERROR] Failed to start playit process on attempt {attempt}.");
+                if (attempt < maxAttempts)
+                {
+                    LogTunnel("[PLAYIT: WARN] Retrying agent launch...");
+                    await Task.Delay(1000, ct);
+                    continue;
+                }
+                _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Не удалось запустить процесс playit.");
+                StatusChanged?.Invoke(_currentInfo);
+                return _currentInfo;
+            }
+
+            if (_jobHandle != IntPtr.Zero)
+            {
+                AssignProcessToJobObject(_jobHandle, proc.Handle);
+            }
+
+            try
+            {
+                _activeReadersCts?.Cancel();
+                _activeReadersCts?.Dispose();
+            }
+            catch { }
+
+            _activeReadersCts = new CancellationTokenSource();
+            var readerCt = _activeReadersCts.Token;
+
+            StartPipeReader(proc.StandardOutput, "PLAYIT-OUT", line =>
+            {
+                LogTunnel($"[PLAYIT-OUT] {line}");
+                if (line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
+                {
+                    tcsConnected.TrySetResult(true);
+                }
+            }, readerCt);
+
+            StartPipeReader(proc.StandardError, "PLAYIT-ERR", line =>
+            {
+                LogTunnel($"[PLAYIT-ERR] {line}");
+                if (line.Contains("tunnel running", StringComparison.OrdinalIgnoreCase) ||
+                    line.Contains("tunnels loaded", StringComparison.OrdinalIgnoreCase))
+                {
+                    tcsConnected.TrySetResult(true);
+                }
+            }, readerCt);
+
+            // Ждём подключения агента или преждевременного завершения (таймаут 4 секунды)
+            var connectTimeout = Task.Delay(4000, ct);
+            var finished = await Task.WhenAny(tcsConnected.Task, processExitTcs.Task, connectTimeout);
+
+            if (finished == processExitTcs.Task)
+            {
+                int exitCode = await processExitTcs.Task;
+                LogTunnel($"[PLAYIT: ERROR] Agent exited prematurely with code {exitCode} on attempt {attempt}.");
+                if (attempt < maxAttempts)
+                {
+                    LogTunnel($"[PLAYIT: WARN] Automatic restart after premature exit (code {exitCode})...");
+                    await Task.Delay(1000, ct);
+                    continue;
+                }
+
+                _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, $"Процесс туннеля playit завершился с кодом {exitCode}.");
+                StatusChanged?.Invoke(_currentInfo);
+                return _currentInfo;
+            }
+
+            var publicHost = PublicHost;
+            var publicPort = PublicPort;
+
+            // Тестируем доступность публичного туннеля через TCP-подключение
+            bool tcpSuccess = await TestTcpConnectAsync(publicHost, publicPort, 3000, ct);
+            if (!tcpSuccess)
+            {
+                LogTunnel($"[PLAYIT: WARN] TCP Connect to {publicHost}:{publicPort} did not succeed from local host (NAT loopback or proxy routing). Agent process is active.");
+            }
+            else
+            {
+                LogTunnel($"[PLAYIT] TCP Connect to {publicHost}:{publicPort} succeeded!");
+            }
+
+            if (proc.HasExited)
+            {
+                int exitCode = -1;
+                try { exitCode = proc.ExitCode; } catch { }
+                LogTunnel($"[PLAYIT: ERROR] Playit agent process terminated unexpectedly (code {exitCode}) on attempt {attempt}.");
+                if (attempt < maxAttempts)
+                {
+                    LogTunnel($"[PLAYIT: WARN] Automatic restart after process crash...");
+                    await Task.Delay(1000, ct);
+                    continue;
+                }
+                _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, $"Процесс туннеля playit завершился с кодом {exitCode}.");
+                StatusChanged?.Invoke(_currentInfo);
+                return _currentInfo;
+            }
+
+            _runtimeRestartCount = 0;
+            _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
             StatusChanged?.Invoke(_currentInfo);
             return _currentInfo;
         }
 
-        _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);
+        _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, "Не удалось запустить туннель после перезапуска.");
         StatusChanged?.Invoke(_currentInfo);
         return _currentInfo;
+    }
+
+    private void OnActiveProcessExited(int exitCode)
+    {
+        if (_currentInfo.Status != TunnelStatus.Active) return;
+
+        LogTunnel($"[PLAYIT: WARN] Active agent process died with code {exitCode}.");
+
+        if (Interlocked.Increment(ref _runtimeRestartCount) <= 1)
+        {
+            LogTunnel("[PLAYIT] Performing 1 automatic restart of active tunnel...");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var result = await StartAsync(25565, CancellationToken.None).ConfigureAwait(false);
+                    if (result.Status != TunnelStatus.Active)
+                    {
+                        var reason = $"Процесс туннеля playit аварийно завершился (код {exitCode}) и не смог перезапуститься.";
+                        LogTunnel($"[PLAYIT: ERROR] {reason}");
+                        _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, reason);
+                        StatusChanged?.Invoke(_currentInfo);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogTunnel($"[EXCEPTION] Automatic restart failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                    _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, $"Перезапуск туннеля завершился ошибкой: {ex.Message}");
+                    StatusChanged?.Invoke(_currentInfo);
+                }
+            });
+            return;
+        }
+
+        var failReason = $"Процесс туннеля playit аварийно завершился (код {exitCode}).";
+        LogTunnel($"[PLAYIT: ERROR] {failReason}");
+        _currentInfo = new TunnelInfo(null, null, TunnelStatus.Failed, failReason);
+        StatusChanged?.Invoke(_currentInfo);
+    }
+
+    private static void StartPipeReader(StreamReader reader, string source, Action<string> onLine, CancellationToken ct)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    string? line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+                    if (line == null) break;
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        onLine(line);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Обычная отмена при остановке туннеля
+            }
+            catch (Exception ex)
+            {
+                LogTunnel($"[EXCEPTION] {source} reader: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            }
+        }, ct);
     }
 
     private static async Task<bool> TestTcpConnectAsync(string host, int port, int timeoutMs, CancellationToken ct)
@@ -622,12 +748,23 @@ public class PlayitTunnelProvider : ITunnelProvider
     {
         try
         {
+            _activeReadersCts?.Cancel();
+            _activeReadersCts?.Dispose();
+            _activeReadersCts = null;
+        }
+        catch { }
+
+        try
+        {
             if (_process != null && !_process.HasExited)
             {
                 _process.Kill(true);
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            LogTunnel($"[EXCEPTION] StopAsync Kill: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+        }
 
         _process = null;
         _currentInfo = new TunnelInfo(null, null, TunnelStatus.Inactive);
@@ -637,10 +774,25 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public void Dispose()
     {
-        _ = StopAsync(CancellationToken.None);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await StopAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                LogTunnel($"[EXCEPTION] Dispose StopAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            }
+        });
+
         if (_jobHandle != IntPtr.Zero)
         {
-            CloseHandle(_jobHandle);
+            try
+            {
+                CloseHandle(_jobHandle);
+            }
+            catch { }
             _jobHandle = IntPtr.Zero;
         }
     }

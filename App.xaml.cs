@@ -37,24 +37,25 @@ public partial class App : Application
         // Перехват и логирование необработанных исключений
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
-            LogCrash(args.ExceptionObject as Exception);
+            LogCrash(args.ExceptionObject as Exception, isFatal: args.IsTerminating);
         };
 
         DispatcherUnhandledException += (s, args) =>
         {
-            LogCrash(args.Exception);
+            LogCrash(args.Exception, isFatal: false);
             args.Handled = true; // Предотвращаем падение приложения при сбоях в UI/рендере
         };
 
         TaskScheduler.UnobservedTaskException += (s, args) =>
         {
-            LogCrash(args.Exception);
+            LogCrash(args.Exception, isFatal: false);
             args.SetObserved();
         };
 
-        // Режим самодиагностики (--selftest, --selftest-shots или --selftest-lobby) или отдельный профиль
+        // Режим самодиагностики (--selftest, --selftest-shots, --selftest-lobby или --selftest-kill-playit) или отдельный профиль
+        bool isKillPlayitTest = Array.Exists(e.Args, a => a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
         bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = isLobbyTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = isKillPlayitTest || isLobbyTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -118,8 +119,20 @@ public partial class App : Application
             _ = mainVM.InitializeAsync();
         }
 
-        // Проверка режима самодиагностики (--selftest-lobby, --selftest или --selftest-shots)
-        if (isLobbyTest)
+        // Проверка режима самодиагностики (--selftest-kill-playit, --selftest-lobby, --selftest или --selftest-shots)
+        if (isKillPlayitTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.LiveTestKillPlayitAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (isLobbyTest)
         {
             _ = Task.Run(async () =>
             {
@@ -179,13 +192,13 @@ public partial class App : Application
         services.AddSingleton<MainViewModel>();
     }
 
-    private static void LogCrash(Exception? ex)
+    private static void LogCrash(Exception? ex, bool isFatal = false)
     {
         if (ex == null) return;
         try
         {
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            string logEntry = $"[{timestamp}] Unhandled Crash:\n{ex}\n----------------------------------------\n";
+            string logEntry = $"[{timestamp}] {(isFatal ? "Fatal Crash" : "Unhandled Exception")}:\n{ex}\n----------------------------------------\n";
 
             // Запись в системный %AppData%\Aura\launcher.log
             try
@@ -197,14 +210,14 @@ public partial class App : Application
             }
             catch { }
 
-            // Показываем диалог пользователю ОДИН РАЗ, предотвращая зацикливание модальных окон
-            if (Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
+            // Показываем диалог пользователю ТОЛЬКО при фатальных сбоях
+            if (isFatal && Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
             {
                 MessageBox.Show(
-                    $"Произошла ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nПолный стек ошибки сохранен в launcher.log.\nПриложение продолжит работу.",
-                    "AURA Launcher — Внимание",
+                    $"Произошла фатальная ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nПолный стек ошибки сохранен в launcher.log.",
+                    "AURA Launcher — Фатальная ошибка",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    MessageBoxImage.Error);
             }
         }
         catch { }

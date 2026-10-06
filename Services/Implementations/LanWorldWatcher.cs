@@ -158,7 +158,14 @@ public class LanWorldWatcher : ILanWorldWatcher
             {
                 IsWorldOpen = true;
                 CurrentPort = port;
-                WorldOpened?.Invoke(port);
+                try
+                {
+                    WorldOpened?.Invoke(port);
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LanWorldWatcher WorldOpened event: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
                 return;
             }
         }
@@ -169,7 +176,14 @@ public class LanWorldWatcher : ILanWorldWatcher
             {
                 IsWorldOpen = false;
                 CurrentPort = null;
-                WorldClosed?.Invoke();
+                try
+                {
+                    WorldClosed?.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LanWorldWatcher WorldClosed event: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
             }
         }
     }

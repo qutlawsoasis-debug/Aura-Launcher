@@ -78,7 +78,17 @@ public class LobbyStateManager : IDisposable
             }
 
             // Если мир закрыт, туннель немедленно останавливается
-            _ = _tunnelProvider.StopAsync(CancellationToken.None);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _tunnelProvider.StopAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    AuraLauncher.Services.Implementations.PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LobbyStateManager.StopAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
+            });
             SetState(LobbyState.Idle);
         }
     }
@@ -90,7 +100,17 @@ public class LobbyStateManager : IDisposable
     {
         lock (_stateLock)
         {
-            _ = _tunnelProvider.StopAsync(CancellationToken.None);
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _tunnelProvider.StopAsync(CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    AuraLauncher.Services.Implementations.PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LobbyStateManager.OnGameExited StopAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
+            });
             SetState(LobbyState.Idle);
         }
     }

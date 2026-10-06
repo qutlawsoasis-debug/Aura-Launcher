@@ -48,46 +48,76 @@ public class LobbyService : ILobbyService, IDisposable
     {
         if (!IsHost || string.IsNullOrWhiteSpace(CurrentLobbyCode) || string.IsNullOrWhiteSpace(CurrentHostToken))
         {
+            PlayitTunnelProvider.LogTunnel("[HOST-OPEN: WARN] HostOpenWorldAsync called but IsHost=false or lobby code/token empty.");
             return false;
         }
 
-        string tunnelAddr;
-        if (!string.IsNullOrWhiteSpace(customTunnelAddress))
+        try
         {
-            tunnelAddr = customTunnelAddress;
-        }
-        else
-        {
-            var tunnelResult = await _tunnelProvider.StartAsync(localPort, cancellationToken);
-            if (tunnelResult.Status != TunnelStatus.Active || string.IsNullOrWhiteSpace(tunnelResult.PublicAddress))
+            string tunnelAddr;
+            if (!string.IsNullOrWhiteSpace(customTunnelAddress))
             {
-                return false;
+                tunnelAddr = customTunnelAddress;
+            }
+            else
+            {
+                var tunnelResult = await _tunnelProvider.StartAsync(localPort, cancellationToken);
+                if (tunnelResult.Status != TunnelStatus.Active || string.IsNullOrWhiteSpace(tunnelResult.PublicAddress))
+                {
+                    PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] Tunnel StartAsync failed: status={tunnelResult.Status}, error={tunnelResult.ErrorMessage}");
+                    return false;
+                }
+
+                tunnelAddr = tunnelResult.PublicPort.HasValue 
+                    ? $"{tunnelResult.PublicAddress}:{tunnelResult.PublicPort.Value}" 
+                    : tunnelResult.PublicAddress;
             }
 
-            tunnelAddr = tunnelResult.PublicPort.HasValue 
-                ? $"{tunnelResult.PublicAddress}:{tunnelResult.PublicPort.Value}" 
-                : tunnelResult.PublicAddress;
-        }
+            PlayitTunnelProvider.LogTunnel($"[HOST-OPEN] Registering tunnel address '{tunnelAddr}' in lobby-api for code {CurrentLobbyCode}...");
+            var success = await _apiClient.OpenLobbyAsync(CurrentLobbyCode, CurrentHostToken, tunnelAddr, cancellationToken);
+            if (success)
+            {
+                CurrentStatus = "open";
+                CurrentTunnelAddress = tunnelAddr;
+                StatusChanged?.Invoke(CurrentStatus);
+                TunnelAddressReady?.Invoke(tunnelAddr);
+                PlayitTunnelProvider.LogTunnel($"[HOST-OPEN] Lobby {CurrentLobbyCode} opened successfully with tunnel {tunnelAddr}.");
+                return true;
+            }
 
-        var success = await _apiClient.OpenLobbyAsync(CurrentLobbyCode, CurrentHostToken, tunnelAddr, cancellationToken);
-        if (success)
+            PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] lobby-api OpenLobbyAsync returned false for code {CurrentLobbyCode}.");
+            return false;
+        }
+        catch (Exception ex)
         {
-            CurrentStatus = "open";
-            CurrentTunnelAddress = tunnelAddr;
-            StatusChanged?.Invoke(CurrentStatus);
-            TunnelAddressReady?.Invoke(tunnelAddr);
-            return true;
+            PlayitTunnelProvider.LogTunnel($"[EXCEPTION] HostOpenWorldAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            return false;
         }
-
-        return false;
     }
 
     public async Task CloseLobbyAsHostAsync(CancellationToken cancellationToken = default)
     {
         if (IsHost && !string.IsNullOrWhiteSpace(CurrentLobbyCode) && !string.IsNullOrWhiteSpace(CurrentHostToken))
         {
-            await _apiClient.CloseLobbyAsync(CurrentLobbyCode, CurrentHostToken, cancellationToken);
-            await _tunnelProvider.StopAsync(cancellationToken);
+            try
+            {
+                PlayitTunnelProvider.LogTunnel($"[LOBBY] Closing lobby {CurrentLobbyCode} as host via API...");
+                await _apiClient.CloseLobbyAsync(CurrentLobbyCode, CurrentHostToken, cancellationToken);
+                PlayitTunnelProvider.LogTunnel($"[LOBBY] Lobby {CurrentLobbyCode} closed via API.");
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsync API call failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            }
+
+            try
+            {
+                await _tunnelProvider.StopAsync(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsHostAsync StopAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            }
         }
         LeaveLobby();
     }
@@ -150,26 +180,38 @@ public class LobbyService : ILobbyService, IDisposable
 
         _ = Task.Run(async () =>
         {
-            while (!ct.IsCancellationRequested)
+            try
             {
-                try
+                while (!ct.IsCancellationRequested)
                 {
-                    await Task.Delay(1500, ct);
-                    if (ct.IsCancellationRequested) break;
-                    await RefreshGuestStatusAsync(ct);
-                    if (CurrentStatus.Equals("closed", StringComparison.OrdinalIgnoreCase))
+                    try
+                    {
+                        await Task.Delay(1500, ct);
+                        if (ct.IsCancellationRequested) break;
+                        await RefreshGuestStatusAsync(ct);
+                        if (CurrentStatus.Equals("closed", StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                    catch (OperationCanceledException)
                     {
                         break;
                     }
+                    catch (Exception loopEx)
+                    {
+                        // Transient poll error, log and continue
+                        PlayitTunnelProvider.LogTunnel($"[GUEST-POLL: WARN] RefreshGuestStatusAsync transient failure: {loopEx.Message}");
+                    }
                 }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-                catch
-                {
-                    // Ignore transient errors
-                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal exit
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] GuestPolling: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
             }
         }, ct);
     }

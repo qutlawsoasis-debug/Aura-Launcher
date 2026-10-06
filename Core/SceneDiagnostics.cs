@@ -452,6 +452,133 @@ public static class SceneDiagnostics
         }
     }
 
+    public static async Task<bool> LiveTestKillPlayitAsync(MainWindow window)
+    {
+        System.Net.Sockets.TcpListener? listener = null;
+        try
+        {
+            PlayitTunnelProvider.LogTunnel("=== [TEST-KILL-PLAYIT] STARTING TEST ===");
+            await Task.Delay(1000);
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
+            await Task.Delay(500);
+
+            // 1. Create lobby
+            PlayitTunnelProvider.LogTunnel("[TEST-KILL-PLAYIT] Creating lobby...");
+            window.Dispatcher.Invoke(() => mainVm.LobbyVM.CreateLobbyCommand.Execute(null));
+
+            for (int i = 0; i < 40; i++)
+            {
+                await Task.Delay(500);
+                if (window.Dispatcher.Invoke(() => mainVm.LobbyVM.IsLobbyCreated && !string.IsNullOrWhiteSpace(mainVm.LobbyVM.LobbyCode))) break;
+            }
+
+            string code = window.Dispatcher.Invoke(() => mainVm.LobbyVM.LobbyCode) ?? "";
+            PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT] Lobby created with code: {code}");
+
+            // 2. Start TCP listener on 25565
+            listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
+            listener.Start();
+            PlayitTunnelProvider.LogTunnel("[TEST-KILL-PLAYIT] Started local TCP listener on 127.0.0.1:25565");
+
+            // 3. Background killer: kills playit whenever it appears (both initial and automatic retry)
+            var killCts = new CancellationTokenSource();
+            _ = Task.Run(async () =>
+            {
+                int killCount = 0;
+                while (!killCts.Token.IsCancellationRequested && killCount < 4)
+                {
+                    try
+                    {
+                        var procs = Process.GetProcessesByName("playit-0.15.26");
+                        foreach (var p in procs)
+                        {
+                            try
+                            {
+                                PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT] Deliberately killing playit process (PID: {p.Id})...");
+                                p.Kill(true);
+                                killCount++;
+                            }
+                            catch { }
+                        }
+                    }
+                    catch { }
+                    await Task.Delay(100, killCts.Token);
+                }
+            }, killCts.Token);
+
+            // 4. Trigger LAN world opened
+            PlayitTunnelProvider.LogTunnel("[TEST-KILL-PLAYIT] Triggering LAN world opened event on port 25565...");
+            var watcher = typeof(LobbyViewModel).GetField("_worldWatcher", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(mainVm.LobbyVM) as ILanWorldWatcher;
+            
+            if (watcher is LanWorldWatcher lww)
+            {
+                lww.ProcessLine("Started serving on 25565");
+            }
+            else
+            {
+                var method = typeof(LobbyViewModel).GetMethod("OnLanWorldOpened", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                method?.Invoke(mainVm.LobbyVM, new object[] { 25565 });
+            }
+
+            // 5. Wait for error to appear on host UI
+            PlayitTunnelProvider.LogTunnel("[TEST-KILL-PLAYIT] Awaiting failure reason on host UI...");
+            bool errorDetected = false;
+            string? failureReason = null;
+
+            for (int i = 0; i < 30; i++)
+            {
+                await Task.Delay(500);
+                bool btnVisible = window.Dispatcher.Invoke(() => mainVm.LobbyVM.ShowTunnelFailedLogButton);
+                failureReason = window.Dispatcher.Invoke(() => mainVm.LobbyVM.TunnelFailureReason);
+                string hostStatus = window.Dispatcher.Invoke(() => mainVm.LobbyVM.HostStatusText);
+
+                if (btnVisible && !string.IsNullOrWhiteSpace(failureReason))
+                {
+                    errorDetected = true;
+                    PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT] Error detected on host UI: '{failureReason}', HostStatusText='{hostStatus}'");
+                    break;
+                }
+            }
+
+            killCts.Cancel();
+
+            if (!errorDetected)
+            {
+                PlayitTunnelProvider.LogTunnel("[TEST-KILL-PLAYIT: FAIL] Error was not detected on host UI within timeout!");
+                return false;
+            }
+
+            // 6. Check lobby status in API (must be 'closed')
+            PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT] Checking lobby status in API for code {code}...");
+            var apiClient = App.Services.GetRequiredService<ILobbyApiClient>();
+            await Task.Delay(1000);
+            var statusResp = await apiClient.GetStatusAsync(code);
+            PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT] API status response: {statusResp?.Status}");
+
+            bool isClosed = string.Equals(statusResp?.Status, "closed", StringComparison.OrdinalIgnoreCase);
+            if (!isClosed)
+            {
+                PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT: FAIL] Expected lobby status 'closed', but got '{statusResp?.Status}'!");
+                return false;
+            }
+
+            PlayitTunnelProvider.LogTunnel("=== [TEST-KILL-PLAYIT: PASSED] Host UI shows error reason, lobby closed via API, no modal dialog! ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[TEST-KILL-PLAYIT: ERROR] {ex}");
+            return false;
+        }
+        finally
+        {
+            try { listener?.Stop(); } catch { }
+        }
+    }
+
     private static string ResolveShotsDir()
     {
         var args = Environment.GetCommandLineArgs();
