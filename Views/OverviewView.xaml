@@ -21,17 +21,32 @@
         <!-- Main StackPanel anchored to the bottom-left of the content area -->
         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Focusable="False" FocusVisualStyle="{x:Null}">
             
-            <!-- 1) Line "Minecraft 1.20.1, Fabric 0.19.5, 61 мод" 15px dim, Margin снизу 12 (прямо над кнопкой «Играть») -->
-            <TextBlock Text="{Binding SpecLine}"
-                       FontFamily="{StaticResource MainFont}"
-                       FontSize="15"
-                       FontWeight="Normal"
-                       Foreground="{StaticResource DimInkBrush}"
-                       Margin="0,0,0,12">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
-                </TextBlock.Effect>
-            </TextBlock>
+            <!-- 1) Line "Minecraft 1.20.1, Fabric 0.19.5, 93 мода" and "Список изменений" link -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,12">
+                <TextBlock Text="{Binding SpecLine}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="15"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    </TextBlock.Effect>
+                </TextBlock>
+                <Border Width="1" Height="12" Background="{StaticResource LineInkBrush}" Margin="10,0,10,0" VerticalAlignment="Center" />
+                <Button Command="{Binding DataContext.OpenChangelogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        Style="{StaticResource GhostBtn}"
+                        Padding="0" VerticalAlignment="Center">
+                    <TextBlock Text="Список изменений"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="13"
+                               Foreground="{StaticResource EmberBrush}"
+                               TextDecorations="Underline">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
+                        </TextBlock.Effect>
+                    </TextBlock>
+                </Button>
+            </StackPanel>
 
             <!-- 3) Button "Играть" 260x70 with bottom progress bar, right of it label MaxWidth 300 wrap -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">

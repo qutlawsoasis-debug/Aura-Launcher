@@ -178,6 +178,16 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _protocolPromptConfirmText, value);
     }
 
+    private bool _isChangelogModalVisible;
+    public bool IsChangelogModalVisible
+    {
+        get => _isChangelogModalVisible;
+        set => SetProperty(ref _isChangelogModalVisible, value);
+    }
+
+    public RelayCommand OpenChangelogCommand { get; }
+    public RelayCommand CloseChangelogCommand { get; }
+
     public AsyncRelayCommand ConfirmProtocolPromptCommand { get; }
     public RelayCommand CancelProtocolPromptCommand { get; }
 
@@ -580,6 +590,9 @@ public class MainViewModel : ObservableObject
 
         _discordRpcService?.Initialize();
         _discordRpcService?.SetInLauncher();
+
+        OpenChangelogCommand = new RelayCommand(_ => IsChangelogModalVisible = true);
+        CloseChangelogCommand = new RelayCommand(_ => IsChangelogModalVisible = false);
 
         ConfirmProtocolPromptCommand = new AsyncRelayCommand(async () =>
         {
