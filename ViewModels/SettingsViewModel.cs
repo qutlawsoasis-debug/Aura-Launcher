@@ -185,6 +185,20 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
+    public bool HideLauncherWhilePlaying
+    {
+        get => _configService.CurrentConfig.HideLauncherWhilePlaying;
+        set
+        {
+            if (_configService.CurrentConfig.HideLauncherWhilePlaying != value)
+            {
+                _configService.CurrentConfig.HideLauncherWhilePlaying = value;
+                OnPropertyChanged();
+                _ = SaveImmediatelyAsync();
+            }
+        }
+    }
+
     public string CurrentVersion
     {
         get

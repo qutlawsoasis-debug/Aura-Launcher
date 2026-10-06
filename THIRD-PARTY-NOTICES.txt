@@ -147,5 +147,10 @@ Copyright 2022 The Onest Project Authors (https://github.com/gorinich/onest)
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 https://scripts.sil.org/OFL
 --------------------------------------------------------------------------------
+Hardcodet WPF NotifyIcon
+Website: https://github.com/hardcodet/wpf-notifyicon
+License: The Code Project Open License (CPOL) 1.02 / MIT
+Copyright (c) 2009 - 2023 Philipp Sumi
+--------------------------------------------------------------------------------
 
 

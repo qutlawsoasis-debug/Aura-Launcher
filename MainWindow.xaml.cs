@@ -1,10 +1,14 @@
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using AuraLauncher.Services.Interfaces;
 using AuraLauncher.ViewModels;
+using Hardcodet.Wpf.TaskbarNotification;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace AuraLauncher;
 
@@ -20,6 +24,7 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _sliderHideTimer;
     private FrameworkElement? _currentActiveView;
     private Storyboard? _activeTransitionStoryboard;
+    private TaskbarIcon? _trayIcon;
 
     public MainWindow()
     {
@@ -32,6 +37,29 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel vm)
         {
+            SetupTrayIcon();
+
+            vm.GameStarted += (s, proc) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    var cfgService = App.Services?.GetService<IConfigService>();
+                    bool hideLauncher = cfgService?.CurrentConfig.HideLauncherWhilePlaying ?? true;
+                    if (hideLauncher)
+                    {
+                        HideToTray();
+                    }
+                });
+            };
+
+            vm.GameExited += (s, exitCode) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    RestoreFromTray();
+                });
+            };
+
             vm.PropertyChanged += (s, args) =>
             {
                 if (args.PropertyName == nameof(MainViewModel.CurrentTabName))
@@ -304,5 +332,108 @@ public partial class MainWindow : Window
 
         SliderBox.BeginAnimation(FrameworkElement.WidthProperty, animW);
         SliderBox.BeginAnimation(UIElement.OpacityProperty, animO);
+    }
+
+    private void SetupTrayIcon()
+    {
+        if (_trayIcon != null) return;
+
+        try
+        {
+            _trayIcon = new TaskbarIcon
+            {
+                ToolTipText = "Aura Launcher",
+                Visibility = Visibility.Collapsed
+            };
+
+            // Загрузка иконки из app_icon.ico
+            try
+            {
+                var iconUri = new Uri("pack://application:,,,/app_icon.ico", UriKind.RelativeOrAbsolute);
+                var streamInfo = System.Windows.Application.GetResourceStream(iconUri);
+                if (streamInfo != null)
+                {
+                    using var stream = streamInfo.Stream;
+                    _trayIcon.Icon = new System.Drawing.Icon(stream);
+                }
+            }
+            catch
+            {
+                var localIco = Path.Combine(AppContext.BaseDirectory, "app_icon.ico");
+                if (File.Exists(localIco))
+                {
+                    _trayIcon.Icon = new System.Drawing.Icon(localIco);
+                }
+            }
+
+            // Двойной клик по иконке открывает окно
+            _trayIcon.TrayMouseDoubleClick += (s, e) =>
+            {
+                RestoreFromTray();
+            };
+
+            // Контекстное меню трея: «Открыть Aura» и «Выйти»
+            var contextMenu = new ContextMenu();
+            var openItem = new MenuItem { Header = "Открыть Aura" };
+            openItem.Click += (s, e) => RestoreFromTray();
+
+            var exitItem = new MenuItem { Header = "Выйти" };
+            exitItem.Click += (s, e) =>
+            {
+                _trayIcon?.Dispose();
+                _trayIcon = null;
+                System.Windows.Application.Current.Shutdown();
+            };
+
+            contextMenu.Items.Add(openItem);
+            contextMenu.Items.Add(new Separator());
+            contextMenu.Items.Add(exitItem);
+
+            _trayIcon.ContextMenu = contextMenu;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TRAY: ERROR] Setup failed: {ex.Message}");
+        }
+
+        Closed += (s, e) =>
+        {
+            try
+            {
+                _trayIcon?.Dispose();
+                _trayIcon = null;
+            }
+            catch { }
+        };
+    }
+
+    public void HideToTray()
+    {
+        App.Log("[TRAY] HideToTray: Игра запущена, окно лаунчера скрыто, иконка в трее показана.");
+        Hide();
+        ShowInTaskbar = false;
+        if (_trayIcon != null)
+        {
+            _trayIcon.Visibility = Visibility.Visible;
+        }
+    }
+
+    public void RestoreFromTray()
+    {
+        App.Log("[TRAY] RestoreFromTray: Окно лаунчера возвращено на экран, иконка в трее скрыта.");
+        if (_trayIcon != null)
+        {
+            _trayIcon.Visibility = Visibility.Collapsed;
+        }
+
+        Show();
+        ShowInTaskbar = true;
+        WindowState = WindowState.Normal;
+
+        // Гарантированно выводим окно поверх остальных и активируем фокус
+        Topmost = true;
+        Topmost = false;
+        Activate();
+        Focus();
     }
 }

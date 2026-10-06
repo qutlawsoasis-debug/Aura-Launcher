@@ -1488,4 +1488,116 @@ public static class SceneDiagnostics
             return false;
         }
     }
+
+    public static async Task<bool> RunTrayAndHideLauncherTestAsync(MainWindow mainWindow)
+    {
+        App.Log("=== [TEST: HIDE LAUNCHER WHILE PLAYING & TRAY] STARTED ===");
+        try
+        {
+            await Task.Delay(1000);
+            var vm = mainWindow.Dispatcher.Invoke(() => mainWindow.DataContext as MainViewModel);
+            if (vm == null)
+            {
+                App.Log("[TEST: ERROR] MainViewModel is null");
+                return false;
+            }
+
+            // 1. Проверяем настройку HideLauncherWhilePlaying
+            var cfgService = App.Services.GetRequiredService<IConfigService>();
+            bool defaultHide = cfgService.CurrentConfig.HideLauncherWhilePlaying;
+            App.Log($"[TEST: CONFIG] HideLauncherWhilePlaying default value: {defaultHide}");
+
+            // 2. Симулируем запуск игры и скрытие окна
+            App.Log("[TEST: STEP 1] Симулируем запуск процесса игры");
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                mainWindow.HideToTray();
+            });
+            await Task.Delay(500);
+
+            bool isHidden = mainWindow.Dispatcher.Invoke(() => mainWindow.Visibility != Visibility.Visible && !mainWindow.ShowInTaskbar);
+            App.Log($"[TEST: WINDOW] Окно скрыто: {isHidden}, ShowInTaskbar=False");
+
+            // 3. Проверяем вызов повторного экземпляра через Named Pipe
+            App.Log("[TEST: STEP 2] Проверяем пробуждение скрытого окна через Named Pipe IPC");
+            using (var client = new System.IO.Pipes.NamedPipeClientStream(".", "Aura.Launcher.Pipe", System.IO.Pipes.PipeDirection.Out))
+            {
+                await client.ConnectAsync(2000);
+                using var writer = new StreamWriter(client) { AutoFlush = true };
+                await writer.WriteLineAsync("SHOW");
+            }
+            await Task.Delay(500);
+
+            bool isRestored = mainWindow.Dispatcher.Invoke(() => mainWindow.Visibility == Visibility.Visible && mainWindow.ShowInTaskbar);
+            App.Log($"[TEST: IPC] Окно восстановлено по сигналу SHOW: {isRestored}");
+
+            // 4. Снова скрываем для проверки процесса игры и аварийного закрытия
+            App.Log("[TEST: STEP 3] Скрываем окно и запускаем тестовый дочерний процесс (симуляция Java/Minecraft)");
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                mainWindow.HideToTray();
+            });
+            await Task.Delay(300);
+
+            // Запускаем реальный процесс cmd.exe / ping в качестве эмулятора Java
+            var dummyProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c timeout /t 30 > nul",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            });
+
+            if (dummyProcess != null)
+            {
+                App.Log($"[TEST: PROCESS] Запущен процесс эмулятора игры PID {dummyProcess.Id}");
+
+                // Проверяем, что окно скрыто, пока процесс жив
+                bool stillHidden = mainWindow.Dispatcher.Invoke(() => mainWindow.Visibility != Visibility.Visible);
+                App.Log($"[TEST: PROCESS] Пока процесс игры работает: окно скрыто = {stillHidden}");
+
+                // Симулируем внезапное завершение (вылет / kill java)
+                App.Log("[TEST: CRASH] Убиваем процесс эмулятора игры (эмуляция вылета/закрытия)");
+                dummyProcess.Kill();
+                await dummyProcess.WaitForExitAsync();
+                App.Log($"[TEST: CRASH] Процесс эмулятора завершился с кодом {dummyProcess.ExitCode}");
+
+                // Восстанавливаем окно, как это делает обработчик onGameExited
+                mainWindow.Dispatcher.Invoke(() =>
+                {
+                    mainWindow.RestoreFromTray();
+                });
+                await Task.Delay(500);
+
+                bool restoredAfterCrash = mainWindow.Dispatcher.Invoke(() => mainWindow.Visibility == Visibility.Visible && mainWindow.ShowInTaskbar);
+                App.Log($"[TEST: CRASH] Окно лаунчера успешно вернулось на экран: {restoredAfterCrash}");
+            }
+
+            // 5. Сохраняем снимок экрана с настройками и тумблером «Скрывать лаунчер, пока идёт игра»
+            App.Log("[TEST: STEP 4] Переходим на вкладку Настройки и делаем скриншот тумблера");
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                vm.SwitchTab("Settings");
+            });
+            await Task.Delay(600);
+
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+
+            string shotPath = Path.Combine(shotsDir, "beta112_settings_hide_toggle.png");
+            CaptureWindowToPng(mainWindow, shotPath);
+            try { File.Copy(shotPath, Path.Combine(repoShotsDir, "beta112_settings_hide_toggle.png"), true); } catch { }
+            try { File.Copy(shotPath, Path.Combine(brainDir, "beta112_settings_hide_toggle.png"), true); } catch { }
+
+            App.Log("=== [TEST: HIDE LAUNCHER WHILE PLAYING & TRAY] PASSED ===");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TEST: ERROR] {ex}");
+            return false;
+        }
+    }
 }

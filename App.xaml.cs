@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -83,7 +84,8 @@ public partial class App : Application
         bool isLifecycleTest = Array.Exists(e.Args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
         bool isAnthemTest = Array.Exists(e.Args, a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase));
         bool isRapidNavTest = Array.Exists(e.Args, a => a.Equals("--selftest-rapid", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isTrayTest = Array.Exists(e.Args, a => a.Equals("--selftest-tray", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -102,10 +104,15 @@ public partial class App : Application
             ? @"Local\Aura.Launcher"
             : $@"Local\Aura.Launcher.{profileArg.Replace('\\', '_').Replace(':', '_').Replace('/', '_')}";
 
+        string pipeName = string.IsNullOrWhiteSpace(profileArg)
+            ? "Aura.Launcher.Pipe"
+            : $"Aura.Launcher.Pipe.{profileArg.Replace('\\', '_').Replace(':', '_').Replace('/', '_')}";
+
         // Именованный Mutex для контроля единого экземпляра приложения
         _singleInstanceMutex = new Mutex(true, mutexName, out bool isNewInstance);
         if (!isNewInstance && !isSelfTest)
         {
+            SignalExistingInstanceViaPipe(pipeName);
             BringExistingInstanceToFront();
             Shutdown();
             return;
@@ -139,6 +146,8 @@ public partial class App : Application
         {
             DataContext = Services.GetRequiredService<MainViewModel>()
         };
+
+        StartPipeServer(pipeName, mainWindow);
 
         mainWindow.Show();
 
@@ -244,6 +253,18 @@ public partial class App : Application
                 }
             });
         }
+        else if (isTrayTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunTrayAndHideLauncherTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
         else if (isSelfTest)
         {
             _ = Task.Run(async () =>
@@ -336,6 +357,52 @@ public partial class App : Application
             System.Diagnostics.Debug.WriteLine(line);
         }
         catch { }
+    }
+
+    private static void SignalExistingInstanceViaPipe(string pipeName)
+    {
+        try
+        {
+            using var client = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+            client.Connect(1500); // таймаут 1.5 секунды
+            using var writer = new StreamWriter(client) { AutoFlush = true };
+            writer.WriteLine("SHOW");
+        }
+        catch { }
+    }
+
+    private static void StartPipeServer(string pipeName, MainWindow mainWindow)
+    {
+        _ = Task.Run(async () =>
+        {
+            while (true)
+            {
+                try
+                {
+                    using var server = new NamedPipeServerStream(
+                        pipeName,
+                        PipeDirection.In,
+                        1,
+                        PipeTransmissionMode.Byte,
+                        PipeOptions.Asynchronous);
+
+                    await server.WaitForConnectionAsync();
+                    using var reader = new StreamReader(server);
+                    var msg = await reader.ReadLineAsync();
+                    if (string.Equals(msg, "SHOW", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mainWindow.Dispatcher.Invoke(() =>
+                        {
+                            mainWindow.RestoreFromTray();
+                        });
+                    }
+                }
+                catch
+                {
+                    await Task.Delay(1000);
+                }
+            }
+        });
     }
 
     private static void BringExistingInstanceToFront()

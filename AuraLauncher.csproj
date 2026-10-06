@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>app_icon.ico</ApplicationIcon>
-    <Version>1.2.19</Version>
+    <Version>1.2.20</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -43,6 +43,7 @@
   <ItemGroup>
     <PackageReference Include="CmlLib.Core" Version="4.0.6" />
     <PackageReference Include="fNbt" Version="2.1.0" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Velopack" Version="1.2.161" />

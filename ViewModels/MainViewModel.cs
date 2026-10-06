@@ -56,6 +56,9 @@ public class MainViewModel : ObservableObject
     private bool _isToastDismissedForSession;
     private string? _pendingNewVersion;
 
+    public event EventHandler<Process>? GameStarted;
+    public event EventHandler<int>? GameExited;
+
     public OverviewViewModel OverviewVM { get; }
     public SettingsViewModel SettingsVM { get; }
     public WardrobeViewModel WardrobeVM { get; }
@@ -787,6 +790,26 @@ public class MainViewModel : ObservableObject
                         {
                             UpdateIdleState();
                         }
+
+                        // Если обновление лаунчера было отложено из-за игры, показываем тост сейчас
+                        if (_isLauncherUpdatePending && !_isToastDismissedForSession && !string.IsNullOrWhiteSpace(_pendingNewVersion))
+                        {
+                            var parts = _pendingNewVersion.Split('.');
+                            string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
+                                ? $"beta 1.0.{patch - 8}"
+                                : _pendingNewVersion;
+
+                            UpdateBannerTitle = $"Вышло обновление {displayVer}";
+                            UpdateBannerButtonText = "Обновить";
+                            OnPropertyChanged(nameof(UpdateBannerMessage));
+                            IsUpdateBannerVisible = true;
+                        }
+
+                        try
+                        {
+                            GameExited?.Invoke(this, exitCode);
+                        }
+                        catch { }
                     });
                 },
                 installProgress: installProgress,
@@ -799,6 +822,12 @@ public class MainViewModel : ObservableObject
             _isLaunching = false;
             OverviewVM.RefreshStats();
             UpdateIdleState();
+
+            try
+            {
+                GameStarted?.Invoke(this, process);
+            }
+            catch { }
         }
         catch (OperationCanceledException)
         {
@@ -839,7 +868,7 @@ public class MainViewModel : ObservableObject
                     _pendingNewVersion = newVersion;
                     HasUpdateDot = true;
 
-                    if (!_isToastDismissedForSession)
+                    if (!_isToastDismissedForSession && !IsGameRunning)
                     {
                         var parts = newVersion.Split('.');
                         string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
@@ -981,7 +1010,7 @@ public class MainViewModel : ObservableObject
                     _pendingNewVersion = newVersion;
                     HasUpdateDot = true;
 
-                    if (!_isToastDismissedForSession)
+                    if (!_isToastDismissedForSession && !IsGameRunning)
                     {
                         var parts = newVersion.Split('.');
                         string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
