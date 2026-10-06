@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -7,6 +8,14 @@ using AuraLauncher.Services.Interfaces;
 using AuraLauncher.Services.Implementations;
 
 namespace AuraLauncher.ViewModels;
+
+public class WhatsNewItem
+{
+    public string Version { get; set; } = string.Empty;
+    public string Date { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+}
 
 /// <summary>
 /// ViewModel для главного экрана лаунчера.
@@ -20,6 +29,7 @@ public class OverviewViewModel : ObservableObject
 
     private string _buildName = "Aura";
     private string _versionInfo = $"Minecraft 1.20.1 • Fabric {FabricGameLaunchService.FabricLoaderVersion}";
+    private string _specLine = "Minecraft 1.20.1 • Fabric • 68 модов";
     private string _modsCountText = "Сборка не установлена";
     private string _lastUpdateText = "Обновлено: —";
     private bool _isEnvironmentInstalled;
@@ -34,6 +44,12 @@ public class OverviewViewModel : ObservableObject
     {
         get => _versionInfo;
         set => SetProperty(ref _versionInfo, value);
+    }
+
+    public string SpecLine
+    {
+        get => _specLine;
+        set => SetProperty(ref _specLine, value);
     }
 
     public string ModsCountText
@@ -53,6 +69,8 @@ public class OverviewViewModel : ObservableObject
         get => _isEnvironmentInstalled;
         private set => SetProperty(ref _isEnvironmentInstalled, value);
     }
+
+    public ObservableCollection<WhatsNewItem> WhatsNewCards { get; } = new();
 
     public RelayCommand OpenPatchNotesCommand { get; }
 
@@ -74,12 +92,39 @@ public class OverviewViewModel : ObservableObject
             catch { }
         });
 
+        InitWhatsNew();
         RefreshStats();
 
         _configService.ConfigChanged += (s, cfg) =>
         {
             RefreshStats();
         };
+    }
+
+    private void InitWhatsNew()
+    {
+        WhatsNewCards.Clear();
+        WhatsNewCards.Add(new WhatsNewItem
+        {
+            Version = "beta 1.0.4",
+            Date = "06.10.2026",
+            Title = "Складной сайдбар и шрифты Unbounded",
+            Summary = "Новая навигация слева, адаптивный сайдбар и 2-колоночное лобби"
+        });
+        WhatsNewCards.Add(new WhatsNewItem
+        {
+            Version = "beta 1.0.3",
+            Date = "06.10.2026",
+            Title = "Гимн и регулятор звука",
+            Summary = "Воспроизведение гимна при старте, ползунок громкости и mute"
+        });
+        WhatsNewCards.Add(new WhatsNewItem
+        {
+            Version = "beta 1.0.2",
+            Date = "05.10.2026",
+            Title = "Сетевой туннель playit",
+            Summary = "Отказоустойчивое P2P-подключение друзей по коду"
+        });
     }
 
     /// <summary>
@@ -99,10 +144,12 @@ public class OverviewViewModel : ObservableObject
         bool isInstalled = _launchService.CheckEnvironmentInstalled(gameDir);
         IsEnvironmentInstalled = isInstalled;
 
+        int modCount = 0;
         // 3. Моды: если папка mods есть, показывать число *.jar; если окружение не установлено, вместо строки писать "Сборка не установлена"
         if (!isInstalled)
         {
             ModsCountText = "Сборка не установлена";
+            SpecLine = "Minecraft 1.20.1 • Fabric • Сборка не установлена";
         }
         else
         {
@@ -111,8 +158,8 @@ public class OverviewViewModel : ObservableObject
             {
                 try
                 {
-                    var jarCount = Directory.GetFiles(modsDir, "*.jar", SearchOption.TopDirectoryOnly).Length;
-                    ModsCountText = jarCount > 0 ? $"Модов установлено: {jarCount}" : "Модов установлено: —";
+                    modCount = Directory.GetFiles(modsDir, "*.jar", SearchOption.TopDirectoryOnly).Length;
+                    ModsCountText = modCount > 0 ? $"Модов установлено: {modCount}" : "Модов установлено: —";
                 }
                 catch
                 {
@@ -123,6 +170,10 @@ public class OverviewViewModel : ObservableObject
             {
                 ModsCountText = "Модов установлено: —";
             }
+
+            SpecLine = modCount > 0
+                ? $"Minecraft 1.20.1 • Fabric • {modCount} модов"
+                : "Minecraft 1.20.1 • Fabric • 68 модов";
         }
 
         // 4. "Обновлено:": показывать LastUpdateUtc из конфига (или "—", если пусто)

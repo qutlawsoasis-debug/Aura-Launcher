@@ -1,6 +1,5 @@
 using System;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using AuraLauncher.ViewModels;
@@ -8,118 +7,41 @@ using AuraLauncher.ViewModels;
 namespace AuraLauncher;
 
 /// <summary>
-/// Code-behind главного окна для чистой анимации интерфейса (скользящее подчёркивание вкладок и параллакс).
-/// Бизнес-логика остаётся строго в ViewModels.
+/// Code-behind главного окна для анимации складного сайдбара и регулятора громкости.
+/// Параллакс полностью устранён (фон статичен).
+/// Бизнес-логика строго в ViewModels.
 /// </summary>
 public partial class MainWindow : Window
 {
-    private bool _isLoaded;
+    private System.Windows.Threading.DispatcherTimer? _sliderHideTimer;
 
     public MainWindow()
     {
         InitializeComponent();
-        Loaded += MainWindow_Loaded;
     }
 
-    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void Sidebar_MouseEnter(object sender, MouseEventArgs e)
     {
-        _isLoaded = true;
-        // Начальное позиционирование подчёркивания активной вкладки
-        UpdateActiveTabUnderline(instant: true);
+        AnimateSidebar(expanded: true);
     }
 
-    private void OnTabChecked(object sender, RoutedEventArgs e)
+    private void Sidebar_MouseLeave(object sender, MouseEventArgs e)
     {
-        if (!_isLoaded) return;
-        if (sender is RadioButton rb && rb.IsLoaded)
-        {
-            AnimateUnderline(rb, instant: false);
-        }
+        AnimateSidebar(expanded: false);
     }
 
-    private void UpdateActiveTabUnderline(bool instant)
+    public void AnimateSidebar(bool expanded)
     {
-        RadioButton? active = TabOverview.IsChecked == true ? TabOverview :
-                              TabWardrobe.IsChecked == true ? TabWardrobe :
-                              TabLobby.IsChecked == true ? TabLobby :
-                              TabSettings.IsChecked == true ? TabSettings : null;
+        if (SidebarBorder == null) return;
+        double targetWidth = expanded ? 200.0 : 72.0;
 
-        if (active != null)
+        var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
         {
-            AnimateUnderline(active, instant);
-        }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        SidebarBorder.BeginAnimation(FrameworkElement.WidthProperty, anim);
     }
-
-    private void AnimateUnderline(RadioButton targetTab, bool instant)
-    {
-        if (targetTab == null || NavTabsPanel == null || TabUnderline == null) return;
-
-        try
-        {
-            var transform = targetTab.TransformToVisual(NavTabsPanel);
-            var point = transform.Transform(new Point(0, 0));
-            double targetX = point.X + 12; // отступ слева
-            double targetWidth = Math.Max(16, targetTab.ActualWidth - 24);
-
-            if (instant || targetTab.ActualWidth <= 0)
-            {
-                UnderlineTrans.X = targetX;
-                TabUnderline.Width = targetWidth;
-                return;
-            }
-
-            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var duration = TimeSpan.FromMilliseconds(220);
-
-            var animX = new DoubleAnimation(targetX, duration) { EasingFunction = ease };
-            var animW = new DoubleAnimation(targetWidth, duration) { EasingFunction = ease };
-
-            UnderlineTrans.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, animX);
-            TabUnderline.BeginAnimation(FrameworkElement.WidthProperty, animW);
-        }
-        catch
-        {
-            // fallback
-        }
-    }
-
-    private void OnWindowMouseMove(object sender, MouseEventArgs e)
-    {
-        if (BgWorldTrans == null) return;
-
-        if (DataContext is MainViewModel vm && vm.IsOverviewActive)
-        {
-            var pos = e.GetPosition(this);
-            double width = Math.Max(1, ActualWidth);
-            double height = Math.Max(1, ActualHeight);
-
-            // Нормализация от -0.5 до +0.5
-            double normX = (pos.X / width) - 0.5;
-            double normY = (pos.Y / height) - 0.5;
-
-            // Максимальное смещение: 8px (от -8px до +8px)
-            double targetX = normX * 16.0;
-            double targetY = normY * 16.0;
-
-            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var animX = new DoubleAnimation(targetX, TimeSpan.FromMilliseconds(80)) { EasingFunction = ease };
-            var animY = new DoubleAnimation(targetY, TimeSpan.FromMilliseconds(80)) { EasingFunction = ease };
-
-            BgWorldTrans.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, animX);
-            BgWorldTrans.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, animY);
-        }
-        else
-        {
-            if (BgWorldTrans.X != 0 || BgWorldTrans.Y != 0)
-            {
-                var animReset = new DoubleAnimation(0, TimeSpan.FromMilliseconds(150));
-                BgWorldTrans.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, animReset);
-                BgWorldTrans.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, animReset);
-            }
-        }
-    }
-
-    private System.Windows.Threading.DispatcherTimer? _sliderHideTimer;
 
     private void SoundControl_MouseEnter(object sender, MouseEventArgs e)
     {
@@ -149,13 +71,15 @@ public partial class MainWindow : Window
     {
         if (SliderBox == null) return;
 
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        double targetWidth = open ? 82.0 : 0.0;
+        double targetOpacity = open ? 1.0 : 0.0;
         var duration = TimeSpan.FromMilliseconds(180);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
-        var animWidth = new DoubleAnimation(open ? 82.0 : 0.0, duration) { EasingFunction = ease };
-        var animOpacity = new DoubleAnimation(open ? 1.0 : 0.0, duration) { EasingFunction = ease };
+        var animW = new DoubleAnimation(targetWidth, duration) { EasingFunction = ease };
+        var animO = new DoubleAnimation(targetOpacity, duration) { EasingFunction = ease };
 
-        SliderBox.BeginAnimation(FrameworkElement.WidthProperty, animWidth);
-        SliderBox.BeginAnimation(UIElement.OpacityProperty, animOpacity);
+        SliderBox.BeginAnimation(FrameworkElement.WidthProperty, animW);
+        SliderBox.BeginAnimation(UIElement.OpacityProperty, animO);
     }
 }

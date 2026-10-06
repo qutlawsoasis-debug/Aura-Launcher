@@ -706,6 +706,8 @@ public static class SceneDiagnostics
 
             string shotsDir = ResolveShotsDir();
             var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
             void SaveShot(string fileName)
             {
@@ -714,6 +716,10 @@ public static class SceneDiagnostics
                 if (Directory.Exists(artifactDir))
                 {
                     try { File.Copy(path, Path.Combine(artifactDir, fileName), true); } catch { }
+                }
+                if (Directory.Exists(repoShotsDir))
+                {
+                    try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
                 }
             }
 
@@ -775,6 +781,12 @@ public static class SceneDiagnostics
             // Leave lobby
             window.Dispatcher.Invoke(() => mainVm.LobbyVM.LeaveLobbyCommand.Execute(null));
             await Task.Delay(500);
+
+            // Record sidebar expansion (72px -> 200px -> 72px)
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
+            await Task.Delay(300);
+            await RecordSidebarExpansionAsync(window, $"{prefix}_sidebar_hover.gif");
+
             return true;
         }
         catch (Exception ex)
@@ -818,6 +830,94 @@ public static class SceneDiagnostics
         }
         catch { }
         return tempDir;
+    }
+
+    public static async Task<bool> RecordSidebarExpansionAsync(MainWindow window, string gifFileName)
+    {
+        try
+        {
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+
+            var frameBitmaps = new List<RenderTargetBitmap>();
+
+            // 1. Initial collapsed state (72px) - 4 frames (800ms)
+            window.Dispatcher.Invoke(() => window.AnimateSidebar(expanded: false));
+            await Task.Delay(250);
+
+            for (int i = 0; i < 4; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(150);
+            }
+
+            // 2. Expanding animation (72px -> 200px) - 8 frames (800ms)
+            window.Dispatcher.Invoke(() => window.AnimateSidebar(expanded: true));
+            for (int i = 0; i < 8; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(100);
+            }
+
+            // 3. Fully expanded state - 8 frames (1.6s)
+            for (int i = 0; i < 8; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(200);
+            }
+
+            // 4. Collapsing animation (200px -> 72px) - 8 frames (800ms)
+            window.Dispatcher.Invoke(() => window.AnimateSidebar(expanded: false));
+            for (int i = 0; i < 8; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(100);
+            }
+
+            // 5. Final collapsed state - 4 frames (800ms)
+            for (int i = 0; i < 4; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(200);
+            }
+
+            string targetPath = Path.Combine(shotsDir, gifFileName);
+            window.Dispatcher.Invoke(() =>
+            {
+                var encoder = new GifBitmapEncoder();
+                foreach (var rtb in frameBitmaps)
+                {
+                    encoder.Frames.Add(BitmapFrame.Create(rtb));
+                }
+                using var fs = File.Create(targetPath);
+                encoder.Save(fs);
+            });
+
+            try { File.Copy(targetPath, Path.Combine(repoShotsDir, gifFileName), true); } catch { }
+            try { File.Copy(targetPath, Path.Combine(brainDir, gifFileName), true); } catch { }
+
+            App.Log($"[RECORDING] Saved sidebar expansion recording to {targetPath}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[RECORDING: ERROR] {ex}");
+            return false;
+        }
+    }
+
+    private static RenderTargetBitmap CaptureWindow(Window window)
+    {
+        return window.Dispatcher.Invoke(() =>
+        {
+            int width = Math.Max(1, (int)window.ActualWidth);
+            int height = Math.Max(1, (int)window.ActualHeight);
+            var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(window);
+            return rtb;
+        }, DispatcherPriority.Render);
     }
 
     public static async Task<bool> RunAnthemTestAsync(Window window)

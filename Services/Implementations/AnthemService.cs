@@ -298,14 +298,51 @@ public class AnthemService : IAnthemService
             return Path.GetFullPath(candidate2);
         }
 
-        // 4. Extract from embedded manifest resource to %APPDATA%\Aura\anthem.mp3
+        // 4. Check already extracted file in %APPDATA%\Aura\anthem.mp3
+        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string targetDir = Path.Combine(appData, "Aura");
+        string targetFile = Path.Combine(targetDir, "anthem.mp3");
+        if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 10000)
+        {
+            return Path.GetFullPath(targetFile);
+        }
+
+        // 5. Extract from WPF Pack Resource (Application.GetResourceStream)
         try
         {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string targetDir = Path.Combine(appData, "Aura");
-            Directory.CreateDirectory(targetDir);
-            string targetFile = Path.Combine(targetDir, "anthem.mp3");
+            var uris = new[]
+            {
+                new Uri("pack://application:,,,/Resources/Audio/anthem.mp3", UriKind.Absolute),
+                new Uri("pack://application:,,,/AuraLauncher;component/Resources/Audio/anthem.mp3", UriKind.Absolute)
+            };
 
+            foreach (var uri in uris)
+            {
+                try
+                {
+                    var streamInfo = System.Windows.Application.GetResourceStream(uri);
+                    if (streamInfo?.Stream != null)
+                    {
+                        Directory.CreateDirectory(targetDir);
+                        using (var fs = new FileStream(targetFile, FileMode.Create, FileAccess.Write))
+                        {
+                            streamInfo.Stream.CopyTo(fs);
+                        }
+                        FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Successfully extracted pack resource to '{targetFile}'");
+                        return Path.GetFullPath(targetFile);
+                    }
+                }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Pack stream extraction error: {ex.Message}");
+        }
+
+        // 6. Extract from embedded manifest resource
+        try
+        {
             var asm = Assembly.GetExecutingAssembly();
             string? resName = asm.GetManifestResourceNames()
                 .FirstOrDefault(n => n.EndsWith("anthem.mp3", StringComparison.OrdinalIgnoreCase));
@@ -315,15 +352,17 @@ public class AnthemService : IAnthemService
                 using var stream = asm.GetManifestResourceStream(resName);
                 if (stream != null)
                 {
+                    Directory.CreateDirectory(targetDir);
                     using var fs = new FileStream(targetFile, FileMode.Create, FileAccess.Write);
                     stream.CopyTo(fs);
+                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Successfully extracted manifest stream to '{targetFile}'");
                     return Path.GetFullPath(targetFile);
                 }
             }
         }
         catch (Exception ex)
         {
-            FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Extraction error: {ex.Message}");
+            FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Manifest extraction error: {ex.Message}");
         }
 
         return candidate1;

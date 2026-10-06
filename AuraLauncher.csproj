@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>app_icon.ico</ApplicationIcon>
-    <Version>1.2.11</Version>
+    <Version>1.2.12</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -22,6 +22,8 @@
     <Resource Include="bg_world.png" />
     <Resource Include="steve.png" />
     <Resource Include="Resources\Fonts\Manrope.ttf" />
+    <Resource Include="Resources\Fonts\Unbounded.ttf" />
+    <Resource Include="Resources\Fonts\Inter.ttf" />
     <Resource Include="Resources\Audio\anthem.mp3" />
   </ItemGroup>
 
@@ -32,9 +34,11 @@
     <None Update="version.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="Resources\Audio\anthem.mp3">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+    <Content Include="Resources\Audio\anthem.mp3">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

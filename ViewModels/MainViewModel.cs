@@ -237,6 +237,8 @@ public class MainViewModel : ObservableObject
 
     public string RamFormatted => $"RAM: {Math.Round(_configService.CurrentConfig.RamMb / 1024.0, 1)} ГБ";
 
+    public string AllocatedRamText => $"Выделено {Math.Round(_configService.CurrentConfig.RamMb / 1024.0, 0)} ГБ ОЗУ";
+
     public ObservableCollection<string> GameLogs { get; } = new();
 
     // Свойства баннера обновлений
@@ -468,6 +470,7 @@ public class MainViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(PlayerNickname));
             OnPropertyChanged(nameof(RamFormatted));
+            OnPropertyChanged(nameof(AllocatedRamText));
             UpdateAvatar();
             OverviewVM.RefreshStats();
             UpdateIdleState();
