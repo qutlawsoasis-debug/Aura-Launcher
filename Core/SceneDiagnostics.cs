@@ -897,7 +897,7 @@ public static class SceneDiagnostics
             await Task.Delay(400);
             SaveShot($"{prefix}_tab_skin_side.png");
 
-            // 2c. СКИН - вид сзади (180°)
+            // 2c. СКИН - вид сзади (180°, обычные руки)
             window.Dispatcher.Invoke(() =>
             {
                 var wardrobeView = FindVisualChild<WardrobeView>(window);
@@ -906,17 +906,18 @@ public static class SceneDiagnostics
             await Task.Delay(400);
             SaveShot($"{prefix}_tab_skin_back.png");
 
-            // 2d. СКИН - с включёнными тонкими руками (Alex)
+            // 2d. СКИН - сзади с тонкими руками (Alex, 180°)
             window.Dispatcher.Invoke(() =>
             {
                 var wardrobeView = FindVisualChild<WardrobeView>(window);
-                wardrobeView?.RotateToFront();
                 if (mainVm.CurrentView is WardrobeViewModel wvm)
                 {
                     wvm.IsSlimModel = true;
                 }
+                wardrobeView?.RotateToBack();
             });
             await Task.Delay(400);
+            SaveShot($"{prefix}_tab_skin_slim_back.png");
             SaveShot($"{prefix}_tab_skin_slim.png");
 
             // Возврат к стандартной модели
@@ -928,6 +929,60 @@ public static class SceneDiagnostics
                 }
             });
             await Task.Delay(200);
+
+            // 2e. Диагностический тест: раскраска каждой грани каждого кубоида своим цветом
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                if (wardrobeView != null)
+                {
+                    wardrobeView.IsDiagnosticMode = true;
+                    wardrobeView.Refresh3DModel();
+                    wardrobeView.RotateToFront();
+                }
+            });
+            await Task.Delay(300);
+            SaveShot("skin_diagnostic_front.png");
+            SaveShot($"{prefix}_skin_diagnostic_front.png");
+
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                wardrobeView?.RotateToBack();
+            });
+            await Task.Delay(300);
+            SaveShot("skin_diagnostic_back.png");
+            SaveShot($"{prefix}_skin_diagnostic_back.png");
+
+            // Восстановление нормальной 3D-модели скина
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                if (wardrobeView != null)
+                {
+                    wardrobeView.IsDiagnosticMode = false;
+                    wardrobeView.RotateToFront();
+                    wardrobeView.Refresh3DModel();
+                }
+            });
+            await Task.Delay(200);
+
+            // 4 скриншота меню на всех вкладках (проверка оранжевого квадрата у активного пункта)
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
+            await Task.Delay(300);
+            SaveShot($"{prefix}_menu_overview.png");
+
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
+            await Task.Delay(300);
+            SaveShot($"{prefix}_menu_lobby.png");
+
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));
+            await Task.Delay(300);
+            SaveShot($"{prefix}_menu_skin.png");
+
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Settings"));
+            await Task.Delay(300);
+            SaveShot($"{prefix}_menu_settings.png");
 
             // 3. НАСТРОЙКИ
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Settings"));

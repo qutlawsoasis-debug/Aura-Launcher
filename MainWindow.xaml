@@ -49,7 +49,6 @@
             <Setter Property="Height" Value="50" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-            <Setter Property="GroupName" Value="GameMainMenu" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
@@ -84,89 +83,29 @@
                             </StackPanel>
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <!-- Checked state: Scale 1, Color Ink -->
+                            <!-- Checked state: ALWAYS Scale 1, Color Ink, Opacity 1 -->
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="MenuText" Property="Foreground" Value="{StaticResource InkBrush}" />
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
-                                                             To="1.0" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
-                                                             To="1.0" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
-                                                             To="0.0" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
-                                                             To="0.0" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
+                                <Setter TargetName="DotSquare" Property="Opacity" Value="1.0" />
+                                <Setter TargetName="DotSquare" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
+                                    </Setter.Value>
+                                </Setter>
                             </Trigger>
 
-                            <!-- Hover state: Scale 0.6 (if unchecked) or keep 1 (if checked), shift text +8px -->
+                            <!-- Hover state for unchecked items: Scale 0.6, Opacity 0.75 -->
                             <MultiTrigger>
                                 <MultiTrigger.Conditions>
                                     <Condition Property="IsMouseOver" Value="True" />
                                     <Condition Property="IsChecked" Value="False" />
                                 </MultiTrigger.Conditions>
-                                <MultiTrigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
-                                                             To="0.6" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
-                                                             To="0.6" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </MultiTrigger.EnterActions>
-                                <MultiTrigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
-                                                             To="0.0" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
-                                                             To="0.0" Duration="0:0:0.160">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </MultiTrigger.ExitActions>
+                                <Setter TargetName="DotSquare" Property="Opacity" Value="0.75" />
+                                <Setter TargetName="DotSquare" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.6" ScaleY="0.6" />
+                                    </Setter.Value>
+                                </Setter>
                             </MultiTrigger>
 
                             <!-- Hover shift: text shifts right by 8px in 160ms -->
@@ -265,21 +204,6 @@
             <!-- ============================================== -->
             <!-- 1. TOP HEADER                                  -->
             <!-- ============================================== -->
-            <!-- Top-left: x=20, y=14: "beta 1.0.N" (mute) + ember dot if update available -->
-            <Canvas Height="40" VerticalAlignment="Top" Panel.ZIndex="50">
-                <StackPanel Canvas.Left="20" Canvas.Top="14" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding LauncherVersionText}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="12"
-                               FontWeight="Normal"
-                               Foreground="{StaticResource MuteBrush}" />
-                    <!-- Маленькая точка ember, пока есть обновление -->
-                    <Border Width="6" Height="6" CornerRadius="3"
-                            Background="{StaticResource EmberBrush}"
-                            Margin="6,0,0,0" VerticalAlignment="Center"
-                            Visibility="{Binding HasUpdateDot, Converter={StaticResource BoolToVis}}" />
-                </StackPanel>
-            </Canvas>
 
             <!-- Top-right: Sound Icon + Minimize + Close (32x34 each, on hover white 10%) -->
             <!-- Sound icon: on hover volume slider (112px wide) slides out to the LEFT in 180ms, collapses 400ms after mouse leave -->
@@ -526,6 +450,21 @@
                     </Grid>
                 </Border>
             </Grid>
+            
+            <!-- 4. Version & update dot in bottom-right corner: правый край 20px, низ 14px, Onest 12px mute. Точка ember слева от неё -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Margin="0,0,20,14" Panel.ZIndex="50" IsHitTestVisible="False">
+                <!-- Точка ember об обновлении (если есть) держать слева от неё -->
+                <Border Width="6" Height="6" CornerRadius="3"
+                        Background="{StaticResource EmberBrush}"
+                        Margin="0,0,6,0" VerticalAlignment="Center"
+                        Visibility="{Binding HasUpdateDot, Converter={StaticResource BoolToVis}}" />
+                <TextBlock Text="{Binding LauncherVersionText}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource MuteBrush}" />
+            </StackPanel>
         </Grid>
     </Border>
 </Window>

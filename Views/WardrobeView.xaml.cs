@@ -90,6 +90,8 @@ public partial class WardrobeView : UserControl
         }
     }
 
+    public bool IsDiagnosticMode { get; set; }
+
     public void Refresh3DModel()
     {
         try
@@ -98,6 +100,13 @@ public partial class WardrobeView : UserControl
             if (vm == null && DataContext is MainViewModel mvm)
             {
                 vm = mvm.WardrobeVM;
+            }
+
+            bool isSlim = vm?.IsSlimModel ?? false;
+            if (IsDiagnosticMode)
+            {
+                PlayerModelVisual.Content = SkinModel3DBuilder.BuildDiagnosticPlayerModel(isSlim);
+                return;
             }
 
             var skinService = App.Services?.GetService<ISkinService>();
@@ -113,7 +122,6 @@ public partial class WardrobeView : UserControl
                 skinBmp = SkinService.LoadDefaultSteveBitmap();
             }
 
-            bool isSlim = vm?.IsSlimModel ?? false;
             var modelGroup = SkinModel3DBuilder.BuildPlayerModel(skinBmp, isSlim);
             PlayerModelVisual.Content = modelGroup;
         }

@@ -66,18 +66,18 @@
                       MouseUp="Skin_MouseUp">
 
                     <!-- Soft oval shadow under feet -->
-                    <Ellipse Width="110" Height="10"
+                    <Ellipse Width="96" Height="8"
                              Fill="#40000000"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Bottom"
-                             Margin="0,0,0,26" />
+                             Margin="0,0,0,14" />
 
                     <!-- 3D Viewport for Player Model -->
                     <Viewport3D x:Name="SkinViewport"
                                 Width="170" Height="290"
                                 ClipToBounds="False">
                         <Viewport3D.Camera>
-                            <PerspectiveCamera Position="0,0,52"
+                            <PerspectiveCamera Position="0,0,27"
                                                LookDirection="0,0,-1"
                                                UpDirection="0,1,0"
                                                FieldOfView="45" />
