@@ -21,4 +21,7 @@ public class LauncherConfig
     public string LobbyApiBaseUrl { get; set; } = "https://lobby-api.vercel.app";
     public string SkinOwnerToken { get; set; } = "";
     public string SkinModel { get; set; } = "default";
+    public int AnthemVolume { get; set; } = 100;
+    public bool AnthemMuted { get; set; } = false;
+    public string? AnthemCustomPath { get; set; }
 }

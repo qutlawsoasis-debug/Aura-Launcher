@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>app_icon.ico</ApplicationIcon>
-    <Version>1.2.10</Version>
+    <Version>1.2.11</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -21,7 +21,8 @@
     <Resource Include="app_icon.ico" />
     <Resource Include="bg_world.png" />
     <Resource Include="steve.png" />
-    <Resource Include="Resources\Fonts\PixelifySans.ttf" />
+    <Resource Include="Resources\Fonts\Manrope.ttf" />
+    <Resource Include="Resources\Audio\anthem.mp3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,6 +30,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="version.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Audio\anthem.mp3">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

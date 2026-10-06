@@ -819,4 +819,32 @@ public static class SceneDiagnostics
         catch { }
         return tempDir;
     }
+
+    public static async Task<bool> RunAnthemTestAsync(Window window)
+    {
+        await Task.Delay(1200);
+        MainViewModel? mainVM = null;
+        window.Dispatcher.Invoke(() =>
+        {
+            mainVM = window.DataContext as MainViewModel;
+        });
+
+        if (mainVM == null) return false;
+
+        bool isDefault100 = mainVM.AnthemVolume == 100;
+        bool isDefaultNotMuted = !mainVM.IsAnthemMuted;
+
+        FabricGameLaunchService.LogLauncherEvent($"[ANTHEM-TEST] DefaultVol: {mainVM.AnthemVolume}%, DefaultMuted: {mainVM.IsAnthemMuted}, IsPlaying: {mainVM.AnthemService?.IsPlaying}");
+
+        // Сымитировать клик по иконке звука (Mute)
+        await window.Dispatcher.InvokeAsync(() =>
+        {
+            mainVM.ToggleMuteCommand.Execute(null);
+        });
+
+        await Task.Delay(600);
+        FabricGameLaunchService.LogLauncherEvent($"[ANTHEM-TEST] After mute click: Vol: {mainVM.AnthemVolume}%, Muted: {mainVM.IsAnthemMuted}");
+
+        return isDefault100 && isDefaultNotMuted && mainVM.IsAnthemMuted;
+    }
 }

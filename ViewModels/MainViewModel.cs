@@ -214,10 +214,10 @@ public class MainViewModel : ObservableObject
     {
         get
         {
-            if (IsGameRunning) return "ИГРА ЗАПУЩЕНА";
-            if (IsBusy) return "ОТМЕНА";
+            if (IsGameRunning) return "Игра запущена";
+            if (IsBusy) return "Отмена";
             var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
-            return _launchService.CheckEnvironmentInstalled(gameDir) ? "ИГРАТЬ" : "УСТАНОВИТЬ";
+            return _launchService.CheckEnvironmentInstalled(gameDir) ? "Играть" : "Установить";
         }
     }
 
@@ -311,6 +311,37 @@ public class MainViewModel : ObservableObject
     public RelayCommand MinimizeWindowCommand { get; }
     public AsyncRelayCommand ApplyBannerUpdateCommand { get; }
     public RelayCommand DismissBannerCommand { get; }
+    public RelayCommand ToggleMuteCommand { get; }
+
+    public IAnthemService? AnthemService { get; }
+
+    public int AnthemVolume
+    {
+        get => AnthemService?.VolumePercent ?? 100;
+        set
+        {
+            if (AnthemService != null && AnthemService.VolumePercent != value)
+            {
+                AnthemService.VolumePercent = value;
+                OnPropertyChanged(nameof(AnthemVolume));
+                OnPropertyChanged(nameof(IsAnthemMuted));
+            }
+        }
+    }
+
+    public bool IsAnthemMuted
+    {
+        get => AnthemService?.IsMuted ?? false;
+        set
+        {
+            if (AnthemService != null && AnthemService.IsMuted != value)
+            {
+                AnthemService.IsMuted = value;
+                OnPropertyChanged(nameof(IsAnthemMuted));
+                OnPropertyChanged(nameof(AnthemVolume));
+            }
+        }
+    }
 
     public MainViewModel(
         IConfigService configService,
@@ -322,7 +353,8 @@ public class MainViewModel : ObservableObject
         SettingsViewModel settingsViewModel,
         WardrobeViewModel wardrobeViewModel,
         LobbyViewModel? lobbyViewModel = null,
-        IServerListSyncService? serverListSyncService = null)
+        IServerListSyncService? serverListSyncService = null,
+        IAnthemService? anthemService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -334,6 +366,17 @@ public class MainViewModel : ObservableObject
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
         LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService);
+        AnthemService = anthemService;
+
+        ToggleMuteCommand = new RelayCommand(_ =>
+        {
+            if (AnthemService != null)
+            {
+                AnthemService.ToggleMute();
+                OnPropertyChanged(nameof(IsAnthemMuted));
+                OnPropertyChanged(nameof(AnthemVolume));
+            }
+        });
 
         LobbyVM.GuestConnectRequested += (s, tunnelAddress) =>
         {

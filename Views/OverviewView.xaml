@@ -9,38 +9,38 @@
 
     <Grid Background="Transparent">
         <!-- Foreground Modpack Info & Stats Cards (sitting above the bottom launch deck) -->
-        <Grid Margin="36,0,36,32" VerticalAlignment="Bottom">
+        <Grid Margin="40,0,40,32" VerticalAlignment="Bottom">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <!-- Hero Typography -->
-            <StackPanel VerticalAlignment="Bottom">
-                <TextBlock Text="{Binding VersionInfo}" FontSize="12" Foreground="#9AA3B2" Margin="0,0,0,8" />
+            <StackPanel VerticalAlignment="Bottom" Margin="0,0,24,0">
+                <TextBlock Text="{Binding VersionInfo}" FontSize="13" FontWeight="Medium" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,6" />
 
-                <!-- Build Title "Aura" Pixel Font -->
-                <TextBlock Text="{Binding BuildName}" FontFamily="{StaticResource PixelFont}" FontSize="46" FontWeight="Bold" Foreground="#19D3A7" Margin="0,0,0,6" />
+                <!-- Build Title "Aura" Manrope Bold -->
+                <TextBlock Text="{Binding BuildName}" FontSize="38" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8" />
 
                 <!-- Sub-headline -->
-                <TextBlock Text="Клиентская сборка с оптимизацией и модами" FontSize="13" Foreground="#9AA3B2" />
+                <TextBlock Text="Клиентская сборка с оптимизацией и модами" FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" />
             </StackPanel>
 
-            <!-- Build Parameters / News Card -->
-            <Border Grid.Column="1" VerticalAlignment="Bottom"
-                    Style="{StaticResource CardPanel}" Padding="20,16">
-                <StackPanel MinWidth="240">
-                    <TextBlock Text="Новости / Статус" FontFamily="{StaticResource PixelFont}" FontSize="13" FontWeight="Bold" Foreground="#E8EAED" />
-                    <Border Height="1" Background="#1B3B2B" Margin="0,10" />
-                    <TextBlock Text="{Binding VersionInfo}" Foreground="#19D3A7" FontSize="12" Margin="0,0,0,6" />
-                    <TextBlock Text="{Binding ModsCountText}" Foreground="#E8EAED" FontSize="12" Margin="0,0,0,6" />
-                    <Border Height="1" Background="#1B3B2B" Margin="0,10" />
-                    <TextBlock Text="{Binding LastUpdateText}" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,10" />
+            <!-- Build Parameters / News Card (Interactive with 2px left highlight on hover) -->
+            <ContentControl Grid.Column="1" VerticalAlignment="Bottom"
+                            Style="{StaticResource InteractiveCard}" Padding="20,16">
+                <StackPanel MinWidth="250">
+                    <TextBlock Text="Новости и статус" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" />
+                    <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,10" />
+                    <TextBlock Text="{Binding VersionInfo}" Foreground="{StaticResource AccentBrush}" FontSize="13" FontWeight="Medium" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding ModsCountText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" Margin="0,0,0,6" />
+                    <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,10" />
+                    <TextBlock Text="{Binding LastUpdateText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,0,0,12" />
                     <Button Command="{Binding OpenPatchNotesCommand}"
                             Style="{StaticResource StandardBtn}"
-                            Content="Список изменений" Height="28" FontSize="11" />
+                            Content="Список изменений" Height="34" FontSize="12" />
                 </StackPanel>
-            </Border>
+            </ContentControl>
         </Grid>
     </Grid>
 </UserControl>

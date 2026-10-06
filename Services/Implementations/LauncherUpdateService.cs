@@ -136,7 +136,7 @@ public class LauncherUpdateService : ILauncherUpdateService
             await _configService.SaveConfigAsync(_configService.CurrentConfig, ct).ConfigureAwait(false);
 
             FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Применение обновления и перезапуск лаунчера (версия {targetVersion})...");
-            _updateManager.ApplyUpdatesAndRestart(updateInfo);
+            _updateManager.ApplyUpdatesAndRestart(updateInfo, new[] { "--updated-restart" });
 
             return new LauncherUpdateResult(LauncherUpdateStatus.UpdatedRestarting, "Лаунчер обновляется и перезапускается...", targetVersion);
         }

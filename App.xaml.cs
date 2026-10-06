@@ -66,7 +66,8 @@ public partial class App : Application
         bool isKillPlayitTest = Array.Exists(e.Args, a => a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
         bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
         bool isLifecycleTest = Array.Exists(e.Args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || isKillPlayitTest || isLobbyTest || isLifecycleTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isAnthemTest = Array.Exists(e.Args, a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -131,6 +132,18 @@ public partial class App : Application
             _ = mainVM.InitializeAsync();
         }
 
+        // Инициализация сервиса гимна (воспроизведение при первом старте, если не mute)
+        try
+        {
+            var anthemService = Services.GetRequiredService<IAnthemService>();
+            anthemService.Initialize();
+            mainWindow.Closed += (s, args) =>
+            {
+                try { anthemService.Stop(); } catch { }
+            };
+        }
+        catch { }
+
         // Проверка режима самодиагностики (--capture-shots, --selftest-kill-playit, --selftest-lobby, --selftest или --selftest-shots)
         if (!string.IsNullOrWhiteSpace(captureShotsPrefix))
         {
@@ -180,6 +193,18 @@ public partial class App : Application
                 }
             });
         }
+        else if (isAnthemTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunAnthemTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
         else if (isSelfTest)
         {
             _ = Task.Run(async () =>
@@ -212,6 +237,7 @@ public partial class App : Application
 
         services.AddSingleton<ILobbyService, LobbyService>();
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();
+        services.AddSingleton<IAnthemService, AnthemService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
@@ -301,6 +327,14 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            var anthemService = Services?.GetService<IAnthemService>();
+            anthemService?.Stop();
+            anthemService?.Dispose();
+        }
+        catch { }
+
         try
         {
             _singleInstanceMutex?.ReleaseMutex();

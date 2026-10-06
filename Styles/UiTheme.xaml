@@ -2,80 +2,70 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ============================================== -->
-    <!-- 1. DESIGN TOKENS (SKILL: aura-ui-design)       -->
+    <!-- 1. DESIGN TOKENS                               -->
     <!-- ============================================== -->
-    <!-- Colors -->
-    <Color x:Key="ColorBgDeep">#0F1115</Color>
-    <Color x:Key="ColorSurface">#171A21</Color>
-    <Color x:Key="ColorSurfaceHover">#20242E</Color>
-    <Color x:Key="ColorSurfacePressed">#12141A</Color>
-    <Color x:Key="ColorBorder">#252A33</Color>
-    <Color x:Key="ColorBorderHover">#353B47</Color>
+    <!-- Graphite Dark Palette: Background -> Panels -> Borders -->
+    <Color x:Key="ColorBgDeep">#12151B</Color>
+    <Color x:Key="ColorSurface">#181C24</Color>
+    <Color x:Key="ColorSurfaceHover">#1F242E</Color>
+    <Color x:Key="ColorSurfacePressed">#14171E</Color>
+    <Color x:Key="ColorBorder">#232936</Color>
+    <Color x:Key="ColorBorderHover">#2E3547</Color>
+    
+    <!-- Accent Color: Mint -->
     <Color x:Key="ColorAccent">#19D3A7</Color>
-    <Color x:Key="ColorAccentHover">#33FFD6</Color>
-    <Color x:Key="ColorAccentPressed">#129E7D</Color>
+    <Color x:Key="ColorAccentHover">#2EE5B9</Color>
+    <Color x:Key="ColorAccentPressed">#14B890</Color>
+    
+    <!-- Text Colors -->
     <Color x:Key="ColorTextPrimary">#E8EAED</Color>
     <Color x:Key="ColorTextSecondary">#9AA3B2</Color>
-    <Color x:Key="ColorTextMuted">#525768</Color>
+    <Color x:Key="ColorTextMuted">#687182</Color>
     <Color x:Key="ColorError">#EF4444</Color>
 
-    <!-- Legacy / Compatibility Colors -->
-    <Color x:Key="ColorBgGlass">#171A21</Color>
-    <Color x:Key="ColorCard">#171A21</Color>
-    <Color x:Key="ColorCardHover">#20242E</Color>
-    <Color x:Key="ColorInput">#171A21</Color>
-    <Color x:Key="ColorAccentCyan">#19D3A7</Color>
-    <Color x:Key="ColorAccentCyanHover">#33FFD6</Color>
-    <Color x:Key="ColorAccentPurple">#19D3A7</Color>
+    <!-- Compatibility Aliases -->
+    <Color x:Key="ColorBorderGreen">#232936</Color>
+    <Color x:Key="ColorCard">#181C24</Color>
+    <Color x:Key="ColorCardHover">#1F242E</Color>
 
-    <!-- Solid Brushes (Always use Brushes for Background/Foreground/Border) -->
+    <!-- Solid Brushes -->
     <SolidColorBrush x:Key="BgDeepBrush" Color="{StaticResource ColorBgDeep}" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource ColorSurface}" />
     <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource ColorSurfaceHover}" />
     <SolidColorBrush x:Key="SurfacePressedBrush" Color="{StaticResource ColorSurfacePressed}" />
-    <SolidColorBrush x:Key="BgGlassBrush" Color="{StaticResource ColorSurface}" />
     <SolidColorBrush x:Key="CardBrush" Color="{StaticResource ColorSurface}" />
     <SolidColorBrush x:Key="CardHoverBrush" Color="{StaticResource ColorSurfaceHover}" />
-    <SolidColorBrush x:Key="InputBrush" Color="{StaticResource ColorSurface}" />
     <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource ColorBorder}" />
     <SolidColorBrush x:Key="BorderHoverBrush" Color="{StaticResource ColorBorderHover}" />
+    <SolidColorBrush x:Key="BorderGreenBrush" Color="{StaticResource ColorBorder}" />
 
     <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource ColorAccent}" />
     <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource ColorAccentHover}" />
     <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource ColorAccentPressed}" />
     <SolidColorBrush x:Key="AccentCyanBrush" Color="{StaticResource ColorAccent}" />
     <SolidColorBrush x:Key="AccentCyanHoverBrush" Color="{StaticResource ColorAccentHover}" />
-    <SolidColorBrush x:Key="AccentPurpleBrush" Color="{StaticResource ColorAccent}" />
-
-    <!-- Dark Green Border Color for Panels & Buttons -->
-    <Color x:Key="ColorBorderGreen">#1B3B2B</Color>
-    <SolidColorBrush x:Key="BorderGreenBrush" Color="{StaticResource ColorBorderGreen}" />
-
-    <!-- Minecraft Pixel Font (Pixelify Sans, OFL License) -->
-    <FontFamily x:Key="PixelFont">pack://application:,,,/Resources/Fonts/#Pixelify Sans</FontFamily>
 
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource ColorTextPrimary}" />
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource ColorTextSecondary}" />
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource ColorTextMuted}" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorError}" />
 
-    <!-- Play Button Accent Brush -->
-    <SolidColorBrush x:Key="PlayBtnBrush" Color="{StaticResource ColorAccent}" />
+    <!-- Typography: Manrope (OFL) -->
+    <FontFamily x:Key="MainFont">pack://application:,,,/Resources/Fonts/#Manrope, Segoe UI, -apple-system, sans-serif</FontFamily>
+    <FontFamily x:Key="PixelFont">pack://application:,,,/Resources/Fonts/#Manrope, Segoe UI, -apple-system, sans-serif</FontFamily>
 
-    <!-- ============================================== -->
-    <!-- WORLD BACKGROUND IMAGE (DecodePixelWidth 1920) -->
-    <!-- ============================================== -->
+    <!-- WORLD BACKGROUND IMAGE -->
     <BitmapImage x:Key="WorldBackgroundBitmap"
                  UriSource="pack://application:,,,/AuraLauncher;component/bg_world.png"
                  DecodePixelWidth="1920"
                  CacheOption="OnLoad" />
 
     <!-- ============================================== -->
-    <!-- CARD PANEL (CornerRadius 6, Hover Accent)      -->
+    <!-- CARD PANELS                                    -->
     <!-- ============================================== -->
     <Style x:Key="CardPanel" TargetType="Border">
-        <Setter Property="Background" Value="#D6121720" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderGreenBrush}" />
+        <Setter Property="Background" Value="#D8181C24" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="6" />
         <Style.Triggers>
@@ -85,46 +75,62 @@
         </Style.Triggers>
     </Style>
 
-    <!-- ============================================== -->
-    <!-- 2. BUTTON STYLES                               -->
-    <!-- ============================================== -->
-
-    <!-- Primary Action Button: "ИГРАТЬ" (Accent #19D3A7, text #0F1115, PixelFont) -->
-    <Style x:Key="PrimaryNeonBtn" TargetType="Button">
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+    <!-- Interactive Card with 2px left highlight indicator on hover -->
+    <Style x:Key="InteractiveCard" TargetType="ContentControl">
+        <Setter Property="Background" Value="#181C24" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="Focusable" Value="False" />
         <Setter Property="Template">
             <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="BtnBrd"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="6">
-                        <TextBlock x:Name="BtnTxt"
-                                   Text="{Binding Path=Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                   Foreground="#0F1115"
-                                   FontFamily="{StaticResource PixelFont}"
-                                   FontSize="15"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-
+                <ControlTemplate TargetType="ContentControl">
+                    <Grid>
+                        <Border x:Name="OuterBrd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <!-- 2px left accent highlight -->
+                        <Border x:Name="LeftAccent"
+                                Width="2"
+                                HorizontalAlignment="Left"
+                                Background="{StaticResource AccentBrush}"
+                                CornerRadius="2,0,0,2"
+                                Opacity="0" />
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <!-- Hover: Background becomes #33FFD6 with 150ms animation -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="BtnBrd" Property="Background" Value="{StaticResource AccentHoverBrush}" />
-                        </Trigger>
-
-                        <!-- Pressed: Background #129E7D -->
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="BtnBrd" Property="Background" Value="{StaticResource AccentPressedBrush}" />
-                        </Trigger>
-
-                        <!-- Disabled: Background #252A33, Foreground #525768 -->
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="BtnBrd" Property="Background" Value="{StaticResource BorderBrush}" />
-                            <Setter TargetName="BtnTxt" Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+                            <Setter TargetName="OuterBrd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="LeftAccent" Storyboard.TargetProperty="Opacity"
+                                                         To="1.0" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="LeftAccent" Storyboard.TargetProperty="Opacity"
+                                                         To="0.0" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -132,42 +138,234 @@
         </Setter>
     </Style>
 
-    <!-- Secondary Action Button: Surface #171A21, Border #1B3B2B, Text #E8EAED, CornerRadius 6 -->
+    <!-- ============================================== -->
+    <!-- 2. BUTTON STYLES                               -->
+    <!-- ============================================== -->
+
+    <!-- Primary Action Button: Lift 1px + Accent Drop Shadow on hover, depress 1px on press, 120ms CubicEase EaseOut, 4s shimmer -->
+    <Style x:Key="PrimaryNeonBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Foreground" Value="#0F1115" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="BtnTrans" Y="0" />
+                        </Grid.RenderTransform>
+                        <Border x:Name="BtnBrd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6"
+                                ClipToBounds="True">
+                            <Border.Effect>
+                                <DropShadowEffect x:Name="BtnShadow"
+                                                  Color="#19D3A7"
+                                                  BlurRadius="0"
+                                                  Opacity="0"
+                                                  ShadowDepth="2"
+                                                  Direction="270" />
+                            </Border.Effect>
+                            
+                            <Grid>
+                                <!-- Shimmer Sheen Layer (sweeps every 4s) -->
+                                <Border x:Name="ShimmerLayer" IsHitTestVisible="False" Opacity="0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="-1,0" EndPoint="0,1">
+                                            <GradientStop Color="#00FFFFFF" Offset="0.0" />
+                                            <GradientStop Color="#60FFFFFF" Offset="0.5" />
+                                            <GradientStop Color="#00FFFFFF" Offset="1.0" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Border.Triggers>
+                                        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                            <BeginStoryboard>
+                                                <Storyboard Duration="0:0:4.0" RepeatBehavior="Forever">
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     From="0.0" To="0.4" Duration="0:0:0.35" BeginTime="0:0:0.5" AutoReverse="True" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </EventTrigger>
+                                    </Border.Triggers>
+                                </Border>
+
+                                <ContentPresenter x:Name="BtnTxt"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  RecognizesAccessKey="True" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <ControlTemplate.Triggers>
+                        <!-- Hover: Lift 1px + Soft Accent Shadow (120ms CubicEase EaseOut) -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="-1" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="Opacity"
+                                                         To="0.38" Duration="0:0:0.120" />
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="BlurRadius"
+                                                         To="14" Duration="0:0:0.120" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="0" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.120" />
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="BlurRadius"
+                                                         To="0" Duration="0:0:0.120" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+
+                        <!-- Pressed: Depress 1px -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="1" Duration="0:0:0.060" />
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="Opacity"
+                                                         To="0.1" Duration="0:0:0.060" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="-1" Duration="0:0:0.060" />
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="Opacity"
+                                                         To="0.38" Duration="0:0:0.060" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                        </Trigger>
+
+                        <!-- Disabled -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="BtnBrd" Property="Background" Value="#232936" />
+                            <Setter TargetName="BtnTxt" Property="TextBlock.Foreground" Value="{StaticResource TextMutedBrush}" />
+                            <Setter TargetName="ShimmerLayer" Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Secondary Action Button: Lift 1px + Accent border on hover, depress 1px on press, 120ms CubicEase -->
     <Style x:Key="StandardBtn" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Height" Value="38" />
-        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="Padding" Value="16,0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Brd"
-                            Background="{TemplateBinding Background}"
-                            BorderThickness="1"
-                            BorderBrush="{StaticResource BorderGreenBrush}"
-                            CornerRadius="6"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="BtnTrans" Y="0" />
+                        </Grid.RenderTransform>
+                        <Border x:Name="Brd"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource BorderBrush}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <Border.Effect>
+                                <DropShadowEffect x:Name="BtnShadow"
+                                                  Color="#19D3A7"
+                                                  BlurRadius="0"
+                                                  Opacity="0"
+                                                  ShadowDepth="1"
+                                                  Direction="270" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <!-- Hover: Surface hover, border accent, 150 ms -->
+                        <!-- Hover: Lift 1px + Accent Border + Soft Shadow (120ms) -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
                             <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="-1" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="Opacity"
+                                                         To="0.25" Duration="0:0:0.120" />
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="BlurRadius"
+                                                         To="10" Duration="0:0:0.120" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="0" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.120" />
+                                        <DoubleAnimation Storyboard.TargetName="BtnShadow" Storyboard.TargetProperty="BlurRadius"
+                                                         To="0" Duration="0:0:0.120" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
-                        <!-- Pressed: Surface darker -->
+                        <!-- Pressed: Depress 1px -->
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfacePressedBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="1" Duration="0:0:0.060" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="-1" Duration="0:0:0.060" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
-                        <!-- Focus: Highlight border with accent -->
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                        </Trigger>
-                        <!-- Disabled: Opacity 0.4 -->
+                        <!-- Disabled -->
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4" />
                         </Trigger>
@@ -177,41 +375,81 @@
         </Setter>
     </Style>
 
-    <!-- Ghost / Text Button: "Сбросить" (Transparent background, text #9AA3B2, hover #E8EAED) -->
+    <!-- Ghost / Text Button -->
     <Style x:Key="GhostBtn" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Height" Value="38" />
+        <Setter Property="Height" Value="34" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Brd"
-                            Background="{TemplateBinding Background}"
-                            BorderThickness="1"
-                            BorderBrush="Transparent"
-                            CornerRadius="4"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Grid>
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="BtnTrans" Y="0" />
+                        </Grid.RenderTransform>
+                        <Border x:Name="Brd"
+                                Background="{TemplateBinding Background}"
+                                BorderThickness="1"
+                                BorderBrush="Transparent"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <!-- Hover: Text #E8EAED, light background #171A21 -->
+                        <!-- Hover: Lift 1px + Light surface -->
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfaceBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="-1" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="0" Duration="0:0:0.120">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
-                        <!-- Pressed: Darker surface #12141A -->
+                        <!-- Pressed: Depress 1px -->
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfacePressedBrush}" />
-                            <Setter Property="Foreground" Value="#FFFFFF" />
-                        </Trigger>
-                        <!-- Focus -->
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="1" Duration="0:0:0.060" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="BtnTrans" Storyboard.TargetProperty="Y"
+                                                         To="-1" Duration="0:0:0.060" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <!-- Disabled -->
                         <Trigger Property="IsEnabled" Value="False">
@@ -223,86 +461,33 @@
         </Setter>
     </Style>
 
-    <!-- Navigation Header Tab Radio Button: "ИГРАТЬ", "СКИН", "НАСТРОЙКИ" -->
-    <!-- Active tab: #E8EAED + 2 px accent line (#19D3A7) at bottom, inactive: #9AA3B2, hover: #E8EAED -->
+    <!-- Navigation Header Tab Radio Button (Title Case, Manrope) -->
     <Style x:Key="NavTabRadio" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-        <Setter Property="FontFamily" Value="{StaticResource PixelFont}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Height" Value="46" />
-        <Setter Property="Padding" Value="20,0" />
+        <Setter Property="Padding" Value="18,0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Grid Background="{TemplateBinding Background}">
-                        <Border x:Name="HoverOverlay"
-                                Background="{StaticResource SurfaceHoverBrush}"
-                                Opacity="0" />
-                        <Border Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <!-- 2 px Accent line at bottom (#19D3A7) -->
-                        <Border x:Name="ActiveIndicator"
-                                Height="2"
-                                VerticalAlignment="Bottom"
-                                Background="{StaticResource AccentBrush}"
-                                Visibility="Collapsed" />
-                    </Grid>
+                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
                     <ControlTemplate.Triggers>
                         <!-- Hover: Text #E8EAED -->
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                            <Setter TargetName="HoverOverlay" Property="Opacity" Value="1" />
                         </Trigger>
-                        <!-- Checked (Active tab): Text #E8EAED, ActiveIndicator visible -->
+                        <!-- Checked: Text #E8EAED, Bold -->
                         <Trigger Property="IsChecked" Value="True">
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                            <Setter TargetName="ActiveIndicator" Property="Visibility" Value="Visible" />
-                        </Trigger>
-                        <!-- Disabled -->
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- Navigation Header Tab Button (Legacy Compatibility) -->
-    <Style x:Key="NavTabBtn" TargetType="Button">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Height" Value="46" />
-        <Setter Property="Padding" Value="20,0" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Border x:Name="Brd"
-                            Background="{TemplateBinding Background}"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <!-- Hover: Text becomes #E8EAED, subtle surface highlight #20242E -->
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
-                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-                        </Trigger>
-                        <!-- Pressed: Surface #12141A, text white -->
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfacePressedBrush}" />
-                            <Setter Property="Foreground" Value="#FFFFFF" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                         <!-- Disabled -->
                         <Trigger Property="IsEnabled" Value="False">
@@ -373,22 +558,99 @@
         </Setter>
     </Style>
 
+    <!-- Header Sound Toggle Button (Vector icon, accent on hover) -->
+    <Style x:Key="WinSoundBtn" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Brd" Background="{TemplateBinding Background}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Brd" Property="Background" Value="{StaticResource SurfaceHoverBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AccentPressedBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Compact Header Volume Slider -->
+    <Style x:Key="HeaderVolumeSlider" TargetType="Slider">
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <Grid VerticalAlignment="Center">
+                        <!-- Track -->
+                        <Border Height="4" Background="#181C24"
+                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                CornerRadius="2" VerticalAlignment="Center" />
+                        <!-- Thumb -->
+                        <Track x:Name="PART_Track">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border x:Name="ThumbBorder"
+                                                    Width="12" Height="12"
+                                                    CornerRadius="6"
+                                                    Background="{StaticResource AccentBrush}"
+                                                    BorderBrush="#12151B"
+                                                    BorderThickness="1"
+                                                    Cursor="Hand" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource AccentHoverBrush}" />
+                                                </Trigger>
+                                                <Trigger Property="IsDragging" Value="True">
+                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource AccentPressedBrush}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ============================================== -->
     <!-- 3. INPUTS & CONTROLS (TextBox, Slider, RAM)    -->
     <!-- ============================================== -->
 
-    <!-- Modern Dark TextBox: Surface #171A21, Border #252A33, Focus #19D3A7 -->
+    <!-- Modern Dark TextBox -->
     <Style x:Key="ModernTextBox" TargetType="TextBox">
-        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="Background" Value="{StaticResource SurfacePressedBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
         <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
         <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="Height" Value="38" />
         <Setter Property="Padding" Value="12,0" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="BorderBrush" Value="{StaticResource BorderGreenBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
@@ -401,7 +663,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource BorderHoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
@@ -420,6 +682,7 @@
     <Style x:Key="RamPillRadio" TargetType="RadioButton">
         <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="12" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Cursor" Value="Hand" />
@@ -434,17 +697,17 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="1"
                             BorderBrush="{StaticResource BorderBrush}"
-                            CornerRadius="4">
+                            CornerRadius="6">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
-                        <!-- Checked State: Subtle accent tint background, accent border, accent text -->
+                        <!-- Checked State: Accent border, accent text -->
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Brd" Property="Background" Value="#132B25" />
+                            <Setter TargetName="Brd" Property="Background" Value="#172C24" />
                             <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                         </Trigger>
-                        <!-- Hover when Unchecked: Light surface #20242E, light border #353B47, text #E8EAED -->
+                        <!-- Hover when Unchecked -->
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="IsMouseOver" Value="True" />
@@ -454,24 +717,6 @@
                             <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource BorderHoverBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
                         </MultiTrigger>
-                        <!-- Hover when Checked -->
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True" />
-                                <Condition Property="IsChecked" Value="True" />
-                            </MultiTrigger.Conditions>
-                            <Setter TargetName="Brd" Property="Background" Value="#17352E" />
-                            <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentHoverBrush}" />
-                            <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
-                        </MultiTrigger>
-                        <!-- Focus -->
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Brd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                        </Trigger>
-                        <!-- Disabled -->
-                        <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" Value="0.4" />
-                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -501,7 +746,7 @@
                                                     Width="18" Height="18"
                                                     CornerRadius="9"
                                                     Background="{StaticResource AccentBrush}"
-                                                    BorderBrush="#0F1115"
+                                                    BorderBrush="#12151B"
                                                     BorderThickness="2"
                                                     Cursor="Hand" />
                                             <ControlTemplate.Triggers>
@@ -548,76 +793,10 @@
         </Setter>
     </Style>
 
-    <!-- ============================================== -->
-    <!-- 4. SLIM DARK SCROLLBAR & EXPANDER              -->
-    <!-- ============================================== -->
-    <Style x:Key="ScrollThumb" TargetType="{x:Type Thumb}">
-        <Setter Property="SnapsToDevicePixels" Value="True" />
-        <Setter Property="OverridesDefaultStyle" Value="true" />
-        <Setter Property="IsTabStop" Value="false" />
-        <Setter Property="Focusable" Value="false" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="{x:Type Thumb}">
-                    <Border CornerRadius="3"
-                            Background="{StaticResource BorderBrush}"
-                            x:Name="ThumbBorder"
-                            Margin="1" />
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource BorderHoverBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource AccentBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style TargetType="{x:Type ScrollBar}">
-        <Setter Property="SnapsToDevicePixels" Value="True" />
-        <Setter Property="OverridesDefaultStyle" Value="true" />
-        <Style.Triggers>
-            <Trigger Property="Orientation" Value="Horizontal">
-                <Setter Property="Height" Value="6" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="{x:Type ScrollBar}">
-                            <Grid Background="Transparent">
-                                <Track x:Name="PART_Track" IsDirectionReversed="False">
-                                    <Track.Thumb>
-                                        <Thumb Style="{StaticResource ScrollThumb}" />
-                                    </Track.Thumb>
-                                </Track>
-                            </Grid>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Trigger>
-            <Trigger Property="Orientation" Value="Vertical">
-                <Setter Property="Width" Value="6" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="{x:Type ScrollBar}">
-                            <Grid Background="Transparent">
-                                <Track x:Name="PART_Track" IsDirectionReversed="True">
-                                    <Track.Thumb>
-                                        <Thumb Style="{StaticResource ScrollThumb}" />
-                                    </Track.Thumb>
-                                </Track>
-                            </Grid>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Trigger>
-        </Style.Triggers>
-    </Style>
-
     <!-- Modern Dark Expander Style -->
     <Style x:Key="ModernExpander" TargetType="Expander">
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="Background" Value="Transparent" />

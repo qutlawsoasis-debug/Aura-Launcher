@@ -3,14 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AuraLauncher.ViewModels"
         xmlns:views="clr-namespace:AuraLauncher.Views"
-        Title="AURA" Height="620" Width="980"
+        xmlns:core="clr-namespace:AuraLauncher.Core"
+        Title="Aura" Height="620" Width="980"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
         ResizeMode="NoResize"
         Icon="app_icon.ico"
-        FontFamily="Segoe UI, -apple-system, sans-serif">
+        FontFamily="{StaticResource MainFont}"
+        MouseMove="OnWindowMouseMove">
 
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="0" CornerRadius="6" CaptionHeight="46" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
@@ -18,6 +20,7 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <core:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
 
         <!-- DataTemplates для динамической смены содержимого вкладок -->
         <DataTemplate DataType="{x:Type vm:OverviewViewModel}">
@@ -34,18 +37,23 @@
         </DataTemplate>
     </Window.Resources>
 
-    <!-- Внешний плоский контейнер окна -->
-    <Border Background="#0F1115" BorderThickness="1" BorderBrush="#1B3B2B" CornerRadius="6" ClipToBounds="True">
+    <!-- Внешний плоский контейнер окна (графитовый фон, 1px рамка #232936) -->
+    <Border Background="{StaticResource BgDeepBrush}" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="6" ClipToBounds="True">
         <Grid>
-            <!-- 0. Background World Image on ALL tabs -->
-            <Image Source="{StaticResource WorldBackgroundBitmap}"
+            <!-- 0. Background World Image with Mouse Parallax Transform -->
+            <Image x:Name="BgWorldImage"
+                   Source="{StaticResource WorldBackgroundBitmap}"
                    Stretch="UniformToFill"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   RenderOptions.BitmapScalingMode="HighQuality" />
+                   RenderOptions.BitmapScalingMode="HighQuality">
+                <Image.RenderTransform>
+                    <TranslateTransform x:Name="BgWorldTrans" X="0" Y="0" />
+                </Image.RenderTransform>
+            </Image>
 
-            <!-- Moderate Darkening Overlay (not pure black: mountains, forest clearly visible) -->
-            <Border Background="#C40E1218" />
+            <!-- Moderate Darkening Overlay (graphite #12151B) -->
+            <Border Background="#C612151B" />
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -60,51 +68,117 @@
                 <!-- ============================================== -->
                 <!-- 1. TOP HEADER BAR                              -->
                 <!-- ============================================== -->
-                <Border Grid.Row="0" Background="#E0141820" CornerRadius="5,5,0,0" Panel.ZIndex="10" BorderThickness="0,0,0,1" BorderBrush="#1B3B2B">
+                <Border Grid.Row="0" Background="#E6151922" CornerRadius="5,5,0,0" Panel.ZIndex="10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <!-- Логотип (Draggable) -->
                             <ColumnDefinition Width="*" />
-                            <!-- Вкладки (Кликабельные) -->
+                            <!-- Вкладки (Кликабельные со скользящей линией) -->
                             <ColumnDefinition Width="Auto" />
                             <!-- Управление окном -->
                         </Grid.ColumnDefinitions>
 
-                        <!-- Логотип и версия (Draggable зона) -->
+                        <!-- Логотип и версия -->
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="18,0,0,0" Background="Transparent">
                             <Image Source="pack://application:,,,/AuraLauncher;component/app_icon.png" Width="20" Height="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <TextBlock Text="AURA" FontFamily="{StaticResource PixelFont}" FontSize="15" FontWeight="Bold" Foreground="#19D3A7" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <Border Background="#1B3B2B" CornerRadius="4" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding LauncherVersionText}" FontSize="11" FontWeight="SemiBold" Foreground="#19D3A7" />
+                            <TextBlock Text="Aura" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,10,0" />
+                            <Border Background="#172C24" CornerRadius="4" Padding="6,2" Margin="0,0,10,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding LauncherVersionText}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
                             </Border>
-                            <TextBlock Text="Fabric 1.20.1" FontSize="12" Foreground="#9AA3B2" VerticalAlignment="Center" />
+                            <TextBlock Text="Fabric 1.20.1" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
                         </StackPanel>
 
-                        <!-- Вкладки навигации -->
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
-                                    WindowChrome.IsHitTestVisibleInChrome="True">
-                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Overview"
-                                         IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
-                                         GroupName="HeaderTabs"
-                                         Style="{StaticResource NavTabRadio}" Content="ИГРАТЬ" />
-                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
-                                         IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
-                                         GroupName="HeaderTabs"
-                                         Style="{StaticResource NavTabRadio}" Content="СКИН" />
-                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Lobby"
-                                         IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
-                                         GroupName="HeaderTabs"
-                                         Style="{StaticResource NavTabRadio}" Content="ЛОББИ" />
-                            <RadioButton Command="{Binding NavigateCommand}" CommandParameter="Settings"
-                                         IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
-                                         GroupName="HeaderTabs"
-                                         Style="{StaticResource NavTabRadio}" Content="НАСТРОЙКИ" />
-                        </StackPanel>
+                        <!-- Вкладки навигации со скользящим подчёркиванием (220 мс) -->
+                        <Grid Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <StackPanel x:Name="NavTabsPanel" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
+                                <RadioButton x:Name="TabOverview" Command="{Binding NavigateCommand}" CommandParameter="Overview"
+                                             IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
+                                             GroupName="HeaderTabs"
+                                             Checked="OnTabChecked"
+                                             Style="{StaticResource NavTabRadio}" Content="Играть" />
+                                <RadioButton x:Name="TabWardrobe" Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
+                                             IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
+                                             GroupName="HeaderTabs"
+                                             Checked="OnTabChecked"
+                                             Style="{StaticResource NavTabRadio}" Content="Скин" />
+                                <RadioButton x:Name="TabLobby" Command="{Binding NavigateCommand}" CommandParameter="Lobby"
+                                             IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
+                                             GroupName="HeaderTabs"
+                                             Checked="OnTabChecked"
+                                             Style="{StaticResource NavTabRadio}" Content="Лобби" />
+                                <RadioButton x:Name="TabSettings" Command="{Binding NavigateCommand}" CommandParameter="Settings"
+                                             IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
+                                             GroupName="HeaderTabs"
+                                             Checked="OnTabChecked"
+                                             Style="{StaticResource NavTabRadio}" Content="Настройки" />
+                            </StackPanel>
 
-                        <!-- Кнопки управления окном (Свернуть / Закрыть) -->
-                        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                            <!-- Скользящий индикатор активной вкладки -->
+                            <Canvas IsHitTestVisible="False" VerticalAlignment="Bottom" Height="2">
+                                <Border x:Name="TabUnderline" Height="2" Background="{StaticResource AccentBrush}" CornerRadius="1">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="UnderlineTrans" X="0" />
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Canvas>
+                        </Grid>
+
+                        <!-- Кнопки управления окном (Звук + Свернуть + Закрыть) -->
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center"
                                     WindowChrome.IsHitTestVisibleInChrome="True">
+                            <!-- Контрол звука: Выдвижной ползунок (180мс) + Векторная иконка звука -->
+                            <Grid x:Name="SoundControlRoot"
+                                  Background="Transparent"
+                                  MouseEnter="SoundControl_MouseEnter"
+                                  MouseLeave="SoundControl_MouseLeave"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,4,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Горизонтальный выдвигающийся ползунок (0-100%) -->
+                                    <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center">
+                                        <Slider x:Name="HeaderVolSlider"
+                                                Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                                                Value="{Binding AnthemVolume, Mode=TwoWay}"
+                                                Style="{StaticResource HeaderVolumeSlider}"
+                                                Width="76" Margin="0,0,6,0"
+                                                ToolTip="Громкость гимна" />
+                                    </Border>
+
+                                    <!-- Векторная кнопка-иконка переключения Mute/Unmute -->
+                                    <Button Command="{Binding ToggleMuteCommand}"
+                                            Style="{StaticResource WinSoundBtn}"
+                                            ToolTip="Гимн: включить / выключить звук"
+                                            Cursor="Hand">
+                                        <Grid Width="16" Height="16">
+                                            <!-- Иконка: Звук включён (динамик с волнами) -->
+                                            <Path x:Name="IconSoundOn"
+                                                  Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M11.5,5.5 C12.8,6.8 13.5,8.3 13.5,10 C13.5,11.7 12.8,13.2 11.5,14.5 M13.8,3.2 C15.8,5.2 16.8,7.5 16.8,10 C16.8,12.5 15.8,14.8 13.8,16.8"
+                                                  Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.2"
+                                                  StrokeLineJoin="Round"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round"
+                                                  Stretch="Uniform"
+                                                  Visibility="{Binding IsAnthemMuted, Converter={StaticResource InverseBoolToVis}}" />
+
+                                            <!-- Иконка: Звук выключен (перечёркнутый динамик) -->
+                                            <Path x:Name="IconSoundMuted"
+                                                  Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M12,7 L16,11 M16,7 L12,11"
+                                                  Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.4"
+                                                  StrokeLineJoin="Round"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round"
+                                                  Stretch="Uniform"
+                                                  Visibility="{Binding IsAnthemMuted, Converter={StaticResource BoolToVis}}" />
+                                        </Grid>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+
                             <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" />
                             <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" />
                         </StackPanel>
@@ -115,12 +189,27 @@
                 <!-- 2. MAIN DYNAMIC CONTENT AREA (ContentControl)  -->
                 <!-- ============================================== -->
                 <Grid Grid.Row="1" Panel.ZIndex="1">
+                    <!-- Смена вкладок: выезжает снизу на 12px с проявлением, 200 мс -->
                     <ContentControl Content="{Binding CurrentView, NotifyOnTargetUpdated=True}" Panel.ZIndex="1">
+                        <ContentControl.RenderTransform>
+                            <TranslateTransform x:Name="ContentSlideTrans" Y="0" />
+                        </ContentControl.RenderTransform>
                         <ContentControl.Triggers>
                             <EventTrigger RoutedEvent="Binding.TargetUpdated">
                                 <BeginStoryboard>
                                     <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.0" To="1.0" Duration="0:0:0.200" />
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="0.0" To="1.0" Duration="0:0:0.200">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                         From="12.0" To="0.0" Duration="0:0:0.200">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
                                     </Storyboard>
                                 </BeginStoryboard>
                             </EventTrigger>
@@ -130,39 +219,27 @@
                     <!-- Плавающее уведомление об обновлении (Toast / Banner) -->
                     <Border VerticalAlignment="Top" HorizontalAlignment="Center"
                             Margin="0,16,0,0" Panel.ZIndex="50"
-                            Background="#EE171A21" BorderBrush="#252A33" BorderThickness="1"
-                            CornerRadius="10" Padding="16,12"
+                            Background="#F0181C24" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="16,12"
                             Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
                             Effect="{x:Null}">
-                        <Border.Resources>
-                            <DropShadowEffect x:Key="ToastShadow" BlurRadius="20" ShadowDepth="4" Direction="270" Color="#000000" Opacity="0.5" />
-                        </Border.Resources>
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Effect" Value="{StaticResource ToastShadow}" />
-                            </Style>
-                        </Border.Style>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <!-- Иконка или индикатор -->
-                            <Border Width="8" Height="8" CornerRadius="4" Background="#19D3A7" Margin="0,0,12,0" VerticalAlignment="Center" />
-                            
+                            <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
                             <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="#E8EAED" FontSize="12" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0" />
+                                <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0" />
                             </StackPanel>
 
-                            <!-- Кнопка действия -->
                             <Button Command="{Binding ApplyBannerUpdateCommand}"
                                     Style="{StaticResource PrimaryNeonBtn}"
-                                    Height="30" Padding="14,0" FontSize="11" FontWeight="SemiBold"
+                                    Height="32" Padding="14,0" FontSize="12" FontWeight="SemiBold"
                                     Content="{Binding UpdateBannerButtonText}"
                                     Margin="0,0,10,0" VerticalAlignment="Center" />
 
-                            <!-- Кнопка закрытия тоста -->
                             <Button Command="{Binding DismissBannerCommand}"
                                     Style="{StaticResource WinCloseBtn}"
                                     Width="26" Height="26" FontSize="11"
-                                    Content="✕" ToolTip="Закрыть уведомление"
+                                    Content="✕" ToolTip="Закрыть"
                                     VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
@@ -171,7 +248,7 @@
                 <!-- ============================================== -->
                 <!-- 3. BOTTOM LAUNCH DECK                          -->
                 <!-- ============================================== -->
-                <Border Grid.Row="2" Background="#E4141820" CornerRadius="0,0,5,5" Panel.ZIndex="10" BorderThickness="0,1,0,0" BorderBrush="#1B3B2B" Padding="24,14">
+                <Border Grid.Row="2" Background="#E6151922" CornerRadius="0,0,5,5" Panel.ZIndex="10" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}" Padding="24,14">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -179,30 +256,30 @@
                             <ColumnDefinition Width="Auto" />
                             <!-- Селектор ОЗУ -->
                             <ColumnDefinition Width="*" />
-                            <!-- Цитаты и статус/прогресс -->
+                            <!-- Статус и прогресс-бар -->
                             <ColumnDefinition Width="Auto" />
                             <!-- Кнопка «Играть» -->
                         </Grid.ColumnDefinitions>
 
-                        <!-- 1. Инфо об игроке (Ник и динамическая аватарка головы) -->
+                        <!-- 1. Инфо об игроке -->
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,24,0">
-                            <Border Width="40" Height="40" Background="#171A21" BorderThickness="1" BorderBrush="#1B3B2B" CornerRadius="6" ClipToBounds="True" Margin="0,0,12,0">
+                            <Border Width="40" Height="40" Background="{StaticResource SurfaceBrush}" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="6" ClipToBounds="True" Margin="0,0,12,0">
                                 <Image Source="{Binding PlayerAvatar}" Width="36" Height="36" RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
                             </Border>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Игрок" Foreground="#9AA3B2" FontSize="11" Margin="0,0,0,1" />
-                                <TextBlock Text="{Binding PlayerNickname}" Foreground="#E8EAED" FontSize="14" FontWeight="SemiBold" />
+                                <TextBlock Text="Игрок" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,1" />
+                                <TextBlock Text="{Binding PlayerNickname}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="SemiBold" />
                             </StackPanel>
                         </StackPanel>
 
                         <!-- 2. Индикатор ОЗУ -->
-                        <TextBlock Grid.Column="1" Text="{Binding RamFormatted}" Foreground="#9AA3B2" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,24,0" />
+                        <TextBlock Grid.Column="1" Text="{Binding RamFormatted}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,24,0" />
 
                         <!-- 3. Статус стейт-машины и прогресс-бар -->
                         <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,24,0">
-                            <TextBlock Text="{Binding StateTitle}" Foreground="#E8EAED" FontSize="13" FontWeight="SemiBold"
+                            <TextBlock Text="{Binding StateTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold"
                                        TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{Binding StatusText}" Foreground="#9AA3B2" FontSize="11" Margin="0,2,0,0"
+                            <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0"
                                        TextTrimming="CharacterEllipsis" />
                             <ProgressBar Height="4" Margin="0,6,0,0"
                                          Style="{StaticResource NeonProgressBar}"
@@ -210,11 +287,11 @@
                                          Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
                         </StackPanel>
 
-                        <!-- 4. Кнопка «ИГРАТЬ» / «ОТМЕНА» -->
+                        <!-- 4. Кнопка «Играть» / «Отмена» -->
                         <Button Grid.Column="3"
                                 Command="{Binding LaunchOrCancelCommand}"
                                 Style="{StaticResource PrimaryNeonBtn}"
-                                Width="200" Height="46"
+                                Width="200" Height="44"
                                 Content="{Binding LaunchButtonText}"
                                 VerticalAlignment="Center" />
                     </Grid>
