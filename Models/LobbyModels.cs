@@ -10,4 +10,5 @@ public class LobbyPlayerItem
     public string Nickname { get; set; } = "";
     public bool IsHost { get; set; }
     public System.Windows.Media.ImageSource? Avatar { get; set; }
+    public bool IsNewlyAdded { get; set; }
 }

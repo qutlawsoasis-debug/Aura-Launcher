@@ -9,6 +9,10 @@
              ClipToBounds="False"
              Background="Transparent">
 
+    <UserControl.CacheMode>
+        <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
+    </UserControl.CacheMode>
+
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>

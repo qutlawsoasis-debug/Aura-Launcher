@@ -934,7 +934,8 @@ public class LobbyViewModel : ObservableObject
     {
         if (players == null || players.Length == 0) return;
 
-        var items = new List<LobbyPlayerItem>();
+        // Build desired player descriptors
+        var incomingPlayers = new List<(string Nick, bool IsHost, ImageSource Avatar)>();
         foreach (var player in players)
         {
             var isHost = string.Equals(player, hostName, StringComparison.OrdinalIgnoreCase);
@@ -948,20 +949,72 @@ public class LobbyViewModel : ObservableObject
                 avatar = SkinService.LoadDefaultSteveBitmap();
             }
 
-            items.Add(new LobbyPlayerItem
-            {
-                Nickname = player,
-                IsHost = isHost,
-                Avatar = avatar
-            });
+            incomingPlayers.Add((player, isHost, avatar));
         }
 
         Dispatch(() =>
         {
-            LobbyPlayers.Clear();
-            foreach (var item in items)
+            // 1. Remove players that are no longer in incoming list
+            var desiredSet = new HashSet<string>(incomingPlayers.Select(p => p.Nick), StringComparer.OrdinalIgnoreCase);
+            for (int i = LobbyPlayers.Count - 1; i >= 0; i--)
             {
-                LobbyPlayers.Add(item);
+                if (!desiredSet.Contains(LobbyPlayers[i].Nickname))
+                {
+                    LobbyPlayers.RemoveAt(i);
+                }
+            }
+
+            // 2. Add or update players in-place
+            for (int i = 0; i < incomingPlayers.Count; i++)
+            {
+                var incoming = incomingPlayers[i];
+                var existingIndex = -1;
+                for (int j = 0; j < LobbyPlayers.Count; j++)
+                {
+                    if (string.Equals(LobbyPlayers[j].Nickname, incoming.Nick, StringComparison.OrdinalIgnoreCase))
+                    {
+                        existingIndex = j;
+                        break;
+                    }
+                }
+
+                if (existingIndex >= 0)
+                {
+                    // Existing player: update properties in-place without triggering new slide-in animation
+                    var existingItem = LobbyPlayers[existingIndex];
+                    existingItem.IsHost = incoming.IsHost;
+                    if (incoming.Avatar != null && existingItem.Avatar != incoming.Avatar)
+                    {
+                        existingItem.Avatar = incoming.Avatar;
+                    }
+                    existingItem.IsNewlyAdded = false;
+
+                    // Ensure matching order if needed
+                    if (existingIndex != i && i < LobbyPlayers.Count)
+                    {
+                        LobbyPlayers.Move(existingIndex, i);
+                    }
+                }
+                else
+                {
+                    // Newly joined player: marked as IsNewlyAdded so slide-in animation fires
+                    var newItem = new LobbyPlayerItem
+                    {
+                        Nickname = incoming.Nick,
+                        IsHost = incoming.IsHost,
+                        Avatar = incoming.Avatar,
+                        IsNewlyAdded = true
+                    };
+
+                    if (i < LobbyPlayers.Count)
+                    {
+                        LobbyPlayers.Insert(i, newItem);
+                    }
+                    else
+                    {
+                        LobbyPlayers.Add(newItem);
+                    }
+                }
             }
         });
     }

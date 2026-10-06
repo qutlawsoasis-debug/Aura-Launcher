@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -761,7 +762,7 @@ public static class SceneDiagnostics
             await Task.Delay(500);
             window.Dispatcher.Invoke(() =>
             {
-                if (window.MainContentHost.Content is WardrobeViewModel)
+                if (mainVm.CurrentView is WardrobeViewModel)
                 {
                     // front is default
                 }
@@ -847,6 +848,33 @@ public static class SceneDiagnostics
             });
             SaveShot($"{prefix}_tab_lobby_open.png");
 
+            // 6b. 10-секундная проверка стабильности координаты X блока игрока в лобби
+            App.Log("[LOBBY_10S_CHECK] Starting 10-second lobby player block position stability check...");
+            double initialX = -1;
+            for (int sec = 0; sec <= 10; sec++)
+            {
+                await mainVm.LobbyVM.RefreshLobbyPlayersAsync(new[] { mainVm.PlayerNickname, "Friend" }, mainVm.PlayerNickname);
+                double currentX = window.Dispatcher.Invoke(() =>
+                {
+                    var playersControl = FindVisualChild<ItemsControl>(window.ViewLobby);
+                    if (playersControl != null)
+                    {
+                        var border = FindVisualChild<Border>(playersControl);
+                        if (border != null)
+                        {
+                            var pt = border.TransformToAncestor(window).Transform(new Point(0, 0));
+                            return pt.X;
+                        }
+                    }
+                    return 0.0;
+                });
+
+                if (initialX < 0) initialX = currentX;
+                double deltaX = Math.Abs(currentX - initialX);
+                App.Log($"[LOBBY_10S_CHECK] t={sec,2}s: PlayerBlock X={currentX:F2}px, deltaX={deltaX:F2}px (stable: {deltaX < 0.01})");
+                await Task.Delay(1000);
+            }
+
             // Leave lobby
             window.Dispatcher.Invoke(() => mainVm.LobbyVM.LeaveLobbyCommand.Execute(null));
             await Task.Delay(500);
@@ -910,17 +938,33 @@ public static class SceneDiagnostics
                 await Task.Delay(120);
             }
 
-            // 3. Switch to "Lobby" tab (overlay fade & screen transition) (6 frames)
+            // 3. Switch to "Lobby" tab (8 frames with 40ms interval, logging Y coordinate)
             window.Dispatcher.Invoke(() =>
             {
                 window.AnimateMenuDimming(window.MenuBtnLobby, isHovered: false);
                 mainVm.SwitchTab("Lobby");
             });
-            for (int i = 0; i < 6; i++)
+            for (int f = 0; f < 8; f++)
             {
                 frameBitmaps.Add(CaptureWindow(window));
-                await Task.Delay(150);
+                window.Dispatcher.Invoke(() =>
+                {
+                    double curY = 0;
+                    if (window.ViewLobby.RenderTransform is TranslateTransform tt)
+                    {
+                        curY = tt.Y;
+                    }
+                    var lobbyTitle = FindVisualChild<TextBlock>(window.ViewLobby);
+                    double titleScreenY = 0;
+                    if (lobbyTitle != null)
+                    {
+                        try { titleScreenY = lobbyTitle.TransformToAncestor(window).Transform(new Point(0, 0)).Y; } catch { }
+                    }
+                    App.Log($"[TRANSITION_FRAME] Frame {f} (t={f * 40,3}ms): Screen=Lobby, Opacity={window.ViewLobby.Opacity:F2}, TransY={curY:F2}px, TitleScreenY={titleScreenY:F2}px");
+                });
+                await Task.Delay(40);
             }
+            await Task.Delay(150);
 
             // 4. Switch to "Wardrobe" (Skin) tab (6 frames)
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));

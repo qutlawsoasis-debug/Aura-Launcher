@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using AuraLauncher.ViewModels;
 
@@ -17,10 +18,13 @@ namespace AuraLauncher;
 public partial class MainWindow : Window
 {
     private System.Windows.Threading.DispatcherTimer? _sliderHideTimer;
+    private FrameworkElement? _currentActiveView;
+    private Storyboard? _activeTransitionStoryboard;
 
     public MainWindow()
     {
         InitializeComponent();
+        _currentActiveView = ViewOverview;
         Loaded += MainWindow_Loaded;
     }
 
@@ -30,14 +34,122 @@ public partial class MainWindow : Window
         {
             vm.PropertyChanged += (s, args) =>
             {
-                if (args.PropertyName == nameof(MainViewModel.CurrentTabName) ||
-                    args.PropertyName == nameof(MainViewModel.IsOverviewActive))
+                if (args.PropertyName == nameof(MainViewModel.CurrentTabName))
+                {
+                    TransitionToTab(vm.CurrentTabName, animate: true);
+                    UpdateScreenOverlay(vm.IsOverviewActive);
+                }
+                else if (args.PropertyName == nameof(MainViewModel.IsOverviewActive))
                 {
                     UpdateScreenOverlay(vm.IsOverviewActive);
                 }
             };
+            TransitionToTab(vm.CurrentTabName, animate: false);
             UpdateScreenOverlay(vm.IsOverviewActive);
         }
+    }
+
+    public void TransitionToTab(string tabName, bool animate = true)
+    {
+        FrameworkElement? targetView = tabName switch
+        {
+            "Lobby" => ViewLobby,
+            "Wardrobe" => ViewWardrobe,
+            "Settings" => ViewSettings,
+            _ => ViewOverview
+        };
+
+        if (targetView == null || targetView == _currentActiveView) return;
+
+        var outgoingView = _currentActiveView;
+        _currentActiveView = targetView;
+
+        _activeTransitionStoryboard?.Stop();
+        _activeTransitionStoryboard = null;
+
+        if (!animate || outgoingView == null)
+        {
+            if (outgoingView != null)
+            {
+                outgoingView.Visibility = Visibility.Collapsed;
+                outgoingView.Opacity = 0.0;
+            }
+            targetView.Visibility = Visibility.Visible;
+            targetView.Opacity = 1.0;
+            if (targetView.RenderTransform is TranslateTransform tt)
+            {
+                tt.Y = 0.0;
+            }
+            return;
+        }
+
+        // Честный Storyboard перехода:
+        // - Уходящий экран: Opacity 1 -> 0 за 100 мс.
+        // - Приходящий экран: Opacity 0 -> 1 за 220 мс, TranslateTransform.Y 8 -> 0 за 220 мс (CubicEase EaseOut).
+        // - Visibility приходящего включать ДО анимации, уходящего — скрывать (Collapsed) по Completed.
+        // - Анимировать СТРОГО Opacity и RenderTransform (TranslateTransform).
+        targetView.Visibility = Visibility.Visible;
+        targetView.Opacity = 0.0;
+        if (targetView.RenderTransform is TranslateTransform inTrans)
+        {
+            inTrans.Y = 8.0;
+        }
+
+        var sb = new Storyboard();
+
+        // Уходящий: Opacity 1 -> 0 за 100 мс
+        var outAnim = new DoubleAnimation
+        {
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(100)
+        };
+        Storyboard.SetTarget(outAnim, outgoingView);
+        Storyboard.SetTargetProperty(outAnim, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(outAnim);
+
+        // Приходящий: Opacity 0 -> 1 за 220 мс (с задержкой 100 мс)
+        var inOpacityAnim = new DoubleAnimation
+        {
+            From = 0.0,
+            To = 1.0,
+            Duration = TimeSpan.FromMilliseconds(220),
+            BeginTime = TimeSpan.FromMilliseconds(100),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(inOpacityAnim, targetView);
+        Storyboard.SetTargetProperty(inOpacityAnim, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(inOpacityAnim);
+
+        // Приходящий: TranslateTransform.Y 8 -> 0 за 220 мс (с задержкой 100 мс)
+        var inSlideAnim = new DoubleAnimation
+        {
+            From = 8.0,
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(220),
+            BeginTime = TimeSpan.FromMilliseconds(100),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(inSlideAnim, targetView);
+        Storyboard.SetTargetProperty(inSlideAnim, new PropertyPath("(UIElement.RenderTransform).(TranslateTransform.Y)"));
+        sb.Children.Add(inSlideAnim);
+
+        sb.Completed += (s, e) =>
+        {
+            outgoingView.Visibility = Visibility.Collapsed;
+            outgoingView.Opacity = 0.0;
+            targetView.Opacity = 1.0;
+            if (targetView.RenderTransform is TranslateTransform finishedTrans)
+            {
+                finishedTrans.Y = 0.0;
+            }
+            if (_activeTransitionStoryboard == sb)
+            {
+                _activeTransitionStoryboard = null;
+            }
+        };
+
+        _activeTransitionStoryboard = sb;
+        sb.Begin();
     }
 
     private void UpdateScreenOverlay(bool isOverview)

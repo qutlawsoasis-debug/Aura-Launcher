@@ -9,6 +9,10 @@
              ClipToBounds="False"
              Background="Transparent">
 
+    <UserControl.CacheMode>
+        <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
+    </UserControl.CacheMode>
+
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
@@ -465,7 +469,7 @@
             <!-- RIGHT COLUMN: Players list (width 230px)       -->
             <!-- 54px rows with 1px lines top/bottom            -->
             <!-- ============================================== -->
-            <StackPanel Grid.Column="2" VerticalAlignment="Top">
+            <StackPanel Grid.Column="2" Width="230" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <TextBlock Text="Игроки"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="18"
@@ -508,30 +512,36 @@
                         <DataTemplate>
                             <!-- 54px row with 1px top border (and bottom on last item) -->
                             <Border Height="54" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,1,0,0" Background="Transparent">
-                                <!-- Animation: new player slides in from -14px in 320ms -->
+                                <!-- Animation: new player slides in from -14px in 320ms ONLY when IsNewlyAdded=True -->
                                 <Border.RenderTransform>
                                     <TranslateTransform x:Name="PlayerTrans" X="0" />
                                 </Border.RenderTransform>
-                                <Border.Triggers>
-                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                                        <BeginStoryboard>
-                                            <Storyboard>
-                                                <DoubleAnimation Storyboard.TargetName="PlayerTrans" Storyboard.TargetProperty="X"
-                                                                 From="-14" To="0" Duration="0:0:0.320">
-                                                    <DoubleAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseOut" />
-                                                    </DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
-                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                 From="0" To="1" Duration="0:0:0.320">
-                                                    <DoubleAnimation.EasingFunction>
-                                                        <CubicEase EasingMode="EaseOut" />
-                                                    </DoubleAnimation.EasingFunction>
-                                                </DoubleAnimation>
-                                            </Storyboard>
-                                        </BeginStoryboard>
-                                    </EventTrigger>
-                                </Border.Triggers>
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsNewlyAdded}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                                             From="-14" To="0" Duration="0:0:0.320">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <CubicEase EasingMode="EaseOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             From="0" To="1" Duration="0:0:0.320">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <CubicEase EasingMode="EaseOut" />
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid VerticalAlignment="Center">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="40" />

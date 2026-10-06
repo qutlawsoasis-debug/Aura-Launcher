@@ -212,7 +212,11 @@
                    Stretch="UniformToFill"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
-                   RenderOptions.BitmapScalingMode="HighQuality" />
+                   RenderOptions.BitmapScalingMode="HighQuality">
+                <Image.CacheMode>
+                    <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
+                </Image.CacheMode>
+            </Image>
 
             <!-- OVERVIEW BACKGROUND GRADIENTS -->
             <Grid x:Name="OverviewGradientOverlay" IsHitTestVisible="False">
@@ -401,41 +405,51 @@
             <!-- 3. CONTENT AREA (BOUNDS: LEFT 340, RIGHT 56,  -->
             <!--    TOP 64, BOTTOM 44). FIXED POSITION!         -->
             <!-- ============================================== -->
-            <!-- Transition: old fades out 100ms, new fades in 220ms with 100ms delay, translateY 8 -> 0 -->
-            <Grid Margin="340,64,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
-                <ContentControl x:Name="MainContentHost"
-                                Focusable="False"
-                                FocusVisualStyle="{x:Null}"
-                                Content="{Binding CurrentView, NotifyOnTargetUpdated=True}"
-                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                    <ContentControl.RenderTransform>
-                        <TranslateTransform x:Name="ContentSlideTrans" Y="0" />
-                    </ContentControl.RenderTransform>
-                    <ContentControl.Triggers>
-                        <EventTrigger RoutedEvent="Binding.TargetUpdated">
-                            <BeginStoryboard>
-                                <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                     From="0.0" To="1.0"
-                                                     Duration="0:0:0.220"
-                                                     BeginTime="0:0:0.100">
-                                        <DoubleAnimation.EasingFunction>
-                                            <CubicEase EasingMode="EaseOut" />
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                     From="8.0" To="0.0"
-                                                     Duration="0:0:0.220"
-                                                     BeginTime="0:0:0.100">
-                                        <DoubleAnimation.EasingFunction>
-                                            <CubicEase EasingMode="EaseOut" />
-                                        </DoubleAnimation.EasingFunction>
-                                    </DoubleAnimation>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </ContentControl.Triggers>
-                </ContentControl>
+            <!-- Storyboard tab transitions: outgoing Opacity 1 -> 0 in 100ms; incoming Opacity 0 -> 1 and Y 8 -> 0 in 220ms -->
+            <Grid x:Name="ScreensContainer" Margin="340,64,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
+                <views:OverviewView x:Name="ViewOverview"
+                                    DataContext="{Binding OverviewVM}"
+                                    Visibility="Visible"
+                                    Opacity="1.0"
+                                    Focusable="False"
+                                    FocusVisualStyle="{x:Null}">
+                    <views:OverviewView.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </views:OverviewView.RenderTransform>
+                </views:OverviewView>
+
+                <views:LobbyView x:Name="ViewLobby"
+                                 DataContext="{Binding LobbyVM}"
+                                 Visibility="Collapsed"
+                                 Opacity="0.0"
+                                 Focusable="False"
+                                 FocusVisualStyle="{x:Null}">
+                    <views:LobbyView.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </views:LobbyView.RenderTransform>
+                </views:LobbyView>
+
+                <views:WardrobeView x:Name="ViewWardrobe"
+                                    DataContext="{Binding WardrobeVM}"
+                                    Visibility="Collapsed"
+                                    Opacity="0.0"
+                                    Focusable="False"
+                                    FocusVisualStyle="{x:Null}">
+                    <views:WardrobeView.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </views:WardrobeView.RenderTransform>
+                </views:WardrobeView>
+
+                <views:SettingsView x:Name="ViewSettings"
+                                    DataContext="{Binding SettingsVM}"
+                                    Visibility="Collapsed"
+                                    Opacity="0.0"
+                                    Focusable="False"
+                                    FocusVisualStyle="{x:Null}">
+                    <views:SettingsView.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </views:SettingsView.RenderTransform>
+                </views:SettingsView>
 
                 <!-- Floating update toast banner -->
                 <Border VerticalAlignment="Top" HorizontalAlignment="Right"
