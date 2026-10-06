@@ -265,19 +265,19 @@
             <!-- ============================================== -->
             <!-- 1. TOP HEADER                                  -->
             <!-- ============================================== -->
-            <!-- Top-left: x=20, y=14: 12px "Aura" (600) + "beta 1.0.5" (mute) -->
+            <!-- Top-left: x=20, y=14: "beta 1.0.N" (mute) + ember dot if update available -->
             <Canvas Height="40" VerticalAlignment="Top" Panel.ZIndex="50">
                 <StackPanel Canvas.Left="20" Canvas.Top="14" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Aura "
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource InkBrush}" />
                     <TextBlock Text="{Binding LauncherVersionText}"
                                FontFamily="{StaticResource MainFont}"
                                FontSize="12"
                                FontWeight="Normal"
                                Foreground="{StaticResource MuteBrush}" />
+                    <!-- Маленькая точка ember, пока есть обновление -->
+                    <Border Width="6" Height="6" CornerRadius="3"
+                            Background="{StaticResource EmberBrush}"
+                            Margin="6,0,0,0" VerticalAlignment="Center"
+                            Visibility="{Binding HasUpdateDot, Converter={StaticResource BoolToVis}}" />
                 </StackPanel>
             </Canvas>
 
@@ -341,6 +341,22 @@
             <!-- 2. GAME MENU & PLAYER INFO (LEFT SIDE)         -->
             <!-- ============================================== -->
             <Canvas Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">
+                <!-- Large Title "Aura" (Oswald 600 124px): x=50, y=44, shown only on Overview tab -->
+                <TextBlock Canvas.Left="50" Canvas.Top="44"
+                           Text="Aura"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="124"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource InkBrush}"
+                           LineHeight="116"
+                           LineStackingStrategy="BlockLineHeight"
+                           IsHitTestVisible="False"
+                           Visibility="{Binding IsOverviewActive, Converter={StaticResource BoolToVis}}">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    </TextBlock.Effect>
+                </TextBlock>
+
                 <!-- Game Menu (4 words: Играть, Лобби, Скин, Настройки):
                      x=50, bottom edge 128px from bottom (i.e. top = 620 - 128 - 4*50 = 292) -->
                 <StackPanel x:Name="GameMenuPanel"
@@ -451,31 +467,63 @@
                     </views:SettingsView.RenderTransform>
                 </views:SettingsView>
 
-                <!-- Floating update toast banner -->
-                <Border VerticalAlignment="Top" HorizontalAlignment="Right"
-                        Margin="0,8,0,0" Panel.ZIndex="100"
-                        Background="#E0071017" BorderBrush="{StaticResource EmberBrush}" BorderThickness="1"
-                        CornerRadius="3" Padding="14,10"
-                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="8" Height="8" CornerRadius="2" Background="{StaticResource EmberBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
-                            <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="{StaticResource InkBrush}" FontSize="13" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="{StaticResource DimInkBrush}" FontSize="11" Margin="0,2,0,0" />
+                <!-- Update Toast: правый нижний угол области контента, ширина 320px, сплошной фон #0F1B22, рамка 1px (белый 14%), слева полоса 3px ember, радиус 3px -->
+                <!-- Внутри заголовок «Вышло обновление beta 1.0.N» (Onest 600 15px), под ним «Обновление скачается...» (13px dim), кнопки «Обновить» (36px) и ссылка «Позже» -->
+                <Border x:Name="UpdateToastBorder"
+                        VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                        Width="320" Panel.ZIndex="100"
+                        Background="#0F1B22"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="ToastTransform" X="0" />
+                    </Border.RenderTransform>
+                    <Grid>
+                        <!-- Левая полоса 3px ember -->
+                        <Border HorizontalAlignment="Left" Width="3" Background="{StaticResource EmberBrush}" />
+
+                        <!-- Внутреннее содержимое с отступами -->
+                        <StackPanel Margin="16,14,14,14">
+                            <!-- Заголовок: Onest 600 15px -->
+                            <TextBlock Text="{Binding UpdateBannerTitle}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="SemiBold"
+                                       FontSize="15"
+                                       Foreground="{StaticResource InkBrush}"
+                                       TextWrapping="Wrap" />
+
+                            <!-- Описание: 13px dim -->
+                            <TextBlock Text="{Binding UpdateBannerMessage}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontWeight="Normal"
+                                       FontSize="13"
+                                       Foreground="{StaticResource DimInkBrush}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12" />
+
+                            <!-- Кнопки: «Обновить» (главная, маленькая 36px) и ссылка «Позже» -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Command="{Binding ApplyBannerUpdateCommand}"
+                                        IsEnabled="{Binding CanApplyUpdate}"
+                                        Style="{StaticResource PrimaryNeonBtn}"
+                                        Height="36" Padding="18,0" FontSize="14"
+                                        Content="{Binding UpdateBannerButtonText}"
+                                        Margin="0,0,14,0" VerticalAlignment="Center" />
+
+                                <TextBlock VerticalAlignment="Center">
+                                    <Hyperlink Command="{Binding DismissBannerCommand}"
+                                               Foreground="{StaticResource MuteBrush}"
+                                               TextDecorations="None">
+                                        <Run Text="Позже" FontFamily="{StaticResource MainFont}" FontSize="13" />
+                                    </Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
                         </StackPanel>
-
-                        <Button Command="{Binding ApplyBannerUpdateCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Height="30" Padding="12,0" FontSize="12"
-                                Content="{Binding UpdateBannerButtonText}"
-                                Margin="0,0,8,0" VerticalAlignment="Center" />
-
-                        <Button Command="{Binding DismissBannerCommand}"
-                                Style="{StaticResource WinCloseBtn}"
-                                Width="24" Height="24" FontSize="11"
-                                Content="✕" ToolTip="Закрыть"
-                                VerticalAlignment="Center" />
-                    </StackPanel>
+                    </Grid>
                 </Border>
             </Grid>
         </Grid>

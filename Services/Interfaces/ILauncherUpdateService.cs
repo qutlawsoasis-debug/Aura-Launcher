@@ -9,6 +9,7 @@ public enum LauncherUpdateStatus
 {
     NotInstalled,
     UpToDate,
+    UpdateAvailable,
     UpdatedRestarting,
     Skipped,
     Failed
@@ -34,5 +35,7 @@ public interface ILauncherUpdateService
 {
     bool IsInstalled { get; }
     string CurrentVersion { get; }
+    Task<string?> CheckForUpdatesAsync(CancellationToken ct = default);
+    Task<LauncherUpdateResult> DownloadAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default);
     Task<LauncherUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default);
 }

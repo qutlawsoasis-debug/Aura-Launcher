@@ -1242,4 +1242,195 @@ public static class SceneDiagnostics
 
         return isDefault100 && isDefaultNotMuted && mainVM.IsAnthemMuted;
     }
+
+    public static async Task<bool> RunFakeUpdateUiAsync(MainWindow window, string mode)
+    {
+        App.Log($"[FAKE-UPDATE-UI] Starting fake update UI mode: '{mode}'...");
+        await Task.Delay(1000);
+
+        string shotsDir = ResolveShotsDir();
+        var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+        var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+        try { Directory.CreateDirectory(repoShotsDir); } catch { }
+
+        var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+        if (mainVm == null) return false;
+
+        void SaveShot(string fileName)
+        {
+            string path = Path.Combine(shotsDir, fileName);
+            CaptureWindowToPng(window, path);
+            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
+            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+        }
+
+        void SaveWindowShot(Window targetWin, string fileName)
+        {
+            string path = Path.Combine(shotsDir, fileName);
+            CaptureWindowToPng(targetWin, path);
+            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
+            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+        }
+
+        if (mode.Equals("toast", StringComparison.OrdinalIgnoreCase))
+        {
+            // Показываем тост
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.HasUpdateDot = true;
+                mainVm.UpdateBannerTitle = "Вышло обновление beta 1.0.10";
+                mainVm.UpdateBannerButtonText = "Обновить";
+                mainVm.IsUpdateBannerVisible = true;
+                window.AnimateToastEntrance();
+            });
+            await Task.Delay(600);
+            SaveShot("update_toast.png");
+            App.Log("[FAKE-UPDATE-UI] Saved update_toast.png");
+            return true;
+        }
+
+        // Для оконных состояний: checking, downloading (63%), error, animation
+        UpdateWindowViewModel? updateVm = null;
+        UpdateWindow? updateWin = null;
+
+        window.Dispatcher.Invoke(() =>
+        {
+            updateVm = new UpdateWindowViewModel(
+                App.Services.GetRequiredService<ILauncherUpdateService>(),
+                onCloseRequested: () => { },
+                onRestoreMainWindow: () => { window.Show(); });
+            
+            updateWin = new UpdateWindow
+            {
+                DataContext = updateVm
+            };
+            window.Hide();
+            updateWin.Show();
+        });
+
+        if (updateVm == null || updateWin == null) return false;
+
+        await Task.Delay(500);
+
+        if (mode.Equals("checking", StringComparison.OrdinalIgnoreCase))
+        {
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("checking"));
+            await Task.Delay(300);
+            SaveWindowShot(updateWin, "update_checking.png");
+            App.Log("[FAKE-UPDATE-UI] Saved update_checking.png");
+            return true;
+        }
+        else if (mode.Equals("downloading", StringComparison.OrdinalIgnoreCase))
+        {
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("downloading"));
+            await Task.Delay(300);
+            SaveWindowShot(updateWin, "update_downloading_63.png");
+            App.Log("[FAKE-UPDATE-UI] Saved update_downloading_63.png");
+            return true;
+        }
+        else if (mode.Equals("error", StringComparison.OrdinalIgnoreCase))
+        {
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("error"));
+            await Task.Delay(300);
+            SaveWindowShot(updateWin, "update_error.png");
+            App.Log("[FAKE-UPDATE-UI] Saved update_error.png");
+            return true;
+        }
+        else if (mode.Equals("animation", StringComparison.OrdinalIgnoreCase))
+        {
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("checking"));
+            await Task.Delay(300);
+            await RecordUpdateLogoAnimationAsync(updateWin, "update_logo_animation.gif");
+            App.Log("[FAKE-UPDATE-UI] Saved update_logo_animation.gif");
+            return true;
+        }
+        else if (mode.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            // 1. Toast
+            window.Dispatcher.Invoke(() =>
+            {
+                updateWin.Hide();
+                window.Show();
+                mainVm.HasUpdateDot = true;
+                mainVm.UpdateBannerTitle = "Вышло обновление beta 1.0.10";
+                mainVm.UpdateBannerButtonText = "Обновить";
+                mainVm.IsUpdateBannerVisible = true;
+                window.AnimateToastEntrance();
+            });
+            await Task.Delay(600);
+            SaveShot("update_toast.png");
+
+            // 2. Checking
+            window.Dispatcher.Invoke(() =>
+            {
+                window.Hide();
+                updateWin.Show();
+                updateVm.SetFakeState("checking");
+            });
+            await Task.Delay(400);
+            SaveWindowShot(updateWin, "update_checking.png");
+
+            // 3. Downloading 63%
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("downloading"));
+            await Task.Delay(400);
+            SaveWindowShot(updateWin, "update_downloading_63.png");
+
+            // 4. Error with countdown
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("error"));
+            await Task.Delay(400);
+            SaveWindowShot(updateWin, "update_error.png");
+
+            // 5. 3-4s animation GIF
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("checking"));
+            await Task.Delay(300);
+            await RecordUpdateLogoAnimationAsync(updateWin, "update_logo_animation.gif");
+
+            return true;
+        }
+
+        return false;
+    }
+
+    public static async Task<bool> RecordUpdateLogoAnimationAsync(Window updateWin, string gifFileName)
+    {
+        try
+        {
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+
+            var frameBitmaps = new List<RenderTargetBitmap>();
+
+            // Запись 3.6 секунды: 24 кадра с интервалом 150 мс (ровно 3 полных круга по 8 кадров/1.2 с)
+            for (int i = 0; i < 24; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(updateWin));
+                await Task.Delay(150);
+            }
+
+            string targetPath = Path.Combine(shotsDir, gifFileName);
+            updateWin.Dispatcher.Invoke(() =>
+            {
+                var encoder = new GifBitmapEncoder();
+                foreach (var rtb in frameBitmaps)
+                {
+                    encoder.Frames.Add(BitmapFrame.Create(rtb));
+                }
+                using var fs = File.Create(targetPath);
+                encoder.Save(fs);
+            });
+
+            try { File.Copy(targetPath, Path.Combine(repoShotsDir, gifFileName), true); } catch { }
+            try { File.Copy(targetPath, Path.Combine(brainDir, gifFileName), true); } catch { }
+
+            App.Log($"[RECORDING] Saved update logo animation to {targetPath}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[RECORDING: ERROR] {ex}");
+            return false;
+        }
+    }
 }

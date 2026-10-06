@@ -102,8 +102,23 @@ try {
 
     Write-Host "Step 2: Packaging release with Velopack vpk CLI..." -ForegroundColor Yellow
     $iconPath = Join-Path $repoRoot "app_icon.ico"
+    $splashPath = Join-Path $repoRoot "splash.png"
+    $vpkArgs = @(
+        "pack",
+        "-u", "AuraLauncher",
+        "-v", $Version,
+        "-p", $tempPublishDir,
+        "-e", "AuraLauncher.exe",
+        "--packTitle", "Aura",
+        "-i", $iconPath,
+        "-r", "win-x64",
+        "-o", $OutDir
+    )
+    if (Test-Path $splashPath) {
+        $vpkArgs += @("-s", $splashPath)
+    }
     
-    & dotnet vpk pack -u AuraLauncher -v $Version -p $tempPublishDir -e AuraLauncher.exe --packTitle "Aura" -i $iconPath -r win-x64 -o $OutDir
+    & dotnet vpk @vpkArgs
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet vpk pack failed with exit code $LASTEXITCODE"
     }

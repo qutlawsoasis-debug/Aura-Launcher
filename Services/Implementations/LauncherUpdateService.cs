@@ -19,6 +19,7 @@ public class LauncherUpdateService : ILauncherUpdateService
     private readonly UpdateManager _updateManager;
     private readonly string? _overrideSource;
     private readonly bool? _isInstalledOverride;
+    private UpdateInfo? _lastUpdateInfo;
 
     public bool IsInstalled => _isInstalledOverride ?? _updateManager.IsInstalled;
 
@@ -82,39 +83,76 @@ public class LauncherUpdateService : ILauncherUpdateService
         return null;
     }
 
-    public async Task<LauncherUpdateResult> CheckAndApplyAsync(
+    public async Task<string?> CheckForUpdatesAsync(CancellationToken ct = default)
+    {
+        if (!IsInstalled)
+        {
+            FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Лаунчер запущен не через Velopack (портативный/IDE режим). Пропуск проверки.");
+            return null;
+        }
+
+        try
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Проверка наличия обновлений лаунчера (источник: {_overrideSource ?? DefaultLauncherRepoUrl})...");
+            var updateInfo = await _updateManager.CheckForUpdatesAsync().WaitAsync(ct).ConfigureAwait(false);
+            _lastUpdateInfo = updateInfo;
+
+            if (updateInfo == null)
+            {
+                FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Установлена последняя версия лаунчера.");
+                return null;
+            }
+
+            var targetVersion = updateInfo.TargetFullRelease?.Version?.ToFullString() ?? "новая версия";
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Найдено обновление лаунчера: {targetVersion}");
+            return targetVersion;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: ERROR] Ошибка при проверке обновлений: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<LauncherUpdateResult> DownloadAndApplyAsync(
         IProgress<DownloadProgressReport>? progress = null, 
         CancellationToken ct = default)
     {
         if (!IsInstalled)
         {
-            FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Лаунчер запущен не через Velopack (портативный/IDE режим). Пропуск проверки.");
             return new LauncherUpdateResult(LauncherUpdateStatus.NotInstalled, "Лаунчер запущен в портативном режиме");
         }
 
         if (_launchService.IsGameRunning)
         {
-            FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Игра сейчас запущена. Проверка обновления лаунчера отложена.");
+            FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Игра сейчас запущена. Обновление лаунчера отложено.");
             return new LauncherUpdateResult(LauncherUpdateStatus.Skipped, "Игра запущена, обновление отложено");
         }
 
         try
         {
-            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Проверка обновлений лаунчера (источник: {_overrideSource ?? DefaultLauncherRepoUrl})...");
-            var updateInfo = await _updateManager.CheckForUpdatesAsync().WaitAsync(ct).ConfigureAwait(false);
+            var updateInfo = _lastUpdateInfo;
             if (updateInfo == null)
             {
-                FabricGameLaunchService.LogLauncherEvent("[LAUNCHER-UPDATE] Установлена последняя версия лаунчера.");
+                updateInfo = await _updateManager.CheckForUpdatesAsync().WaitAsync(ct).ConfigureAwait(false);
+                _lastUpdateInfo = updateInfo;
+            }
+
+            if (updateInfo == null)
+            {
                 return new LauncherUpdateResult(LauncherUpdateStatus.UpToDate, "Установлена последняя версия лаунчера");
             }
 
             var targetVersion = updateInfo.TargetFullRelease?.Version?.ToFullString() ?? "новая версия";
-            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Найдено обновление лаунчера: {targetVersion}");
 
             progress?.Report(new DownloadProgressReport
             {
                 Percentage = 0,
-                StatusText = "Обновление лаунчера: 0%"
+                StatusText = "Скачиваем обновление… 0%"
             });
 
             await _updateManager.DownloadUpdatesAsync(updateInfo, percent =>
@@ -122,7 +160,7 @@ public class LauncherUpdateService : ILauncherUpdateService
                 progress?.Report(new DownloadProgressReport
                 {
                     Percentage = percent,
-                    StatusText = $"Обновление лаунчера: {percent}%"
+                    StatusText = $"Скачиваем обновление… {percent}%"
                 });
             }, ct).ConfigureAwait(false);
 
@@ -146,8 +184,21 @@ public class LauncherUpdateService : ILauncherUpdateService
         }
         catch (Exception ex)
         {
-            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: ERROR] Ошибка обновления лаунчера: {ex.Message}");
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: ERROR] Ошибка применения обновления: {ex.Message}");
             return new LauncherUpdateResult(LauncherUpdateStatus.Failed, $"Ошибка обновления лаунчера: {ex.Message}");
         }
+    }
+
+    public async Task<LauncherUpdateResult> CheckAndApplyAsync(
+        IProgress<DownloadProgressReport>? progress = null, 
+        CancellationToken ct = default)
+    {
+        var newVer = await CheckForUpdatesAsync(ct).ConfigureAwait(false);
+        if (newVer == null)
+        {
+            return new LauncherUpdateResult(LauncherUpdateStatus.UpToDate, "Установлена последняя версия лаунчера");
+        }
+
+        return await DownloadAndApplyAsync(progress, ct).ConfigureAwait(false);
     }
 }

@@ -52,6 +52,9 @@ public class MainViewModel : ObservableObject
     private string _updateBannerMessage = string.Empty;
     private string _updateBannerButtonText = string.Empty;
     private bool _isLauncherUpdatePending;
+    private bool _hasUpdateDot;
+    private bool _isToastDismissedForSession;
+    private string? _pendingNewVersion;
 
     public OverviewViewModel OverviewVM { get; }
     public SettingsViewModel SettingsVM { get; }
@@ -203,8 +206,11 @@ public class MainViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(LaunchButtonText));
                 OnPropertyChanged(nameof(AllocatedRamText));
+                OnPropertyChanged(nameof(CanApplyUpdate));
+                OnPropertyChanged(nameof(UpdateBannerMessage));
                 LaunchOrCancelCommand.RaiseCanExecuteChanged();
                 LaunchGameCommand.RaiseCanExecuteChanged();
+                ApplyBannerUpdateCommand?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -249,7 +255,7 @@ public class MainViewModel : ObservableObject
 
     public ObservableCollection<string> GameLogs { get; } = new();
 
-    // Свойства баннера обновлений
+    // Свойства баннера обновлений / тоста
     public bool IsUpdateBannerVisible
     {
         get => _isUpdateBannerVisible;
@@ -264,15 +270,36 @@ public class MainViewModel : ObservableObject
 
     public string UpdateBannerMessage
     {
-        get => _updateBannerMessage;
+        get
+        {
+            if (IsGameRunning)
+            {
+                return "Обновление скачается и лаунчер перезапустится. Сначала закройте игру";
+            }
+            if (LobbyVM != null && LobbyVM.IsLobbyCreated)
+            {
+                return "Обновление скачается и лаунчер перезапустится. Лобби закроется";
+            }
+            return !string.IsNullOrWhiteSpace(_updateBannerMessage) 
+                ? _updateBannerMessage 
+                : "Обновление скачается и лаунчер перезапустится.";
+        }
         set => SetProperty(ref _updateBannerMessage, value);
     }
 
     public string UpdateBannerButtonText
     {
-        get => _updateBannerButtonText;
+        get => !string.IsNullOrWhiteSpace(_updateBannerButtonText) ? _updateBannerButtonText : "Обновить";
         set => SetProperty(ref _updateBannerButtonText, value);
     }
+
+    public bool HasUpdateDot
+    {
+        get => _hasUpdateDot;
+        set => SetProperty(ref _hasUpdateDot, value);
+    }
+
+    public bool CanApplyUpdate => !IsGameRunning;
 
     public string LauncherVersionText
     {
@@ -376,6 +403,13 @@ public class MainViewModel : ObservableObject
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
         LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService);
+        LobbyVM.PropertyChanged += (s, e) =>
+        {
+            if (e.PropertyName == nameof(LobbyViewModel.IsLobbyCreated))
+            {
+                OnPropertyChanged(nameof(UpdateBannerMessage));
+            }
+        };
         AnthemService = anthemService;
 
         ToggleMuteCommand = new RelayCommand(_ =>
@@ -435,16 +469,19 @@ public class MainViewModel : ObservableObject
 
         DismissBannerCommand = new RelayCommand(_ =>
         {
+            _isToastDismissedForSession = true;
             IsUpdateBannerVisible = false;
         });
 
         ApplyBannerUpdateCommand = new AsyncRelayCommand(async () =>
         {
+            if (IsGameRunning) return;
             IsUpdateBannerVisible = false;
+
             if (_isLauncherUpdatePending)
             {
-                // Для лаунчера вызываем проверку/применение обновления лаунчера
-                await CheckUpdatesAsync(isStartup: false);
+                // Открываем отдельное окно обновления лаунчера
+                OpenUpdateWindow();
             }
             else
             {
@@ -793,36 +830,33 @@ public class MainViewModel : ObservableObject
         // 1. Сначала обновление лаунчера через Velopack
         try
         {
-            if (!isStartup)
+            if (_launcherUpdateService.IsInstalled)
             {
-                SetLauncherState(LauncherState.Checking, "Проверка обновлений лаунчера...");
-            }
+                var newVersion = await _launcherUpdateService.CheckForUpdatesAsync(CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(newVersion))
+                {
+                    _isLauncherUpdatePending = true;
+                    _pendingNewVersion = newVersion;
+                    HasUpdateDot = true;
 
-            var launcherProgress = new Progress<DownloadProgressReport>(report =>
-            {
-                IsProgressVisible = true;
-                SetLauncherState(LauncherState.Downloading, report.StatusText);
-                ProgressPercentage = report.Percentage;
-                SpeedText = string.Empty;
-                RemainingTimeText = string.Empty;
-                StatusText = report.StatusText;
-            });
+                    if (!_isToastDismissedForSession)
+                    {
+                        var parts = newVersion.Split('.');
+                        string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
+                            ? $"beta 1.0.{patch - 8}"
+                            : newVersion;
 
-            var launcherResult = await _launcherUpdateService.CheckAndApplyAsync(launcherProgress, CancellationToken.None);
-            if (launcherResult.Status == LauncherUpdateStatus.UpdatedRestarting)
-            {
-                IsProgressVisible = false;
-                SetLauncherState(LauncherState.Ready, launcherResult.Message);
-                return;
+                        UpdateBannerTitle = $"Вышло обновление {displayVer}";
+                        UpdateBannerButtonText = "Обновить";
+                        OnPropertyChanged(nameof(UpdateBannerMessage));
+                        IsUpdateBannerVisible = true;
+                    }
+                }
             }
         }
         catch (Exception ex)
         {
             FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: UNHANDLED] {ex.Message}");
-        }
-        finally
-        {
-            IsProgressVisible = false;
         }
 
         // 2. Затем обновление сборки модов
@@ -919,7 +953,7 @@ public class MainViewModel : ObservableObject
         _backgroundUpdateTimer?.Stop();
         _backgroundUpdateTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMinutes(15)
+            Interval = TimeSpan.FromMinutes(30)
         };
         _backgroundUpdateTimer.Tick += async (s, e) =>
         {
@@ -930,7 +964,7 @@ public class MainViewModel : ObservableObject
 
     public async Task CheckBackgroundUpdatesAsync()
     {
-        if (IsBusy || IsGameRunning || _isLaunching)
+        if (IsBusy || _isLaunching)
         {
             return;
         }
@@ -940,17 +974,25 @@ public class MainViewModel : ObservableObject
             // 1. Проверяем обновление лаунчера
             if (_launcherUpdateService.IsInstalled)
             {
-                var launcherResult = await _launcherUpdateService.CheckAndApplyAsync(null, CancellationToken.None);
-                if (launcherResult.Status == LauncherUpdateStatus.UpdatedRestarting)
+                var newVersion = await _launcherUpdateService.CheckForUpdatesAsync(CancellationToken.None);
+                if (!string.IsNullOrWhiteSpace(newVersion))
                 {
-                    // Обновление скачано и готово к перезапуску
                     _isLauncherUpdatePending = true;
-                    UpdateBannerTitle = "Обновление лаунчера";
-                    UpdateBannerMessage = string.IsNullOrWhiteSpace(launcherResult.NewVersion)
-                        ? "Доступна новая версия лаунчера. Нажмите для перезапуска."
-                        : $"Доступна версия {launcherResult.NewVersion}. Нажмите для перезапуска.";
-                    UpdateBannerButtonText = "ПЕРЕЗАПУСТИТЬ";
-                    IsUpdateBannerVisible = true;
+                    _pendingNewVersion = newVersion;
+                    HasUpdateDot = true;
+
+                    if (!_isToastDismissedForSession)
+                    {
+                        var parts = newVersion.Split('.');
+                        string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
+                            ? $"beta 1.0.{patch - 8}"
+                            : newVersion;
+
+                        UpdateBannerTitle = $"Вышло обновление {displayVer}";
+                        UpdateBannerButtonText = "Обновить";
+                        OnPropertyChanged(nameof(UpdateBannerMessage));
+                        IsUpdateBannerVisible = true;
+                    }
                     return;
                 }
             }
@@ -993,5 +1035,34 @@ public class MainViewModel : ObservableObject
         {
             // Фоновая проверка не должна мешать пользователю
         }
+    }
+
+    public void OpenUpdateWindow()
+    {
+        var mainWin = System.Windows.Application.Current.MainWindow;
+        var updateVm = new UpdateWindowViewModel(
+            _launcherUpdateService,
+            onCloseRequested: () => { },
+            onRestoreMainWindow: () =>
+            {
+                if (mainWin != null)
+                {
+                    mainWin.Show();
+                    mainWin.Activate();
+                }
+            });
+
+        var updateWin = new Views.UpdateWindow
+        {
+            DataContext = updateVm
+        };
+
+        if (mainWin != null)
+        {
+            mainWin.Hide();
+        }
+
+        updateWin.Show();
+        _ = updateVm.StartUpdateFlowAsync();
     }
 }

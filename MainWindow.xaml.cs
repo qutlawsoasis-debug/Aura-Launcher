@@ -43,10 +43,48 @@ public partial class MainWindow : Window
                 {
                     UpdateScreenOverlay(vm.IsOverviewActive);
                 }
+                else if (args.PropertyName == nameof(MainViewModel.IsUpdateBannerVisible))
+                {
+                    if (vm.IsUpdateBannerVisible)
+                    {
+                        AnimateToastEntrance();
+                    }
+                }
             };
             TransitionToTab(vm.CurrentTabName, animate: false);
             UpdateScreenOverlay(vm.IsOverviewActive);
+            if (vm.IsUpdateBannerVisible)
+            {
+                AnimateToastEntrance();
+            }
         }
+    }
+
+    public void AnimateToastEntrance()
+    {
+        if (UpdateToastBorder == null || ToastTransform == null) return;
+
+        UpdateToastBorder.Opacity = 0.0;
+        ToastTransform.X = 16.0;
+
+        var sb = new Storyboard();
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(240))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(fadeIn, UpdateToastBorder);
+        Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(fadeIn);
+
+        var slideIn = new DoubleAnimation(16.0, 0.0, TimeSpan.FromMilliseconds(240))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(slideIn, ToastTransform);
+        Storyboard.SetTargetProperty(slideIn, new PropertyPath(TranslateTransform.XProperty));
+        sb.Children.Add(slideIn);
+
+        sb.Begin();
     }
 
     public void TransitionToTab(string tabName, bool animate = true)

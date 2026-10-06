@@ -21,27 +21,13 @@
         <!-- Main StackPanel anchored to the bottom-left of the content area -->
         <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Focusable="False" FocusVisualStyle="{x:Null}">
             
-            <!-- 1) Line "Minecraft 1.20.1, Fabric 0.19.5, 61 мод" 15px dim, Margin снизу 12 -->
+            <!-- 1) Line "Minecraft 1.20.1, Fabric 0.19.5, 61 мод" 15px dim, Margin снизу 12 (прямо над кнопкой «Играть») -->
             <TextBlock Text="{Binding SpecLine}"
                        FontFamily="{StaticResource MainFont}"
                        FontSize="15"
                        FontWeight="Normal"
                        Foreground="{StaticResource DimInkBrush}"
                        Margin="0,0,0,12">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
-                </TextBlock.Effect>
-            </TextBlock>
-
-            <!-- 2) Title "Aura" Oswald 600 124px, LineHeight 116, Margin снизу 20 (не пересекаются) -->
-            <TextBlock Text="Aura"
-                       FontFamily="{StaticResource HeadingFont}"
-                       FontSize="124"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource InkBrush}"
-                       LineHeight="116"
-                       LineStackingStrategy="BlockLineHeight"
-                       Margin="0,0,0,20">
                 <TextBlock.Effect>
                     <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>

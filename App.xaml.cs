@@ -63,12 +63,27 @@ public partial class App : Application
             }
         }
 
+        string? fakeUpdateUiMode = null;
+        for (int i = 0; i < e.Args.Length; i++)
+        {
+            if (e.Args[i].StartsWith("--fake-update-ui=", StringComparison.OrdinalIgnoreCase))
+            {
+                fakeUpdateUiMode = e.Args[i].Substring("--fake-update-ui=".Length);
+                break;
+            }
+            if (e.Args[i].Equals("--fake-update-ui", StringComparison.OrdinalIgnoreCase) && i < e.Args.Length - 1)
+            {
+                fakeUpdateUiMode = e.Args[i + 1];
+                break;
+            }
+        }
+
         bool isKillPlayitTest = Array.Exists(e.Args, a => a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
         bool isLobbyTest = Array.Exists(e.Args, a => a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase));
         bool isLifecycleTest = Array.Exists(e.Args, a => a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase));
         bool isAnthemTest = Array.Exists(e.Args, a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase));
         bool isRapidNavTest = Array.Exists(e.Args, a => a.Equals("--selftest-rapid", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || Array.Exists(e.Args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -145,8 +160,19 @@ public partial class App : Application
         }
         catch { }
 
-        // Проверка режима самодиагностики (--capture-shots, --selftest-kill-playit, --selftest-lobby, --selftest или --selftest-shots)
-        if (!string.IsNullOrWhiteSpace(captureShotsPrefix))
+        if (!string.IsNullOrWhiteSpace(fakeUpdateUiMode))
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunFakeUpdateUiAsync(mainWindow, fakeUpdateUiMode);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
+        else if (!string.IsNullOrWhiteSpace(captureShotsPrefix))
         {
             _ = Task.Run(async () =>
             {
