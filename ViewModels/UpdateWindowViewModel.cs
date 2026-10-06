@@ -16,7 +16,6 @@ public class UpdateWindowViewModel : ObservableObject
 
     private string _statusText = "Проверяем обновления…";
     private double _progressValue = 0;
-    private bool _isProgressIndeterminate = false;
     private bool _hasError = false;
     private int _retryCountdown = 30;
     private int _failedAttempts = 0;
@@ -24,6 +23,7 @@ public class UpdateWindowViewModel : ObservableObject
     private bool _isRetrying = false;
     private System.Windows.Threading.DispatcherTimer? _retryTimer;
     private CancellationTokenSource? _updateCts;
+    private string _versionTransitionText = "beta 1.0.12 → beta 1.0.13";
 
     public string StatusText
     {
@@ -31,22 +31,36 @@ public class UpdateWindowViewModel : ObservableObject
         set => SetProperty(ref _statusText, value);
     }
 
+    public string VersionTransitionText
+    {
+        get => _versionTransitionText;
+        set => SetProperty(ref _versionTransitionText, value);
+    }
+
     public double ProgressValue
     {
         get => _progressValue;
-        set => SetProperty(ref _progressValue, value);
+        set
+        {
+            if (SetProperty(ref _progressValue, value))
+            {
+                OnPropertyChanged(nameof(HasDefiniteProgress));
+            }
+        }
     }
 
-    public bool IsProgressIndeterminate
-    {
-        get => _isProgressIndeterminate;
-        set => SetProperty(ref _isProgressIndeterminate, value);
-    }
+    public bool HasDefiniteProgress => ProgressValue > 0 && ProgressValue <= 100 && !HasError;
 
     public bool HasError
     {
         get => _hasError;
-        set => SetProperty(ref _hasError, value);
+        set
+        {
+            if (SetProperty(ref _hasError, value))
+            {
+                OnPropertyChanged(nameof(HasDefiniteProgress));
+            }
+        }
     }
 
     public int RetryCountdown
@@ -75,14 +89,50 @@ public class UpdateWindowViewModel : ObservableObject
     public UpdateWindowViewModel(
         ILauncherUpdateService launcherUpdateService,
         Action onCloseRequested,
-        Action onRestoreMainWindow)
+        Action onRestoreMainWindow,
+        string? targetVersion = null)
     {
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
         _onCloseRequested = onCloseRequested ?? throw new ArgumentNullException(nameof(onCloseRequested));
         _onRestoreMainWindow = onRestoreMainWindow ?? throw new ArgumentNullException(nameof(onRestoreMainWindow));
 
+        FormatVersionTransition(targetVersion);
+
         RetryNowCommand = new RelayCommand(_ => RetryNow());
         LaunchCurrentVersionCommand = new RelayCommand(_ => LaunchCurrentVersion());
+    }
+
+    private void FormatVersionTransition(string? targetVersion)
+    {
+        string curVer = "beta 1.0.12";
+        try
+        {
+            var cur = _launcherUpdateService.CurrentVersion;
+            var parts = cur.Split('.');
+            if (parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8)
+            {
+                // Если сборка уже 1.2.21 (beta 1.0.13), для окна обновления текущая версия до обновления - это beta 1.0.12
+                int currentPatch = patch > 20 ? patch - 9 : patch - 8;
+                curVer = $"beta 1.0.{currentPatch}";
+            }
+        }
+        catch { }
+
+        string newVer = "beta 1.0.13";
+        if (!string.IsNullOrWhiteSpace(targetVersion))
+        {
+            var parts = targetVersion.Split('.');
+            if (parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8)
+            {
+                newVer = $"beta 1.0.{patch - 8}";
+            }
+            else
+            {
+                newVer = targetVersion;
+            }
+        }
+
+        VersionTransitionText = $"{curVer} → {newVer}";
     }
 
     public async Task StartUpdateFlowAsync()
@@ -101,7 +151,7 @@ public class UpdateWindowViewModel : ObservableObject
 
         try
         {
-            await Task.Delay(400, ct); // Небольшая пауза для читаемости статуса
+            await Task.Delay(400, ct);
 
             var progress = new Progress<DownloadProgressReport>(report =>
             {
@@ -109,7 +159,7 @@ public class UpdateWindowViewModel : ObservableObject
                 ProgressValue = report.Percentage;
                 if (report.Percentage < 100)
                 {
-                    StatusText = $"Скачиваем обновление… {report.Percentage:F0}%";
+                    StatusText = $"Скачиваем… {report.Percentage:F0}%";
                 }
                 else
                 {
@@ -124,7 +174,6 @@ public class UpdateWindowViewModel : ObservableObject
                 ProgressValue = 100;
                 StatusText = "Запускаем Aura…";
                 await Task.Delay(800, ct);
-                // Velopack сам перезапустит приложение
             }
             else if (result.Status == LauncherUpdateStatus.UpToDate)
             {
@@ -220,7 +269,7 @@ public class UpdateWindowViewModel : ObservableObject
                 break;
             case "downloading":
                 HasError = false;
-                StatusText = "Скачиваем обновление… 63%";
+                StatusText = "Скачиваем… 63%";
                 ProgressValue = 63;
                 break;
             case "installing":

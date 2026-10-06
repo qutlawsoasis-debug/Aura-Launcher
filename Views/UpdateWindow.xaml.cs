@@ -1,81 +1,127 @@
 using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Shapes;
-using System.Windows.Threading;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using AuraLauncher.ViewModels;
 
 namespace AuraLauncher.Views;
 
 public partial class UpdateWindow : Window
 {
-    private DispatcherTimer? _stepTimer;
-    private int _stepIndex = 0;
-    private readonly Rectangle[] _dots;
+    private Storyboard? _slidingStoryboard;
 
     public UpdateWindow()
     {
         InitializeComponent();
-        _dots = new[] { Dot0, Dot1, Dot2, Dot3, Dot4, Dot5, Dot6, Dot7 };
-
         Loaded += UpdateWindow_Loaded;
-        Unloaded += UpdateWindow_Unloaded;
+        DataContextChanged += UpdateWindow_DataContextChanged;
+    }
+
+    private void UpdateWindow_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is INotifyPropertyChanged oldVm)
+        {
+            oldVm.PropertyChanged -= Vm_PropertyChanged;
+        }
+        if (e.NewValue is UpdateWindowViewModel newVm)
+        {
+            newVm.PropertyChanged += Vm_PropertyChanged;
+            UpdateProgressAnimation(newVm);
+        }
+    }
+
+    private void Vm_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (DataContext is UpdateWindowViewModel vm)
+        {
+            if (e.PropertyName == nameof(UpdateWindowViewModel.ProgressValue) ||
+                e.PropertyName == nameof(UpdateWindowViewModel.HasDefiniteProgress) ||
+                e.PropertyName == nameof(UpdateWindowViewModel.HasError))
+            {
+                UpdateProgressAnimation(vm);
+            }
+        }
     }
 
     private void UpdateWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        StartSteppingAnimation();
-    }
-
-    private void UpdateWindow_Unloaded(object sender, RoutedEventArgs e)
-    {
-        StopSteppingAnimation();
-    }
-
-    public void StartSteppingAnimation()
-    {
-        StopSteppingAnimation();
-
-        // 8 кадров за 1.2 с -> 1200 / 8 = 150 мс на шаг
-        _stepTimer = new DispatcherTimer(DispatcherPriority.Render)
+        if (DataContext is UpdateWindowViewModel vm)
         {
-            Interval = TimeSpan.FromMilliseconds(150)
-        };
-        _stepTimer.Tick += (s, e) =>
+            UpdateProgressAnimation(vm);
+        }
+        else
         {
-            _stepIndex = (_stepIndex + 1) % 8;
-            UpdateDotsBrightness(_stepIndex);
-        };
-        _stepTimer.Start();
-        UpdateDotsBrightness(_stepIndex);
-    }
-
-    public void StopSteppingAnimation()
-    {
-        _stepTimer?.Stop();
-        _stepTimer = null;
-    }
-
-    private void UpdateDotsBrightness(int activeHead)
-    {
-        // 8 квадратов по кругу: ступенчатая бегущая яркость в стиле блоков
-        // activeHead = 1.0 (самый яркий), хвост затухает ступенчато
-        for (int i = 0; i < 8; i++)
-        {
-            int dist = (activeHead - i + 8) % 8;
-            double opacity = dist switch
-            {
-                0 => 1.0,
-                1 => 0.75,
-                2 => 0.50,
-                3 => 0.30,
-                _ => 0.12
-            };
-            _dots[i].Opacity = opacity;
+            StartSlidingAnimation();
         }
     }
 
-    private void Border_MouseDown(object sender, MouseButtonEventArgs e)
+    private void UpdateProgressAnimation(UpdateWindowViewModel vm)
     {
+        if (vm.HasError)
+        {
+            StopSlidingAnimation();
+            DefiniteProgressBar.BeginAnimation(FrameworkElement.WidthProperty, null);
+            DefiniteProgressBar.Width = 0;
+            return;
+        }
+
+        if (vm.HasDefiniteProgress)
+        {
+            StopSlidingAnimation();
+            double targetWidth = Math.Clamp((vm.ProgressValue / 100.0) * 440.0, 0, 440.0);
+            
+            // Плавное заполнение за 200 мс
+            var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            DefiniteProgressBar.BeginAnimation(FrameworkElement.WidthProperty, anim);
+        }
+        else
+        {
+            DefiniteProgressBar.BeginAnimation(FrameworkElement.WidthProperty, null);
+            DefiniteProgressBar.Width = 0;
+            StartSlidingAnimation();
+        }
+    }
+
+    private void StartSlidingAnimation()
+    {
+        if (_slidingStoryboard != null) return;
+
+        // По линии скользит отрезок 120px, 2 с, EaseInOut, цикл
+        SlidingChunk.Width = 120;
+        var anim = new DoubleAnimation
+        {
+            From = -120.0,
+            To = 440.0,
+            Duration = TimeSpan.FromSeconds(2),
+            RepeatBehavior = RepeatBehavior.Forever,
+            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        Storyboard.SetTarget(anim, ChunkTranslate);
+        Storyboard.SetTargetProperty(anim, new PropertyPath(TranslateTransform.XProperty));
+
+        _slidingStoryboard = new Storyboard();
+        _slidingStoryboard.Children.Add(anim);
+        _slidingStoryboard.Begin();
+    }
+
+    private void StopSlidingAnimation()
+    {
+        if (_slidingStoryboard != null)
+        {
+            _slidingStoryboard.Stop();
+            _slidingStoryboard = null;
+        }
+    }
+
+    private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        // Перетаскивание за любое место окна
         if (e.ChangedButton == MouseButton.Left)
         {
             try

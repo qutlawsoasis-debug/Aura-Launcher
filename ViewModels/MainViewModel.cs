@@ -1079,7 +1079,8 @@ public class MainViewModel : ObservableObject
                     mainWin.Show();
                     mainWin.Activate();
                 }
-            });
+            },
+            targetVersion: _pendingNewVersion);
 
         var updateWin = new Views.UpdateWindow
         {

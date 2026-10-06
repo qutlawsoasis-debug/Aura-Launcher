@@ -173,8 +173,8 @@ public class LauncherUpdateService : ILauncherUpdateService
             // Убеждаемся, что конфиг сохранён перед рестартом
             await _configService.SaveConfigAsync(_configService.CurrentConfig, ct).ConfigureAwait(false);
 
-            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Применение обновления и перезапуск лаунчера (версия {targetVersion})...");
-            _updateManager.ApplyUpdatesAndRestart(updateInfo, new[] { "--updated-restart" });
+            FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Применение обновления (silent=true) и перезапуск лаунчера (версия {targetVersion})...");
+            _updateManager.WaitExitThenApplyUpdates(updateInfo, silent: true, restart: true, restartArgs: new[] { "--updated-restart" });
 
             return new LauncherUpdateResult(LauncherUpdateStatus.UpdatedRestarting, "Лаунчер обновляется и перезапускается...", targetVersion);
         }

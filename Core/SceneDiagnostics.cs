@@ -1379,8 +1379,17 @@ public static class SceneDiagnostics
         {
             window.Dispatcher.Invoke(() => updateVm.SetFakeState("downloading"));
             await Task.Delay(300);
+            SaveWindowShot(updateWin, "update_downloading.png");
             SaveWindowShot(updateWin, "update_downloading_63.png");
-            App.Log("[FAKE-UPDATE-UI] Saved update_downloading_63.png");
+            App.Log("[FAKE-UPDATE-UI] Saved update_downloading.png");
+            return true;
+        }
+        else if (mode.Equals("installing", StringComparison.OrdinalIgnoreCase))
+        {
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("installing"));
+            await Task.Delay(300);
+            SaveWindowShot(updateWin, "update_installing.png");
+            App.Log("[FAKE-UPDATE-UI] Saved update_installing.png");
             return true;
         }
         else if (mode.Equals("error", StringComparison.OrdinalIgnoreCase))
@@ -1407,7 +1416,7 @@ public static class SceneDiagnostics
                 updateWin.Hide();
                 window.Show();
                 mainVm.HasUpdateDot = true;
-                mainVm.UpdateBannerTitle = "Вышло обновление beta 1.0.10";
+                mainVm.UpdateBannerTitle = "Вышло обновление beta 1.0.13";
                 mainVm.UpdateBannerButtonText = "Обновить";
                 mainVm.IsUpdateBannerVisible = true;
                 window.AnimateToastEntrance();
@@ -1428,9 +1437,15 @@ public static class SceneDiagnostics
             // 3. Downloading 63%
             window.Dispatcher.Invoke(() => updateVm.SetFakeState("downloading"));
             await Task.Delay(400);
+            SaveWindowShot(updateWin, "update_downloading.png");
             SaveWindowShot(updateWin, "update_downloading_63.png");
 
-            // 4. Error with countdown
+            // 4. Installing
+            window.Dispatcher.Invoke(() => updateVm.SetFakeState("installing"));
+            await Task.Delay(400);
+            SaveWindowShot(updateWin, "update_installing.png");
+
+            // 5. Error with countdown
             window.Dispatcher.Invoke(() => updateVm.SetFakeState("error"));
             await Task.Delay(400);
             SaveWindowShot(updateWin, "update_error.png");
