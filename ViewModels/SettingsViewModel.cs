@@ -88,6 +88,9 @@ public class SettingsViewModel : ObservableObject
                 cfg.SkinOwnerToken = res.OwnerToken;
                 await _configService.SaveConfigAsync(cfg);
             }
+
+            await _skinService.SyncSkinToGameAsync(cfg.SkinPath, newNick, cfg.GameDir);
+            _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
         }
         catch { }
     }

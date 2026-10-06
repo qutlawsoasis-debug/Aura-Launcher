@@ -322,6 +322,8 @@ public class SkinService : ISkinService
         {
             await ResetToDefaultSteveAsync(nickname, gameDir, cancellationToken);
         }
+
+        ClearCustomSkinLoaderCache(gameDir);
     }
 
     public async Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default)
@@ -627,10 +629,34 @@ public class SkinService : ISkinService
 
             var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
             File.WriteAllText(cslJsonPath, rootObj.ToJsonString(options));
+
+            ClearCustomSkinLoaderCache(gameDir);
         }
         catch (Exception ex)
         {
             FabricGameLaunchService.LogLauncherEvent($"[CSL-CONFIG: ERROR] {ex.Message}");
+        }
+    }
+
+    public void ClearCustomSkinLoaderCache(string gameDir)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(gameDir)) return;
+            var cachesDir = Path.Combine(gameDir, "CustomSkinLoader", "caches");
+            if (Directory.Exists(cachesDir))
+            {
+                var files = Directory.GetFiles(cachesDir, "*", SearchOption.AllDirectories);
+                foreach (var f in files)
+                {
+                    try { File.Delete(f); } catch { }
+                }
+                FabricGameLaunchService.LogLauncherEvent($"[CSL-CACHE] Очищен кэш CustomSkinLoader: {cachesDir}");
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[CSL-CACHE: ERROR] Ошибка очистки кэша: {ex.Message}");
         }
     }
 

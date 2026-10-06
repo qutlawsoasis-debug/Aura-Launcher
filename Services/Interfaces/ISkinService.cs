@@ -61,4 +61,9 @@ public interface ISkinService
     /// Мерж конфига CustomSkinLoader.json: добавление AuraLobby первым источником в loadlist.
     /// </summary>
     void EnsureCustomSkinLoaderConfig(string gameDir);
+
+    /// <summary>
+    /// Очистка папки кэша CustomSkinLoader (<gameDir>/CustomSkinLoader/caches).
+    /// </summary>
+    void ClearCustomSkinLoaderCache(string gameDir);
 }
