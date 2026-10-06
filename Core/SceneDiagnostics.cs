@@ -1266,6 +1266,7 @@ public static class SceneDiagnostics
             int height = Math.Max(1, (int)window.ActualHeight);
             var rtb = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
             rtb.Render(window);
+            rtb.Freeze();
             return rtb;
         }, DispatcherPriority.Render);
     }
@@ -1455,10 +1456,108 @@ public static class SceneDiagnostics
             await Task.Delay(300);
             await RecordUpdateLogoAnimationAsync(updateWin, "update_logo_animation.gif");
 
+            // 6. 6-frame sequence of update transition without standard window
+            await RecordUpdateSequenceAsync(window, updateWin, updateVm);
+
             return true;
         }
 
         return false;
+    }
+
+    public static async Task RecordUpdateSequenceAsync(MainWindow mainWindow, Window updateWin, UpdateWindowViewModel updateVm)
+    {
+        try
+        {
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var frames = new List<(string Name, BitmapSource Bitmap)>();
+
+            // Frame 1: Checking
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                mainWindow.Hide();
+                updateWin.Show();
+                updateVm.SetFakeState("checking");
+            });
+            await Task.Delay(400);
+            frames.Add(("update_seq_1_checking.png", CaptureWindow(updateWin)));
+
+            // Frame 2: Downloading 35%
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                updateVm.HasError = false;
+                updateVm.ProgressValue = 35;
+                updateVm.StatusText = "Скачиваем… 35%";
+            });
+            await Task.Delay(400);
+            frames.Add(("update_seq_2_downloading.png", CaptureWindow(updateWin)));
+
+            // Frame 3: Downloading 85%
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                updateVm.ProgressValue = 85;
+                updateVm.StatusText = "Скачиваем… 85%";
+            });
+            await Task.Delay(400);
+            frames.Add(("update_seq_3_downloading.png", CaptureWindow(updateWin)));
+
+            // Frame 4: Installing
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                updateVm.ProgressValue = 100;
+                updateVm.StatusText = "Устанавливаем…";
+            });
+            await Task.Delay(400);
+            frames.Add(("update_seq_4_installing.png", CaptureWindow(updateWin)));
+
+            // Frame 5: Restarting
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                updateVm.ProgressValue = 100;
+                updateVm.StatusText = "Запускаем Aura…";
+            });
+            await Task.Delay(400);
+            frames.Add(("update_seq_5_restarting.png", CaptureWindow(updateWin)));
+
+            // Frame 6: Launcher MainWindow launched directly (no intermediate standard window)
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                updateWin.Hide();
+                mainWindow.Show();
+            });
+            await Task.Delay(500);
+            frames.Add(("update_seq_6_launched.png", CaptureWindow(mainWindow)));
+
+            var gifEncoder = new GifBitmapEncoder();
+            foreach (var (name, bmp) in frames)
+            {
+                var pngEncoder = new PngBitmapEncoder();
+                pngEncoder.Frames.Add(BitmapFrame.Create(bmp));
+                using (var fs = File.Create(Path.Combine(shotsDir, name)))
+                {
+                    pngEncoder.Save(fs);
+                }
+                try { File.Copy(Path.Combine(shotsDir, name), Path.Combine(repoShotsDir, name), true); } catch { }
+                try { File.Copy(Path.Combine(shotsDir, name), Path.Combine(brainDir, name), true); } catch { }
+                gifEncoder.Frames.Add(BitmapFrame.Create(bmp));
+            }
+
+            string gifPath = Path.Combine(shotsDir, "update_sequence.gif");
+            using (var fs = File.Create(gifPath))
+            {
+                gifEncoder.Save(fs);
+            }
+            try { File.Copy(gifPath, Path.Combine(repoShotsDir, "update_sequence.gif"), true); } catch { }
+            try { File.Copy(gifPath, Path.Combine(brainDir, "update_sequence.gif"), true); } catch { }
+
+            App.Log("[UPDATE-SEQUENCE] Successfully saved 6-frame sequence and update_sequence.gif");
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[UPDATE-SEQUENCE: ERROR] {ex}");
+        }
     }
 
     public static async Task<bool> RecordUpdateLogoAnimationAsync(Window updateWin, string gifFileName)
