@@ -176,6 +176,9 @@
         </Setter>
     </Style>
 
+    <!-- Secondary Button (Alias based on StandardBtn) -->
+    <Style x:Key="SecondaryBtn" BasedOn="{StaticResource StandardBtn}" TargetType="Button" />
+
     <!-- Main Button (Primary): gradient #F7B44F -> #EB962B, text #1C1106, bottom border 4px #A85F12, glow shadow ember, radius 3px -->
     <Style x:Key="PrimaryNeonBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
