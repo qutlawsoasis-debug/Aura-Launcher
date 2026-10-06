@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import url from 'url';
 import { getStore } from './store.js';
 import { validatePngSkin, isValidNickname, getClientIp } from './skinUtils.js';
+import { handleRegister, handleSync, handleFriendRequest, handleFriendRespond, handleFriendRemove, handleInvite, handleInviteRespond } from './friendRoutes.js';
 function parseBody(req) {
     return new Promise((resolve, reject) => {
         let body = '';
@@ -32,7 +33,7 @@ function sendJson(res, statusCode, data) {
         'Content-Type': 'application/json; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aura-Client'
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aura-Client, X-User-Id, X-User-Token'
     });
     res.end(json);
 }
@@ -41,7 +42,7 @@ export const server = http.createServer(async (req, res) => {
         res.writeHead(204, {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aura-Client'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Aura-Client, X-User-Id, X-User-Token'
         });
         res.end();
         return;
@@ -51,6 +52,28 @@ export const server = http.createServer(async (req, res) => {
     console.log(`[LOBBY-API] ${req.method} ${pathname}`);
     try {
         const store = getStore();
+        // Task 32: Users & Friends & Invites
+        if (pathname === '/api/user/register') {
+            return await handleRegister(req, res);
+        }
+        if (pathname === '/api/sync') {
+            return await handleSync(req, res);
+        }
+        if (pathname === '/api/friends/request') {
+            return await handleFriendRequest(req, res);
+        }
+        if (pathname === '/api/friends/respond') {
+            return await handleFriendRespond(req, res);
+        }
+        if (pathname === '/api/friends/remove') {
+            return await handleFriendRemove(req, res);
+        }
+        if (pathname === '/api/invite' || pathname === '/api/invite/create') {
+            return await handleInvite(req, res);
+        }
+        if (pathname === '/api/invite/respond') {
+            return await handleInviteRespond(req, res);
+        }
         // 0. GET /api/tunnel-config
         if (req.method === 'GET' && pathname === '/api/tunnel-config') {
             const clientHeader = req.headers['x-aura-client'];
