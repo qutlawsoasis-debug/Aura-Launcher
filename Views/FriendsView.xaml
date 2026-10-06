@@ -13,7 +13,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
         <Style x:Key="FriendCodeCellStyle" TargetType="Border">
-            <Setter Property="Width" Value="38" />
+            <Setter Property="Width" Value="36" />
             <Setter Property="Height" Value="50" />
             <Setter Property="Background" Value="#12FFFFFF" />
             <Setter Property="CornerRadius" Value="3" />
@@ -84,8 +84,8 @@
                        Foreground="{StaticResource MuteBrush}"
                        Margin="0,0,0,8" />
 
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
-                <!-- 8 visual cells for the friend code -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,8">
+                <!-- 8 visual cells for the friend code (36x50 with gap 6) -->
                 <Border Style="{StaticResource FriendCodeCellStyle}">
                     <TextBlock Text="{Binding CodeChar0}" Style="{StaticResource CodeCharText}" />
                 </Border>
@@ -115,26 +115,30 @@
                 <Button Command="{Binding CopyCodeCommand}"
                         Style="{StaticResource StandardBtn}"
                         Height="50"
-                        Padding="18,0"
-                        Margin="0,0,10,0"
+                        Padding="20,0"
                         Content="{Binding CopyButtonText}" />
-
-                <!-- Button "Копировать ссылку" -->
-                <Button Command="{Binding CopyLinkCommand}"
-                        Height="50"
-                        Padding="16,0">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
-                            <Setter Property="Content" Value="{Binding CopyLinkButtonText}" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
-                                    <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
             </StackPanel>
+
+            <!-- "Копировать ссылку" вынесено ссылкой ниже строки кода (стиль GhostBtn / link) -->
+            <Button Command="{Binding CopyLinkCommand}"
+                    Style="{StaticResource GhostBtn}"
+                    HorizontalAlignment="Left"
+                    Margin="0,0,0,20">
+                <Button.Content>
+                    <TextBlock Text="{Binding CopyLinkButtonText}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource EmberBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Button.Content>
+            </Button>
 
             <!-- SECTION 2: ДОБАВИТЬ ДРУГА -->
             <TextBlock Text="Добавить друга"
@@ -172,6 +176,7 @@
                        FontSize="13"
                        FontWeight="Medium"
                        Foreground="#FF8A7A"
+                       TextWrapping="Wrap"
                        Margin="0,4,0,8"
                        Visibility="{Binding HasAddFriendError, Converter={StaticResource BoolToVis}}" />
 
@@ -180,7 +185,7 @@
         </StackPanel>
 
         <!-- Main Content Area: Requests and Friends list -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer Grid.Row="1" Style="{StaticResource AuraScrollViewer}">
             <StackPanel Margin="0,0,8,16">
 
                 <!-- SECTION 3: ЗАЯВКИ (показываются только когда есть) -->
@@ -242,6 +247,7 @@
                            FontFamily="{StaticResource MainFont}"
                            FontSize="14"
                            Foreground="{StaticResource MuteBrush}"
+                           TextWrapping="Wrap"
                            Margin="0,12,0,0"
                            Visibility="{Binding IsEmptyList, Converter={StaticResource BoolToVis}}" />
 

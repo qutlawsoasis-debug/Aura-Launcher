@@ -117,6 +117,12 @@ public class AnthemService : IAnthemService
             return;
         }
 
+        if (!config.MusicOnStartup)
+        {
+            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (startup music disabled in settings)");
+            return;
+        }
+
         if (_isMuted)
         {
             FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (muted)");

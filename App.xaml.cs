@@ -97,7 +97,8 @@ public partial class App : Application
         bool isProtocolTest = Array.Exists(args, a => a.Equals("--selftest-protocol", StringComparison.OrdinalIgnoreCase));
         bool isNotificationsReportTest = Array.Exists(args, a => a.Equals("--selftest-notifications-report", StringComparison.OrdinalIgnoreCase));
         bool isIconTest = Array.Exists(args, a => a.Equals("--selftest-icon", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isLayoutAudit = Array.Exists(args, a => a.Equals("--layout-audit", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isLayoutAudit || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -366,6 +367,14 @@ public partial class App : Application
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
                 }
+            });
+        }
+        else if (isLayoutAudit)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunLayoutAuditAsync(mainWindow);
+                Environment.Exit(success ? 0 : 1);
             });
         }
         else if (isSelfTest)

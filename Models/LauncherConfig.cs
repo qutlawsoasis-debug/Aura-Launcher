@@ -24,6 +24,7 @@ public class LauncherConfig
     public int AnthemVolume { get; set; } = 100;
     public bool AnthemMuted { get; set; } = false;
     public string? AnthemCustomPath { get; set; }
+    public bool MusicOnStartup { get; set; } = true;
     public bool HideLauncherWhilePlaying { get; set; } = true;
     public string? UserId { get; set; }
     public string? UserTokenEncrypted { get; set; }

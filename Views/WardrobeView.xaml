@@ -108,7 +108,8 @@
                            FontSize="14"
                            FontWeight="Medium"
                            Foreground="{StaticResource DimInkBrush}"
-                           TextTrimming="CharacterEllipsis"
+                           TextWrapping="Wrap"
+                           MaxWidth="360"
                            Margin="0,0,0,16" />
 
                 <!-- Buttons: "Выбрать файл" (StandardBtn) + "Сбросить" (GhostBtn) -->

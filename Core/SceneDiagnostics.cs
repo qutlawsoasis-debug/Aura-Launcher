@@ -2543,4 +2543,394 @@ public static class SceneDiagnostics
             return false;
         }
     }
+
+    public static async Task<bool> RunLayoutAuditAsync(MainWindow window)
+    {
+        try
+        {
+            try { Console.OutputEncoding = Encoding.UTF8; } catch { }
+            Console.WriteLine("================================================================================");
+            Console.WriteLine("                         LAYOUT AUDIT: AURA LAUNCHER                            ");
+            Console.WriteLine("================================================================================");
+            App.Log("[LAYOUT-AUDIT] Starting layout audit across all tabs and states...");
+
+            await Task.Delay(1000);
+
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            string shotsDir = ResolveShotsDir();
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+
+            void CaptureScreen(string name)
+            {
+                string path = Path.Combine(shotsDir, $"{name}.png");
+                CaptureWindowToPng(window, path);
+                Console.WriteLine($"[SCREENSHOT] Captured: {name}.png");
+                if (Directory.Exists(brainDir))
+                {
+                    try { File.Copy(path, Path.Combine(brainDir, $"{name}.png"), true); } catch { }
+                }
+            }
+
+            var screenStates = new (string TabName, string StateName, Action PrepareState, FrameworkElement ViewElement)[]
+            {
+                // 1. Играть
+                ("Overview", "1_Play", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
+                }), window.ViewOverview),
+
+                // 2. Лобби: пусто
+                ("Lobby", "2_Lobby_Empty", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Lobby");
+                        var lvm = mainVm.LobbyVM;
+                        typeof(LobbyViewModel).GetField("_isInLobby", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, false);
+                        typeof(LobbyViewModel).GetField("_lobbyCode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, null);
+                        typeof(LobbyViewModel).GetField("_isLobbyCreated", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, false);
+                        lvm.GuestCodeInput = string.Empty;
+                        lvm.JoinErrorMessage = string.Empty;
+                        lvm.LobbyPlayers.Clear();
+                        typeof(LobbyViewModel).GetMethod("NotifyCellPropertiesChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                        typeof(LobbyViewModel).GetMethod("NotifyStatusStateChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                    });
+                }), window.ViewLobby),
+
+                // 3. Лобби: хост ждёт
+                ("Lobby", "3_Lobby_Host_Waiting", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Lobby");
+                        var lvm = mainVm.LobbyVM;
+                        typeof(LobbyViewModel).GetField("_isInLobby", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        typeof(LobbyViewModel).GetField("_isLobbyCreated", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        typeof(LobbyViewModel).GetField("_isWorldOpen", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, false);
+                        typeof(LobbyViewModel).GetField("_lobbyCode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, "ABC123");
+                        lvm.HostStatusText = "Ждём, пока вы откроете мир";
+                        lvm.LobbyPlayers.Clear();
+                        lvm.LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = mainVm.PlayerNickname,
+                            IsHost = true,
+                            Avatar = mainVm.PlayerAvatar
+                        });
+                        typeof(LobbyViewModel).GetMethod("NotifyCellPropertiesChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                        typeof(LobbyViewModel).GetMethod("NotifyStatusStateChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                    });
+                }), window.ViewLobby),
+
+                // 4. Лобби: хост мир открыт
+                ("Lobby", "4_Lobby_Host_WorldOpen", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Lobby");
+                        var lvm = mainVm.LobbyVM;
+                        typeof(LobbyViewModel).GetField("_isInLobby", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        typeof(LobbyViewModel).GetField("_isLobbyCreated", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        typeof(LobbyViewModel).GetField("_isWorldOpen", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        typeof(LobbyViewModel).GetField("_lobbyCode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, "ABC123");
+                        lvm.HostStatusText = "Мир открыт для сети";
+                        lvm.LobbyPlayers.Clear();
+                        lvm.LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = mainVm.PlayerNickname,
+                            IsHost = true,
+                            Avatar = mainVm.PlayerAvatar
+                        });
+                        lvm.LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = "FriendPlayer",
+                            IsHost = false,
+                            Avatar = SkinService.LoadDefaultSteveBitmap()
+                        });
+                        typeof(LobbyViewModel).GetMethod("NotifyCellPropertiesChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                        typeof(LobbyViewModel).GetMethod("NotifyStatusStateChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                    });
+                }), window.ViewLobby),
+
+                // 5. Лобби: гость
+                ("Lobby", "5_Lobby_Guest", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Lobby");
+                        var lvm = mainVm.LobbyVM;
+                        typeof(LobbyViewModel).GetField("_isInLobby", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        typeof(LobbyViewModel).GetField("_isLobbyCreated", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, false);
+                        typeof(LobbyViewModel).GetField("_lobbyCode", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, "XYZ789");
+                        typeof(LobbyViewModel).GetField("_canGuestConnect", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(lvm, true);
+                        lvm.GuestStatusText = "Хост открыл мир";
+                        lvm.LobbyPlayers.Clear();
+                        lvm.LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = "HostMaster",
+                            IsHost = true,
+                            Avatar = SkinService.LoadDefaultSteveBitmap()
+                        });
+                        lvm.LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = mainVm.PlayerNickname,
+                            IsHost = false,
+                            Avatar = mainVm.PlayerAvatar
+                        });
+                        typeof(LobbyViewModel).GetMethod("NotifyCellPropertiesChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                        typeof(LobbyViewModel).GetMethod("NotifyStatusStateChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
+                    });
+                }), window.ViewLobby),
+
+                // 6. Друзья: пусто
+                ("Friends", "6_Friends_Empty", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Friends");
+                        mainVm.FriendsVM.Friends.Clear();
+                        mainVm.FriendsVM.IncomingRequests.Clear();
+                        mainVm.FriendsVM.AddCodeInput = string.Empty;
+                        mainVm.FriendsVM.AddFriendErrorMessage = string.Empty;
+                    });
+                }), window.ViewFriends),
+
+                // 7. Друзья: 3 друга + 1 входящая заявка + ошибка добавления
+                ("Friends", "7_Friends_Full_WithError", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Friends");
+                        mainVm.FriendsVM.Friends.Clear();
+                        mainVm.FriendsVM.IncomingRequests.Clear();
+
+                        mainVm.FriendsVM.IncomingRequests.Add(new FriendRequestItemViewModel("req1", "AlexExplorer", (id, acc) => { }));
+
+                        var f1 = new FriendItemViewModel(new FriendPresenceItem { Id = "f1", Nick = "DiamondMiner", Online = true, Status = "online", LastSeen = 0 }, _ => { }, _ => { });
+                        var f2 = new FriendItemViewModel(new FriendPresenceItem { Id = "f2", Nick = "RedstoneKing", Online = true, Status = "lobby", LastSeen = 0 }, _ => { }, _ => { });
+                        var f3 = new FriendItemViewModel(new FriendPresenceItem { Id = "f3", Nick = "CreeperHunter", Online = false, Status = "offline", LastSeen = DateTimeOffset.Now.AddHours(-2).ToUnixTimeMilliseconds() }, _ => { }, _ => { });
+
+                        mainVm.FriendsVM.Friends.Add(f1);
+                        mainVm.FriendsVM.Friends.Add(f2);
+                        mainVm.FriendsVM.Friends.Add(f3);
+
+                        mainVm.FriendsVM.AddCodeInput = "BADCODE1";
+                        mainVm.FriendsVM.AddFriendErrorMessage = "Пользователь с таким кодом не найден";
+                    });
+                }), window.ViewFriends),
+
+                // 8. Скин с ошибкой
+                ("Wardrobe", "8_Skin_WithError", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Wardrobe");
+                        mainVm.WardrobeVM.StatusMessage = "Неверный формат скина. Поддерживаются только PNG 64x64 или 64x32.";
+                        mainVm.WardrobeVM.IsStatusError = true;
+                    });
+                }), window.ViewWardrobe),
+
+                // 9. Настройки целиком
+                ("Settings", "9_Settings_Full", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Settings");
+                        var sv = FindVisualChild<ScrollViewer>(window.ViewSettings);
+                        sv?.ScrollToTop();
+                    });
+                }), window.ViewSettings),
+
+                // 10. Настройки с прокруткой
+                ("Settings", "10_Settings_Scrolled", (Action)(() =>
+                {
+                    window.Dispatcher.Invoke(() =>
+                    {
+                        mainVm.SwitchTab("Settings");
+                        var sv = FindVisualChild<ScrollViewer>(window.ViewSettings);
+                        sv?.ScrollToBottom();
+                    });
+                }), window.ViewSettings)
+            };
+
+            int totalViolations = 0;
+            double screenLeft = 340.0;
+            double screenRight = 924.0;
+            double screenTop = 64.0;
+            double screenBottom = 576.0;
+
+            foreach (var (tab, stateName, prepare, viewElem) in screenStates)
+            {
+                Console.WriteLine($"\n--- [АУДИТ] Состояние: {stateName} (Вкладка: {tab}) ---");
+                prepare();
+                await Task.Delay(400);
+
+                window.Dispatcher.Invoke(() =>
+                {
+                    window.UpdateLayout();
+                });
+                await Task.Delay(100);
+
+                CaptureScreen(stateName);
+
+                int stateViolations = 0;
+
+                window.Dispatcher.Invoke(() =>
+                {
+                    // Обход визуального дерева
+                    var allElements = new List<FrameworkElement>();
+                    void CollectElements(DependencyObject parent)
+                    {
+                        int count = VisualTreeHelper.GetChildrenCount(parent);
+                        for (int i = 0; i < count; i++)
+                        {
+                            var child = VisualTreeHelper.GetChild(parent, i);
+                            if (child is FrameworkElement fe)
+                            {
+                                allElements.Add(fe);
+                            }
+                            CollectElements(child);
+                        }
+                    }
+
+                    CollectElements(viewElem);
+
+                    foreach (var elem in allElements)
+                    {
+                        if (elem.Visibility != Visibility.Visible || !elem.IsLoaded || elem.Opacity <= 0) continue;
+
+                        // Если родительский контейнер имеет ClipToBounds=True, его обрезанные дочерние элементы не выходят визуально
+                        var clipParent = FindVisualAncestor<UIElement>(elem, p => p != elem && p.ClipToBounds);
+                        if (clipParent != null) continue;
+
+                        // Игнорируем элементы внутри прокручиваемого содержимого ScrollViewer для вертикального выхода,
+                        // если они находятся внутри ScrollViewer
+                        var parentScrollViewer = FindVisualAncestor<ScrollViewer>(elem);
+
+                        // Проверяем границы элемента относительно MainWindow
+                        try
+                        {
+                            var transform = elem.TransformToAncestor(window);
+                            var elemBounds = transform.TransformBounds(new Rect(0, 0, elem.ActualWidth, elem.ActualHeight));
+
+                            // а) Границы выходят за область экрана: left 340, right 924, top 64, bottom 576
+                            // Если внутри ScrollViewer - вертикальный выход за bottom/top разрешен, но горизонтальный (left/right) не должен превышать 924
+                            bool boundsExceeded = false;
+                            string boundDetail = "";
+
+                            // Допуск 2px на погрешности округления антиалиасинга
+                            if (elemBounds.Left < screenLeft - 2 && !(elem is ScrollViewer))
+                            {
+                                boundsExceeded = true;
+                                boundDetail = $"Left={elemBounds.Left:F1} < {screenLeft}";
+                            }
+                            if (elemBounds.Right > screenRight + 2)
+                            {
+                                boundsExceeded = true;
+                                boundDetail = $"Right={elemBounds.Right:F1} > {screenRight}";
+                            }
+
+                            if (parentScrollViewer == null)
+                            {
+                                if (elemBounds.Top < screenTop - 2)
+                                {
+                                    boundsExceeded = true;
+                                    boundDetail = $"Top={elemBounds.Top:F1} < {screenTop}";
+                                }
+                                if (elemBounds.Bottom > screenBottom + 2)
+                                {
+                                    boundsExceeded = true;
+                                    boundDetail = $"Bottom={elemBounds.Bottom:F1} > {screenBottom}";
+                                }
+                            }
+
+                            if (boundsExceeded && elem.ActualWidth > 0 && elem.ActualHeight > 0)
+                            {
+                                Console.WriteLine($"  [НАРУШЕНИЕ ГРАНИЦ] {elem.GetType().Name} (Name='{elem.Name}'): {boundDetail}, Rect=[{elemBounds.Left:F0},{elemBounds.Top:F0},{elemBounds.Width:F0},{elemBounds.Height:F0}]");
+                                stateViolations++;
+                            }
+                        }
+                        catch { }
+
+                        // б) TextBlock: текст не помещается или включено TextTrimming
+                        if (elem is TextBlock tb)
+                        {
+                            if (tb.TextTrimming != TextTrimming.None)
+                            {
+                                Console.WriteLine($"  [НАРУШЕНИЕ ТРИММИНГА] TextBlock '{tb.Text}': включено TextTrimming={tb.TextTrimming}");
+                                stateViolations++;
+                            }
+
+                            // Проверяем, помещается ли текст
+                            if (!string.IsNullOrEmpty(tb.Text) && tb.ActualWidth > 0)
+                            {
+                                var formattedText = new FormattedText(
+                                    tb.Text,
+                                    System.Globalization.CultureInfo.CurrentCulture,
+                                    tb.FlowDirection,
+                                    new Typeface(tb.FontFamily, tb.FontStyle, tb.FontWeight, tb.FontStretch),
+                                    tb.FontSize,
+                                    Brushes.Black,
+                                    VisualTreeHelper.GetDpi(tb).PixelsPerDip);
+
+                                if (tb.TextWrapping == TextWrapping.NoWrap && formattedText.Width > tb.ActualWidth + 2)
+                                {
+                                    Console.WriteLine($"  [НАРУШЕНИЕ ТЕКСТА] TextBlock '{tb.Text}': желаемая ширина {formattedText.Width:F1} > доступная {tb.ActualWidth:F1}");
+                                    stateViolations++;
+                                }
+                            }
+                        }
+                    }
+                });
+
+                if (stateViolations == 0)
+                {
+                    Console.WriteLine($"  -> State {stateName}: 0 violations / Состояние {stateName}: 0 нарушений");
+                }
+                else
+                {
+                    Console.WriteLine($"  -> State {stateName}: {stateViolations} violations / Состояние {stateName}: {stateViolations} нарушений");
+                }
+
+                totalViolations += stateViolations;
+            }
+
+            Console.WriteLine("================================================================================");
+            Console.WriteLine($"LAYOUT AUDIT RESULT: {totalViolations} violations / ИТОГ: {totalViolations} нарушений");
+            if (totalViolations == 0)
+            {
+                Console.WriteLine("0 нарушений");
+            }
+            Console.WriteLine("================================================================================");
+
+            return totalViolations == 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LAYOUT-AUDIT ERROR] {ex}");
+            App.Log($"[LAYOUT-AUDIT ERROR] {ex}");
+            return false;
+        }
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject current) where T : DependencyObject
+    {
+        while (current != null)
+        {
+            if (current is T match) return match;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject current, Func<T, bool> predicate) where T : DependencyObject
+    {
+        while (current != null)
+        {
+            if (current is T match && predicate(match)) return match;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
 }

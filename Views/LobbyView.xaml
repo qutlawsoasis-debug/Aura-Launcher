@@ -493,10 +493,10 @@
             </Grid>
 
             <!-- ============================================== -->
-            <!-- RIGHT COLUMN: Players list (width 230px)       -->
+            <!-- RIGHT COLUMN: Players list (width 200px)       -->
             <!-- 54px rows with 1px lines top/bottom            -->
             <!-- ============================================== -->
-            <StackPanel Grid.Column="2" Width="230" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <StackPanel Grid.Column="2" Width="200" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <TextBlock Text="Игроки"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="18"
@@ -510,6 +510,7 @@
                            FontSize="13"
                            Foreground="{StaticResource MuteBrush}"
                            TextWrapping="Wrap"
+                           MaxWidth="200"
                            LineHeight="18">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -592,7 +593,7 @@
                                                Foreground="{StaticResource InkBrush}"
                                                VerticalAlignment="Center"
                                                Margin="10,0,6,0"
-                                               TextTrimming="CharacterEllipsis" />
+                                               TextWrapping="Wrap" />
 
                                     <!-- Badge "хост" 12px ember -->
                                     <TextBlock Grid.Column="2" Text="хост"
