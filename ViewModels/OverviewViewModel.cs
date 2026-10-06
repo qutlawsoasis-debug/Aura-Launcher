@@ -9,13 +9,6 @@ using AuraLauncher.Services.Implementations;
 
 namespace AuraLauncher.ViewModels;
 
-public class WhatsNewItem
-{
-    public string Version { get; set; } = string.Empty;
-    public string Date { get; set; } = string.Empty;
-    public string Title { get; set; } = string.Empty;
-    public string Summary { get; set; } = string.Empty;
-}
 
 /// <summary>
 /// ViewModel для главного экрана лаунчера.
@@ -70,61 +63,17 @@ public class OverviewViewModel : ObservableObject
         private set => SetProperty(ref _isEnvironmentInstalled, value);
     }
 
-    public ObservableCollection<WhatsNewItem> WhatsNewCards { get; } = new();
-
-    public RelayCommand OpenPatchNotesCommand { get; }
-
     public OverviewViewModel(IConfigService configService, IGameLaunchService launchService)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
 
-        OpenPatchNotesCommand = new RelayCommand(_ =>
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "https://github.com/magnev/Aura-Launcher/releases",
-                    UseShellExecute = true
-                });
-            }
-            catch { }
-        });
-
-        InitWhatsNew();
         RefreshStats();
 
         _configService.ConfigChanged += (s, cfg) =>
         {
             RefreshStats();
         };
-    }
-
-    private void InitWhatsNew()
-    {
-        WhatsNewCards.Clear();
-        WhatsNewCards.Add(new WhatsNewItem
-        {
-            Version = "beta 1.0.4",
-            Date = "06.10.2026",
-            Title = "Складной сайдбар и шрифты Unbounded",
-            Summary = "Новая навигация слева, адаптивный сайдбар и 2-колоночное лобби"
-        });
-        WhatsNewCards.Add(new WhatsNewItem
-        {
-            Version = "beta 1.0.3",
-            Date = "06.10.2026",
-            Title = "Гимн и регулятор звука",
-            Summary = "Воспроизведение гимна при старте, ползунок громкости и mute"
-        });
-        WhatsNewCards.Add(new WhatsNewItem
-        {
-            Version = "beta 1.0.2",
-            Date = "05.10.2026",
-            Title = "Сетевой туннель playit",
-            Summary = "Отказоустойчивое P2P-подключение друзей по коду"
-        });
     }
 
     /// <summary>
@@ -172,7 +121,7 @@ public class OverviewViewModel : ObservableObject
             }
 
             SpecLine = modCount > 0
-                ? $"Minecraft 1.20.1, Fabric {fabricLoader}, {modCount} модов"
+                ? $"Minecraft 1.20.1, Fabric {fabricLoader}, {modCount} мод"
                 : "Minecraft 1.20.1, Fabric 0.19.5, 61 мод";
         }
 

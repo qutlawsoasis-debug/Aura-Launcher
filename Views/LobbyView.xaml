@@ -4,7 +4,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             d:DesignHeight="512" d:DesignWidth="584"
+             Focusable="False"
+             FocusVisualStyle="{x:Null}"
+             ClipToBounds="False"
              Background="Transparent">
 
     <UserControl.Resources>
@@ -31,24 +33,25 @@
         </Storyboard>
     </UserControl.Resources>
 
-    <Grid Background="Transparent">
+    <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" /> <!-- Header -->
             <RowDefinition Height="*" />    <!-- Content -->
         </Grid.RowDefinitions>
 
-        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,24">
+        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle (Height=Auto, LineHeight 66, Margin сверху 6px) -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,24" Focusable="False">
             <TextBlock Text="Лобби"
                        FontFamily="{StaticResource HeadingFont}"
                        FontSize="60"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource InkBrush}"
-                       LineHeight="54"
+                       Height="Auto"
+                       LineHeight="66"
                        LineStackingStrategy="BlockLineHeight"
-                       Margin="-2,-6,0,6">
+                       Margin="0,6,0,6">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="270" ShadowDepth="2" />
+                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
             <TextBlock Text="Совместная игра по сети через защищённый туннель"
@@ -58,12 +61,12 @@
                        Foreground="{StaticResource DimInkBrush}" />
         </StackPanel>
 
-        <!-- 2 Columns with gap 56px, right column 230px -->
-        <Grid Grid.Row="1">
+        <!-- Fixed 2 Columns: left 344px, gap 40px, right 200px (total 584px) -->
+        <Grid Grid.Row="1" Focusable="False" ClipToBounds="False">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="56" /> <!-- Gap -->
-                <ColumnDefinition Width="230" />
+                <ColumnDefinition Width="344" />
+                <ColumnDefinition Width="40" />
+                <ColumnDefinition Width="200" />
             </Grid.ColumnDefinitions>
 
             <!-- ============================================== -->
@@ -117,9 +120,9 @@
                                Foreground="{StaticResource MuteBrush}"
                                Margin="0,0,0,8" />
 
-                    <!-- Six 44x58 code cells with gap 8 and hidden input + "Войти" button -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
-                        <Grid>
+                    <!-- Six 44x58 code cells with gap 8 and hidden input + "Войти" button in WrapPanel -->
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,24">
+                        <Grid Margin="0,0,12,8">
                             <!-- 6 visual cells -->
                             <StackPanel Orientation="Horizontal">
                                 <!-- Cell 0 -->
@@ -294,13 +297,13 @@
                                      VerticalAlignment="Stretch" />
                         </Grid>
 
-                        <!-- "Войти" button (height 48, disabled until 6 chars) -->
+                        <!-- "Войти" button (height 58, disabled until 6 chars) -->
                         <Button Command="{Binding JoinLobbyCommand}"
                                 Style="{StaticResource StandardBtn}"
                                 Height="58"
                                 Content="Войти"
-                                Margin="16,0,0,0" />
-                    </StackPanel>
+                                Margin="0,0,0,8" />
+                    </WrapPanel>
                 </StackPanel>
 
                 <!-- ============================================== -->
@@ -325,46 +328,26 @@
                                Foreground="{StaticResource MuteBrush}"
                                Margin="0,0,0,8" />
 
-                    <!-- Code cells + "Копировать" button (shows "Скопировано" for 1.6s) -->
+                    <!-- Six cells displaying LobbyCode (304px total width) -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <!-- Six cells displaying LobbyCode -->
-                        <StackPanel Orientation="Horizontal">
-                            <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
-                                <TextBlock Text="{Binding CodeChar0}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
-                                <TextBlock Text="{Binding CodeChar1}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
-                                <TextBlock Text="{Binding CodeChar2}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
-                                <TextBlock Text="{Binding CodeChar3}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
-                                <TextBlock Text="{Binding CodeChar4}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <Border Style="{StaticResource CodeCellBorderStyle}" BorderBrush="#99F2A63C">
-                                <TextBlock Text="{Binding CodeChar5}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                        </StackPanel>
-
-                        <!-- "Копировать" / "Скопировано" Button -->
-                        <Button Command="{Binding CopyCodeCommand}"
-                                Height="58"
-                                Margin="16,0,0,0">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
-                                    <Setter Property="Content" Value="Копировать" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CodeCopied}" Value="True">
-                                            <Setter Property="Content" Value="Скопировано" />
-                                            <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                            <TextBlock Text="{Binding CodeChar0}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                            <TextBlock Text="{Binding CodeChar1}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                            <TextBlock Text="{Binding CodeChar2}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                            <TextBlock Text="{Binding CodeChar3}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                            <TextBlock Text="{Binding CodeChar4}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CodeCellBorderStyle}" BorderBrush="#99F2A63C">
+                            <TextBlock Text="{Binding CodeChar5}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
                     </StackPanel>
 
                     <!-- Status string with square 10x10 dot (radius 2):
@@ -406,21 +389,21 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- Main action button + "Выйти из лобби" bad link -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
+                    <!-- Main buttons row in WrapPanel: [Открыть мир / Подключиться к игре] [Копировать] [Выйти из лобби] -->
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
                         <!-- Host: "Открыть мир" button -->
                         <Button Command="{Binding OpenWorldCommand}"
                                 Style="{StaticResource PrimaryNeonBtn}"
                                 Height="48"
                                 Content="Открыть мир"
-                                Margin="0,0,16,0"
+                                Margin="0,0,12,8"
                                 Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
 
                         <!-- Guest: "Подключиться к игре" button -->
                         <Button Command="{Binding ConnectToGameCommand}"
                                 Height="48"
                                 Content="Подключиться к игре"
-                                Margin="0,0,16,0">
+                                Margin="0,0,12,8">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -433,12 +416,31 @@
                             </Button.Style>
                         </Button>
 
+                        <!-- "Копировать" / "Скопировано" Button -->
+                        <Button Command="{Binding CopyCodeCommand}"
+                                Height="48"
+                                Padding="20,0"
+                                Margin="0,0,12,8">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
+                                    <Setter Property="Content" Value="Копировать" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CodeCopied}" Value="True">
+                                            <Setter Property="Content" Value="Скопировано" />
+                                            <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <!-- "Выйти из лобби" link in bad color -->
                         <Button Command="{Binding LeaveLobbyCommand}"
                                 Style="{StaticResource BadLinkBtn}"
                                 Content="Выйти из лобби"
+                                Margin="0,0,0,8"
                                 VerticalAlignment="Center" />
-                    </StackPanel>
+                    </WrapPanel>
 
                     <!-- Warning note for host: "Не показывайте код посторонним: в этом режиме проверка лицензии отключена."
                          13px dim, 2px ember left border, padding 12px -->

@@ -11,7 +11,8 @@
         Background="Transparent"
         ResizeMode="NoResize"
         Icon="app_icon.ico"
-        FontFamily="{StaticResource MainFont}">
+        FontFamily="{StaticResource MainFont}"
+        FocusVisualStyle="{x:Null}">
 
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="0" CornerRadius="3" CaptionHeight="40" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
@@ -104,6 +105,24 @@
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
 
                             <!-- Hover state: Scale 0.6 (if unchecked) or keep 1 (if checked), shift text +8px -->
@@ -195,8 +214,18 @@
                    VerticalAlignment="Center"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 
-            <!-- OVERVIEW BACKGROUND GRADIENTS (left-to-right 92%->72%->12%->0, bottom-to-top 70%->0) -->
+            <!-- OVERVIEW BACKGROUND GRADIENTS -->
             <Grid x:Name="OverviewGradientOverlay" IsHitTestVisible="False">
+                <!-- Top-to-bottom header gradient: rgba(5,12,16,.55) -> 0, height 90px (window icons visible on sky) -->
+                <Border Height="90" VerticalAlignment="Top">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#8C050C10" Offset="0.0" />
+                            <GradientStop Color="#00050C10" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+
                 <!-- Left-to-right gradient -->
                 <Border>
                     <Border.Background>
@@ -209,12 +238,14 @@
                         </LinearGradientBrush>
                     </Border.Background>
                 </Border>
-                <!-- Bottom-to-top gradient (70% at 0 to 0 at 42%) -->
+
+                <!-- Bottom-to-top gradient up to 55% height -->
                 <Border>
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
-                            <GradientStop Color="#B3050C10" Offset="0.0" />  <!-- 70% at 0 -->
-                            <GradientStop Color="#00050C10" Offset="0.42" /> <!-- 0 at 42% -->
+                            <GradientStop Color="#CC050C10" Offset="0.0" />  <!-- 80% at 0 -->
+                            <GradientStop Color="#66050C10" Offset="0.25" />
+                            <GradientStop Color="#00050C10" Offset="0.55" /> <!-- 0 at 55% -->
                             <GradientStop Color="#00050C10" Offset="1.0" />
                         </LinearGradientBrush>
                     </Border.Background>
@@ -371,8 +402,10 @@
             <!--    TOP 64, BOTTOM 44). FIXED POSITION!         -->
             <!-- ============================================== -->
             <!-- Transition: old fades out 100ms, new fades in 220ms with 100ms delay, translateY 8 -> 0 -->
-            <Grid Margin="340,64,56,44" ClipToBounds="True" Panel.ZIndex="30">
+            <Grid Margin="340,64,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
                 <ContentControl x:Name="MainContentHost"
+                                Focusable="False"
+                                FocusVisualStyle="{x:Null}"
                                 Content="{Binding CurrentView, NotifyOnTargetUpdated=True}"
                                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <ContentControl.RenderTransform>

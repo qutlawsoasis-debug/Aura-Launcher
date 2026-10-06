@@ -202,6 +202,7 @@ public class MainViewModel : ObservableObject
             if (SetProperty(ref _isGameRunning, value))
             {
                 OnPropertyChanged(nameof(LaunchButtonText));
+                OnPropertyChanged(nameof(AllocatedRamText));
                 LaunchOrCancelCommand.RaiseCanExecuteChanged();
                 LaunchGameCommand.RaiseCanExecuteChanged();
             }
@@ -237,7 +238,14 @@ public class MainViewModel : ObservableObject
 
     public string RamFormatted => $"RAM: {Math.Round(_configService.CurrentConfig.RamMb / 1024.0, 1)} ГБ";
 
-    public string AllocatedRamText => $"Выделено {Math.Round(_configService.CurrentConfig.RamMb / 1024.0, 0)} ГБ ОЗУ";
+    public string AllocatedRamText
+    {
+        get
+        {
+            if (IsGameRunning) return "Закройте Minecraft, чтобы запустить снова";
+            return $"Выделено {Math.Round(_configService.CurrentConfig.RamMb / 1024.0, 0)} ГБ памяти";
+        }
+    }
 
     public ObservableCollection<string> GameLogs { get; } = new();
 

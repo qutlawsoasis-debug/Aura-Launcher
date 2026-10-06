@@ -4,31 +4,34 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="512" d:DesignWidth="584"
+             Focusable="False"
+             FocusVisualStyle="{x:Null}"
+             ClipToBounds="False"
              Background="Transparent">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <Grid Background="Transparent">
+    <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" /> <!-- Header -->
             <RowDefinition Height="*" />    <!-- Content -->
         </Grid.RowDefinitions>
 
-        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,28">
+        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle (Height=Auto, LineHeight 66, Margin сверху 6px) -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,28" Focusable="False">
             <TextBlock Text="Скин"
                        FontFamily="{StaticResource HeadingFont}"
                        FontSize="60"
                        FontWeight="SemiBold"
                        Foreground="{StaticResource InkBrush}"
-                       LineHeight="54"
+                       Height="Auto"
+                       LineHeight="66"
                        LineStackingStrategy="BlockLineHeight"
-                       Margin="-2,-6,0,6">
+                       Margin="0,6,0,6">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="270" ShadowDepth="2" />
+                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
             <TextBlock Text="Внешний вид персонажа в сетевой игре"

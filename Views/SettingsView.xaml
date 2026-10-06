@@ -4,32 +4,35 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="512" d:DesignWidth="584"
+             Focusable="False"
+             FocusVisualStyle="{x:Null}"
+             ClipToBounds="False"
              Background="Transparent">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <Grid Background="Transparent">
+    <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" /> <!-- Header -->
             <RowDefinition Height="*" />    <!-- Content -->
         </Grid.RowDefinitions>
 
-        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle, top-right "Сохранено" -->
-        <Grid Grid.Row="0" Margin="0,0,0,28">
+        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle (Height=Auto, LineHeight 66, Margin сверху 6px) -->
+        <Grid Grid.Row="0" Margin="0,0,0,28" Focusable="False">
             <StackPanel HorizontalAlignment="Left">
                 <TextBlock Text="Настройки"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="60"
                            FontWeight="SemiBold"
                            Foreground="{StaticResource InkBrush}"
-                           LineHeight="54"
+                           Height="Auto"
+                           LineHeight="66"
                            LineStackingStrategy="BlockLineHeight"
-                           Margin="-2,-6,0,6">
+                           Margin="0,6,0,6">
                     <TextBlock.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="270" ShadowDepth="2" />
+                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                     </TextBlock.Effect>
                 </TextBlock>
                 <TextBlock Text="Параметры запуска и игровые настройки"
@@ -52,7 +55,7 @@
         </Grid>
 
         <!-- Main Content: Three rows with 14px dim label on left (150px col), content on right, 1px lines between -->
-        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+        <StackPanel Grid.Row="1" VerticalAlignment="Top" Focusable="False">
             
             <!-- ROW 1: "Ник в игре" -->
             <!-- borderless box with 2px bottom line (focus ember, error bad), 20px text, error note -->
@@ -81,6 +84,9 @@
                             <Style TargetType="Border">
                                 <Setter Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
                                 <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFocused, ElementName=NickInputBox}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                                    </DataTrigger>
                                     <DataTrigger Binding="{Binding HasNicknameError}" Value="True">
                                         <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
                                     </DataTrigger>

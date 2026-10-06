@@ -729,7 +729,21 @@ public static class SceneDiagnostics
             await Task.Delay(500);
             SaveShot($"{prefix}_tab_play.png");
 
-            // 1b. ИГРАТЬ с наведением на меню (проверка: заголовок Aura не сдвигается)
+            // 1b. ИГРАТЬ после клика (игра запущена: видна надпись "Закройте Minecraft, чтобы запустить снова")
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.IsGameRunning = true;
+            });
+            await Task.Delay(300);
+            SaveShot($"{prefix}_tab_play_clicked.png");
+            SaveShot($"{prefix}_tab_play_running.png");
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.IsGameRunning = false;
+            });
+            await Task.Delay(200);
+
+            // 1c. ИГРАТЬ с наведением на меню (проверка: заголовок Aura не сдвигается)
             window.Dispatcher.Invoke(() =>
             {
                 window.AnimateMenuDimming(window.MenuBtnLobby, isHovered: true);

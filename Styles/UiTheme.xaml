@@ -66,6 +66,57 @@
                  DecodePixelWidth="1920"
                  CacheOption="OnLoad" />
 
+    <!-- KEYBOARD FOCUS VISUAL (2px solid ember, not dotted) -->
+    <Style x:Key="EmberKeyboardFocusVisual">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderBrush="{StaticResource EmberBrush}"
+                            BorderThickness="2"
+                            CornerRadius="3"
+                            SnapsToDevicePixels="True"
+                            Margin="-2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Global defaults: Null FocusVisualStyle and Focusable=False for containers -->
+    <Style TargetType="{x:Type UserControl}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="ClipToBounds" Value="False" />
+    </Style>
+
+    <Style TargetType="{x:Type ContentControl}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Focusable" Value="False" />
+    </Style>
+
+    <Style TargetType="{x:Type Grid}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Focusable" Value="False" />
+    </Style>
+
+    <Style TargetType="{x:Type Border}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    </Style>
+
+    <Style TargetType="{x:Type StackPanel}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Focusable" Value="False" />
+    </Style>
+
+    <!-- Base Button keyboard focus -->
+    <Style TargetType="{x:Type Button}">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
+    </Style>
+
+    <!-- Base TextBox keyboard focus -->
+    <Style TargetType="{x:Type TextBox}">
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
+    </Style>
+
     <!-- ============================================== -->
     <!-- 2. BUTTON STYLES                               -->
     <!-- ============================================== -->
@@ -74,7 +125,7 @@
     <!-- Hover: bg 17%, lift 1px. Press: depress 2px, border 1px. 120ms -->
     <Style x:Key="StandardBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Height" Value="48" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -128,7 +179,7 @@
     <!-- Main Button (Primary): gradient #F7B44F -> #EB962B, text #1C1106, bottom border 4px #A85F12, glow shadow ember, radius 3px -->
     <Style x:Key="PrimaryNeonBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Height" Value="48" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
         <Setter Property="FontWeight" Value="SemiBold" />
@@ -202,7 +253,7 @@
     <!-- Large Play Button (260x70, font 28) with sheen sweep and bottom launch progress bar -->
     <Style x:Key="OverviewPlayBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Width" Value="260" />
         <Setter Property="Height" Value="70" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
@@ -313,7 +364,7 @@
         <Setter Property="Foreground" Value="{StaticResource MuteBrush}" />
         <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -337,7 +388,7 @@
         <Setter Property="Foreground" Value="{StaticResource BadBrush}" />
         <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
