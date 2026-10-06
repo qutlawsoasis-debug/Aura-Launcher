@@ -14,14 +14,13 @@
         FontFamily="{StaticResource MainFont}">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="0" CornerRadius="6" CaptionHeight="40" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
+        <WindowChrome GlassFrameThickness="0" CornerRadius="3" CaptionHeight="40" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <core:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
 
-        <!-- DataTemplates для динамической смены содержимого вкладок -->
         <DataTemplate DataType="{x:Type vm:OverviewViewModel}">
             <views:OverviewView />
         </DataTemplate>
@@ -34,12 +33,161 @@
         <DataTemplate DataType="{x:Type vm:LobbyViewModel}">
             <views:LobbyView />
         </DataTemplate>
+
+        <!-- Menu Item RadioButton Style:
+             Row height 50px, Oswald 500 40px.
+             Ember 10x10 square (radius 2) to the left of word:
+               active scale 1, hover scale 0.6, else scale 0 (160ms animation).
+             Active word white/ink, others dim (62%).
+             Hover: word shifts right by 8px in 160ms;
+             When any item hovered, other items drop to opacity 0.42 (handled in code-behind / triggers).
+             Content area does NOT shift!
+        -->
+        <Style x:Key="GameMenuRadio" TargetType="RadioButton">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Height" Value="50" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="GroupName" Value="GameMainMenu" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Grid Background="Transparent">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Ember 10x10 square with radius 2 -->
+                                <Border x:Name="DotSquare"
+                                        Width="10" Height="10"
+                                        CornerRadius="2"
+                                        Background="{StaticResource EmberBrush}"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,14,0"
+                                        RenderTransformOrigin="0.5,0.5">
+                                    <Border.RenderTransform>
+                                        <ScaleTransform x:Name="DotScale" ScaleX="0" ScaleY="0" />
+                                    </Border.RenderTransform>
+                                </Border>
+
+                                <!-- Text with 8px horizontal translation -->
+                                <TextBlock x:Name="MenuText"
+                                           Text="{TemplateBinding Content}"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="40"
+                                           FontWeight="Medium"
+                                           Foreground="{StaticResource DimInkBrush}"
+                                           VerticalAlignment="Center"
+                                           RenderTransformOrigin="0,0.5">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="TextTrans" X="0" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <!-- Checked state: Scale 1, Color Ink -->
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="MenuText" Property="Foreground" Value="{StaticResource InkBrush}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="1.0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="1.0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                            </Trigger>
+
+                            <!-- Hover state: Scale 0.6 (if unchecked) or keep 1 (if checked), shift text +8px -->
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <MultiTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.6" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.6" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </MultiTrigger.EnterActions>
+                                <MultiTrigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleX"
+                                                             To="0.0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="DotScale" Storyboard.TargetProperty="ScaleY"
+                                                             To="0.0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </MultiTrigger.ExitActions>
+                            </MultiTrigger>
+
+                            <!-- Hover shift: text shifts right by 8px in 160ms -->
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="TextTrans" Storyboard.TargetProperty="X"
+                                                             To="8" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="TextTrans" Storyboard.TargetProperty="X"
+                                                             To="0" Duration="0:0:0.160">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <!-- Внешний контейнер окна (1px рамка #232936, скругление 6px) -->
-    <Border Background="{StaticResource BgDeepBrush}" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="6" ClipToBounds="True">
+    <!-- Outer Window Border: 980x620, radius 3px -->
+    <Border Background="{StaticResource NightBrush}" BorderThickness="1" BorderBrush="{StaticResource LineInkBrush}" CornerRadius="3" ClipToBounds="True">
         <Grid>
-            <!-- 0. Статичный фон игрового мира (без параллакса и смещений мыши) -->
+            <!-- 0. STATIC WORLD ART BACKGROUND ON ALL SCREENS (no parallax) -->
             <Image x:Name="BgWorldImage"
                    Source="{StaticResource WorldBackgroundBitmap}"
                    Stretch="UniformToFill"
@@ -47,307 +195,241 @@
                    VerticalAlignment="Center"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 
-            <!-- Затемняющая подложка -->
-            <Border Background="#C612151B" />
-
-            <!-- Основная сетка: левый сайдбар + правая рабочая область -->
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <!-- Сайдбар (72px -> 200px) -->
-                    <ColumnDefinition Width="*" />
-                    <!-- Основное рабочее пространство -->
-                </Grid.ColumnDefinitions>
-
-                <!-- ============================================== -->
-                <!-- 1. LEFT COLLAPSIBLE SIDEBAR                    -->
-                <!-- ============================================== -->
-                <Border x:Name="SidebarBorder"
-                        Grid.Column="0"
-                        Width="72"
-                        Background="#F013161D"
-                        BorderThickness="0,0,1,0"
-                        BorderBrush="{StaticResource BorderBrush}"
-                        ClipToBounds="True"
-                        Panel.ZIndex="30"
-                        MouseEnter="Sidebar_MouseEnter"
-                        MouseLeave="Sidebar_MouseLeave"
-                        WindowChrome.IsHitTestVisibleInChrome="True">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="64" />
-                            <!-- Шапка сайдбара: Логотип и версия -->
-                            <RowDefinition Height="*" />
-                            <!-- Навигационные вкладки -->
-                            <RowDefinition Height="Auto" />
-                            <!-- Подвал: Звук + Аватар игрока -->
-                        </Grid.RowDefinitions>
-
-                        <!-- Шапка: Логотип и версия -->
-                        <Grid Grid.Row="0" VerticalAlignment="Center" Height="56" ClipToBounds="True">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="70" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0"
-                                   Source="pack://application:,,,/AuraLauncher;component/app_icon.png"
-                                   Width="28" Height="28"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                                <TextBlock Text="Aura"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="15" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentBrush}"
-                                           VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Border Background="#172C24" CornerRadius="4" Padding="5,2" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding LauncherVersionText}" FontSize="10" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
-                                </Border>
-                            </StackPanel>
-                        </Grid>
-
-                        <!-- Вкладки навигации -->
-                        <StackPanel Grid.Row="1" Margin="0,8,0,0">
-                            <!-- 1. Играть -->
-                            <RadioButton x:Name="TabOverview" Command="{Binding NavigateCommand}" CommandParameter="Overview"
-                                         IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
-                                         GroupName="SidebarTabs"
-                                         Style="{StaticResource SidebarTabRadio}">
-                                <Grid Height="44">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="68" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Path Grid.Column="0" Data="M6,4 L18,12 L6,20 Z"
-                                          Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="14" Height="14" Stretch="Uniform"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="Играть"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="13" FontWeight="SemiBold"
-                                               VerticalAlignment="Center" Margin="4,0,0,0" />
-                                </Grid>
-                            </RadioButton>
-
-                            <!-- 2. Скин -->
-                            <RadioButton x:Name="TabWardrobe" Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
-                                         IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
-                                         GroupName="SidebarTabs"
-                                         Style="{StaticResource SidebarTabRadio}">
-                                <Grid Height="44">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="68" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Path Grid.Column="0" Data="M12,4 A4,4 0 1,0 12,12 A4,4 0 1,0 12,4 Z M4,20 C4,16 7.5,15 12,15 C16.5,15 20,16 20,20 Z"
-                                          Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="15" Height="15" Stretch="Uniform"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="Скин"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="13" FontWeight="SemiBold"
-                                               VerticalAlignment="Center" Margin="4,0,0,0" />
-                                </Grid>
-                            </RadioButton>
-
-                            <!-- 3. Лобби -->
-                            <RadioButton x:Name="TabLobby" Command="{Binding NavigateCommand}" CommandParameter="Lobby"
-                                         IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
-                                         GroupName="SidebarTabs"
-                                         Style="{StaticResource SidebarTabRadio}">
-                                <Grid Height="44">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="68" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Path Grid.Column="0" Data="M16,11 C17.66,11 18.99,9.66 18.99,8 C18.99,6.34 17.66,5 16,5 C14.34,5 13,6.34 13,8 C13,9.66 14.34,11 16,11 Z M8,11 C9.66,11 11,9.66 11,8 C11,6.34 9.66,5 8,5 C6.34,5 5,6.34 5,8 C5,9.66 6.34,11 8,11 Z M8,13 C5.67,13 1,14.17 1,16.5 L1,19 L15,19 L15,16.5 C15,14.17 10.33,13 8,13 Z M16,13 C15.71,13 15.38,13.02 15.03,13.05 C16.19,13.89 17,15.02 17,16.5 L17,19 L23,19 L23,16.5 C23,14.17 18.33,13 16,13 Z"
-                                          Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="16" Height="16" Stretch="Uniform"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="Лобби"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="13" FontWeight="SemiBold"
-                                               VerticalAlignment="Center" Margin="4,0,0,0" />
-                                </Grid>
-                            </RadioButton>
-
-                            <!-- 4. Настройки -->
-                            <RadioButton x:Name="TabSettings" Command="{Binding NavigateCommand}" CommandParameter="Settings"
-                                         IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
-                                         GroupName="SidebarTabs"
-                                         Style="{StaticResource SidebarTabRadio}">
-                                <Grid Height="44">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="68" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Path Grid.Column="0" Data="M12,15.5 A3.5,3.5 0 1,0 12,8.5 A3.5,3.5 0 1,0 12,15.5 Z M19.4,13 C19.45,12.67 19.5,12.34 19.5,12 C19.5,11.66 19.45,11.33 19.4,11 L21.5,9.35 C21.7,9.2 21.75,8.93 21.62,8.71 L19.62,5.25 C19.5,5.03 19.23,4.95 19,5.04 L16.5,6.05 C16,5.66 15.44,5.34 14.84,5.1 L14.45,2.46 C14.42,2.2 14.2,2 13.94,2 L9.94,2 C9.68,2 9.46,2.2 9.43,2.46 L9.04,5.1 C8.44,5.34 7.88,5.66 7.38,6.05 L4.88,5.04 C4.65,4.95 4.38,5.03 4.26,5.25 L2.26,8.71 C2.13,8.93 2.18,9.2 2.38,9.35 L4.48,11 C4.43,11.33 4.38,11.66 4.38,12 C4.38,12.34 4.43,12.67 4.48,13 L2.38,14.65 C2.18,14.8 2.13,15.07 2.26,15.29 L4.26,18.75 C4.38,18.97 4.65,19.05 4.88,18.96 L7.38,17.95 C7.88,18.34 8.44,18.66 9.04,18.9 L9.43,21.54 C9.46,21.8 9.68,22 9.94,22 L13.94,22 C14.2,22 14.42,21.8 14.45,21.54 L14.84,18.9 C15.44,18.66 16,18.34 16.5,17.95 L19,18.96 C19.23,19.05 19.5,18.97 19.62,18.75 L21.62,15.29 C21.75,15.07 21.7,14.8 21.5,14.65 Z"
-                                          Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
-                                          Width="16" Height="16" Stretch="Uniform"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="Настройки"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="13" FontWeight="SemiBold"
-                                               VerticalAlignment="Center" Margin="4,0,0,0" />
-                                </Grid>
-                            </RadioButton>
-                        </StackPanel>
-
-                        <!-- Подвал сайдбара: Звук гимна + Аватар и ник игрока -->
-                        <StackPanel Grid.Row="2" Margin="0,0,0,16">
-                            <!-- Блок звука: иконка + ползунок, выдвигающийся ВПРАВО (180мс) -->
-                            <Grid x:Name="SoundControlRoot"
-                                  Background="Transparent"
-                                  MouseEnter="SoundControl_MouseEnter"
-                                  MouseLeave="SoundControl_MouseLeave"
-                                  Height="40" Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="70" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Кнопка звука центрирована в 72px -->
-                                <Button Grid.Column="0" Command="{Binding ToggleMuteCommand}"
-                                        Style="{StaticResource WinSoundBtn}"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                                        ToolTip="Гимн: включить / выключить звук"
-                                        Cursor="Hand">
-                                    <Grid Width="16" Height="16">
-                                        <!-- Звук включен -->
-                                        <Path x:Name="IconSoundOn"
-                                              Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M11.5,5.5 C12.8,6.8 13.5,8.3 13.5,10 C13.5,11.7 12.8,13.2 11.5,14.5 M13.8,3.2 C15.8,5.2 16.8,7.5 16.8,10 C16.8,12.5 15.8,14.8 13.8,16.8"
-                                              Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              StrokeThickness="1.2"
-                                              StrokeLineJoin="Round"
-                                              StrokeStartLineCap="Round"
-                                              StrokeEndLineCap="Round"
-                                              Stretch="Uniform"
-                                              Visibility="{Binding IsAnthemMuted, Converter={StaticResource InverseBoolToVis}}" />
-
-                                        <!-- Звук выключен -->
-                                        <Path x:Name="IconSoundMuted"
-                                              Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M12,7 L16,11 M16,7 L12,11"
-                                              Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              StrokeThickness="1.4"
-                                              StrokeLineJoin="Round"
-                                              StrokeStartLineCap="Round"
-                                              StrokeEndLineCap="Round"
-                                              Stretch="Uniform"
-                                              Visibility="{Binding IsAnthemMuted, Converter={StaticResource BoolToVis}}" />
-                                    </Grid>
-                                </Button>
-
-                                <!-- Выдвигающийся ВПРАВО ползунок громкости -->
-                                <Border Grid.Column="1" x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center" HorizontalAlignment="Left">
-                                    <Slider x:Name="HeaderVolSlider"
-                                            Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
-                                            Value="{Binding AnthemVolume, Mode=TwoWay}"
-                                            Style="{StaticResource HeaderVolumeSlider}"
-                                            Width="76" Margin="4,0,0,0"
-                                            ToolTip="Громкость гимна" />
-                                </Border>
-                            </Grid>
-
-                            <!-- Разделитель -->
-                            <Border Height="1" Background="{StaticResource BorderBrush}" Margin="12,0,12,12" />
-
-                            <!-- Аватарка (32x32) и никнейм -->
-                            <Grid Height="36" ClipToBounds="True">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="70" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Width="32" Height="32" Background="{StaticResource SurfaceBrush}"
-                                        BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="6"
-                                        ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Image Source="{Binding PlayerAvatar}" Width="32" Height="32"
-                                           RenderOptions.BitmapScalingMode="NearestNeighbor" Stretch="UniformToFill" />
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="{Binding PlayerNickname}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="13" FontWeight="SemiBold"
-                                           Foreground="{StaticResource TextPrimaryBrush}"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" Margin="4,0,12,0" />
-                            </Grid>
-                        </StackPanel>
-                    </Grid>
+            <!-- OVERVIEW BACKGROUND GRADIENTS (left-to-right 92%->72%->12%->0, bottom-to-top 70%->0) -->
+            <Grid x:Name="OverviewGradientOverlay" IsHitTestVisible="False">
+                <!-- Left-to-right gradient -->
+                <Border>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                            <GradientStop Color="#EB050C10" Offset="0.0" />  <!-- 92% at 0 -->
+                            <GradientStop Color="#B8050C10" Offset="0.30" /> <!-- 72% at 30% -->
+                            <GradientStop Color="#1F050C10" Offset="0.62" /> <!-- 12% at 62% -->
+                            <GradientStop Color="#00050C10" Offset="0.80" /> <!-- 0 at 80% -->
+                            <GradientStop Color="#00050C10" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Background>
                 </Border>
+                <!-- Bottom-to-top gradient (70% at 0 to 0 at 42%) -->
+                <Border>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,1" EndPoint="0,0">
+                            <GradientStop Color="#B3050C10" Offset="0.0" />  <!-- 70% at 0 -->
+                            <GradientStop Color="#00050C10" Offset="0.42" /> <!-- 0 at 42% -->
+                            <GradientStop Color="#00050C10" Offset="1.0" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+            </Grid>
 
-                <!-- ============================================== -->
-                <!-- 2. MAIN WORKSPACE                              -->
-                <!-- ============================================== -->
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="40" />
-                        <!-- Верхняя плавающая строка с кнопками окна -->
-                        <RowDefinition Height="*" />
-                        <!-- Контент активной вкладки -->
-                    </Grid.RowDefinitions>
+            <!-- OTHER SCREENS OVERLAY (rgba(6,14,18,0.66) fade-in 300ms) -->
+            <Border x:Name="OtherScreensOverlay"
+                    Background="#A8060E12"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
 
-                    <!-- Плавающие кнопки свернуть / закрыть в правом верхнем углу -->
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                WindowChrome.IsHitTestVisibleInChrome="True" Panel.ZIndex="50">
-                        <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" />
-                        <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" />
+            <!-- ============================================== -->
+            <!-- 1. TOP HEADER                                  -->
+            <!-- ============================================== -->
+            <!-- Top-left: x=20, y=14: 12px "Aura" (600) + "beta 1.0.5" (mute) -->
+            <Canvas Height="40" VerticalAlignment="Top" Panel.ZIndex="50">
+                <StackPanel Canvas.Left="20" Canvas.Top="14" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Aura "
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkBrush}" />
+                    <TextBlock Text="{Binding LauncherVersionText}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               FontWeight="Normal"
+                               Foreground="{StaticResource MuteBrush}" />
+                </StackPanel>
+            </Canvas>
+
+            <!-- Top-right: Sound Icon + Minimize + Close (32x34 each, on hover white 10%) -->
+            <!-- Sound icon: on hover volume slider (112px wide) slides out to the LEFT in 180ms, collapses 400ms after mouse leave -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,8,12,0" Panel.ZIndex="60"
+                        WindowChrome.IsHitTestVisibleInChrome="True">
+                
+                <!-- Sound Root: slider on left, button on right -->
+                <Grid x:Name="SoundControlRoot"
+                      Background="Transparent"
+                      MouseEnter="SoundControl_MouseEnter"
+                      MouseLeave="SoundControl_MouseLeave"
+                      Height="34" Margin="0,0,4,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Sliding Volume Box to the LEFT (Width 0 -> 112) -->
+                        <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center">
+                            <Slider x:Name="HeaderVolSlider"
+                                    Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                                    Value="{Binding AnthemVolume, Mode=TwoWay}"
+                                    Style="{StaticResource HeaderVolumeSlider}"
+                                    Width="112" Margin="0,0,8,0"
+                                    ToolTip="Громкость гимна" />
+                        </Border>
+
+                        <!-- Sound Button -->
+                        <Button Command="{Binding ToggleMuteCommand}"
+                                Style="{StaticResource WinSoundBtn}"
+                                ToolTip="Гимн: звук включён / выключен">
+                            <Grid Width="16" Height="16">
+                                <!-- Sound On -->
+                                <Path x:Name="IconSoundOn"
+                                      Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M11.5,5.5 C12.8,6.8 13.5,8.3 13.5,10 C13.5,11.7 12.8,13.2 11.5,14.5 M13.8,3.2 C15.8,5.2 16.8,7.5 16.8,10 C16.8,12.5 15.8,14.8 13.8,16.8"
+                                      Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.2"
+                                      StrokeLineJoin="Round"
+                                      Stretch="Uniform"
+                                      Visibility="{Binding IsAnthemMuted, Converter={StaticResource InverseBoolToVis}}" />
+                                <!-- Sound Muted -->
+                                <Path x:Name="IconSoundMuted"
+                                      Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M12,7 L16,11 M16,7 L12,11"
+                                      Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.4"
+                                      StrokeLineJoin="Round"
+                                      Stretch="Uniform"
+                                      Visibility="{Binding IsAnthemMuted, Converter={StaticResource BoolToVis}}" />
+                            </Grid>
+                        </Button>
                     </StackPanel>
-
-                    <!-- Контент активного раздела: плавный выезд 10px + fade-in 180 мс -->
-                    <ContentControl Grid.Row="1" Content="{Binding CurrentView, NotifyOnTargetUpdated=True}" Panel.ZIndex="1">
-                        <ContentControl.RenderTransform>
-                            <TranslateTransform x:Name="ContentSlideTrans" Y="0" />
-                        </ContentControl.RenderTransform>
-                        <ContentControl.Triggers>
-                            <EventTrigger RoutedEvent="Binding.TargetUpdated">
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         From="0.0" To="1.0" Duration="0:0:0.180">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut" />
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                         From="10.0" To="0.0" Duration="0:0:0.180">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut" />
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </EventTrigger>
-                        </ContentControl.Triggers>
-                    </ContentControl>
-
-                    <!-- Плавающий баннер обновления -->
-                    <Border Grid.Row="1" VerticalAlignment="Top" HorizontalAlignment="Center"
-                            Margin="0,16,0,0" Panel.ZIndex="50"
-                            Background="#F0181C24" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                            CornerRadius="8" Padding="16,12"
-                            Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Width="8" Height="8" CornerRadius="4" Background="{StaticResource AccentBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
-                            <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
-                                <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" />
-                                <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,2,0,0" />
-                            </StackPanel>
-
-                            <Button Command="{Binding ApplyBannerUpdateCommand}"
-                                    Style="{StaticResource PrimaryNeonBtn}"
-                                    Height="32" Padding="14,0" FontSize="12" FontWeight="SemiBold"
-                                    Content="{Binding UpdateBannerButtonText}"
-                                    Margin="0,0,10,0" VerticalAlignment="Center" />
-
-                            <Button Command="{Binding DismissBannerCommand}"
-                                    Style="{StaticResource WinCloseBtn}"
-                                    Width="26" Height="26" FontSize="11"
-                                    Content="✕" ToolTip="Закрыть"
-                                    VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
                 </Grid>
+
+                <!-- Minimize & Close Buttons -->
+                <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" />
+                <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" />
+            </StackPanel>
+
+            <!-- ============================================== -->
+            <!-- 2. GAME MENU & PLAYER INFO (LEFT SIDE)         -->
+            <!-- ============================================== -->
+            <Canvas Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">
+                <!-- Game Menu (4 words: Играть, Лобби, Скин, Настройки):
+                     x=50, bottom edge 128px from bottom (i.e. top = 620 - 128 - 4*50 = 292) -->
+                <StackPanel x:Name="GameMenuPanel"
+                            Canvas.Left="50" Canvas.Top="292"
+                            Width="250"
+                            WindowChrome.IsHitTestVisibleInChrome="True">
+                    
+                    <!-- 1. Играть -->
+                    <RadioButton x:Name="MenuBtnPlay" Content="Играть"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Overview"
+                                 IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
+                                 Style="{StaticResource GameMenuRadio}"
+                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+
+                    <!-- 2. Лобби -->
+                    <RadioButton x:Name="MenuBtnLobby" Content="Лобби"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Lobby"
+                                 IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
+                                 Style="{StaticResource GameMenuRadio}"
+                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+
+                    <!-- 3. Скин -->
+                    <RadioButton x:Name="MenuBtnSkin" Content="Скин"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
+                                 IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
+                                 Style="{StaticResource GameMenuRadio}"
+                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+
+                    <!-- 4. Настройки -->
+                    <RadioButton x:Name="MenuBtnSettings" Content="Настройки"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Settings"
+                                 IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
+                                 Style="{StaticResource GameMenuRadio}"
+                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                </StackPanel>
+
+                <!-- Player info: x=56, bottom 40px (top = 620 - 40 - 40 = 540)
+                     head 40x40 (nearest neighbor / aliased pixel scaling), nickname 16px 600, below "N ГБ памяти" 12px mute -->
+                <StackPanel Canvas.Left="56" Canvas.Top="540" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="40" Height="40" CornerRadius="2" ClipToBounds="True" Background="#141E26" Margin="0,0,12,0">
+                        <Image Source="{Binding PlayerAvatar}" Width="40" Height="40"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"
+                               RenderOptions.EdgeMode="Aliased"
+                               Stretch="UniformToFill" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="{Binding PlayerNickname}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="16" FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextTrimming="CharacterEllipsis" MaxWidth="180" />
+                        <TextBlock Text="{Binding RamFormatted}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12" FontWeight="Normal"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Canvas>
+
+            <!-- ============================================== -->
+            <!-- 3. CONTENT AREA (BOUNDS: LEFT 340, RIGHT 56,  -->
+            <!--    TOP 64, BOTTOM 44). FIXED POSITION!         -->
+            <!-- ============================================== -->
+            <!-- Transition: old fades out 100ms, new fades in 220ms with 100ms delay, translateY 8 -> 0 -->
+            <Grid Margin="340,64,56,44" ClipToBounds="True" Panel.ZIndex="30">
+                <ContentControl x:Name="MainContentHost"
+                                Content="{Binding CurrentView, NotifyOnTargetUpdated=True}"
+                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <ContentControl.RenderTransform>
+                        <TranslateTransform x:Name="ContentSlideTrans" Y="0" />
+                    </ContentControl.RenderTransform>
+                    <ContentControl.Triggers>
+                        <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                     From="0.0" To="1.0"
+                                                     Duration="0:0:0.220"
+                                                     BeginTime="0:0:0.100">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                     From="8.0" To="0.0"
+                                                     Duration="0:0:0.220"
+                                                     BeginTime="0:0:0.100">
+                                        <DoubleAnimation.EasingFunction>
+                                            <CubicEase EasingMode="EaseOut" />
+                                        </DoubleAnimation.EasingFunction>
+                                    </DoubleAnimation>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </ContentControl.Triggers>
+                </ContentControl>
+
+                <!-- Floating update toast banner -->
+                <Border VerticalAlignment="Top" HorizontalAlignment="Right"
+                        Margin="0,8,0,0" Panel.ZIndex="100"
+                        Background="#E0071017" BorderBrush="{StaticResource EmberBrush}" BorderThickness="1"
+                        CornerRadius="3" Padding="14,10"
+                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="8" Height="8" CornerRadius="2" Background="{StaticResource EmberBrush}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,14,0">
+                            <TextBlock Text="{Binding UpdateBannerTitle}" Foreground="{StaticResource InkBrush}" FontSize="13" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding UpdateBannerMessage}" Foreground="{StaticResource DimInkBrush}" FontSize="11" Margin="0,2,0,0" />
+                        </StackPanel>
+
+                        <Button Command="{Binding ApplyBannerUpdateCommand}"
+                                Style="{StaticResource PrimaryNeonBtn}"
+                                Height="30" Padding="12,0" FontSize="12"
+                                Content="{Binding UpdateBannerButtonText}"
+                                Margin="0,0,8,0" VerticalAlignment="Center" />
+
+                        <Button Command="{Binding DismissBannerCommand}"
+                                Style="{StaticResource WinCloseBtn}"
+                                Width="24" Height="24" FontSize="11"
+                                Content="✕" ToolTip="Закрыть"
+                                VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
     </Border>

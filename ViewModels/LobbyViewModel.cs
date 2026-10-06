@@ -161,6 +161,7 @@ public class LobbyViewModel : ObservableObject
             if (SetProperty(ref _isInLobby, value))
             {
                 RaiseAllCommands();
+                NotifyCellPropertiesChanged();
             }
         }
     }
@@ -194,7 +195,13 @@ public class LobbyViewModel : ObservableObject
     public string? LobbyCode
     {
         get => _lobbyCode;
-        private set => SetProperty(ref _lobbyCode, value);
+        private set
+        {
+            if (SetProperty(ref _lobbyCode, value))
+            {
+                NotifyCellPropertiesChanged();
+            }
+        }
     }
 
     public string HostStatusText
@@ -236,14 +243,69 @@ public class LobbyViewModel : ObservableObject
         get => _guestCodeInput;
         set
         {
-            // Ограничиваем до 6 символов и приводим к верхнему регистру
-            var cleaned = (value ?? string.Empty).Trim().ToUpperInvariant();
-            if (cleaned.Length > 6) cleaned = cleaned[..6];
+            // Ограничиваем до 6 символов, только A-Z и 0-9
+            var raw = value ?? string.Empty;
+            var cleaned = new string(raw.Where(c => char.IsLetterOrDigit(c)).Select(char.ToUpperInvariant).Take(6).ToArray());
             if (SetProperty(ref _guestCodeInput, cleaned))
             {
                 RaiseAllCommands();
+                NotifyCellPropertiesChanged();
             }
         }
+    }
+
+    // Посимвольный доступ к ячейкам кода (для хоста или гостя)
+    public string DisplayCode => IsInLobby ? (LobbyCode ?? string.Empty) : GuestCodeInput;
+    public string CodeChar0 => GetCodeChar(0);
+    public string CodeChar1 => GetCodeChar(1);
+    public string CodeChar2 => GetCodeChar(2);
+    public string CodeChar3 => GetCodeChar(3);
+    public string CodeChar4 => GetCodeChar(4);
+    public string CodeChar5 => GetCodeChar(5);
+
+    public bool IsCellFilled0 => DisplayCode.Length > 0;
+    public bool IsCellFilled1 => DisplayCode.Length > 1;
+    public bool IsCellFilled2 => DisplayCode.Length > 2;
+    public bool IsCellFilled3 => DisplayCode.Length > 3;
+    public bool IsCellFilled4 => DisplayCode.Length > 4;
+    public bool IsCellFilled5 => DisplayCode.Length > 5;
+
+    public bool IsCellCurrent0 => !IsInLobby && DisplayCode.Length == 0;
+    public bool IsCellCurrent1 => !IsInLobby && DisplayCode.Length == 1;
+    public bool IsCellCurrent2 => !IsInLobby && DisplayCode.Length == 2;
+    public bool IsCellCurrent3 => !IsInLobby && DisplayCode.Length == 3;
+    public bool IsCellCurrent4 => !IsInLobby && DisplayCode.Length == 4;
+    public bool IsCellCurrent5 => !IsInLobby && DisplayCode.Length == 5;
+
+    private string GetCodeChar(int index)
+    {
+        var code = DisplayCode;
+        return index < code.Length ? code[index].ToString() : string.Empty;
+    }
+
+    private void NotifyCellPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(DisplayCode));
+        OnPropertyChanged(nameof(CodeChar0));
+        OnPropertyChanged(nameof(CodeChar1));
+        OnPropertyChanged(nameof(CodeChar2));
+        OnPropertyChanged(nameof(CodeChar3));
+        OnPropertyChanged(nameof(CodeChar4));
+        OnPropertyChanged(nameof(CodeChar5));
+
+        OnPropertyChanged(nameof(IsCellFilled0));
+        OnPropertyChanged(nameof(IsCellFilled1));
+        OnPropertyChanged(nameof(IsCellFilled2));
+        OnPropertyChanged(nameof(IsCellFilled3));
+        OnPropertyChanged(nameof(IsCellFilled4));
+        OnPropertyChanged(nameof(IsCellFilled5));
+
+        OnPropertyChanged(nameof(IsCellCurrent0));
+        OnPropertyChanged(nameof(IsCellCurrent1));
+        OnPropertyChanged(nameof(IsCellCurrent2));
+        OnPropertyChanged(nameof(IsCellCurrent3));
+        OnPropertyChanged(nameof(IsCellCurrent4));
+        OnPropertyChanged(nameof(IsCellCurrent5));
     }
 
     public bool IsGuestJoined
@@ -261,7 +323,7 @@ public class LobbyViewModel : ObservableObject
     public string GuestStatusText
     {
         get => _guestStatusText;
-        private set { if (SetProperty(ref _guestStatusText, value)) NotifyStatusStateChanged(); }
+        internal set { if (SetProperty(ref _guestStatusText, value)) NotifyStatusStateChanged(); }
     }
 
     public bool CanGuestConnect
@@ -723,8 +785,8 @@ public class LobbyViewModel : ObservableObject
                 Clipboard.SetText(LobbyCode);
                 CodeCopied = true;
 
-                // Сбрасываем через 2 секунды
-                _ = Task.Delay(2000).ContinueWith(_ =>
+                // Сбрасываем через 1.6 секунды по спецификации задачи 27Б
+                _ = Task.Delay(1600).ContinueWith(_ =>
                 {
                     Application.Current?.Dispatcher?.InvokeAsync(() => CodeCopied = false);
                 });

@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using AuraLauncher.ViewModels;
@@ -7,9 +8,11 @@ using AuraLauncher.ViewModels;
 namespace AuraLauncher;
 
 /// <summary>
-/// Code-behind главного окна для анимации складного сайдбара и регулятора громкости.
-/// Параллакс полностью устранён (фон статичен).
-/// Бизнес-логика строго в ViewModels.
+/// Code-behind главного окна.
+/// Меню (Oswald 40px, 8px сдвиг, затемнение остальных пунктов до 0.42).
+/// Регулятор громкости выезжает влево на 112px.
+/// Затемнение других экранов rgba(6,14,18,0.66) 300ms fade-in.
+/// Контентная область неподвижна при наведении меню.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -18,29 +21,75 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Loaded += MainWindow_Loaded;
     }
 
-    private void Sidebar_MouseEnter(object sender, MouseEventArgs e)
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        AnimateSidebar(expanded: true);
+        if (DataContext is MainViewModel vm)
+        {
+            vm.PropertyChanged += (s, args) =>
+            {
+                if (args.PropertyName == nameof(MainViewModel.CurrentTabName) ||
+                    args.PropertyName == nameof(MainViewModel.IsOverviewActive))
+                {
+                    UpdateScreenOverlay(vm.IsOverviewActive);
+                }
+            };
+            UpdateScreenOverlay(vm.IsOverviewActive);
+        }
     }
 
-    private void Sidebar_MouseLeave(object sender, MouseEventArgs e)
+    private void UpdateScreenOverlay(bool isOverview)
     {
-        AnimateSidebar(expanded: false);
-    }
+        if (OtherScreensOverlay == null) return;
 
-    public void AnimateSidebar(bool expanded)
-    {
-        if (SidebarBorder == null) return;
-        double targetWidth = expanded ? 200.0 : 72.0;
-
-        var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
+        double targetOpacity = isOverview ? 0.0 : 1.0;
+        var anim = new DoubleAnimation(targetOpacity, TimeSpan.FromMilliseconds(300))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
+        OtherScreensOverlay.BeginAnimation(UIElement.OpacityProperty, anim);
+    }
 
-        SidebarBorder.BeginAnimation(FrameworkElement.WidthProperty, anim);
+    private void MenuItem_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (sender is FrameworkElement hoveredItem)
+        {
+            AnimateMenuDimming(hoveredItem, isHovered: true);
+        }
+    }
+
+    private void MenuItem_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (sender is FrameworkElement hoveredItem)
+        {
+            AnimateMenuDimming(hoveredItem, isHovered: false);
+        }
+    }
+
+    /// <summary>
+    /// При наведении на пункт меню: остальные слова опускаются до opacity 0.42.
+    /// Контент не сдвигается.
+    /// </summary>
+    public void AnimateMenuDimming(FrameworkElement activeItem, bool isHovered)
+    {
+        var items = new[] { MenuBtnPlay, MenuBtnLobby, MenuBtnSkin, MenuBtnSettings };
+        var duration = TimeSpan.FromMilliseconds(160);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+        foreach (var item in items)
+        {
+            if (item == null) continue;
+            double targetOpacity = 1.0;
+            if (isHovered && item != activeItem)
+            {
+                targetOpacity = 0.42;
+            }
+
+            var anim = new DoubleAnimation(targetOpacity, duration) { EasingFunction = ease };
+            item.BeginAnimation(UIElement.OpacityProperty, anim);
+        }
     }
 
     private void SoundControl_MouseEnter(object sender, MouseEventArgs e)
@@ -67,11 +116,11 @@ public partial class MainWindow : Window
         _sliderHideTimer.Start();
     }
 
-    private void AnimateSlider(bool open)
+    public void AnimateSlider(bool open)
     {
         if (SliderBox == null) return;
 
-        double targetWidth = open ? 82.0 : 0.0;
+        double targetWidth = open ? 120.0 : 0.0;
         double targetOpacity = open ? 1.0 : 0.0;
         var duration = TimeSpan.FromMilliseconds(180);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };

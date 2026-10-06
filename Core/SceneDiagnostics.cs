@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using AuraLauncher.Services.Interfaces;
 using AuraLauncher.Services.Implementations;
 using AuraLauncher.ViewModels;
+using AuraLauncher.Views;
 using AuraLauncher.Models;
 
 namespace AuraLauncher.Core;
@@ -723,27 +724,74 @@ public static class SceneDiagnostics
                 }
             }
 
-            // 1. Играть
+            // 1. ИГРАТЬ обычный
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
             await Task.Delay(500);
             SaveShot($"{prefix}_tab_play.png");
 
-            // 2. Скин
+            // 1b. ИГРАТЬ с наведением на меню (проверка: заголовок Aura не сдвигается)
+            window.Dispatcher.Invoke(() =>
+            {
+                window.AnimateMenuDimming(window.MenuBtnLobby, isHovered: true);
+            });
+            await Task.Delay(300);
+            SaveShot($"{prefix}_tab_play_menu_hover.png");
+            window.Dispatcher.Invoke(() =>
+            {
+                window.AnimateMenuDimming(window.MenuBtnPlay, isHovered: false);
+            });
+            await Task.Delay(200);
+
+            // 2. СКИН - спереди
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));
             await Task.Delay(500);
+            window.Dispatcher.Invoke(() =>
+            {
+                if (window.MainContentHost.Content is WardrobeViewModel)
+                {
+                    // front is default
+                }
+            });
             SaveShot($"{prefix}_tab_skin.png");
+            SaveShot($"{prefix}_tab_skin_front.png");
 
-            // 3. Настройки
+            // 2b. СКИН - сзади
+            await Task.Delay(200);
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                wardrobeView?.RotateToBack();
+            });
+            await Task.Delay(600);
+            SaveShot($"{prefix}_tab_skin_back.png");
+
+            // Return to front
+            window.Dispatcher.Invoke(() =>
+            {
+                var wardrobeView = FindVisualChild<WardrobeView>(window);
+                wardrobeView?.RotateToFront();
+            });
+            await Task.Delay(300);
+
+            // 3. НАСТРОЙКИ
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Settings"));
             await Task.Delay(500);
             SaveShot($"{prefix}_tab_settings.png");
 
-            // 4. Лобби - пусто
+            // 4. ЛОББИ - пусто
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
             await Task.Delay(500);
             SaveShot($"{prefix}_tab_lobby_empty.png");
 
-            // 5. Лобби - ожидание хоста (создаем лобби)
+            // 4b. ЛОББИ - гость ждет (симуляция гостя)
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.LobbyVM.GuestCodeInput = "ABC123";
+            });
+            await Task.Delay(200);
+            SaveShot($"{prefix}_tab_lobby_guest_input.png");
+
+            // 5. ЛОББИ - ожидание у хоста (создаем лобби)
             window.Dispatcher.Invoke(() => mainVm.LobbyVM.CreateLobbyCommand.Execute(null));
             for (int i = 0; i < 40; i++)
             {
@@ -753,7 +801,14 @@ public static class SceneDiagnostics
             await Task.Delay(500);
             SaveShot($"{prefix}_tab_lobby_waiting.png");
 
-            // 6. Лобби - мир открыт
+            // 5b. Гость ждет в лобби
+            window.Dispatcher.Invoke(() =>
+            {
+                mainVm.LobbyVM.GuestStatusText = "Ждём хоста...";
+            });
+            SaveShot($"{prefix}_tab_lobby_guest_waiting.png");
+
+            // 6. ЛОББИ - мир открыт с 2 игроками
             listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
             listener.Start();
             var lobbyService = App.Services.GetRequiredService<ILobbyService>();
@@ -761,7 +816,7 @@ public static class SceneDiagnostics
             window.Dispatcher.Invoke(() =>
             {
                 mainVm.LobbyVM.IsWorldOpen = true;
-                mainVm.LobbyVM.HostStatusText = "Лобби открыто!";
+                mainVm.LobbyVM.HostStatusText = "Мир открыт для сети";
             });
             await Task.Delay(1000);
             window.Dispatcher.Invoke(() =>
@@ -782,10 +837,10 @@ public static class SceneDiagnostics
             window.Dispatcher.Invoke(() => mainVm.LobbyVM.LeaveLobbyCommand.Execute(null));
             await Task.Delay(500);
 
-            // Record sidebar expansion (72px -> 200px -> 72px)
+            // Record UI animation (5-10s GIF): hover menu, screen transitions
             window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
             await Task.Delay(300);
-            await RecordSidebarExpansionAsync(window, $"{prefix}_sidebar_hover.gif");
+            await RecordGameMenuAndTransitionsAsync(window, $"{prefix}_menu_and_screens.gif");
 
             return true;
         }
@@ -797,6 +852,108 @@ public static class SceneDiagnostics
         finally
         {
             try { listener?.Stop(); } catch { }
+        }
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        int count = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild) return typedChild;
+            var sub = FindVisualChild<T>(child);
+            if (sub != null) return sub;
+        }
+        return null;
+    }
+
+    public static async Task<bool> RecordGameMenuAndTransitionsAsync(MainWindow window, string gifFileName)
+    {
+        try
+        {
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+
+            var frameBitmaps = new List<RenderTargetBitmap>();
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            // 1. Initial Overview state (4 frames)
+            for (int i = 0; i < 4; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(150);
+            }
+
+            // 2. Hover over "Лобби" item (menu dimming & shift) (6 frames)
+            window.Dispatcher.Invoke(() => window.AnimateMenuDimming(window.MenuBtnLobby, isHovered: true));
+            for (int i = 0; i < 6; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(120);
+            }
+
+            // 3. Switch to "Lobby" tab (overlay fade & screen transition) (6 frames)
+            window.Dispatcher.Invoke(() =>
+            {
+                window.AnimateMenuDimming(window.MenuBtnLobby, isHovered: false);
+                mainVm.SwitchTab("Lobby");
+            });
+            for (int i = 0; i < 6; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(150);
+            }
+
+            // 4. Switch to "Wardrobe" (Skin) tab (6 frames)
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));
+            for (int i = 0; i < 6; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(150);
+            }
+
+            // 5. Switch to "Settings" tab (6 frames)
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Settings"));
+            for (int i = 0; i < 6; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(150);
+            }
+
+            // 6. Return to "Overview" tab (6 frames)
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Overview"));
+            for (int i = 0; i < 6; i++)
+            {
+                frameBitmaps.Add(CaptureWindow(window));
+                await Task.Delay(150);
+            }
+
+            string targetPath = Path.Combine(shotsDir, gifFileName);
+            window.Dispatcher.Invoke(() =>
+            {
+                var encoder = new GifBitmapEncoder();
+                foreach (var rtb in frameBitmaps)
+                {
+                    encoder.Frames.Add(BitmapFrame.Create(rtb));
+                }
+                using var fs = File.Create(targetPath);
+                encoder.Save(fs);
+            });
+
+            try { File.Copy(targetPath, Path.Combine(repoShotsDir, gifFileName), true); } catch { }
+            try { File.Copy(targetPath, Path.Combine(brainDir, gifFileName), true); } catch { }
+
+            App.Log($"[RECORDING] Saved menu & transitions recording to {targetPath}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[RECORDING: ERROR] {ex}");
+            return false;
         }
     }
 
@@ -830,82 +987,6 @@ public static class SceneDiagnostics
         }
         catch { }
         return tempDir;
-    }
-
-    public static async Task<bool> RecordSidebarExpansionAsync(MainWindow window, string gifFileName)
-    {
-        try
-        {
-            string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
-
-            var frameBitmaps = new List<RenderTargetBitmap>();
-
-            // 1. Initial collapsed state (72px) - 4 frames (800ms)
-            window.Dispatcher.Invoke(() => window.AnimateSidebar(expanded: false));
-            await Task.Delay(250);
-
-            for (int i = 0; i < 4; i++)
-            {
-                frameBitmaps.Add(CaptureWindow(window));
-                await Task.Delay(150);
-            }
-
-            // 2. Expanding animation (72px -> 200px) - 8 frames (800ms)
-            window.Dispatcher.Invoke(() => window.AnimateSidebar(expanded: true));
-            for (int i = 0; i < 8; i++)
-            {
-                frameBitmaps.Add(CaptureWindow(window));
-                await Task.Delay(100);
-            }
-
-            // 3. Fully expanded state - 8 frames (1.6s)
-            for (int i = 0; i < 8; i++)
-            {
-                frameBitmaps.Add(CaptureWindow(window));
-                await Task.Delay(200);
-            }
-
-            // 4. Collapsing animation (200px -> 72px) - 8 frames (800ms)
-            window.Dispatcher.Invoke(() => window.AnimateSidebar(expanded: false));
-            for (int i = 0; i < 8; i++)
-            {
-                frameBitmaps.Add(CaptureWindow(window));
-                await Task.Delay(100);
-            }
-
-            // 5. Final collapsed state - 4 frames (800ms)
-            for (int i = 0; i < 4; i++)
-            {
-                frameBitmaps.Add(CaptureWindow(window));
-                await Task.Delay(200);
-            }
-
-            string targetPath = Path.Combine(shotsDir, gifFileName);
-            window.Dispatcher.Invoke(() =>
-            {
-                var encoder = new GifBitmapEncoder();
-                foreach (var rtb in frameBitmaps)
-                {
-                    encoder.Frames.Add(BitmapFrame.Create(rtb));
-                }
-                using var fs = File.Create(targetPath);
-                encoder.Save(fs);
-            });
-
-            try { File.Copy(targetPath, Path.Combine(repoShotsDir, gifFileName), true); } catch { }
-            try { File.Copy(targetPath, Path.Combine(brainDir, gifFileName), true); } catch { }
-
-            App.Log($"[RECORDING] Saved sidebar expansion recording to {targetPath}");
-            return true;
-        }
-        catch (Exception ex)
-        {
-            App.Log($"[RECORDING: ERROR] {ex}");
-            return false;
-        }
     }
 
     private static RenderTargetBitmap CaptureWindow(Window window)

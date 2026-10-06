@@ -4,195 +4,176 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d" 
-             d:DesignHeight="620" d:DesignWidth="908"
+             d:DesignHeight="512" d:DesignWidth="584"
              Background="Transparent">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- Style for release notes item: top 1px line, title shifts 4px on hover -->
+        <Style x:Key="WhatsNewItemBtn" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0" Background="Transparent">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Version}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource EmberBrush}"
+                                           Margin="0,0,0,2" />
+                                <TextBlock x:Name="ItemTitle"
+                                           Text="{Binding Title}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="14"
+                                           FontWeight="Normal"
+                                           Foreground="{StaticResource InkBrush}"
+                                           TextTrimming="CharacterEllipsis">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="TitleTrans" X="0" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="TitleTrans" Storyboard.TargetProperty="X"
+                                                             To="4" Duration="0:0:0.140">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="TitleTrans" Storyboard.TargetProperty="X"
+                                                             To="0" Duration="0:0:0.140">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut" />
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid Background="Transparent">
-        <!-- Main Overlay Layout: Bottom area contains bottom-left play section and bottom-right "What's New" row -->
-        <Grid VerticalAlignment="Bottom" Margin="40,0,40,36">
+        <!-- Main Grid anchored to the bottom of the content area -->
+        <Grid VerticalAlignment="Bottom">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="250" />
             </Grid.ColumnDefinitions>
 
             <!-- ============================================== -->
-            <!-- BOTTOM-LEFT: Pack title, spec line, button, RAM -->
+            <!-- BOTTOM-LEFT: Spec line, Title "Aura", Button   -->
             <!-- ============================================== -->
-            <StackPanel Grid.Column="0" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-                <!-- Pack Title (Unbounded Bold) -->
-                <TextBlock Text="{Binding BuildName}"
-                           FontFamily="{StaticResource HeadingFont}"
-                           FontSize="40"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource TextPrimaryBrush}"
-                           Margin="0,0,0,4">
-                    <TextBlock.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="270" ShadowDepth="2" />
-                    </TextBlock.Effect>
-                </TextBlock>
-
-                <!-- Spec Line in One Line: "Minecraft 1.20.1 • Fabric • 68 модов" -->
+            <StackPanel Grid.Column="0" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="0,0,20,0">
+                
+                <!-- 1) Line "Minecraft 1.20.1, Fabric 0.19.5, 61 мод" 15px dim -->
                 <TextBlock Text="{Binding SpecLine}"
                            FontFamily="{StaticResource MainFont}"
-                           FontSize="14"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           Margin="0,0,0,24">
+                           FontSize="15"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           Margin="0,0,0,2">
                     <TextBlock.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="8" Opacity="0.7" Direction="270" ShadowDepth="1" />
+                        <DropShadowEffect Color="#000000" BlurRadius="6" Opacity="0.6" Direction="270" ShadowDepth="1" />
                     </TextBlock.Effect>
                 </TextBlock>
 
-                <!-- Status & Progress Bar (when busy/installing/launching) -->
-                <StackPanel Margin="0,0,0,12"
-                            Visibility="{Binding DataContext.IsProgressVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="{Binding DataContext.StatusText, RelativeSource={RelativeSource AncestorType=Window}}"
-                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,6" />
-                    <ProgressBar Height="4" Width="220" HorizontalAlignment="Left"
-                                 Style="{StaticResource NeonProgressBar}"
-                                 Value="{Binding DataContext.ProgressPercentage, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <!-- 2) Title "Aura" Oswald 600 124px, line-height 0.92 -->
+                <TextBlock Text="Aura"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="124"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource InkBrush}"
+                           LineHeight="114"
+                           LineStackingStrategy="BlockLineHeight"
+                           Margin="-4,-12,0,14">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.75" Direction="270" ShadowDepth="3" />
+                    </TextBlock.Effect>
+                </TextBlock>
+
+                <!-- 3) Button "Играть" 260x70 with bottom progress bar, right of it "Выделено N ГБ памяти" 13px mute -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Grid Width="260" Height="70">
+                        <Button Command="{Binding DataContext.LaunchOrCancelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Style="{StaticResource OverviewPlayBtn}"
+                                Content="{Binding DataContext.LaunchButtonText, RelativeSource={RelativeSource AncestorType=Window}}" />
+
+                        <!-- Bottom 5px launch progress bar within button bounds -->
+                        <ProgressBar Height="5" VerticalAlignment="Bottom"
+                                     HorizontalAlignment="Stretch"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{StaticResource EmberDarkBrush}"
+                                     Value="{Binding DataContext.ProgressPercentage, RelativeSource={RelativeSource AncestorType=Window}}"
+                                     Visibility="{Binding DataContext.IsProgressVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
+
+                    <!-- Right of button: 13px mute "Выделено N ГБ памяти" -->
+                    <StackPanel VerticalAlignment="Center" Margin="18,0,0,0">
+                        <!-- Extra state indicator when launching or running -->
+                        <TextBlock Text="{Binding DataContext.StateTitle, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource EmberBrush}"
+                                   Margin="0,0,0,2"
+                                   Visibility="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
+
+                        <TextBlock Text="{Binding DataContext.AllocatedRamText, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   FontWeight="Normal"
+                                   Foreground="{StaticResource MuteBrush}">
+                            <TextBlock.Effect>
+                                <DropShadowEffect Color="#000000" BlurRadius="6" Opacity="0.6" Direction="270" ShadowDepth="1" />
+                            </TextBlock.Effect>
+                        </TextBlock>
+                    </StackPanel>
                 </StackPanel>
-
-                <!-- Status text when busy but without progress bar -->
-                <TextBlock Text="{Binding DataContext.StateTitle, RelativeSource={RelativeSource AncestorType=Window}}"
-                           Foreground="{StaticResource AccentBrush}" FontSize="13" FontWeight="SemiBold"
-                           Margin="0,0,0,10">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DataContext.IsBusy, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding DataContext.IsGameRunning, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-
-                <!-- Large "Играть" Button -->
-                <Button Command="{Binding DataContext.LaunchOrCancelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                        Style="{StaticResource PrimaryNeonBtn}"
-                        Width="220" Height="48"
-                        Content="{Binding DataContext.LaunchButtonText, RelativeSource={RelativeSource AncestorType=Window}}"
-                        FontSize="15"
-                        FontWeight="Bold"
-                        Margin="0,0,0,8" />
-
-                <!-- Small RAM Text below button: "Выделено 6 ГБ ОЗУ" -->
-                <TextBlock Text="{Binding DataContext.AllocatedRamText, RelativeSource={RelativeSource AncestorType=Window}}"
-                           FontFamily="{StaticResource MainFont}"
-                           FontSize="12"
-                           FontWeight="Medium"
-                           Foreground="{StaticResource TextMutedBrush}"
-                           Margin="4,0,0,0">
-                    <TextBlock.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="6" Opacity="0.5" Direction="270" ShadowDepth="1" />
-                    </TextBlock.Effect>
-                </TextBlock>
             </StackPanel>
 
             <!-- ============================================== -->
-            <!-- BOTTOM-RIGHT: Horizontal row of 3 "Что нового" cards -->
+            <!-- BOTTOM-RIGHT: "Что нового" list width 250px    -->
+            <!-- (3 latest releases, 1px top line, version 12px -->
+            <!-- ember, title 14px; hover shifts title 4px;     -->
+            <!-- no cards)                                      -->
             <!-- ============================================== -->
-            <StackPanel Grid.Column="1" VerticalAlignment="Bottom" HorizontalAlignment="Right">
+            <StackPanel Grid.Column="1" VerticalAlignment="Bottom" Width="250">
                 <TextBlock Text="Что нового"
                            FontFamily="{StaticResource HeadingFont}"
-                           FontSize="13"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource TextSecondaryBrush}"
-                           Margin="0,0,0,10"
-                           HorizontalAlignment="Right" />
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource DimInkBrush}"
+                           Margin="0,0,0,8" />
 
                 <ItemsControl ItemsSource="{Binding WhatsNewCards}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Orientation="Horizontal" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <Button Command="{Binding DataContext.OpenPatchNotesCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Cursor="Hand" Margin="0,0,12,0">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="CardBrd"
-                                                Width="148" Height="106"
-                                                Background="#D8181C24"
-                                                BorderBrush="{StaticResource BorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="6"
-                                                Padding="12,10">
-                                            <Border.RenderTransform>
-                                                <TranslateTransform x:Name="CardTrans" Y="0" />
-                                            </Border.RenderTransform>
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="*" />
-                                                </Grid.RowDefinitions>
-
-                                                <!-- Version Tag -->
-                                                <Border Grid.Row="0" HorizontalAlignment="Left"
-                                                        Background="#172C24" CornerRadius="3" Padding="5,2" Margin="0,0,0,6">
-                                                    <TextBlock Text="{Binding Version}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="{StaticResource AccentBrush}" />
-                                                </Border>
-
-                                                <!-- Date -->
-                                                <TextBlock Grid.Row="1" Text="{Binding Date}"
-                                                           FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                                                           Margin="0,0,0,4" />
-
-                                                <!-- Title / Summary -->
-                                                <TextBlock Grid.Row="2" Text="{Binding Title}"
-                                                           FontSize="11" FontWeight="SemiBold"
-                                                           Foreground="{StaticResource TextPrimaryBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           TextWrapping="Wrap" />
-                                            </Grid>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="CardBrd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                                                <Setter TargetName="CardBrd" Property="Background" Value="#E01F242E" />
-                                                <Trigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="CardTrans" Storyboard.TargetProperty="Y"
-                                                                             To="-1" Duration="0:0:0.120">
-                                                                <DoubleAnimation.EasingFunction>
-                                                                    <CubicEase EasingMode="EaseOut" />
-                                                                </DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </Trigger.EnterActions>
-                                                <Trigger.ExitActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="CardTrans" Storyboard.TargetProperty="Y"
-                                                                             To="0" Duration="0:0:0.120">
-                                                                <DoubleAnimation.EasingFunction>
-                                                                    <CubicEase EasingMode="EaseOut" />
-                                                                </DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </Trigger.ExitActions>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
+                                    Style="{StaticResource WhatsNewItemBtn}" />
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

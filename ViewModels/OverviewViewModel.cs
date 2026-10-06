@@ -29,7 +29,7 @@ public class OverviewViewModel : ObservableObject
 
     private string _buildName = "Aura";
     private string _versionInfo = $"Minecraft 1.20.1 • Fabric {FabricGameLaunchService.FabricLoaderVersion}";
-    private string _specLine = "Minecraft 1.20.1 • Fabric • 68 модов";
+    private string _specLine = "Minecraft 1.20.1, Fabric 0.19.5, 61 мод";
     private string _modsCountText = "Сборка не установлена";
     private string _lastUpdateText = "Обновлено: —";
     private bool _isEnvironmentInstalled;
@@ -172,8 +172,8 @@ public class OverviewViewModel : ObservableObject
             }
 
             SpecLine = modCount > 0
-                ? $"Minecraft 1.20.1 • Fabric • {modCount} модов"
-                : "Minecraft 1.20.1 • Fabric • 68 модов";
+                ? $"Minecraft 1.20.1, Fabric {fabricLoader}, {modCount} модов"
+                : "Minecraft 1.20.1, Fabric 0.19.5, 61 мод";
         }
 
         // 4. "Обновлено:": показывать LastUpdateUtc из конфига (или "—", если пусто)

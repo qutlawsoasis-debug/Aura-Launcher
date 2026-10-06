@@ -4,97 +4,168 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="478" d:DesignWidth="980"
+             d:DesignHeight="512" d:DesignWidth="584"
              Background="Transparent">
+
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
     <Grid Background="Transparent">
-        <!-- Блок превью + блок управления в CardPanel -->
-        <Border Style="{StaticResource CardPanel}" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="40,28" Margin="0,16">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                
-                <!-- 1. Блок 2D-превью (вид спереди и сзади рядом, масштаб 10x, NearestNeighbor) -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Вид спереди (10x: 160x320) -->
-                    <StackPanel HorizontalAlignment="Center" Margin="0,0,28,0">
-                        <Grid Width="160" Height="330">
-                            <!-- Тень под ногами -->
-                            <Ellipse Width="110" Height="8" Fill="#101318"
-                                     HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- Header -->
+            <RowDefinition Height="*" />    <!-- Content -->
+        </Grid.RowDefinitions>
 
-                            <!-- Превью спереди -->
-                            <Image Source="{Binding SkinFrontPreview}"
-                                   Width="160" Height="320"
-                                   VerticalAlignment="Top"
-                                   RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                   RenderOptions.EdgeMode="Aliased"
-                                   Stretch="Fill" />
-                        </Grid>
-                        <TextBlock Text="Спереди" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
-                    </StackPanel>
+        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,28">
+            <TextBlock Text="Скин"
+                       FontFamily="{StaticResource HeadingFont}"
+                       FontSize="60"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource InkBrush}"
+                       LineHeight="54"
+                       LineStackingStrategy="BlockLineHeight"
+                       Margin="-2,-6,0,6">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="270" ShadowDepth="2" />
+                </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock Text="Внешний вид персонажа в сетевой игре"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="15"
+                       FontWeight="Normal"
+                       Foreground="{StaticResource DimInkBrush}" />
+        </StackPanel>
 
-                    <!-- Вид сзади (10x: 160x320) -->
-                    <StackPanel HorizontalAlignment="Center">
-                        <Grid Width="160" Height="330">
-                            <!-- Тень под ногами -->
-                            <Ellipse Width="110" Height="8" Fill="#101318"
-                                     HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,4" />
+        <!-- Main Content: Left figure 144x288, Right controls -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="384" />
+            </Grid.ColumnDefinitions>
 
-                            <!-- Превью сзади -->
-                            <Image Source="{Binding SkinBackPreview}"
-                                   Width="160" Height="320"
-                                   VerticalAlignment="Top"
-                                   RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                   RenderOptions.EdgeMode="Aliased"
-                                   Stretch="Fill" />
-                        </Grid>
-                        <TextBlock Text="Сзади" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                                   HorizontalAlignment="Center" Margin="0,8,0,0" />
-                    </StackPanel>
-                </StackPanel>
+            <!-- ============================================== -->
+            <!-- LEFT: 144x288 figure (front/back with drag     -->
+            <!-- rotation), soft oval shadow, caption           -->
+            <!-- ============================================== -->
+            <StackPanel Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Grid x:Name="SkinDragArea"
+                      Width="144" Height="300"
+                      Background="Transparent"
+                      Cursor="Hand"
+                      MouseDown="Skin_MouseDown"
+                      MouseMove="Skin_MouseMove"
+                      MouseUp="Skin_MouseUp">
+                    
+                    <!-- Soft oval shadow under feet -->
+                    <Ellipse Width="110" Height="10"
+                             Fill="#40000000"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Bottom"
+                             Margin="0,0,0,8" />
 
-                <!-- 2. Блок управления -->
-                <StackPanel Margin="56,0,0,0" VerticalAlignment="Center" MaxWidth="320">
-                    <!-- Заголовок -->
-                    <TextBlock Text="Скин персонажа" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,6" />
+                    <!-- Rotating Figure Container with ScaleX RenderTransform -->
+                    <Grid Width="144" Height="288"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Top"
+                          RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="FigureScale" ScaleX="1.0" />
+                        </Grid.RenderTransform>
 
-                    <!-- Исходное имя файла или 'Стандартный' -->
-                    <TextBlock Text="{Binding SkinDisplayName}" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,24" TextTrimming="CharacterEllipsis" />
+                        <!-- Front View -->
+                        <Image x:Name="ImgFront"
+                               Source="{Binding SkinFrontPreview}"
+                               Width="144" Height="288"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"
+                               RenderOptions.EdgeMode="Aliased"
+                               Stretch="Fill" />
 
-                    <!-- Кнопки: 'Выбрать файл…' и 'Сбросить' -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16" VerticalAlignment="Center">
-                        <Button Command="{Binding SelectSkinCommand}"
-                                Style="{StaticResource StandardBtn}"
-                                Content="Выбрать файл…"
-                                Height="38" Padding="18,0" Margin="0,0,12,0" />
+                        <!-- Back View (shown when rotated past 90 degrees) -->
+                        <Image x:Name="ImgBack"
+                               Source="{Binding SkinBackPreview}"
+                               Width="144" Height="288"
+                               Opacity="0"
+                               RenderOptions.BitmapScalingMode="NearestNeighbor"
+                               RenderOptions.EdgeMode="Aliased"
+                               Stretch="Fill" />
+                    </Grid>
+                </Grid>
 
-                        <Button Command="{Binding ResetSkinCommand}"
-                                Style="{StaticResource GhostBtn}"
-                                Content="Сбросить"
-                                Height="38" Padding="14,0" />
-                    </StackPanel>
-
-                    <TextBlock Text="Поддерживаются файлы PNG 64×64 и 64×32" FontSize="12" Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,16" />
-
-                    <!-- Переключатель модели: Тонкие руки (slim) -->
-                    <CheckBox Content="Тонкие руки (Alex / Slim)"
-                              IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              FontSize="13"
-                              Margin="0,0,0,16" />
-
-                    <!-- Сообщение об ошибке или успехе -->
-                    <TextBlock Text="{Binding StatusMessage}"
-                               Foreground="{Binding StatusBrush}"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}"
-                               TextWrapping="Wrap" />
-                </StackPanel>
+                <!-- Label "Потяните, чтобы повернуть" 12px mute -->
+                <TextBlock Text="Потяните, чтобы повернуть"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource MuteBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,0" />
             </StackPanel>
-        </Border>
+
+            <!-- ============================================== -->
+            <!-- RIGHT: filename, "Выбрать файл", "Сбросить",   -->
+            <!-- toggle "Тонкие руки (Alex)", notes, error      -->
+            <!-- ============================================== -->
+            <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="20,0,0,0">
+                
+                <!-- Filename 14px dim -->
+                <TextBlock Text="{Binding SkinDisplayName}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource DimInkBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,0,16" />
+
+                <!-- Buttons: "Выбрать файл" (StandardBtn) + "Сбросить" (GhostBtn) -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,24">
+                    <Button Command="{Binding SelectSkinCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Height="48"
+                            Content="Выбрать файл"
+                            Margin="0,0,16,0" />
+
+                    <Button Command="{Binding ResetSkinCommand}"
+                            Style="{StaticResource GhostBtn}"
+                            Height="48"
+                            Content="Сбросить"
+                            VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- 1px separator line -->
+                <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+
+                <!-- Toggle "Тонкие руки (Alex)" (46x26, radius 3, knob 20x20, ember when checked) -->
+                <CheckBox IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
+                          Style="{StaticResource AlexToggleSwitch}"
+                          Margin="0,0,0,20">
+                    <TextBlock Text="Тонкие руки (Alex)"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="14"
+                               FontWeight="Medium"
+                               Foreground="{StaticResource InkBrush}" />
+                </CheckBox>
+
+                <!-- Note 13px mute: "PNG 64×64 или 64×32. Остальные игроки в лобби увидят этот скин." -->
+                <TextBlock Text="PNG 64×64 или 64×32. Остальные игроки в лобби увидят этот скин."
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="13"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource MuteBrush}"
+                           TextWrapping="Wrap"
+                           LineHeight="18"
+                           Margin="0,0,0,14" />
+
+                <!-- Error message in bad color if invalid size -->
+                <TextBlock Text="{Binding StatusMessage}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="13"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource BadBrush}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

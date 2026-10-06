@@ -92,10 +92,10 @@ public class SettingsViewModel : ObservableObject
 
     public static string GetNicknameErrorMessage(NicknameError error) => error switch
     {
-        NicknameError.Empty => "Никнейм не может быть пустым",
-        NicknameError.TooShort => "Никнейм должен содержать минимум 3 символа",
-        NicknameError.TooLong => "Никнейм не может превышать 16 символов",
-        NicknameError.InvalidChars => "Разрешены только буквы (A-Z), цифры (0-9) и знак _",
+        NicknameError.Empty => "Ник: от 3 до 16 символов, латиница, цифры и _.",
+        NicknameError.TooShort => "Ник: от 3 до 16 символов, латиница, цифры и _.",
+        NicknameError.TooLong => "Ник: от 3 до 16 символов, латиница, цифры и _.",
+        NicknameError.InvalidChars => "Ник: от 3 до 16 символов, латиница, цифры и _.",
         _ => string.Empty
     };
 
@@ -250,6 +250,22 @@ public class SettingsViewModel : ObservableObject
         };
     }
 
+    private bool _isSavedToastVisible;
+    public bool IsSavedToastVisible
+    {
+        get => _isSavedToastVisible;
+        private set => SetProperty(ref _isSavedToastVisible, value);
+    }
+
+    private void ShowSavedToast()
+    {
+        IsSavedToastVisible = true;
+        _ = Task.Delay(1400).ContinueWith(_ =>
+        {
+            System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => IsSavedToastVisible = false);
+        });
+    }
+
     public void ScheduleDebouncedSave()
     {
         _debounceCts?.Cancel();
@@ -265,6 +281,7 @@ public class SettingsViewModel : ObservableObject
 
                 await _configService.SaveConfigAsync(_configService.CurrentConfig);
                 ErrorMessage = string.Empty;
+                ShowSavedToast();
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -281,6 +298,7 @@ public class SettingsViewModel : ObservableObject
         {
             await _configService.SaveConfigAsync(_configService.CurrentConfig);
             ErrorMessage = string.Empty;
+            ShowSavedToast();
         }
         catch (Exception ex)
         {

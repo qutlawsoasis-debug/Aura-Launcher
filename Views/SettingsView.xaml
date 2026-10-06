@@ -4,102 +4,218 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              mc:Ignorable="d" 
-             d:DesignHeight="478" d:DesignWidth="980"
+             d:DesignHeight="512" d:DesignWidth="584"
              Background="Transparent">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
     </UserControl.Resources>
 
-    <Grid Background="Transparent" Margin="48,16,48,16">
-        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <Border Style="{StaticResource CardPanel}" VerticalAlignment="Top" MaxWidth="620" HorizontalAlignment="Left" Padding="32,24">
-                <StackPanel>
-                    <TextBlock Text="Настройки" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,20" />
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- Header -->
+            <RowDefinition Height="*" />    <!-- Content -->
+        </Grid.RowDefinitions>
 
-                    <!-- 1. Nickname -->
-                    <TextBlock Text="Игровой никнейм" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <TextBox Style="{StaticResource ModernTextBox}"
-                             Text="{Binding Nickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             MaxLength="16"
-                             KeyDown="OnTextBoxKeyDown"
-                             Margin="0,0,0,4" />
+        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle, top-right "Сохранено" -->
+        <Grid Grid.Row="0" Margin="0,0,0,28">
+            <StackPanel HorizontalAlignment="Left">
+                <TextBlock Text="Настройки"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="60"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource InkBrush}"
+                           LineHeight="54"
+                           LineStackingStrategy="BlockLineHeight"
+                           Margin="-2,-6,0,6">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="270" ShadowDepth="2" />
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="Параметры запуска и игровые настройки"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="15"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}" />
+            </StackPanel>
+
+            <!-- Top-right green "Сохранено" feedback on change for 1.4s -->
+            <TextBlock Text="Сохранено"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource OkBrush}"
+                       HorizontalAlignment="Right"
+                       VerticalAlignment="Top"
+                       Margin="0,8,0,0"
+                       Visibility="{Binding IsSavedToastVisible, Converter={StaticResource BoolToVis}}" />
+        </Grid>
+
+        <!-- Main Content: Three rows with 14px dim label on left (150px col), content on right, 1px lines between -->
+        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+            
+            <!-- ROW 1: "Ник в игре" -->
+            <!-- borderless box with 2px bottom line (focus ember, error bad), 20px text, error note -->
+            <Grid MinHeight="70" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Ник в игре"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           VerticalAlignment="Top"
+                           Margin="0,6,0,0" />
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Top" MaxWidth="360" HorizontalAlignment="Left">
+                    <!-- Borderless box with 2px bottom line -->
+                    <Border x:Name="NickBorder"
+                            BorderBrush="{StaticResource LineInkBrush}"
+                            BorderThickness="0,0,0,2"
+                            Background="Transparent"
+                            Padding="0,0,0,4">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasNicknameError}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource BadBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+
+                        <TextBox x:Name="NickInputBox"
+                                 Text="{Binding Nickname, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 FontFamily="{StaticResource MainFont}"
+                                 FontSize="20"
+                                 FontWeight="Medium"
+                                 Foreground="{StaticResource InkBrush}"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 CaretBrush="{StaticResource EmberBrush}"
+                                 MaxLength="16"
+                                 KeyDown="OnTextBoxKeyDown">
+                            <TextBox.Style>
+                                <Style TargetType="TextBox">
+                                    <Style.Triggers>
+                                        <Trigger Property="IsFocused" Value="True">
+                                            <!-- Parent border highlight handled via focus trigger -->
+                                        </Trigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBox.Style>
+                        </TextBox>
+                    </Border>
+
+                    <!-- Error note in bad color -->
                     <TextBlock Text="{Binding NicknameErrorText}"
-                               Foreground="{StaticResource ErrorBrush}"
-                               FontSize="11"
-                               Margin="2,0,0,14"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{StaticResource BadBrush}"
+                               Margin="0,6,0,0"
                                TextWrapping="Wrap"
                                Visibility="{Binding HasNicknameError, Converter={StaticResource BoolToVis}}" />
+                </StackPanel>
+            </Grid>
 
-                    <!-- 2. RAM Allocation -->
-                    <Grid Margin="0,4,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Выделение оперативной памяти" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="{}{0} МБ ({1} ГБ)">
-                                    <Binding Path="RamMb" />
-                                    <Binding Path="RamGb" />
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
-                    </Grid>
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
 
-                    <Slider Style="{StaticResource ModernSlider}"
-                            Minimum="2" Maximum="16" SmallChange="1" LargeChange="2" TickFrequency="1"
+            <!-- ROW 2: "Память для игры" -->
+            <!-- Oswald 600 52px with "ГБ" 20px, slider 2..16 GB (track 6px, ember, thumb 14x22 radius 3), quick links 4, 6, 8, 12 ГБ -->
+            <Grid MinHeight="110" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Память для игры"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           VerticalAlignment="Top"
+                           Margin="0,8,0,0" />
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Top" MaxWidth="380" HorizontalAlignment="Left">
+                    <!-- Memory display: Oswald 600 52px + "ГБ" 20px -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,0,10">
+                        <TextBlock Text="{Binding RamGb}"
+                                   FontFamily="{StaticResource HeadingFont}"
+                                   FontSize="52"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   LineHeight="48"
+                                   LineStackingStrategy="BlockLineHeight" />
+                        <TextBlock Text=" ГБ"
+                                   FontFamily="{StaticResource HeadingFont}"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   VerticalAlignment="Bottom"
+                                   Margin="2,0,0,6" />
+                    </StackPanel>
+
+                    <!-- Slider 2..16 GB (track 6px ember, thumb 14x22 radius 3) -->
+                    <Slider Minimum="2" Maximum="16"
+                            SmallChange="1" LargeChange="2"
+                            TickFrequency="1"
                             IsSnapToTickEnabled="True"
                             Value="{Binding RamGb, Mode=TwoWay}"
-                            Margin="0,4,0,12" Height="26" />
+                            Style="{StaticResource SettingsRamSlider}"
+                            Margin="0,0,0,14" />
 
-                    <!-- RAM Quick Select Pills -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                    <!-- Quick links: 4 ГБ, 6 ГБ, 8 ГБ, 12 ГБ -->
+                    <StackPanel Orientation="Horizontal">
                         <RadioButton Content="4 ГБ" IsChecked="{Binding IsRam4, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
                         <RadioButton Content="6 ГБ" IsChecked="{Binding IsRam6, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
                         <RadioButton Content="8 ГБ" IsChecked="{Binding IsRam8, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
                         <RadioButton Content="12 ГБ" IsChecked="{Binding IsRam12, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
                     </StackPanel>
-
-                    <!-- 3. Game Directory -->
-                    <TextBlock Text="Рабочая папка игры" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <Grid Margin="0,0,0,20">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox Style="{StaticResource ModernTextBox}"
-                                 Text="{Binding GameDir, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
-                                 KeyDown="OnTextBoxKeyDown"
-                                 VerticalAlignment="Center" />
-                        <Button Grid.Column="1"
-                                Command="{Binding SelectGameFolderCommand}"
-                                Style="{StaticResource StandardBtn}"
-                                Content="Обзор..."
-                                Height="38" Padding="18,0" Margin="10,0,0,0"
-                                VerticalAlignment="Center" />
-                    </Grid>
-
-                    <!-- 4. Advanced Settings (Expander) -->
-                    <Expander Style="{StaticResource ModernExpander}" Header="Расширенные настройки" IsExpanded="False" Margin="0,0,0,16">
-                        <StackPanel Margin="0,10,0,0">
-                            <TextBlock Text="Репозиторий GitHub для обновлений" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4" />
-                            <TextBlock Text="Формат: owner/repo (например, username/aura-client)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,8" />
-                            <TextBox Style="{StaticResource ModernTextBox}"
-                                     Text="{Binding PackRepo, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                        </StackPanel>
-                    </Expander>
-
-                    <!-- Error Notification -->
-                    <TextBlock Text="{Binding ErrorMessage}"
-                               Foreground="{StaticResource ErrorBrush}"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}"
-                               Margin="0,8,0,0" />
                 </StackPanel>
-            </Border>
-        </ScrollViewer>
+            </Grid>
+
+            <!-- 1px line separator -->
+            <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,20" />
+
+            <!-- ROW 3: "Папка игры" -->
+            <!-- path and "Изменить" link -->
+            <Grid MinHeight="50" Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="Папка игры"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}"
+                           VerticalAlignment="Center" />
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding GameDir}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="14"
+                               FontWeight="Normal"
+                               Foreground="{StaticResource InkBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="300"
+                               VerticalAlignment="Center"
+                               Margin="0,0,16,0" />
+
+                    <!-- "Изменить" link -->
+                    <Button Command="{Binding SelectGameFolderCommand}"
+                            Style="{StaticResource GhostBtn}"
+                            Content="Изменить"
+                            Foreground="{StaticResource EmberBrush}"
+                            VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
     </Grid>
 </UserControl>
