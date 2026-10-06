@@ -20,10 +20,26 @@ public class SettingsViewModel : ObservableObject
     private readonly ISkinService _skinService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IReportService? _reportService;
+    private readonly IBackgroundService? _backgroundService;
     private CancellationTokenSource? _debounceCts;
     private string _errorMessage = string.Empty;
     private string _nickname = string.Empty;
     private string _nicknameErrorText = string.Empty;
+
+    public bool AutoRotateBackgrounds
+    {
+        get => _backgroundService?.AutoRotationEnabled ?? true;
+        set
+        {
+            if (_backgroundService != null && _backgroundService.AutoRotationEnabled != value)
+            {
+                _backgroundService.AutoRotationEnabled = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public RelayCommand NextBackgroundCommand { get; }
 
     public string Nickname
     {
@@ -294,12 +310,19 @@ public class SettingsViewModel : ObservableObject
         IConfigService configService,
         ISkinService skinService,
         IDiscordRpcService? discordRpcService = null,
-        IReportService? reportService = null)
+        IReportService? reportService = null,
+        IBackgroundService? backgroundService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _discordRpcService = discordRpcService;
         _reportService = reportService;
+        _backgroundService = backgroundService;
+
+        NextBackgroundCommand = new RelayCommand(_ =>
+        {
+            _backgroundService?.NextBackground();
+        });
 
         OpenSendReportCommand = new RelayCommand(_ =>
         {

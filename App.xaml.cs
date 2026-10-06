@@ -161,6 +161,14 @@ public partial class App : Application
         }
         catch { }
 
+        // Инициализация сервиса динамических фонов
+        try
+        {
+            var bgService = Services.GetRequiredService<IBackgroundService>();
+            bgService.Initialize();
+        }
+        catch { }
+
         // Создаем главное окно и передаем MainViewModel в качестве DataContext
         var mainWindow = new MainWindow
         {
@@ -427,6 +435,7 @@ public partial class App : Application
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IDiscordRpcService, DiscordRpcService>();
         services.AddSingleton<IReportService, ReportService>();
+        services.AddSingleton<IBackgroundService, BackgroundService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();

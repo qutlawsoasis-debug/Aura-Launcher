@@ -145,17 +145,29 @@
     <!-- Outer Window Border: 980x620, radius 3px -->
     <Border Background="{StaticResource NightBrush}" BorderThickness="1" BorderBrush="{StaticResource LineInkBrush}" CornerRadius="3" ClipToBounds="True">
         <Grid>
-            <!-- 0. STATIC WORLD ART BACKGROUND ON ALL SCREENS (no parallax) -->
-            <Image x:Name="BgWorldImage"
-                   Source="{StaticResource WorldBackgroundBitmap}"
-                   Stretch="UniformToFill"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   RenderOptions.BitmapScalingMode="HighQuality">
-                <Image.CacheMode>
-                    <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
-                </Image.CacheMode>
-            </Image>
+            <!-- 0. DYNAMIC ROTATING BACKGROUND WITH SMOOTH CROSS-FADE -->
+            <Grid x:Name="BackgroundHost" ClipToBounds="True">
+                <Image x:Name="BgImageCurrent"
+                       Source="{StaticResource WorldBackgroundBitmap}"
+                       Stretch="UniformToFill"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality">
+                    <Image.CacheMode>
+                        <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
+                    </Image.CacheMode>
+                </Image>
+                <Image x:Name="BgImageNext"
+                       Opacity="0"
+                       Stretch="UniformToFill"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality">
+                    <Image.CacheMode>
+                        <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
+                    </Image.CacheMode>
+                </Image>
+            </Grid>
 
             <!-- OVERVIEW BACKGROUND GRADIENTS -->
             <Grid x:Name="OverviewGradientOverlay" IsHitTestVisible="False">

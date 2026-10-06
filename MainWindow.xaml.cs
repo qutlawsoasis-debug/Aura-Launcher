@@ -96,6 +96,19 @@ public partial class MainWindow : Window
             {
                 AnimateInviteToastEntrance();
             }
+
+            var bgService = App.Services?.GetService<IBackgroundService>();
+            if (bgService != null)
+            {
+                bgService.BackgroundChanged += (s, nextImg) =>
+                {
+                    Dispatcher.Invoke(() => AnimateBackgroundTransition(nextImg));
+                };
+                if (bgService.CurrentImage != null)
+                {
+                    BgImageCurrent.Source = bgService.CurrentImage;
+                }
+            }
         }
     }
 
@@ -485,5 +498,36 @@ public partial class MainWindow : Window
         Topmost = false;
         Activate();
         Focus();
+    }
+
+    public void AnimateBackgroundTransition(System.Windows.Media.Imaging.BitmapImage nextImage)
+    {
+        if (BgImageCurrent == null || BgImageNext == null) return;
+
+        if (BgImageCurrent.Source == null)
+        {
+            BgImageCurrent.Source = nextImage;
+            return;
+        }
+
+        BgImageNext.Source = nextImage;
+        BgImageNext.Opacity = 0.0;
+
+        var anim = new DoubleAnimation
+        {
+            From = 0.0,
+            To = 1.0,
+            Duration = TimeSpan.FromMilliseconds(1200),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+        };
+
+        anim.Completed += (s, e) =>
+        {
+            BgImageCurrent.Source = nextImage;
+            BgImageNext.Opacity = 0.0;
+            BgImageNext.Source = null;
+        };
+
+        BgImageNext.BeginAnimation(UIElement.OpacityProperty, anim);
     }
 }

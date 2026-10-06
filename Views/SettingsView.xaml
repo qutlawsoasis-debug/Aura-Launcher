@@ -273,6 +273,38 @@
                               VerticalAlignment="Center" />
                 </Grid>
 
+                <!-- 2.6 "Автосмена фона" -->
+                <Grid Height="56" Margin="0,2,0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Автосмена фона (каждые 60 сек)"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Коллекция из 15 арт-пейзажей Minecraft с плавным кроссфейдом"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Command="{Binding NextBackgroundCommand}"
+                                Content="Сменить фон"
+                                Style="{StaticResource SecondaryBtn}"
+                                Height="30" Padding="12,0" FontSize="12"
+                                Margin="0,0,12,0" />
+                        <CheckBox IsChecked="{Binding AutoRotateBackgrounds, Mode=TwoWay}"
+                                  Style="{StaticResource AlexToggleSwitch}"
+                                  VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
                 <!-- ============================================== -->
                 <!-- ГРУППА 3: ПОДДЕРЖКА                            -->
                 <!-- ============================================== -->
