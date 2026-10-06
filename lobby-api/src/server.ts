@@ -428,9 +428,33 @@ export const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // 8. GET /csl/{username}.json
-    const cslMatch = pathname.match(/^\/csl\/([^/]+?)(?:\.json)?$/);
-    if (req.method === 'GET' && cslMatch && !pathname.startsWith('/csl/raw/') && !pathname.startsWith('/csl/textures/')) {
+    // 8. GET/HEAD /csl/raw/{sha1}.png or /csl/textures/{sha1} or /textures/{sha1}
+    const rawMatch = pathname.match(/^(?:\/(?:api\/)?csl)?\/+(?:raw|textures)\/+([a-fA-F0-9]+?)(?:\.png)?$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && rawMatch) {
+      const sha1 = rawMatch[1].toLowerCase();
+      const pngBuffer = await store.getSkinByHash(sha1);
+      if (!pngBuffer) {
+        sendJson(res, 404, { error: 'Texture not found' });
+        return;
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': pngBuffer.length,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*'
+      });
+      if (req.method === 'HEAD') {
+        res.end();
+      } else {
+        res.end(pngBuffer);
+      }
+      return;
+    }
+
+    // 9. GET/HEAD /csl/{username}.json
+    const cslMatch = pathname.match(/^(?:\/api)?\/csl\/+([^/]+?)(?:\.json)?$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && cslMatch && !pathname.includes('/textures/') && !pathname.includes('/raw/')) {
       const username = cslMatch[1].trim();
       const skinRecord = await store.getSkin(username.toLowerCase());
       if (!skinRecord) {
@@ -449,25 +473,6 @@ export const server = http.createServer(async (req, res) => {
         },
         cape: null
       });
-      return;
-    }
-
-    // 9. GET /csl/raw/{sha1}.png or /csl/textures/{sha1}
-    const rawMatch = pathname.match(/^\/csl\/(?:raw|textures)\/([a-fA-F0-9]+?)(?:\.png)?$/);
-    if (req.method === 'GET' && rawMatch) {
-      const sha1 = rawMatch[1].toLowerCase();
-      const pngBuffer = await store.getSkinByHash(sha1);
-      if (!pngBuffer) {
-        sendJson(res, 404, { error: 'Texture not found' });
-        return;
-      }
-
-      res.writeHead(200, {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'Access-Control-Allow-Origin': '*'
-      });
-      res.end(pngBuffer);
       return;
     }
 

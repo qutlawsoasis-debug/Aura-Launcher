@@ -5,7 +5,6 @@
     { "source": "/api/lobby/open", "destination": "/api/open" },
     { "source": "/api/lobby/heartbeat", "destination": "/api/heartbeat" },
     { "source": "/api/lobby/close", "destination": "/api/close" },
-    { "source": "/csl/textures/:path*", "destination": "/api/csl" },
     { "source": "/j/:code", "destination": "/api/landing?type=join&code=:code" },
     { "source": "/f/:code", "destination": "/api/landing?type=friend&code=:code" }
   ]
