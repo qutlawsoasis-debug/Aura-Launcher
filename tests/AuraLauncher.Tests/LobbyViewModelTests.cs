@@ -20,9 +20,14 @@ public class LobbyViewModelTests
         public bool IsHost { get; set; }
         public bool IsReadyToPlay => CurrentStatus.Equals("open", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(CurrentTunnelAddress);
 
+        public IReadOnlyDictionary<string, PlayerModSyncInfo>? CurrentModSync { get; set; }
+
         public event Action<string>? StatusChanged;
         public event Action<string>? TunnelAddressReady;
         public event Action<LobbyStatusResponse>? LobbyStatusUpdated;
+        public event Action<IReadOnlyDictionary<string, PlayerModSyncInfo>>? ModSyncUpdated;
+
+        public Task UpdateManifestAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
         public Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default)
         {
@@ -156,8 +161,9 @@ public class LobbyViewModelTests
         public LobbyStatusResponse? DetailedStatusResponse { get; set; }
         public string DetailedRawBody { get; set; } = "";
 
-        public Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, CancellationToken cancellationToken = default) => Task.FromResult<LobbyCreateResponse?>(null);
-        public Task<LobbyJoinResponse?> JoinLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default) => Task.FromResult<LobbyJoinResponse?>(null);
+        public Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, IReadOnlyList<ModManifestEntry>? manifest = null, CancellationToken cancellationToken = default) => Task.FromResult<LobbyCreateResponse?>(null);
+        public Task<LobbyJoinResponse?> JoinLobbyAsync(string code, string playerName, IReadOnlyList<ModManifestEntry>? manifest = null, CancellationToken cancellationToken = default) => Task.FromResult<LobbyJoinResponse?>(null);
+        public Task<bool> UpdateManifestAsync(string code, string playerName, IReadOnlyList<ModManifestEntry> manifest, CancellationToken cancellationToken = default) => Task.FromResult(true);
         public Task<LobbyStatusResponse?> GetStatusAsync(string code, CancellationToken cancellationToken = default) => Task.FromResult<LobbyStatusResponse?>(null);
         public Task<(System.Net.HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, CancellationToken cancellationToken = default)
         {
