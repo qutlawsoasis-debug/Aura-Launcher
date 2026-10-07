@@ -1,0 +1,30 @@
+name: 🔨 Build & Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build & Verify (.NET 8 WPF)
+    runs-on: windows-latest
+
+    steps:
+    - name: 📥 Checkout repository
+      uses: actions/checkout@v4
+
+    - name: ⚙️ Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: 📦 Restore dependencies
+      run: dotnet restore AuraLauncher.csproj
+
+    - name: 🏗️ Build solution (Release)
+      run: dotnet build AuraLauncher.csproj -c Release --no-restore
+
+    - name: 🧪 Run Unit Tests
+      run: dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --no-build -c Release --filter "Category!=Integration" --verbosity normal

@@ -1,0 +1,52 @@
+name: 🐛 Bug Report
+description: File a bug report to help us fix issues in Aura Launcher
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please check existing issues before submitting.
+  - type: input
+    id: version
+    attributes:
+      label: Launcher Version
+      description: What version of Aura Launcher are you running? (e.g. v1.2.35 / beta 1.0.27)
+      placeholder: v1.2.35
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows 11 (64-bit)
+        - Windows 10 (64-bit)
+        - Other Windows Version
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what happened.
+      placeholder: When clicking "Join Lobby" while my friend is host...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      placeholder: |
+        1. Open Aura Launcher
+        2. Navigate to 'Friends'
+        3. Click 'Join'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Diagnostic Information
+      description: Paste relevant logs from %APPDATA%\AuraLauncher\logs or the built-in diagnostic report.
+      render: shell
