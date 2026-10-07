@@ -93,6 +93,74 @@ public class WorkshopService : IWorkshopService
                         catch { }
                     }
 
+                    string playtimeFormatted = string.Empty;
+                    try
+                    {
+                        string statsDir = Path.Combine(d, "stats");
+                        if (Directory.Exists(statsDir))
+                        {
+                            long maxTicks = 0;
+                            foreach (var sf in Directory.EnumerateFiles(statsDir, "*.json"))
+                            {
+                                string j = File.ReadAllText(sf);
+                                using var doc = System.Text.Json.JsonDocument.Parse(j);
+                                if (doc.RootElement.TryGetProperty("stats", out var stObj) &&
+                                    stObj.TryGetProperty("minecraft:custom", out var cObj))
+                                {
+                                    if (cObj.TryGetProperty("minecraft:play_time", out var ptProp))
+                                        maxTicks = Math.Max(maxTicks, ptProp.GetInt64());
+                                    else if (cObj.TryGetProperty("minecraft:total_world_time", out var twProp))
+                                        maxTicks = Math.Max(maxTicks, twProp.GetInt64());
+                                }
+                            }
+                            if (maxTicks > 0)
+                            {
+                                int hours = (int)(maxTicks / (20 * 3600));
+                                if (hours > 0) playtimeFormatted = $"{hours} ч";
+                            }
+                        }
+                    }
+                    catch { }
+
+                    var backupsList = new List<WorldBackupItem>();
+                    string backupDir = Path.Combine(gameDir, "backups", "AuraBackups");
+                    if (Directory.Exists(backupDir))
+                    {
+                        string safeName = string.Join("_", displayName.Split(Path.GetInvalidFileNameChars()));
+                        var zipFiles = Directory.EnumerateFiles(backupDir, "*.zip")
+                            .Where(z => Path.GetFileName(z).StartsWith(safeName, StringComparison.OrdinalIgnoreCase) ||
+                                        Path.GetFileName(z).StartsWith(dirInfo.Name, StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+
+                        foreach (var z in zipFiles)
+                        {
+                            var fi = new FileInfo(z);
+                            backupsList.Add(new WorldBackupItem
+                            {
+                                FileName = fi.Name,
+                                FilePath = z,
+                                CreatedAt = fi.LastWriteTime,
+                                SizeFormatted = FormatFileSize(fi.Length)
+                            });
+                        }
+                    }
+                    backupsList = backupsList.OrderByDescending(b => b.CreatedAt).ToList();
+
+                    var ticks = new List<BackupTickItem>();
+                    for (int dayOffset = 29; dayOffset >= 0; dayOffset--)
+                    {
+                        var date = DateTime.Today.AddDays(-dayOffset);
+                        bool hasB = backupsList.Any(b => b.CreatedAt.Date == date);
+                        ticks.Add(new BackupTickItem { HasBackup = hasB });
+                    }
+
+                    string lastBackupText = "бэкапов нет";
+                    if (backupsList.Count > 0)
+                    {
+                        int daysAgo = (int)Math.Max(0, (DateTime.Today - backupsList[0].CreatedAt.Date).TotalDays);
+                        lastBackupText = daysAgo == 0 ? "последний сегодня" : daysAgo == 1 ? "последний вчера" : $"последний {daysAgo} дн. назад";
+                    }
+
                     result.Add(new WorldSaveItem
                     {
                         FolderName = dirInfo.Name,
@@ -101,7 +169,12 @@ public class WorkshopService : IWorkshopService
                         LastPlayed = lastPlayed,
                         GameMode = gameMode,
                         SizeFormatted = FormatFileSize(totalBytes),
-                        IconSource = icon
+                        IconSource = icon,
+                        PlaytimeFormatted = playtimeFormatted,
+                        BackupsCount = backupsList.Count,
+                        LastBackupText = lastBackupText,
+                        BackupTicks = ticks,
+                        Backups = backupsList
                     });
                 }
                 catch { }
@@ -130,6 +203,31 @@ public class WorkshopService : IWorkshopService
 
             ZipFile.CreateFromDirectory(world.FolderPath, zipPath, CompressionLevel.Optimal, false);
             return zipPath;
+        });
+    }
+
+    public Task RestoreWorldBackupAsync(WorldSaveItem world, WorldBackupItem backup)
+    {
+        return Task.Run(() =>
+        {
+            if (!File.Exists(backup.FilePath)) throw new FileNotFoundException("Файл бэкапа не найден.");
+            if (Directory.Exists(world.FolderPath))
+            {
+                Directory.Delete(world.FolderPath, true);
+            }
+            Directory.CreateDirectory(world.FolderPath);
+            ZipFile.ExtractToDirectory(backup.FilePath, world.FolderPath, true);
+        });
+    }
+
+    public Task DeleteWorldBackupAsync(WorldBackupItem backup)
+    {
+        return Task.Run(() =>
+        {
+            if (File.Exists(backup.FilePath))
+            {
+                File.Delete(backup.FilePath);
+            }
         });
     }
 
@@ -163,10 +261,19 @@ public class WorkshopService : IWorkshopService
                         rawName = rawName[..^4];
                     }
 
+                    string version = string.Empty;
+                    var verMatch = System.Text.RegularExpressions.Regex.Match(rawName, @"[-_v](\d+(\.\d+)+.*)$");
+                    if (verMatch.Success)
+                    {
+                        version = verMatch.Groups[1].Value;
+                        rawName = rawName.Substring(0, verMatch.Index).TrimEnd('-', '_');
+                    }
+
                     result.Add(new ModItem
                     {
                         FileName = fi.Name,
                         DisplayName = rawName,
+                        Version = version,
                         FullPath = f,
                         IsEnabled = isEnabled,
                         SizeFormatted = FormatFileSize(fi.Length)

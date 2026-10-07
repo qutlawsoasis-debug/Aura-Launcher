@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -31,6 +32,11 @@ public class WorkshopViewModel : ObservableObject
     private BitmapImage? _fullPreviewImage;
     private string _activeShaderName = string.Empty;
 
+    private bool _isRestoreModalOpen;
+    private WorldSaveItem? _activeBackupWorld;
+    private WorldBackupItem? _restoreConfirmBackup;
+    private WorldBackupItem? _deleteConfirmBackup;
+
     public ObservableCollection<WorldSaveItem> WorldSaves { get; } = new();
     public ObservableCollection<ModItem> Mods { get; } = new();
     public ObservableCollection<ModItem> FilteredMods { get; } = new();
@@ -39,6 +45,8 @@ public class WorkshopViewModel : ObservableObject
 
     public event Action? BackupCreated;
     public event Action<int>? ScreenshotsCountChanged;
+    public event Action? ModToggled;
+    public event Action? SubTabChanged;
 
     public string ActiveSubTab
     {
@@ -50,6 +58,7 @@ public class WorkshopViewModel : ObservableObject
                 IsWorldsTabActive = value == "Worlds";
                 IsModsTabActive = value == "Mods";
                 IsScreenshotsTabActive = value == "Screenshots";
+                SubTabChanged?.Invoke();
             }
         }
     }
@@ -72,6 +81,23 @@ public class WorkshopViewModel : ObservableObject
         set => SetProperty(ref _isScreenshotsTabActive, value);
     }
 
+    public int WorldsCount => WorldSaves.Count;
+    public int ModsCount => Mods.Count;
+    public int ScreenshotsCount => Screenshots.Count;
+
+    public bool HasWorlds => WorldSaves.Count > 0;
+    public bool HasNoWorlds => WorldSaves.Count == 0 && !IsLoading;
+
+    public bool HasMods => FilteredMods.Count > 0;
+    public bool HasNoMods => FilteredMods.Count == 0 && !IsLoading;
+
+    public bool HasScreenshots => Screenshots.Count > 0;
+    public bool HasNoScreenshots => Screenshots.Count == 0 && !IsLoading;
+
+    public WorldSaveItem? FeaturedWorld => WorldSaves.FirstOrDefault();
+    public IEnumerable<WorldSaveItem> OtherWorlds => WorldSaves.Count > 1 ? WorldSaves.Skip(1) : Enumerable.Empty<WorldSaveItem>();
+    public bool HasOtherWorlds => WorldSaves.Count > 1;
+
     public string SearchModText
     {
         get => _searchModText;
@@ -87,7 +113,15 @@ public class WorkshopViewModel : ObservableObject
     public bool IsLoading
     {
         get => _isLoading;
-        set => SetProperty(ref _isLoading, value);
+        set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                OnPropertyChanged(nameof(HasNoWorlds));
+                OnPropertyChanged(nameof(HasNoMods));
+                OnPropertyChanged(nameof(HasNoScreenshots));
+            }
+        }
     }
 
     public string StatusMessage
@@ -120,13 +154,36 @@ public class WorkshopViewModel : ObservableObject
         set => SetProperty(ref _activeShaderName, value);
     }
 
+    public bool IsRestoreModalOpen
+    {
+        get => _isRestoreModalOpen;
+        set => SetProperty(ref _isRestoreModalOpen, value);
+    }
+
+    public WorldSaveItem? ActiveBackupWorld
+    {
+        get => _activeBackupWorld;
+        set => SetProperty(ref _activeBackupWorld, value);
+    }
+
+    public WorldBackupItem? RestoreConfirmBackup
+    {
+        get => _restoreConfirmBackup;
+        set => SetProperty(ref _restoreConfirmBackup, value);
+    }
+
+    public WorldBackupItem? DeleteConfirmBackup
+    {
+        get => _deleteConfirmBackup;
+        set => SetProperty(ref _deleteConfirmBackup, value);
+    }
+
     // Commands
     public RelayCommand SwitchSubTabCommand { get; }
     public AsyncRelayCommand RefreshAllCommand { get; }
     public AsyncRelayCommand CreateBackupCommand { get; }
     public RelayCommand OpenWorldFolderCommand { get; }
     public RelayCommand OpenBackupsFolderCommand { get; }
-    public event Action? ModToggled;
 
     public RelayCommand ToggleModCommand { get; }
     public RelayCommand SelectShaderCommand { get; }
@@ -138,6 +195,15 @@ public class WorkshopViewModel : ObservableObject
     public RelayCommand CopyScreenshotCommand { get; }
     public RelayCommand OpenScreenshotFileCommand { get; }
     public RelayCommand DeleteScreenshotCommand { get; }
+
+    public RelayCommand OpenRestoreDialogCommand { get; }
+    public RelayCommand CloseRestoreDialogCommand { get; }
+    public RelayCommand PromptRestoreBackupCommand { get; }
+    public RelayCommand CancelRestoreConfirmCommand { get; }
+    public AsyncRelayCommand ConfirmRestoreBackupCommand { get; }
+    public RelayCommand PromptDeleteBackupCommand { get; }
+    public RelayCommand CancelDeleteConfirmCommand { get; }
+    public AsyncRelayCommand ConfirmDeleteBackupCommand { get; }
 
     public WorkshopViewModel(
         IWorkshopService workshopService,
@@ -160,7 +226,8 @@ public class WorkshopViewModel : ObservableObject
 
         CreateBackupCommand = new AsyncRelayCommand(async p =>
         {
-            if (p is not WorldSaveItem world || world.IsBackingUp) return;
+            var world = p as WorldSaveItem ?? FeaturedWorld;
+            if (world == null || world.IsBackingUp) return;
             try
             {
                 world.IsBackingUp = true;
@@ -168,6 +235,10 @@ public class WorkshopViewModel : ObservableObject
                 string zip = await _workshopService.CreateWorldBackupAsync(world);
                 world.BackupStatusText = "Бэкап сохранён!";
                 BackupCreated?.Invoke();
+
+                // Refresh backups list for this world
+                await RefreshAllAsync();
+
                 _ = Task.Delay(3000).ContinueWith(_ =>
                 {
                     Application.Current?.Dispatcher?.InvokeAsync(() => world.BackupStatusText = string.Empty);
@@ -186,7 +257,8 @@ public class WorkshopViewModel : ObservableObject
 
         OpenWorldFolderCommand = new RelayCommand(p =>
         {
-            if (p is WorldSaveItem world && Directory.Exists(world.FolderPath))
+            var world = p as WorldSaveItem ?? FeaturedWorld;
+            if (world != null && Directory.Exists(world.FolderPath))
             {
                 try
                 {
@@ -211,12 +283,18 @@ public class WorkshopViewModel : ObservableObject
         ToggleModCommand = new RelayCommand(p =>
         {
             if (p is not ModItem mod) return;
-            bool newState = !mod.IsEnabled;
-            if (_workshopService.ToggleMod(mod, newState))
+            bool targetState = mod.IsEnabled;
+            _ = Task.Run(async () =>
             {
-                ApplyModFilter();
-                ModToggled?.Invoke();
-            }
+                // Give 190ms for smooth 180ms toggle animation before renaming file
+                await Task.Delay(190);
+                _workshopService.ToggleMod(mod, targetState);
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    ApplyModFilter();
+                    ModToggled?.Invoke();
+                });
+            });
         });
 
         SelectShaderCommand = new RelayCommand(p =>
@@ -332,7 +410,120 @@ public class WorkshopViewModel : ObservableObject
                         FullPreviewImage = null;
                         SelectedScreenshot = null;
                     }
+                    OnPropertyChanged(nameof(ScreenshotsCount));
+                    OnPropertyChanged(nameof(HasScreenshots));
+                    OnPropertyChanged(nameof(HasNoScreenshots));
                 }
+            }
+        });
+
+        OpenRestoreDialogCommand = new RelayCommand(p =>
+        {
+            ActiveBackupWorld = p as WorldSaveItem ?? FeaturedWorld;
+            RestoreConfirmBackup = null;
+            DeleteConfirmBackup = null;
+            IsRestoreModalOpen = true;
+        });
+
+        CloseRestoreDialogCommand = new RelayCommand(_ =>
+        {
+            IsRestoreModalOpen = false;
+            ActiveBackupWorld = null;
+            RestoreConfirmBackup = null;
+            DeleteConfirmBackup = null;
+        });
+
+        PromptRestoreBackupCommand = new RelayCommand(p =>
+        {
+            var item = p as WorldBackupItem;
+            if (ActiveBackupWorld?.Backups != null)
+            {
+                foreach (var b in ActiveBackupWorld.Backups)
+                {
+                    b.IsConfirmingRestore = (b == item);
+                    b.IsConfirmingDelete = false;
+                }
+            }
+            RestoreConfirmBackup = item;
+            DeleteConfirmBackup = null;
+        });
+
+        CancelRestoreConfirmCommand = new RelayCommand(_ =>
+        {
+            if (ActiveBackupWorld?.Backups != null)
+            {
+                foreach (var b in ActiveBackupWorld.Backups)
+                    b.IsConfirmingRestore = false;
+            }
+            RestoreConfirmBackup = null;
+        });
+
+        ConfirmRestoreBackupCommand = new AsyncRelayCommand(async p =>
+        {
+            var backup = p as WorldBackupItem ?? RestoreConfirmBackup;
+            if (ActiveBackupWorld != null && backup != null)
+            {
+                try
+                {
+                    await _workshopService.RestoreWorldBackupAsync(ActiveBackupWorld, backup);
+                    StatusMessage = "Мир успешно восстановлен из бэкапа!";
+                    _ = Task.Delay(3000).ContinueWith(_ =>
+                    {
+                        Application.Current?.Dispatcher?.InvokeAsync(() => StatusMessage = string.Empty);
+                    });
+                    RestoreConfirmBackup = null;
+                    IsRestoreModalOpen = false;
+                    await RefreshAllAsync();
+                }
+                catch (Exception ex)
+                {
+                    StatusMessage = $"Ошибка восстановления: {ex.Message}";
+                }
+            }
+        });
+
+        PromptDeleteBackupCommand = new RelayCommand(p =>
+        {
+            var item = p as WorldBackupItem;
+            if (ActiveBackupWorld?.Backups != null)
+            {
+                foreach (var b in ActiveBackupWorld.Backups)
+                {
+                    b.IsConfirmingDelete = (b == item);
+                    b.IsConfirmingRestore = false;
+                }
+            }
+            DeleteConfirmBackup = item;
+            RestoreConfirmBackup = null;
+        });
+
+        CancelDeleteConfirmCommand = new RelayCommand(_ =>
+        {
+            if (ActiveBackupWorld?.Backups != null)
+            {
+                foreach (var b in ActiveBackupWorld.Backups)
+                    b.IsConfirmingDelete = false;
+            }
+            DeleteConfirmBackup = null;
+        });
+
+        ConfirmDeleteBackupCommand = new AsyncRelayCommand(async p =>
+        {
+            var backup = p as WorldBackupItem ?? DeleteConfirmBackup;
+            if (backup != null)
+            {
+                try
+                {
+                    await _workshopService.DeleteWorldBackupAsync(backup);
+                    if (ActiveBackupWorld != null)
+                    {
+                        ActiveBackupWorld.Backups.Remove(backup);
+                        ActiveBackupWorld.BackupsCount = ActiveBackupWorld.Backups.Count;
+                    }
+                    DeleteConfirmBackup = null;
+                    await RefreshAllAsync();
+                }
+                catch { }
             }
         });
     }
@@ -368,11 +559,22 @@ public class WorkshopViewModel : ObservableObject
             WorldSaves.Clear();
             foreach (var w in worlds) WorldSaves.Add(w);
 
+            OnPropertyChanged(nameof(WorldsCount));
+            OnPropertyChanged(nameof(FeaturedWorld));
+            OnPropertyChanged(nameof(OtherWorlds));
+            OnPropertyChanged(nameof(HasOtherWorlds));
+            OnPropertyChanged(nameof(HasWorlds));
+            OnPropertyChanged(nameof(HasNoWorlds));
+
             // 2. Mods
             var mods = await _workshopService.GetModsAsync(gameDir);
             Mods.Clear();
             foreach (var m in mods) Mods.Add(m);
             ApplyModFilter();
+
+            OnPropertyChanged(nameof(ModsCount));
+            OnPropertyChanged(nameof(HasMods));
+            OnPropertyChanged(nameof(HasNoMods));
 
             // 3. Shaders
             var shaders = await _workshopService.GetShaderPacksAsync(gameDir);
@@ -388,6 +590,10 @@ public class WorkshopViewModel : ObservableObject
             Screenshots.Clear();
             foreach (var sc in screens) Screenshots.Add(sc);
             ScreenshotsCountChanged?.Invoke(Screenshots.Count);
+
+            OnPropertyChanged(nameof(ScreenshotsCount));
+            OnPropertyChanged(nameof(HasScreenshots));
+            OnPropertyChanged(nameof(HasNoScreenshots));
         }
         catch (Exception ex)
         {
@@ -412,6 +618,9 @@ public class WorkshopViewModel : ObservableObject
         {
             FilteredMods.Add(m);
         }
+
+        OnPropertyChanged(nameof(HasMods));
+        OnPropertyChanged(nameof(HasNoMods));
     }
 
     private string GetGameDir()

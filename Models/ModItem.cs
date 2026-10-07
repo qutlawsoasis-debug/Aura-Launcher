@@ -10,6 +10,9 @@ public class ModItem : ObservableObject
     public string DisplayName { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
     public string SizeFormatted { get; set; } = string.Empty;
+    public string Version { get; set; } = string.Empty;
+
+    public string VersionOrSize => !string.IsNullOrWhiteSpace(Version) ? Version : SizeFormatted;
 
     public bool IsEnabled
     {

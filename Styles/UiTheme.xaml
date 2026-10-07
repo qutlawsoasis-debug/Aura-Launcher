@@ -753,7 +753,7 @@
         </Setter>
     </Style>
 
-    <!-- Thin ScrollBar: 4px width, ink 18% (#2EEAF1EF), ember (#F2A63C) on hover -->
+    <!-- ScrollBar: 6px width, white ~22% (#38FFFFFF), Accent on hover, radius 3, transparent track, no arrows -->
     <Style x:Key="AuraScrollBarThumb" TargetType="{x:Type Thumb}">
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="IsTabStop" Value="False" />
@@ -761,15 +761,15 @@
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Thumb}">
                     <Border x:Name="ThumbBorder"
-                            Background="#2EEAF1EF"
-                            CornerRadius="2"
+                            Background="#38FFFFFF"
+                            CornerRadius="3"
                             SnapsToDevicePixels="True" />
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource Accent}" />
                         </Trigger>
                         <Trigger Property="IsDragging" Value="True">
-                            <Setter TargetName="ThumbBorder" Property="Background" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="ThumbBorder" Property="Background" Value="{DynamicResource Accent}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -779,19 +779,19 @@
 
     <Style x:Key="AuraScrollBar" TargetType="{x:Type ScrollBar}">
         <Setter Property="OverridesDefaultStyle" Value="True" />
-        <Setter Property="Width" Value="4" />
-        <Setter Property="MinWidth" Value="4" />
+        <Setter Property="Width" Value="6" />
+        <Setter Property="MinWidth" Value="6" />
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ScrollBar}">
                     <Grid Background="Transparent" SnapsToDevicePixels="True">
-                        <Track x:Name="PART_Track" IsDirectionReversed="True" Width="4">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True" Width="6">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Command="{x:Static ScrollBar.LineUpCommand}" Opacity="0" Focusable="False" Height="0" />
                             </Track.DecreaseRepeatButton>
                             <Track.Thumb>
-                                <Thumb Style="{StaticResource AuraScrollBarThumb}" Width="4" />
+                                <Thumb Style="{StaticResource AuraScrollBarThumb}" Width="6" />
                             </Track.Thumb>
                             <Track.IncreaseRepeatButton>
                                 <RepeatButton Command="{x:Static ScrollBar.LineDownCommand}" Opacity="0" Focusable="False" Height="0" />
@@ -802,6 +802,8 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <Style TargetType="{x:Type ScrollBar}" BasedOn="{StaticResource AuraScrollBar}" />
 
     <!-- Aura ScrollViewer with 4px scrollbar and bottom 24px fade gradient -->
     <Style x:Key="AuraScrollViewer" TargetType="{x:Type ScrollViewer}">
