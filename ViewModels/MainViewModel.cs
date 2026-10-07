@@ -59,6 +59,7 @@ public class MainViewModel : ObservableObject
     private readonly INotificationService? _notificationService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IReportService? _reportService;
+    private readonly IAchievementService? _achievementService;
 
     // Свойства диалога «Отправить отчёт»
     private bool _isSendReportModalVisible;
@@ -203,6 +204,7 @@ public class MainViewModel : ObservableObject
 
     public RelayCommand OpenChangelogCommand { get; }
     public RelayCommand CloseChangelogCommand { get; }
+    public RelayCommand OpenOverviewScreenshotCommand { get; }
 
     public bool IsSendReportModalVisible
     {
@@ -673,7 +675,8 @@ public class MainViewModel : ObservableObject
         IDiscordRpcService? discordRpcService = null,
         IReportService? reportService = null,
         WorkshopViewModel? workshopViewModel = null,
-        IWorkshopService? workshopService = null)
+        IWorkshopService? workshopService = null,
+        IAchievementService? achievementService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -684,6 +687,7 @@ public class MainViewModel : ObservableObject
         _notificationService = notificationService;
         _discordRpcService = discordRpcService;
         _reportService = reportService ?? new ReportService(configService, notificationService ?? new NotificationService(configService));
+        _achievementService = achievementService;
         AnthemService = anthemService;
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
@@ -713,6 +717,25 @@ public class MainViewModel : ObservableObject
             {
                 _notificationService?.NotifyFriendRequest(req.Nick, req.Id);
             };
+            _friendService.FriendsListUpdated += friends =>
+            {
+                _achievementService?.Report("friends_count", friends?.Count ?? 0);
+            };
+        }
+
+        if (_achievementService != null)
+        {
+            GameStarted += (s, proc) => _achievementService.Report("game_launch");
+            GameExited += (s, code) => _achievementService.Report("game_exit");
+
+            LobbyVM.LobbyCreated += () => _achievementService.Report("lobby_created");
+            LobbyVM.PlayerCountChanged += count => _achievementService.Report("lobby_players_count", count);
+            LobbyVM.Reconnected += () => _achievementService.Report("reconnected");
+
+            WorkshopVM.BackupCreated += () => _achievementService.Report("backup_created");
+            WorkshopVM.ScreenshotsCountChanged += count => _achievementService.Report("screenshots_count", count);
+
+            WardrobeVM.CustomSkinApplied += () => _achievementService.Report("custom_skin");
         }
 
         _discordRpcService?.Initialize();
@@ -720,6 +743,20 @@ public class MainViewModel : ObservableObject
 
         OpenChangelogCommand = new RelayCommand(_ => IsChangelogModalVisible = true);
         CloseChangelogCommand = new RelayCommand(_ => IsChangelogModalVisible = false);
+        OpenOverviewScreenshotCommand = new RelayCommand(p =>
+        {
+            if (p is ScreenshotItem item)
+            {
+                SwitchTab("Workshop");
+                WorkshopVM.ActiveSubTab = "Screenshots";
+                WorkshopVM.OpenScreenshotPreview(item);
+            }
+            else
+            {
+                SwitchTab("Workshop");
+                WorkshopVM.ActiveSubTab = "Screenshots";
+            }
+        });
 
         ConfirmProtocolPromptCommand = new AsyncRelayCommand(async () =>
         {

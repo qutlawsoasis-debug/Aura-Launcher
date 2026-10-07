@@ -41,6 +41,7 @@ public class FriendService : IFriendService
     public bool IsGameRunning { get; set; }
 
     public event Action<SyncResponse>? SyncUpdated;
+    public event Action<IReadOnlyList<FriendPresenceItem>>? FriendsListUpdated;
     public event Action<IncomingInviteItem>? InviteReceived;
     public event Action<FriendRequestItem>? FriendRequestReceived;
 
@@ -244,6 +245,7 @@ public class FriendService : IFriendService
                 }
 
                 SyncUpdated?.Invoke(syncResult);
+                FriendsListUpdated?.Invoke(syncResult.Friends ?? Array.Empty<FriendPresenceItem>());
             }
 
             return syncResult;

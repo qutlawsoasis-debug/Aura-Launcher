@@ -1,0 +1,12 @@
+.gradle/
+build/
+assets/
+data/
+com/
+META-INF/
+run/
+*.iml
+*.ipr
+*.iws
+flightrecorder-config.jfc
+version.json

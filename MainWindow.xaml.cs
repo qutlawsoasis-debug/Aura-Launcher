@@ -753,46 +753,31 @@ public partial class MainWindow : Window
 
     private void SaveDisplayState(string state)
     {
-        var cfgService = App.Services?.GetService<IConfigService>();
-        if (cfgService != null)
-        {
-            _ = cfgService.UpdateConfigAsync(c =>
-            {
-                c.WindowDisplayState = state;
-            });
-        }
+        // Задача 1в: Кнопка в шапке и F11 меняют режим только для текущей сессии и не сохраняются в настройки.
+        // Запуск лаунчера всегда происходит в режиме из StartMode.
     }
 
     private void RestoreDisplayState()
     {
         var cfgService = App.Services?.GetService<IConfigService>();
-        string state = cfgService?.CurrentConfig.WindowDisplayState ?? "Maximized";
+        string mode = cfgService?.CurrentConfig.StartMode ?? "Maximized";
 
-        if (state == "Fullscreen")
+        _isFullscreen = false;
+        Topmost = false;
+        ResizeMode = ResizeMode.CanResize;
+
+        if (string.Equals(mode, "Windowed", StringComparison.OrdinalIgnoreCase))
         {
-            _lastNonFullscreenState = "Maximized";
-            _isFullscreen = true;
-            Topmost = true;
-            ResizeMode = ResizeMode.NoResize;
-            WindowState = WindowState.Normal;
-            ApplyFullscreenBounds();
-        }
-        else if (state == "Normal")
-        {
-            _isFullscreen = false;
             _lastNonFullscreenState = "Normal";
-            Topmost = false;
-            ResizeMode = ResizeMode.CanResize;
             WindowState = WindowState.Normal;
             Width = 1280;
             Height = 720;
+            Left = (SystemParameters.WorkArea.Width - 1280) / 2 + SystemParameters.WorkArea.Left;
+            Top = (SystemParameters.WorkArea.Height - 720) / 2 + SystemParameters.WorkArea.Top;
         }
         else
         {
-            _isFullscreen = false;
             _lastNonFullscreenState = "Maximized";
-            Topmost = false;
-            ResizeMode = ResizeMode.CanResize;
             WindowState = WindowState.Maximized;
         }
 
@@ -817,13 +802,11 @@ public partial class MainWindow : Window
             Height = 720;
             Left = (SystemParameters.WorkArea.Width - 1280) / 2 + SystemParameters.WorkArea.Left;
             Top = (SystemParameters.WorkArea.Height - 720) / 2 + SystemParameters.WorkArea.Top;
-            SaveDisplayState("Normal");
         }
         else
         {
             _lastNonFullscreenState = "Maximized";
             WindowState = WindowState.Maximized;
-            SaveDisplayState("Maximized");
         }
 
         UpdateWindowChromeAndBorders();
@@ -838,12 +821,10 @@ public partial class MainWindow : Window
             if (WindowState == WindowState.Maximized)
             {
                 _lastNonFullscreenState = "Maximized";
-                SaveDisplayState("Maximized");
             }
             else if (WindowState == WindowState.Normal)
             {
                 _lastNonFullscreenState = "Normal";
-                SaveDisplayState("Normal");
             }
         }
         UpdateWindowChromeAndBorders();

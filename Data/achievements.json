@@ -1,0 +1,86 @@
+[
+  {
+    "id": "first_launch",
+    "title": "Искра",
+    "description": "Первый запуск игры",
+    "target": 1
+  },
+  {
+    "id": "ten_launches",
+    "title": "Постоялец",
+    "description": "10 запусков игры",
+    "target": 10
+  },
+  {
+    "id": "hundred_hours",
+    "title": "Сто часов",
+    "description": "100 часов в игре",
+    "target": 100
+  },
+  {
+    "id": "marathon",
+    "title": "Марафон",
+    "description": "5 часов в одной сессии",
+    "target": 5
+  },
+  {
+    "id": "night_shift",
+    "title": "Ночная смена",
+    "description": "Запуск с 03:00 до 05:00",
+    "target": 1
+  },
+  {
+    "id": "first_lobby",
+    "title": "Хост",
+    "description": "Первое созданное лобби",
+    "target": 1
+  },
+  {
+    "id": "full_table",
+    "title": "Полный стол",
+    "description": "4 игрока в твоём лобби",
+    "target": 4
+  },
+  {
+    "id": "reconnected",
+    "title": "Вернулся",
+    "description": "Нажал «Переподключиться»",
+    "target": 1
+  },
+  {
+    "id": "first_friend",
+    "title": "Свой человек",
+    "description": "Первый друг в списке",
+    "target": 1
+  },
+  {
+    "id": "five_friends",
+    "title": "Компания",
+    "description": "5 друзей в списке",
+    "target": 5
+  },
+  {
+    "id": "first_backup",
+    "title": "Страховка",
+    "description": "Первый созданный бэкап мира",
+    "target": 1
+  },
+  {
+    "id": "ten_backups",
+    "title": "Параноик",
+    "description": "10 бэкапов миров",
+    "target": 10
+  },
+  {
+    "id": "photographer",
+    "title": "Фотограф",
+    "description": "10 скриншотов в галерее",
+    "target": 10
+  },
+  {
+    "id": "own_style",
+    "title": "Свой стиль",
+    "description": "Установлен кастомный скин",
+    "target": 1
+  }
+]

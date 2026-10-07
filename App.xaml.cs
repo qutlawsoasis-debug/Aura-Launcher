@@ -12,6 +12,7 @@ using Microsoft.Toolkit.Uwp.Notifications;
 using AuraLauncher.Services.Interfaces;
 using AuraLauncher.Services.Implementations;
 using AuraLauncher.ViewModels;
+using AuraLauncher.Views;
 
 namespace AuraLauncher;
 
@@ -101,7 +102,8 @@ public partial class App : Application
         bool isLayoutAudit = Array.Exists(args, a => a.Equals("--layout-audit", StringComparison.OrdinalIgnoreCase));
         bool isColorsTest = Array.Exists(args, a => a.Equals("--selftest-colors", StringComparison.OrdinalIgnoreCase));
         bool isScaleCrispTest = Array.Exists(args, a => a.Equals("--selftest-scale-crisp", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isReportTest || isLayoutAudit || isColorsTest || isScaleCrispTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isSplashTest = Array.Exists(args, a => a.Equals("--selftest-splash", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isReportTest || isLayoutAudit || isColorsTest || isScaleCrispTest || isSplashTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -163,35 +165,65 @@ public partial class App : Application
         }
         catch { }
 
-        // Проверка наличия обновлений лаунчера ПЕРЕД созданием интерфейса
+        // Предстартовое окно (splash): открывается до тяжелых ресурсов и главного окна
         bool isUpdatedRestart = Array.Exists(args, a => a.Equals("--updated-restart", StringComparison.OrdinalIgnoreCase));
-        bool skipPreUpdate = isUpdatedRestart || isSelfTest || Array.Exists(args, a => a.Equals("--no-preupdate", StringComparison.OrdinalIgnoreCase));
-        if (!skipPreUpdate)
+        bool skipSplash = isUpdatedRestart || isSelfTest || Array.Exists(args, a => a.Equals("--no-splash", StringComparison.OrdinalIgnoreCase) || a.Equals("--no-preupdate", StringComparison.OrdinalIgnoreCase));
+
+        if (!skipSplash)
         {
             try
             {
                 var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
-                if (launcherUpdateService.IsInstalled)
-                {
-                    FabricGameLaunchService.LogLauncherEvent("[PRE-STARTUP] Проверка обновлений перед запуском...");
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-                    var updateAvailable = Task.Run(() => launcherUpdateService.CheckForUpdatesAsync(cts.Token)).GetAwaiter().GetResult();
-                    if (!string.IsNullOrWhiteSpace(updateAvailable))
+                var startupCompletedTcs = new TaskCompletionSource<bool>();
+                StartupWindow? splashWin = null;
+                StartupWindowViewModel? startupVm = null;
+
+                startupVm = new StartupWindowViewModel(
+                    launcherUpdateService,
+                    onLaunchMainRequested: () =>
                     {
-                        FabricGameLaunchService.LogLauncherEvent($"[PRE-STARTUP] Обнаружена новая версия {updateAvailable}. Скачивание и применение обновления перед открытием окна...");
-                        var result = Task.Run(() => launcherUpdateService.DownloadAndApplyAsync(ct: cts.Token)).GetAwaiter().GetResult();
-                        if (result.Status == LauncherUpdateStatus.UpdatedRestarting)
+                        Dispatcher.Invoke(() =>
                         {
-                            FabricGameLaunchService.LogLauncherEvent("[PRE-STARTUP] Обновление применено! Выполняется перезапуск...");
+                            if (splashWin != null)
+                            {
+                                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(220));
+                                fadeOut.Completed += (s, ev) =>
+                                {
+                                    splashWin.Close();
+                                    startupCompletedTcs.TrySetResult(true);
+                                };
+                                splashWin.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+                            }
+                            else
+                            {
+                                startupCompletedTcs.TrySetResult(true);
+                            }
+                        });
+                    },
+                    onCloseRequested: () =>
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            splashWin?.Close();
                             Shutdown(0);
-                            return;
-                        }
-                    }
-                }
+                        });
+                    });
+
+                splashWin = new StartupWindow
+                {
+                    DataContext = startupVm
+                };
+                splashWin.Show();
+                _ = startupVm.StartStartupFlowAsync();
+
+                // Ждем завершения splash-флоу в неблокирующем цикле событий WPF
+                var frame = new System.Windows.Threading.DispatcherFrame();
+                _ = startupCompletedTcs.Task.ContinueWith(_ => frame.Continue = false);
+                System.Windows.Threading.Dispatcher.PushFrame(frame);
             }
             catch (Exception ex)
             {
-                FabricGameLaunchService.LogLauncherEvent($"[PRE-STARTUP: WARNING] Предстартовая проверка обновлений: {ex.Message}");
+                FabricGameLaunchService.LogLauncherEvent($"[STARTUP-WINDOW: ERROR] {ex.Message}");
             }
         }
 
@@ -282,6 +314,14 @@ public partial class App : Application
                     }
                 });
             };
+        }
+        catch { }
+
+        // Инициализация сервиса достижений
+        try
+        {
+            var achievementService = Services.GetRequiredService<IAchievementService>();
+            achievementService.Initialize();
         }
         catch { }
 
@@ -485,6 +525,18 @@ public partial class App : Application
                 }
             });
         }
+        else if (isSplashTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunSplashSelfTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
+            });
+        }
         else if (isSelfTest)
         {
             _ = Task.Run(async () =>
@@ -524,6 +576,7 @@ public partial class App : Application
         services.AddSingleton<IReportService, ReportService>();
         services.AddSingleton<IBackgroundService, BackgroundService>();
         services.AddSingleton<IWorkshopService, WorkshopService>();
+        services.AddSingleton<IAchievementService, AchievementService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();

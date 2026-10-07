@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.auramc.defaults.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "IntegratedServerMixin",
+    "LevelPropertiesMixin",
+    "PlayerManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -32,6 +32,8 @@ public class WardrobeViewModel : ObservableObject
         ErrorBrush.Freeze();
     }
 
+    public event Action? CustomSkinApplied;
+
     public string Nickname => _configService.CurrentConfig.Nickname;
 
     public string SkinPath
@@ -46,6 +48,10 @@ public class WardrobeViewModel : ObservableObject
                 OnPropertyChanged(nameof(SkinDisplayName));
                 _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
                 UpdateSkinPreviews();
+                if (!string.IsNullOrWhiteSpace(value) && File.Exists(value))
+                {
+                    CustomSkinApplied?.Invoke();
+                }
             }
         }
     }

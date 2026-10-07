@@ -12,6 +12,8 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <SolidColorBrush x:Key="FeedTextPrimary" Color="#E8F0F8" />
+        <SolidColorBrush x:Key="FeedTextSecondary" Color="#B8E8F0F8" />
     </UserControl.Resources>
 
     <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
@@ -101,5 +103,182 @@
                 </StackPanel>
             </StackPanel>
         </StackPanel>
+
+        <!-- ПРАВАЯ КОЛОНКА (ЛЕНТА НА ГЛАВНОМ ЭКРАНЕ) -->
+        <Grid HorizontalAlignment="Right"
+              VerticalAlignment="Stretch"
+              Width="340"
+              MinWidth="300"
+              MaxWidth="380"
+              Margin="0,160,0,135"
+              ClipToBounds="False"
+              Visibility="{Binding HasRightFeed, Converter={StaticResource BoolToVis}}">
+
+            <!-- Мягкое затемнение фона под колонкой для читаемости текста на арт-фонах -->
+            <Border HorizontalAlignment="Stretch"
+                    VerticalAlignment="Stretch"
+                    IsHitTestVisible="False"
+                    Margin="-16,-16,-16,-16"
+                    CornerRadius="3">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#00091015" Offset="0.0" />
+                        <GradientStop Color="#60091015" Offset="0.25" />
+                        <GradientStop Color="#8C091015" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+
+            <!-- ScrollViewer на случай нехватки вертикального места -->
+            <ScrollViewer Style="{StaticResource AuraScrollViewer}"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          Focusable="False">
+                <StackPanel Focusable="False">
+                    <!-- 1. Блок «Последний скриншот» -->
+                    <Border x:Name="FeedBlockScreenshot"
+                            Opacity="0"
+                            Margin="0,0,0,28"
+                            Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
+                        <Border.RenderTransform>
+                            <TranslateTransform X="16" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="13"
+                                       FontWeight="Medium"
+                                       Foreground="{StaticResource FeedTextSecondary}"
+                                       Margin="0,0,0,8" />
+
+                            <Button Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding LatestScreenshot}"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="0"
+                                    HorizontalAlignment="Stretch"
+                                    HorizontalContentAlignment="Stretch"
+                                    Cursor="Hand">
+                                <StackPanel HorizontalAlignment="Stretch">
+                                    <Border CornerRadius="3"
+                                            ClipToBounds="True"
+                                            MaxHeight="190"
+                                            Background="#0C141A"
+                                            HorizontalAlignment="Stretch">
+                                        <Image Source="{Binding LatestScreenshot.Thumbnail}"
+                                               Stretch="UniformToFill"
+                                               MaxHeight="190"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               RenderOptions.BitmapScalingMode="HighQuality"
+                                               SizeChanged="ScreenshotImage_SizeChanged" />
+                                    </Border>
+
+                                    <TextBlock Text="{Binding LatestScreenshotDateText}"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource FeedTextSecondary}"
+                                               Margin="0,6,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 2. Блок «Достижение» -->
+                    <Border x:Name="FeedBlockAchievement"
+                            Opacity="0"
+                            Margin="0,0,0,28"
+                            Visibility="{Binding HasAchievementBlock, Converter={StaticResource BoolToVis}}">
+                        <Border.RenderTransform>
+                            <TranslateTransform X="16" />
+                        </Border.RenderTransform>
+                        <Button Command="{Binding OpenAchievementsCommand}"
+                                Style="{StaticResource GhostBtn}"
+                                Padding="0"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                Cursor="Hand">
+                            <StackPanel HorizontalAlignment="Stretch">
+                                <TextBlock Text="ДОСТИЖЕНИЕ"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="{StaticResource FeedTextSecondary}"
+                                           Margin="0,0,0,8" />
+
+                                <TextBlock Text="{Binding AchievementTitle}"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource FeedTextPrimary}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,4" />
+
+                                <TextBlock Text="{Binding AchievementDescription}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="14"
+                                           Foreground="{StaticResource FeedTextSecondary}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding AchievementDateOrProgress}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource FeedTextSecondary}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Button>
+                    </Border>
+
+                    <!-- 3. Блок «Что нового» -->
+                    <Border x:Name="FeedBlockWhatsNew"
+                            Opacity="0"
+                            Margin="0,0,0,16"
+                            Visibility="{Binding HasWhatsNewBlock, Converter={StaticResource BoolToVis}}">
+                        <Border.RenderTransform>
+                            <TranslateTransform X="16" />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="ЧТО НОВОГО • "
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="Medium"
+                                           Foreground="{StaticResource FeedTextSecondary}" />
+                                <TextBlock Text="{Binding WhatsNewVersion}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource Accent}" />
+                            </StackPanel>
+
+                            <ItemsControl ItemsSource="{Binding WhatsNewLines}" Margin="0,0,0,8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="14"
+                                                   Foreground="{StaticResource FeedTextPrimary}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,6" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Button Command="{Binding DataContext.OpenChangelogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    Cursor="Hand">
+                                <TextBlock Text="Все изменения"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           Foreground="{StaticResource Accent}"
+                                           TextDecorations="Underline" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>

@@ -1,4 +1,4 @@
-<Window x:Class="AuraLauncher.Views.UpdateWindow"
+<Window x:Class="AuraLauncher.Views.StartupWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Aura"
@@ -87,10 +87,10 @@
 
                 <!-- Прогресс-бар скачивания обновления (тонкая полоса amber, видна при наличии прогресса) -->
                 <Grid Width="220" Height="3" Margin="0,12,0,0"
-                      Visibility="{Binding HasDefiniteProgress, Converter={StaticResource BoolToVis}}"
+                      Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}"
                       HorizontalAlignment="Center"
                       Background="{DynamicResource Border}">
-                    <Border x:Name="DefiniteProgressBar"
+                    <Border x:Name="ProgressBarFill"
                             HorizontalAlignment="Left"
                             Height="3"
                             Background="{DynamicResource Accent}"
@@ -98,18 +98,18 @@
                 </Grid>
 
                 <!-- Процент скачивания (если обновление загружается) -->
-                <TextBlock Text="{Binding RetryCountdownText}"
+                <TextBlock Text="{Binding ProgressPercentText}"
                            FontFamily="{StaticResource MainFont}"
                            FontSize="12"
                            Foreground="{DynamicResource Accent}"
                            HorizontalAlignment="Center"
                            Margin="0,4,0,0"
-                           Visibility="{Binding HasDefiniteProgress, Converter={StaticResource BoolToVis}}" />
+                           Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
             </StackPanel>
 
             <!-- Внизу мелко версия лаунчера: «beta 1.0.N» -->
             <TextBlock Grid.Row="1"
-                       Text="{Binding VersionTransitionText}"
+                       Text="{Binding VersionText}"
                        FontFamily="{StaticResource MainFont}"
                        FontSize="11"
                        Foreground="{DynamicResource AccentFaint}"

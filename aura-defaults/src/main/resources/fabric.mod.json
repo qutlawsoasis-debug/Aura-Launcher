@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "aura-defaults",
+  "version": "${version}",
+  "name": "Aura Defaults",
+  "description": "Sets default game rules and locks cheats in Aura",
+  "authors": [
+    "Aura Team"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/aura-defaults/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "net.auramc.defaults.AuraDefaultsMod"
+    ]
+  },
+  "mixins": [
+    "aura-defaults.mixins.json",
+    {
+      "config": "aura-defaults.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.21",
+    "minecraft": "~1.20.1",
+    "java": ">=17",
+    "fabric-api": "*"
+  }
+}

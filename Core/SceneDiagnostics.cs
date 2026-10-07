@@ -47,6 +47,7 @@ public record SelfTestReport(
 /// Выполняет снимки RenderTargetBitmap для всех трех вкладок (Играть, Скин, Настройки)
 /// и проверяет наличие изображения программным анализом пикселей.
 /// </summary>
+#if DEBUG
 public static class SceneDiagnostics
 {
     public static PixelAnalysisResult AnalyzeImage(string pngFilePath)
@@ -3174,4 +3175,98 @@ public static class SceneDiagnostics
             return false;
         }
     }
+
+    public static async Task<bool> RunSplashSelfTestAsync(MainWindow mainWindow)
+    {
+        App.Log("[TEST: SPLASH] Starting splash and settings self-test...");
+        string shotsDir = ResolveShotsDir();
+        var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+        var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+        try { Directory.CreateDirectory(repoShotsDir); } catch { }
+
+        void SaveWindowShot(Window targetWin, string fileName)
+        {
+            string path = Path.Combine(shotsDir, fileName);
+            CaptureWindowToPng(targetWin, path);
+            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
+            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+        }
+
+        void SaveMainWindowShot(string fileName)
+        {
+            string path = Path.Combine(shotsDir, fileName);
+            CaptureWindowToPng(mainWindow, path);
+            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
+            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+        }
+
+        try
+        {
+            StartupWindowViewModel? splashVm = null;
+            StartupWindow? splashWin = null;
+
+            mainWindow.Dispatcher.Invoke(() =>
+            {
+                splashVm = new StartupWindowViewModel(
+                    App.Services.GetRequiredService<ILauncherUpdateService>(),
+                    onLaunchMainRequested: () => { },
+                    onCloseRequested: () => { });
+
+                splashWin = new StartupWindow
+                {
+                    DataContext = splashVm
+                };
+                splashWin.Show();
+            });
+
+            if (splashVm == null || splashWin == null) return false;
+
+            await Task.Delay(400);
+
+            // 1. «Проверка обновления.» (checking)
+            mainWindow.Dispatcher.Invoke(() => splashVm.SetFakeState("checking"));
+            await Task.Delay(300);
+            SaveWindowShot(splashWin, "splash_checking.png");
+
+            // 2. «Установлено последнее обновление!» (latest)
+            mainWindow.Dispatcher.Invoke(() => splashVm.SetFakeState("latest"));
+            await Task.Delay(300);
+            SaveWindowShot(splashWin, "splash_latest_installed.png");
+
+            // 3. «Загрузка обновления» + тонкая полоса прогресса amber и процент
+            mainWindow.Dispatcher.Invoke(() => splashVm.SetFakeState("downloading"));
+            await Task.Delay(300);
+            SaveWindowShot(splashWin, "splash_downloading_progress.png");
+
+            // 4. «Запуск лаунчера.» (launching)
+            mainWindow.Dispatcher.Invoke(() => splashVm.SetFakeState("launching"));
+            await Task.Delay(300);
+            SaveWindowShot(splashWin, "splash_launching.png");
+
+            // Закрываем splash
+            mainWindow.Dispatcher.Invoke(() => splashWin.Close());
+
+            // 5. Переходим на вкладку Настройки и делаем снимок настройки «Режим запуска»
+            var mainVm = mainWindow.Dispatcher.Invoke(() => mainWindow.DataContext as MainViewModel);
+            if (mainVm != null)
+            {
+                mainWindow.Dispatcher.Invoke(() =>
+                {
+                    mainWindow.Show();
+                    mainVm.SwitchTab("Settings");
+                });
+                await Task.Delay(600);
+                SaveMainWindowShot("settings_start_mode.png");
+            }
+
+            App.Log("[TEST: SPLASH] Completed splash and settings self-test successfully.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[TEST: SPLASH ERROR] {ex.Message}");
+            return false;
+        }
+    }
 }
+#endif

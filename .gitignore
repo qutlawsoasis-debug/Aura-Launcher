@@ -9,3 +9,7 @@ aura_config.json
 *.pdb
 *.zip
 shots/
+.gradle/
+build/
+aura-defaults/data/
+aura-defaults/run/

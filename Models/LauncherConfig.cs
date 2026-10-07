@@ -38,4 +38,5 @@ public class LauncherConfig
     public DateTime? LastPlayedUtc { get; set; }
     public string CurrentMusicTrack { get; set; } = "Aura Cyberpunk Anthem";
     public string WindowDisplayState { get; set; } = "Maximized";
+    public string StartMode { get; set; } = "Maximized";
 }

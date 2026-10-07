@@ -18,6 +18,7 @@ public interface IFriendService : IDisposable
     bool IsGameRunning { get; set; }
 
     event Action<SyncResponse>? SyncUpdated;
+    event Action<IReadOnlyList<FriendPresenceItem>>? FriendsListUpdated;
     event Action<IncomingInviteItem>? InviteReceived;
     event Action<FriendRequestItem>? FriendRequestReceived;
 

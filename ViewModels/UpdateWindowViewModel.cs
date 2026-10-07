@@ -267,6 +267,12 @@ public class UpdateWindowViewModel : ObservableObject
                 StatusText = "Проверяем обновления…";
                 ProgressValue = 0;
                 break;
+            case "latest":
+            case "uptodate":
+                HasError = false;
+                StatusText = "Установлено последнее обновление!";
+                ProgressValue = 0;
+                break;
             case "downloading":
                 HasError = false;
                 StatusText = "Скачиваем… 63%";

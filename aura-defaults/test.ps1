@@ -1,0 +1,1 @@
+& 'C:\Users\magne\AppData\Roaming\.aura\runtime\windows-x64\java-runtime-gamma\bin\javap.exe' -p -cp 'C:\Users\magne\.gradle\caches\fabric-loom\minecraftMaven\net\minecraft\minecraft-merged\1.20.1-net.fabricmc.yarn.1_20_1.1.20.1+build.10-v2\minecraft-merged-1.20.1-net.fabricmc.yarn.1_20_1.1.20.1+build.10-v2.jar' 'net.minecraft.client.gui.screen.world.CreateWorldScreen'  

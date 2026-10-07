@@ -277,6 +277,46 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
+    public string StartMode
+    {
+        get => _configService.CurrentConfig.StartMode ?? "Maximized";
+        set
+        {
+            if (_configService.CurrentConfig.StartMode != value)
+            {
+                _configService.CurrentConfig.StartMode = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsStartModeWindowed));
+                OnPropertyChanged(nameof(IsStartModeMaximized));
+                _ = SaveImmediatelyAsync();
+            }
+        }
+    }
+
+    public bool IsStartModeWindowed
+    {
+        get => string.Equals(_configService.CurrentConfig.StartMode, "Windowed", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value && StartMode != "Windowed")
+            {
+                StartMode = "Windowed";
+            }
+        }
+    }
+
+    public bool IsStartModeMaximized
+    {
+        get => !IsStartModeWindowed;
+        set
+        {
+            if (value && StartMode != "Maximized")
+            {
+                StartMode = "Maximized";
+            }
+        }
+    }
+
     public string CurrentVersion
     {
         get

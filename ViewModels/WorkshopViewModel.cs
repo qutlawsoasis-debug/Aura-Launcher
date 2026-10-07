@@ -37,6 +37,9 @@ public class WorkshopViewModel : ObservableObject
     public ObservableCollection<ShaderPackItem> ShaderPacks { get; } = new();
     public ObservableCollection<ScreenshotItem> Screenshots { get; } = new();
 
+    public event Action? BackupCreated;
+    public event Action<int>? ScreenshotsCountChanged;
+
     public string ActiveSubTab
     {
         get => _activeSubTab;
@@ -162,6 +165,7 @@ public class WorkshopViewModel : ObservableObject
                 world.BackupStatusText = "Создание бэкапа...";
                 string zip = await _workshopService.CreateWorldBackupAsync(world);
                 world.BackupStatusText = "Бэкап сохранён!";
+                BackupCreated?.Invoke();
                 _ = Task.Delay(3000).ContinueWith(_ =>
                 {
                     Application.Current?.Dispatcher?.InvokeAsync(() => world.BackupStatusText = string.Empty);
@@ -262,21 +266,10 @@ public class WorkshopViewModel : ObservableObject
 
         PreviewScreenshotCommand = new RelayCommand(p =>
         {
-            if (p is not ScreenshotItem item || !File.Exists(item.FullPath)) return;
-            try
+            if (p is ScreenshotItem item)
             {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(item.FullPath, UriKind.Absolute);
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
-                bmp.Freeze();
-
-                FullPreviewImage = bmp;
-                SelectedScreenshot = item;
-                IsScreenshotPreviewOpen = true;
+                OpenScreenshotPreview(item);
             }
-            catch { }
         });
 
         CloseScreenshotPreviewCommand = new RelayCommand(_ =>
@@ -341,6 +334,25 @@ public class WorkshopViewModel : ObservableObject
         });
     }
 
+    public void OpenScreenshotPreview(ScreenshotItem item)
+    {
+        if (item == null || !File.Exists(item.FullPath)) return;
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(item.FullPath, UriKind.Absolute);
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+
+            FullPreviewImage = bmp;
+            SelectedScreenshot = item;
+            IsScreenshotPreviewOpen = true;
+        }
+        catch { }
+    }
+
     public async Task RefreshAllAsync()
     {
         IsLoading = true;
@@ -372,6 +384,7 @@ public class WorkshopViewModel : ObservableObject
             var screens = await _workshopService.GetScreenshotsAsync(gameDir);
             Screenshots.Clear();
             foreach (var sc in screens) Screenshots.Add(sc);
+            ScreenshotsCountChanged?.Invoke(Screenshots.Count);
         }
         catch (Exception ex)
         {

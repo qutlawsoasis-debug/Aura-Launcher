@@ -2,7 +2,6 @@ using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
 using AuraLauncher.ViewModels;
 
@@ -10,13 +9,22 @@ namespace AuraLauncher.Views;
 
 public partial class UpdateWindow : Window
 {
-    private Storyboard? _slidingStoryboard;
+    private Storyboard? _spinnerStoryboard;
 
     public UpdateWindow()
     {
         InitializeComponent();
         Loaded += UpdateWindow_Loaded;
         DataContextChanged += UpdateWindow_DataContextChanged;
+    }
+
+    private void UpdateWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        StartSpinnerAnimation();
+        if (DataContext is UpdateWindowViewModel vm)
+        {
+            UpdateProgressAnimation(vm);
+        }
     }
 
     private void UpdateWindow_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -45,23 +53,32 @@ public partial class UpdateWindow : Window
         }
     }
 
-    private void UpdateWindow_Loaded(object sender, RoutedEventArgs e)
+    private void StartSpinnerAnimation()
     {
-        if (DataContext is UpdateWindowViewModel vm)
+        if (_spinnerStoryboard != null) return;
+
+        var rotateAnim = new DoubleAnimation
         {
-            UpdateProgressAnimation(vm);
-        }
-        else
-        {
-            StartSlidingAnimation();
-        }
+            From = 0.0,
+            To = 360.0,
+            Duration = TimeSpan.FromSeconds(1.0),
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+
+        Storyboard.SetTarget(rotateAnim, SpinnerRotate);
+        Storyboard.SetTargetProperty(rotateAnim, new PropertyPath(System.Windows.Media.RotateTransform.AngleProperty));
+
+        _spinnerStoryboard = new Storyboard();
+        _spinnerStoryboard.Children.Add(rotateAnim);
+        _spinnerStoryboard.Begin();
     }
 
     private void UpdateProgressAnimation(UpdateWindowViewModel vm)
     {
+        if (DefiniteProgressBar == null) return;
+
         if (vm.HasError)
         {
-            StopSlidingAnimation();
             DefiniteProgressBar.BeginAnimation(FrameworkElement.WidthProperty, null);
             DefiniteProgressBar.Width = 0;
             return;
@@ -69,10 +86,7 @@ public partial class UpdateWindow : Window
 
         if (vm.HasDefiniteProgress)
         {
-            StopSlidingAnimation();
-            double targetWidth = Math.Clamp((vm.ProgressValue / 100.0) * 440.0, 0, 440.0);
-            
-            // Плавное заполнение за 200 мс
+            double targetWidth = Math.Clamp((vm.ProgressValue / 100.0) * 220.0, 0, 220.0);
             var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
@@ -83,45 +97,11 @@ public partial class UpdateWindow : Window
         {
             DefiniteProgressBar.BeginAnimation(FrameworkElement.WidthProperty, null);
             DefiniteProgressBar.Width = 0;
-            StartSlidingAnimation();
-        }
-    }
-
-    private void StartSlidingAnimation()
-    {
-        if (_slidingStoryboard != null) return;
-
-        // По линии скользит отрезок 120px, 2 с, EaseInOut, цикл
-        SlidingChunk.Width = 120;
-        var anim = new DoubleAnimation
-        {
-            From = -120.0,
-            To = 440.0,
-            Duration = TimeSpan.FromSeconds(2),
-            RepeatBehavior = RepeatBehavior.Forever,
-            EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
-        };
-
-        Storyboard.SetTarget(anim, ChunkTranslate);
-        Storyboard.SetTargetProperty(anim, new PropertyPath(TranslateTransform.XProperty));
-
-        _slidingStoryboard = new Storyboard();
-        _slidingStoryboard.Children.Add(anim);
-        _slidingStoryboard.Begin();
-    }
-
-    private void StopSlidingAnimation()
-    {
-        if (_slidingStoryboard != null)
-        {
-            _slidingStoryboard.Stop();
-            _slidingStoryboard = null;
         }
     }
 
     private void Window_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        // Перетаскивание за любое место окна
         if (e.ChangedButton == MouseButton.Left)
         {
             try

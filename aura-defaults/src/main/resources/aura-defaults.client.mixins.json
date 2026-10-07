@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.auramc.defaults.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "CreateWorldScreenMixin",
+    "OpenToLanScreenMixin",
+    "TabManagerMixin",
+    "WorldCreatorMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

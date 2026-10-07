@@ -32,6 +32,10 @@ public class LobbyViewModel : ObservableObject
     private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
     private bool _previousWorldIsOpen;
 
+    public event Action? LobbyCreated;
+    public event Action<int>? PlayerCountChanged;
+    public event Action? Reconnected;
+
     // === Список игроков лобби ===
     public ObservableCollection<LobbyPlayerItem> LobbyPlayers { get; } = new();
 
@@ -513,6 +517,7 @@ public class LobbyViewModel : ObservableObject
                         Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap()
                     });
                 });
+                LobbyCreated?.Invoke();
                 return code;
             }
             else
@@ -956,6 +961,7 @@ public class LobbyViewModel : ObservableObject
 
     private Task ReconnectAsync()
     {
+        Reconnected?.Invoke();
         return ConnectToGameAsync();
     }
 
@@ -1287,6 +1293,7 @@ public class LobbyViewModel : ObservableObject
                     }
                 }
             }
+            PlayerCountChanged?.Invoke(LobbyPlayers.Count);
         });
     }
 
