@@ -25,6 +25,9 @@
         <DataTemplate DataType="{x:Type vm:OverviewViewModel}">
             <views:OverviewView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:WorkshopViewModel}">
+            <views:WorkshopView />
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:WardrobeViewModel}">
             <views:WardrobeView />
         </DataTemplate>
@@ -35,18 +38,9 @@
             <views:LobbyView />
         </DataTemplate>
 
-        <!-- Menu Item RadioButton Style:
-             Row height 50px, Oswald 500 40px.
-             Ember 10x10 square (radius 2) to the left of word:
-               active scale 1, hover scale 0.6, else scale 0 (160ms animation).
-             Active word white/ink, others dim (62%).
-             Hover: word shifts right by 8px in 160ms;
-             When any item hovered, other items drop to opacity 0.42 (handled in code-behind / triggers).
-             Content area does NOT shift!
-        -->
         <Style x:Key="GameMenuRadio" TargetType="RadioButton">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Height" Value="50" />
+            <Setter Property="Height" Value="46" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
@@ -225,14 +219,40 @@
                       MouseLeave="SoundControl_MouseLeave"
                       Height="34" Margin="0,0,4,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <!-- Sliding Volume Box to the LEFT (Width 0 -> 112) -->
+                        <!-- Sliding Volume Box to the LEFT (Width 0 -> 180) -->
                         <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center">
-                            <Slider x:Name="HeaderVolSlider"
-                                    Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
-                                    Value="{Binding AnthemVolume, Mode=TwoWay}"
-                                    Style="{StaticResource HeaderVolumeSlider}"
-                                    Width="112" Margin="0,0,8,0"
-                                    ToolTip="Громкость гимна" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                                <!-- Prev Track -->
+                                <Button Command="{Binding PreviousTrackCommand}"
+                                        Style="{StaticResource WinSoundBtn}"
+                                        ToolTip="Предыдущий трек"
+                                        Width="20" Height="22" Margin="0,0,2,0">
+                                    <TextBlock Text="⏮" FontSize="10" Foreground="{StaticResource DimInkBrush}" />
+                                </Button>
+
+                                <!-- Play/Pause -->
+                                <Button Command="{Binding TogglePlayPauseCommand}"
+                                        Style="{StaticResource WinSoundBtn}"
+                                        ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Музыка: {0}'}"
+                                        Width="20" Height="22" Margin="0,0,2,0">
+                                    <TextBlock Text="⏯" FontSize="10" Foreground="{StaticResource EmberBrush}" />
+                                </Button>
+
+                                <!-- Next Track -->
+                                <Button Command="{Binding NextTrackCommand}"
+                                        Style="{StaticResource WinSoundBtn}"
+                                        ToolTip="Следующий трек"
+                                        Width="20" Height="22" Margin="0,0,6,0">
+                                    <TextBlock Text="⏭" FontSize="10" Foreground="{StaticResource DimInkBrush}" />
+                                </Button>
+
+                                <Slider x:Name="HeaderVolSlider"
+                                        Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                                        Value="{Binding AnthemVolume, Mode=TwoWay}"
+                                        Style="{StaticResource HeaderVolumeSlider}"
+                                        Width="74"
+                                        ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Громкость: {0}% • {1}'}" />
+                            </StackPanel>
                         </Border>
 
                         <!-- Sound Button -->
@@ -288,10 +308,10 @@
                     </TextBlock.Effect>
                 </TextBlock>
 
-                <!-- Game Menu (5 words: Играть, Лобби, Друзья, Скин, Настройки):
-                     x=50, top=242 -->
+                <!-- Game Menu (6 words: Играть, Лобби, Друзья, Мастерская, Профиль, Настройки):
+                     x=50, top=224 -->
                 <StackPanel x:Name="GameMenuPanel"
-                            Canvas.Left="50" Canvas.Top="242"
+                            Canvas.Left="50" Canvas.Top="224"
                             Width="250"
                             WindowChrome.IsHitTestVisibleInChrome="True">
                     
@@ -316,14 +336,21 @@
                                  Style="{StaticResource GameMenuRadio}"
                                  MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 4. Профиль -->
+                    <!-- 4. Мастерская -->
+                    <RadioButton x:Name="MenuBtnWorkshop" Content="Мастерская"
+                                 Command="{Binding NavigateCommand}" CommandParameter="Workshop"
+                                 IsChecked="{Binding IsWorkshopActive, Mode=TwoWay}"
+                                 Style="{StaticResource GameMenuRadio}"
+                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+
+                    <!-- 5. Профиль -->
                     <RadioButton x:Name="MenuBtnSkin" Content="Профиль"
                                  Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
                                  IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
                                  Style="{StaticResource GameMenuRadio}"
                                  MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 5. Настройки -->
+                    <!-- 6. Настройки -->
                     <RadioButton x:Name="MenuBtnSettings" Content="Настройки"
                                  Command="{Binding NavigateCommand}" CommandParameter="Settings"
                                  IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
@@ -333,7 +360,7 @@
 
                 <!-- Smooth sliding active navigation indicator dot (Ember 10x10 square) -->
                 <Border x:Name="ActiveNavIndicator"
-                        Canvas.Left="50" Canvas.Top="262"
+                        Canvas.Left="50" Canvas.Top="242"
                         Width="10" Height="10"
                         CornerRadius="2"
                         Background="{StaticResource EmberBrush}"
@@ -408,6 +435,17 @@
                         <TranslateTransform Y="0" />
                     </views:FriendsView.RenderTransform>
                 </views:FriendsView>
+
+                <views:WorkshopView x:Name="ViewWorkshop"
+                                    DataContext="{Binding WorkshopVM}"
+                                    Visibility="Collapsed"
+                                    Opacity="0.0"
+                                    Focusable="False"
+                                    FocusVisualStyle="{x:Null}">
+                    <views:WorkshopView.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </views:WorkshopView.RenderTransform>
+                </views:WorkshopView>
 
                 <views:WardrobeView x:Name="ViewWardrobe"
                                     DataContext="{Binding WardrobeVM}"

@@ -6,7 +6,7 @@ public interface IDiscordRpcService : IDisposable
 {
     void Initialize();
     void SetInLauncher();
-    void SetInLobby(int playerCount);
-    void SetPlayingGame(DateTime? startTime = null);
+    void SetInLobby(int playerCount, string? hostName = null, string? lobbyCode = null);
+    void SetPlayingGame(string? worldName = null, DateTime? startTime = null);
     void UpdateSettings();
 }

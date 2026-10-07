@@ -26,6 +26,13 @@ public class AnthemService : IAnthemService
     private bool _disposed = false;
     private string? _resolvedAudioPath;
 
+    private readonly System.Collections.Generic.List<string> _playlist = new();
+    private int _currentTrackIndex = 0;
+    private string _currentTrackTitle = "Aura Cyberpunk Anthem";
+
+    public string CurrentTrackTitle => _currentTrackTitle;
+    public event EventHandler<string>? TrackChanged;
+
     public int VolumePercent
     {
         get => _volumePercent;
@@ -146,15 +153,16 @@ public class AnthemService : IAnthemService
 
     public void PlayAnthem(bool force = false)
     {
-        if (string.IsNullOrWhiteSpace(_resolvedAudioPath) || !File.Exists(_resolvedAudioPath))
+        EnsurePlaylistLoaded();
+
+        if (_playlist.Count == 0)
         {
-            _resolvedAudioPath = ResolveAudioFilePath(_configService.CurrentConfig);
-            if (string.IsNullOrWhiteSpace(_resolvedAudioPath) || !File.Exists(_resolvedAudioPath))
-            {
-                FabricGameLaunchService.LogLauncherEvent("[ANTHEM: ERROR] Audio file not found.");
-                return;
-            }
+            FabricGameLaunchService.LogLauncherEvent("[ANTHEM: ERROR] Audio file not found.");
+            return;
         }
+
+        string currentPath = _playlist[_currentTrackIndex];
+        UpdateTrackTitle(currentPath);
 
         _ = Task.Run(async () =>
         {
@@ -165,11 +173,11 @@ public class AnthemService : IAnthemService
             {
                 try
                 {
-                    _player.Open(new Uri(_resolvedAudioPath, UriKind.Absolute));
+                    _player.Open(new Uri(currentPath, UriKind.Absolute));
                     _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
                     _player.Play();
                     _isPlaying = true;
-                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Started playback (vol: {_volumePercent}%, muted: {_isMuted}, pos: {_player.Position})");
+                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Started playback track '{_currentTrackTitle}' (vol: {_volumePercent}%, muted: {_isMuted})");
                 }
                 catch (Exception ex)
                 {
@@ -177,6 +185,120 @@ public class AnthemService : IAnthemService
                 }
             });
         });
+    }
+
+    public void TogglePlayPause()
+    {
+        if (_playerDispatcher == null || _player == null || _disposed) return;
+
+        _playerDispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                if (_isPlaying)
+                {
+                    _player.Pause();
+                    _isPlaying = false;
+                }
+                else
+                {
+                    if (_playlist.Count == 0)
+                    {
+                        PlayAnthem(true);
+                    }
+                    else
+                    {
+                        _player.Play();
+                        _isPlaying = true;
+                    }
+                }
+            }
+            catch { }
+        });
+    }
+
+    public void NextTrack()
+    {
+        EnsurePlaylistLoaded();
+        if (_playlist.Count <= 1) return;
+
+        _currentTrackIndex = (_currentTrackIndex + 1) % _playlist.Count;
+        PlayCurrentTrack();
+    }
+
+    public void PreviousTrack()
+    {
+        EnsurePlaylistLoaded();
+        if (_playlist.Count <= 1) return;
+
+        _currentTrackIndex = (_currentTrackIndex - 1 + _playlist.Count) % _playlist.Count;
+        PlayCurrentTrack();
+    }
+
+    private void PlayCurrentTrack()
+    {
+        if (_playlist.Count == 0) return;
+        string track = _playlist[_currentTrackIndex];
+        UpdateTrackTitle(track);
+
+        _playerDispatcher?.InvokeAsync(() =>
+        {
+            try
+            {
+                _player?.Open(new Uri(track, UriKind.Absolute));
+                if (_player != null)
+                {
+                    _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
+                    _player.Play();
+                    _isPlaying = true;
+                }
+            }
+            catch { }
+        });
+    }
+
+    private void UpdateTrackTitle(string path)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        _currentTrackTitle = string.Equals(fileName, "anthem", StringComparison.OrdinalIgnoreCase)
+            ? "Aura Cyberpunk Anthem"
+            : fileName;
+        TrackChanged?.Invoke(this, _currentTrackTitle);
+    }
+
+    private void EnsurePlaylistLoaded()
+    {
+        if (_playlist.Count > 0) return;
+
+        if (string.IsNullOrWhiteSpace(_resolvedAudioPath) || !File.Exists(_resolvedAudioPath))
+        {
+            _resolvedAudioPath = ResolveAudioFilePath(_configService.CurrentConfig);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_resolvedAudioPath) && File.Exists(_resolvedAudioPath))
+        {
+            _playlist.Add(_resolvedAudioPath);
+        }
+
+        try
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string musicDir = Path.Combine(appData, "Aura", "Music");
+            if (Directory.Exists(musicDir))
+            {
+                var files = Directory.GetFiles(musicDir, "*.*")
+                    .Where(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) ||
+                                f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase));
+                foreach (var f in files)
+                {
+                    if (!_playlist.Contains(f, StringComparer.OrdinalIgnoreCase))
+                    {
+                        _playlist.Add(f);
+                    }
+                }
+            }
+        }
+        catch { }
     }
 
     public void ToggleMute()

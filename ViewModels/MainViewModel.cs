@@ -344,6 +344,15 @@ public class MainViewModel : ObservableObject
         }
     }
 
+    public bool IsWorkshopActive
+    {
+        get => CurrentTabName.Equals("Workshop", StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (value) SwitchTab("Workshop");
+        }
+    }
+
     public void SwitchTab(string viewName)
     {
         if (string.IsNullOrWhiteSpace(viewName)) return;
@@ -361,6 +370,11 @@ public class MainViewModel : ObservableObject
         else if (viewName.Equals("Wardrobe", StringComparison.OrdinalIgnoreCase))
         {
             CurrentView = WardrobeVM;
+        }
+        else if (viewName.Equals("Workshop", StringComparison.OrdinalIgnoreCase))
+        {
+            CurrentView = WorkshopVM;
+            _ = WorkshopVM.RefreshAllAsync();
         }
         else if (viewName.Equals("Lobby", StringComparison.OrdinalIgnoreCase))
         {
@@ -586,8 +600,16 @@ public class MainViewModel : ObservableObject
     public AsyncRelayCommand ApplyBannerUpdateCommand { get; }
     public RelayCommand DismissBannerCommand { get; }
     public RelayCommand ToggleMuteCommand { get; }
+    public RelayCommand TogglePlayPauseCommand { get; }
+    public RelayCommand NextTrackCommand { get; }
+    public RelayCommand PreviousTrackCommand { get; }
 
     public IAnthemService? AnthemService { get; }
+    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "Aura Cyberpunk Anthem";
+
+    public WorkshopViewModel WorkshopVM { get; }
+
+    private DateTime? _gameSessionStartTime;
 
     public int AnthemVolume
     {
@@ -633,7 +655,9 @@ public class MainViewModel : ObservableObject
         IAnthemService? anthemService = null,
         INotificationService? notificationService = null,
         IDiscordRpcService? discordRpcService = null,
-        IReportService? reportService = null)
+        IReportService? reportService = null,
+        WorkshopViewModel? workshopViewModel = null,
+        IWorkshopService? workshopService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -644,10 +668,12 @@ public class MainViewModel : ObservableObject
         _notificationService = notificationService;
         _discordRpcService = discordRpcService;
         _reportService = reportService ?? new ReportService(configService, notificationService ?? new NotificationService(configService));
+        AnthemService = anthemService;
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
         LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService);
+        WorkshopVM = workshopViewModel ?? new WorkshopViewModel(workshopService ?? new WorkshopService(), _configService, _launchService);
         
         _friendService = friendService;
         FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), new LobbyService(new LobbyApiClient()), _skinService, LobbyVM);
@@ -736,6 +762,17 @@ public class MainViewModel : ObservableObject
                 _friendService.IsInLobby = LobbyVM.IsInLobby;
                 _friendService.CurrentLobbyCode = LobbyVM.LobbyCode;
                 _ = _friendService.SyncNowAsync();
+            }
+            if (_discordRpcService != null && (e.PropertyName == nameof(LobbyViewModel.IsInLobby) || e.PropertyName == nameof(LobbyViewModel.LobbyPlayers)))
+            {
+                if (LobbyVM.IsInLobby)
+                {
+                    _discordRpcService.SetInLobby(LobbyVM.LobbyPlayers.Count, LobbyVM.HostName, LobbyVM.LobbyCode);
+                }
+                else if (!IsGameRunning)
+                {
+                    _discordRpcService.SetInLauncher();
+                }
             }
         };
         SettingsVM.SendReportRequested += (err) =>
@@ -836,6 +873,32 @@ public class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(AnthemVolume));
             }
         });
+
+        TogglePlayPauseCommand = new RelayCommand(_ =>
+        {
+            AnthemService?.TogglePlayPause();
+            OnPropertyChanged(nameof(CurrentTrackTitle));
+        });
+
+        NextTrackCommand = new RelayCommand(_ =>
+        {
+            AnthemService?.NextTrack();
+            OnPropertyChanged(nameof(CurrentTrackTitle));
+        });
+
+        PreviousTrackCommand = new RelayCommand(_ =>
+        {
+            AnthemService?.PreviousTrack();
+            OnPropertyChanged(nameof(CurrentTrackTitle));
+        });
+
+        if (AnthemService != null)
+        {
+            AnthemService.TrackChanged += (s, title) =>
+            {
+                OnPropertyChanged(nameof(CurrentTrackTitle));
+            };
+        }
 
         LobbyVM.GuestConnectRequested += (s, tunnelAddress) =>
         {
@@ -1294,6 +1357,9 @@ public class MainViewModel : ObservableObject
                     : $"{report.DetailText} • {report.FormattedSpeed}";
             });
 
+            _gameSessionStartTime = DateTime.UtcNow;
+            _discordRpcService?.SetPlayingGame("Aura Pack (1.20.1)", _gameSessionStartTime);
+
             var process = await _launchService.LaunchGameAsync(
                 config,
                 line =>
@@ -1313,6 +1379,22 @@ public class MainViewModel : ObservableObject
                     System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
                     {
                         IsGameRunning = false;
+                        if (_gameSessionStartTime.HasValue)
+                        {
+                            var elapsed = DateTime.UtcNow - _gameSessionStartTime.Value;
+                            long addSec = (long)elapsed.TotalSeconds;
+                            if (addSec > 5)
+                            {
+                                _ = _configService.UpdateConfigAsync(c =>
+                                {
+                                    c.TotalPlayTimeSeconds += addSec;
+                                    c.TotalGameLaunches += 1;
+                                    c.LastPlayedUtc = DateTime.UtcNow;
+                                });
+                            }
+                            _gameSessionStartTime = null;
+                        }
+
                         OverviewVM.RefreshStats();
                         LobbyVM.OnGameExited();
                         if (exitCode != 0)
@@ -1347,7 +1429,7 @@ public class MainViewModel : ObservableObject
                             }
                             if (LobbyVM.IsInLobby && LobbyVM.LobbyPlayers.Count > 0)
                             {
-                                _discordRpcService?.SetInLobby(LobbyVM.LobbyPlayers.Count);
+                                _discordRpcService?.SetInLobby(LobbyVM.LobbyPlayers.Count, LobbyVM.HostName, LobbyVM.LobbyCode);
                             }
                             else
                             {
@@ -1376,7 +1458,7 @@ public class MainViewModel : ObservableObject
                     _friendService.IsGameRunning = true;
                     _ = _friendService.SyncNowAsync();
                 }
-                _discordRpcService?.SetPlayingGame(DateTime.UtcNow);
+                _discordRpcService?.SetPlayingGame(startTime: DateTime.UtcNow);
                 GameStarted?.Invoke(this, process);
             }
             catch { }

@@ -33,4 +33,8 @@ public class LauncherConfig
     public bool WindowsNotificationsEnabled { get; set; } = true;
     public string? DiscordAppId { get; set; } = "1556968494673690674";
     public bool DiscordRpcEnabled { get; set; } = true;
+    public long TotalPlayTimeSeconds { get; set; } = 0;
+    public int TotalGameLaunches { get; set; } = 0;
+    public DateTime? LastPlayedUtc { get; set; }
+    public string CurrentMusicTrack { get; set; } = "Aura Cyberpunk Anthem";
 }

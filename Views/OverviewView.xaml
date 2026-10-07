@@ -48,6 +48,18 @@
                 </Button>
             </StackPanel>
 
+            <!-- Playtime & launches statistic badge -->
+            <TextBlock Text="{Binding PlaytimeSummaryText}"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="13"
+                       FontWeight="Normal"
+                       Foreground="{StaticResource MuteBrush}"
+                       Margin="0,0,0,14">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
+                </TextBlock.Effect>
+            </TextBlock>
+
             <!-- 3) Button "Играть" 260x70 with bottom progress bar, right of it label MaxWidth 300 wrap -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Grid Width="260" Height="70">

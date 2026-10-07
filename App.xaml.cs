@@ -436,10 +436,12 @@ public partial class App : Application
         services.AddSingleton<IDiscordRpcService, DiscordRpcService>();
         services.AddSingleton<IReportService, ReportService>();
         services.AddSingleton<IBackgroundService, BackgroundService>();
+        services.AddSingleton<IWorkshopService, WorkshopService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
         services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<WorkshopViewModel>();
         services.AddSingleton<WardrobeViewModel>(sp => new WardrobeViewModel(
             sp.GetRequiredService<ISkinService>(),
             sp.GetRequiredService<IConfigService>(),

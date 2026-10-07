@@ -1,6 +1,17 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:behaviors="clr-namespace:AuraLauncher.Behaviors">
+                    xmlns:behaviors="clr-namespace:AuraLauncher.Behaviors"
+                    xmlns:core="clr-namespace:AuraLauncher.Core">
+
+    <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    <core:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
+    <core:IntToVisibilityConverter x:Key="IntToVis" />
+    <core:InverseIntToVisibilityConverter x:Key="InverseIntToVis" />
+    <core:BoolToEmberOrDarkBgConverter x:Key="BoolToEmberOrDarkBgConverter" />
+    <core:BoolToEmberOrLineBorderConverter x:Key="BoolToEmberOrLineBorderConverter" />
+    <core:BoolToInkOrDimBrushConverter x:Key="BoolToInkOrDimBrushConverter" />
+    <core:BoolToInkOrMuteBrushConverter x:Key="BoolToInkOrMuteBrushConverter" />
+    <core:BoolToEnabledTextConverter x:Key="BoolToEnabledTextConverter" />
 
     <!-- ============================================== -->
     <!-- 1. DESIGN TOKENS (TASK 27A & 27B)              -->
@@ -179,6 +190,89 @@
 
     <!-- Secondary Button (Alias based on StandardBtn) -->
     <Style x:Key="SecondaryBtn" BasedOn="{StaticResource StandardBtn}" TargetType="Button" />
+
+    <!-- PrimaryActionBtn: compact ember button with hover lift -->
+    <Style x:Key="PrimaryActionBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="#1C1106" />
+        <Setter Property="Padding" Value="14,6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="OuterBrd"
+                            BorderBrush="{StaticResource EmberDarkBrush}"
+                            BorderThickness="0,0,0,2"
+                            CornerRadius="4"
+                            SnapsToDevicePixels="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#F7B44F" Offset="0" />
+                                <GradientStop Color="#EB962B" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.9" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="OuterBrd" Property="BorderThickness" Value="0,0,0,1" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- SubNavPillRadio: compact tab pill radio button -->
+    <Style x:Key="SubNavPillRadio" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Padding" Value="14,6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="PillBorder"
+                            CornerRadius="5"
+                            Background="#0C141A"
+                            BorderBrush="{StaticResource LineInkBrush}"
+                            BorderThickness="1"
+                            Padding="{TemplateBinding Padding}">
+                        <TextBlock x:Name="PillText"
+                                   Text="{TemplateBinding Content}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12" FontWeight="Medium"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="PillBorder" Property="Background" Value="#2B1D0E" />
+                            <Setter TargetName="PillBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="PillText" Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="PillBorder" Property="Background" Value="#14212B" />
+                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource InkBrush}" />
+                        </MultiTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
     <!-- Main Button (Primary): gradient #F7B44F -> #EB962B, text #1C1106, bottom border 4px #A85F12, glow shadow ember, radius 3px -->
     <Style x:Key="PrimaryNeonBtn" TargetType="Button">

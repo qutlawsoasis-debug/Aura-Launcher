@@ -43,6 +43,7 @@ public class LobbyViewModel : ObservableObject
 
     // === Хост ===
     private string? _lobbyCode;
+    private string? _hostName;
     private string _hostStatusText = "Ожидание мира...";
     private bool _isLobbyCreated;
     private bool _isWorldOpen;
@@ -257,6 +258,12 @@ public class LobbyViewModel : ObservableObject
                 NotifyCellPropertiesChanged();
             }
         }
+    }
+
+    public string? HostName
+    {
+        get => _hostName ?? LobbyPlayers.FirstOrDefault(p => p.IsHost)?.Nickname ?? (_lobbyService.IsHost ? _configService.CurrentConfig?.Nickname : null);
+        private set => SetProperty(ref _hostName, value);
     }
 
     public string HostStatusText
@@ -485,6 +492,7 @@ public class LobbyViewModel : ObservableObject
             if (!string.IsNullOrWhiteSpace(code))
             {
                 LobbyCode = code;
+                HostName = hostName;
                 IsLobbyCreated = true;
                 IsInLobby = true;
                 HostStatusText = "Ожидание мира...";
@@ -1029,6 +1037,7 @@ public class LobbyViewModel : ObservableObject
         IsGuestJoined = false;
         CanGuestConnect = false;
         LobbyCode = null;
+        HostName = null;
         GuestCodeInput = string.Empty;
         CodeCopied = false;
         HostStatusText = "Ожидание мира...";
@@ -1180,6 +1189,10 @@ public class LobbyViewModel : ObservableObject
     public async Task RefreshLobbyPlayersAsync(string[]? players, string? hostName)
     {
         if (players == null) return;
+        if (!string.IsNullOrWhiteSpace(hostName))
+        {
+            HostName = hostName;
+        }
 
         // Build desired player descriptors
         var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;

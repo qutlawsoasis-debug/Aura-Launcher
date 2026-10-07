@@ -57,6 +57,21 @@ public class OverviewViewModel : ObservableObject
         set => SetProperty(ref _lastUpdateText, value);
     }
 
+    private string _playTimeFormatted = "0 мин.";
+    private string _playtimeSummaryText = "⏱️ Время в игре: 0 мин. • 0 запусков";
+
+    public string PlayTimeFormatted
+    {
+        get => _playTimeFormatted;
+        set => SetProperty(ref _playTimeFormatted, value);
+    }
+
+    public string PlaytimeSummaryText
+    {
+        get => _playtimeSummaryText;
+        set => SetProperty(ref _playtimeSummaryText, value);
+    }
+
     public bool IsEnvironmentInstalled
     {
         get => _isEnvironmentInstalled;
@@ -134,5 +149,12 @@ public class OverviewViewModel : ObservableObject
         {
             LastUpdateText = "Обновлено: —";
         }
+
+        // 5. Статистика игрового времени
+        long totalSec = config.TotalPlayTimeSeconds;
+        long hours = totalSec / 3600;
+        long minutes = (totalSec % 3600) / 60;
+        PlayTimeFormatted = hours > 0 ? $"{hours} ч. {minutes} мин." : $"{minutes} мин.";
+        PlaytimeSummaryText = $"⏱️ В игре: {PlayTimeFormatted}  •  Запусков: {config.TotalGameLaunches}";
     }
 }

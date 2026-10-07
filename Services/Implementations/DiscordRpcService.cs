@@ -59,6 +59,10 @@ public class DiscordRpcService : IDiscordRpcService
         }
     }
 
+    private string? _lobbyHostName;
+    private string? _lobbyCode;
+    private string? _playingWorldName;
+
     public void SetInLauncher()
     {
         _currentActivity = "launcher";
@@ -66,17 +70,20 @@ public class DiscordRpcService : IDiscordRpcService
         ApplyCurrentPresence();
     }
 
-    public void SetInLobby(int playerCount)
+    public void SetInLobby(int playerCount, string? hostName = null, string? lobbyCode = null)
     {
         _currentActivity = "lobby";
         _lobbyPlayerCount = Math.Max(1, playerCount);
+        _lobbyHostName = hostName;
+        _lobbyCode = lobbyCode;
         _gameStartTime = null;
         ApplyCurrentPresence();
     }
 
-    public void SetPlayingGame(DateTime? startTime = null)
+    public void SetPlayingGame(string? worldName = null, DateTime? startTime = null)
     {
         _currentActivity = "playing";
+        _playingWorldName = worldName;
         _gameStartTime = startTime ?? _gameStartTime ?? DateTime.UtcNow;
         ApplyCurrentPresence();
     }
@@ -88,31 +95,57 @@ public class DiscordRpcService : IDiscordRpcService
         try
         {
             RichPresence presence;
+            var buttons = new Button[]
+            {
+                new Button
+                {
+                    Label = "Скачать Aura Launcher",
+                    Url = "https://github.com/qutlawsoasis-debug/Aura-Launcher"
+                }
+            };
+
             switch (_currentActivity)
             {
                 case "playing":
                     presence = new RichPresence
                     {
-                        Details = "Играет в Aura",
+                        Details = !string.IsNullOrWhiteSpace(_playingWorldName)
+                            ? $"В мире: {_playingWorldName}"
+                            : "В мире Minecraft (Fabric 1.20.1)",
+                        State = "Сборка Aura Pack • 98 модов",
                         Timestamps = new Timestamps { Start = _gameStartTime ?? DateTime.UtcNow },
                         Assets = new Assets
                         {
                             LargeImageKey = "aura_logo",
-                            LargeImageText = "Aura Launcher"
-                        }
+                            LargeImageText = "Aura Launcher",
+                            SmallImageKey = "minecraft",
+                            SmallImageText = "Minecraft 1.20.1"
+                        },
+                        Buttons = buttons
                     };
                     break;
 
                 case "lobby":
+                    string lobbyDetails = !string.IsNullOrWhiteSpace(_lobbyCode)
+                        ? $"В лобби #{_lobbyCode}"
+                        : "В лобби мультиплеера";
+
+                    string lobbyState = !string.IsNullOrWhiteSpace(_lobbyHostName)
+                        ? $"Игроков: {_lobbyPlayerCount}/8 • Хост: {_lobbyHostName}"
+                        : $"Игроков: {_lobbyPlayerCount}/8";
+
                     presence = new RichPresence
                     {
-                        Details = "В лобби",
-                        State = $"Игроков: {_lobbyPlayerCount}",
+                        Details = lobbyDetails,
+                        State = lobbyState,
                         Assets = new Assets
                         {
                             LargeImageKey = "aura_logo",
-                            LargeImageText = "Aura Launcher"
-                        }
+                            LargeImageText = "Aura Launcher",
+                            SmallImageKey = "online",
+                            SmallImageText = "P2P Multiplayer"
+                        },
+                        Buttons = buttons
                     };
                     break;
 
@@ -120,12 +153,14 @@ public class DiscordRpcService : IDiscordRpcService
                 default:
                     presence = new RichPresence
                     {
-                        Details = "В лаунчере",
+                        Details = "В главном меню",
+                        State = "Выбирает режим игры",
                         Assets = new Assets
                         {
                             LargeImageKey = "aura_logo",
                             LargeImageText = "Aura Launcher"
-                        }
+                        },
+                        Buttons = buttons
                     };
                     break;
             }

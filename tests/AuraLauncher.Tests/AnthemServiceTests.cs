@@ -42,9 +42,14 @@ public class AnthemServiceTests
         public bool IsPlaying { get; set; } = false;
         public bool Initialized { get; set; } = false;
         public bool Stopped { get; set; } = false;
+        public string CurrentTrackTitle { get; set; } = "Aura Theme";
+        public event EventHandler<string>? TrackChanged;
 
         public void Initialize() => Initialized = true;
         public void PlayAnthem(bool force = false) => IsPlaying = true;
+        public void TogglePlayPause() => IsPlaying = !IsPlaying;
+        public void NextTrack() => TrackChanged?.Invoke(this, CurrentTrackTitle);
+        public void PreviousTrack() => TrackChanged?.Invoke(this, CurrentTrackTitle);
         public void ToggleMute() => IsMuted = !IsMuted;
         public void SetVolume(int volumePercent) => VolumePercent = Math.Clamp(volumePercent, 0, 100);
         public void Stop() { IsPlaying = false; Stopped = true; }

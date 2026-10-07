@@ -180,6 +180,7 @@ public partial class MainWindow : Window
         {
             "Lobby" => ViewLobby,
             "Friends" => ViewFriends,
+            "Workshop" => ViewWorkshop,
             "Wardrobe" => ViewWardrobe,
             "Settings" => ViewSettings,
             _ => ViewOverview
@@ -192,11 +193,12 @@ public partial class MainWindow : Window
         {
             "Lobby" => 1,
             "Friends" => 2,
-            "Wardrobe" => 3,
-            "Settings" => 4,
+            "Workshop" => 3,
+            "Wardrobe" => 4,
+            "Settings" => 5,
             _ => 0
         };
-        double targetDotY = targetIndex * 50.0;
+        double targetDotY = targetIndex * 46.0;
 
         if (NavIndicatorTrans != null)
         {
@@ -226,7 +228,7 @@ public partial class MainWindow : Window
             _activeTransitionStoryboard = null;
         }
 
-        var allScreens = new FrameworkElement[] { ViewOverview, ViewLobby, ViewFriends, ViewWardrobe, ViewSettings };
+        var allScreens = new FrameworkElement[] { ViewOverview, ViewLobby, ViewFriends, ViewWorkshop, ViewWardrobe, ViewSettings };
         var outgoingView = _currentActiveView;
         _currentActiveView = targetView;
 
@@ -418,7 +420,7 @@ public partial class MainWindow : Window
     /// </summary>
     public void AnimateMenuDimming(FrameworkElement activeItem, bool isHovered)
     {
-        var items = new[] { MenuBtnPlay, MenuBtnLobby, MenuBtnSkin, MenuBtnSettings };
+        var items = new[] { MenuBtnPlay, MenuBtnLobby, MenuBtnFriends, MenuBtnWorkshop, MenuBtnSkin, MenuBtnSettings };
         var duration = TimeSpan.FromMilliseconds(160);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
@@ -464,7 +466,7 @@ public partial class MainWindow : Window
     {
         if (SliderBox == null) return;
 
-        double targetWidth = open ? 120.0 : 0.0;
+        double targetWidth = open ? 190.0 : 0.0;
         double targetOpacity = open ? 1.0 : 0.0;
         var duration = TimeSpan.FromMilliseconds(180);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
