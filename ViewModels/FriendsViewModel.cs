@@ -142,7 +142,8 @@ public class FriendItemViewModel : ObservableObject
         _ => null
     };
 
-    public bool CanInvite => Online && !IsInMyLobby && string.IsNullOrEmpty(_inviteState);
+    public bool CanInvite => Online && !IsInMyLobby && !CanJoin && string.IsNullOrEmpty(_inviteState);
+    public bool CanJoin => Online && string.Equals(Status, "lobby", StringComparison.OrdinalIgnoreCase);
 
     private bool _isConfirmingDelete;
     public bool IsConfirmingDelete
@@ -152,11 +153,12 @@ public class FriendItemViewModel : ObservableObject
     }
 
     public RelayCommand InviteCommand { get; }
+    public RelayCommand JoinCommand { get; }
     public RelayCommand StartDeleteCommand { get; }
     public RelayCommand ConfirmDeleteCommand { get; }
     public RelayCommand CancelDeleteCommand { get; }
 
-    public FriendItemViewModel(FriendPresenceItem item, Action<FriendItemViewModel> onInvite, Action<FriendItemViewModel> onRemove)
+    public FriendItemViewModel(FriendPresenceItem item, Action<FriendItemViewModel> onInvite, Action<FriendItemViewModel> onRemove, Action<FriendItemViewModel>? onJoin = null)
     {
         Id = item.Id;
         Nick = item.Nick;
@@ -168,6 +170,7 @@ public class FriendItemViewModel : ObservableObject
         _onRemove = onRemove;
 
         InviteCommand = new RelayCommand(_ => _onInvite(this));
+        JoinCommand = new RelayCommand(_ => onJoin?.Invoke(this));
         StartDeleteCommand = new RelayCommand(_ => IsConfirmingDelete = true);
         ConfirmDeleteCommand = new RelayCommand(_ =>
         {
@@ -183,6 +186,8 @@ public class FriendItemViewModel : ObservableObject
         Status = item.Status;
         LastSeen = item.LastSeen;
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(CanJoin));
+        OnPropertyChanged(nameof(CanInvite));
     }
 
     public static string FormatLastSeen(long lastSeenMs)
@@ -464,7 +469,7 @@ public class FriendsViewModel : ObservableObject
                     }
                     else
                     {
-                        var vm = new FriendItemViewModel(item, OnInviteFriend, OnRemoveFriend);
+                        var vm = new FriendItemViewModel(item, OnInviteFriend, OnRemoveFriend, OnJoinFriend);
                         updatedList.Add(vm);
                         _ = LoadAvatarAsync(vm);
                     }
@@ -590,5 +595,14 @@ public class FriendsViewModel : ObservableObject
                 Dispatch(() => friend.InviteState = null);
             }
         });
+    }
+
+    private void OnJoinFriend(FriendItemViewModel friend)
+    {
+        try
+        {
+            OpenLobbyRequested?.Invoke();
+        }
+        catch { }
     }
 }

@@ -452,6 +452,23 @@
                             </Button.Style>
                         </Button>
 
+                        <!-- Guest: "Переподключиться" button (активна при вылете или возможности повторного подключения) -->
+                        <Button Command="{Binding ReconnectCommand}"
+                                Height="48"
+                                Content="Переподключиться"
+                                Margin="0,0,12,8">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryBtn}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding CanReconnect}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
                         <!-- "Копировать" / "Скопировано" Button -->
                         <Button Command="{Binding CopyCodeCommand}"
                                 Height="48"

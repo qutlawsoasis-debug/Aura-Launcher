@@ -322,6 +322,15 @@
                                                    Margin="0,0,14,0"
                                                    Visibility="{Binding HasInviteState, Converter={StaticResource BoolToVis}}" />
 
+                                        <!-- Button "Войти" (когда друг в лобби) -->
+                                        <Button Command="{Binding JoinCommand}"
+                                                Style="{StaticResource PrimaryNeonBtn}"
+                                                Height="32"
+                                                Padding="14,0"
+                                                Content="Войти"
+                                                Margin="0,0,14,0"
+                                                Visibility="{Binding CanJoin, Converter={StaticResource BoolToVis}}" />
+
                                         <!-- Button "Пригласить" (только у online не в моем лобби) -->
                                         <Button Command="{Binding InviteCommand}"
                                                 Style="{StaticResource PrimaryNeonBtn}"

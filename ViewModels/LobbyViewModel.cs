@@ -59,6 +59,7 @@ public class LobbyViewModel : ObservableObject
     public bool WasInvited { get; set; }
     private string _guestStatusText = "Введите 6-значный код лобби";
     private bool _canGuestConnect;
+    private string? _lastTunnelAddress;
     private string _joinErrorMessage = string.Empty;
     private bool _isJoiningLobby;
 
@@ -109,10 +110,13 @@ public class LobbyViewModel : ObservableObject
         private set => SetProperty(ref _tunnelLogCopied, value);
     }
 
+    public bool CanReconnect => !IsBusy && !_lobbyService.IsHost && (CanGuestConnect || !string.IsNullOrWhiteSpace(_lastTunnelAddress));
+
     public AsyncRelayCommand CreateLobbyCommand { get; }
     public AsyncRelayCommand JoinLobbyCommand { get; }
     public RelayCommand CopyCodeCommand { get; }
     public AsyncRelayCommand ConnectToGameCommand { get; }
+    public AsyncRelayCommand ReconnectCommand { get; }
     public AsyncRelayCommand OpenWorldCommand { get; }
     public RelayCommand LeaveLobbyCommand { get; }
     public RelayCommand CopyTunnelLogCommand { get; }
@@ -146,6 +150,7 @@ public class LobbyViewModel : ObservableObject
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         CopyLinkCommand = new RelayCommand(_ => CopyLobbyLink(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         ConnectToGameCommand = new AsyncRelayCommand(ConnectToGameAsync, () => !IsBusy && CanGuestConnect);
+        ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, () => CanReconnect);
         OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && _lobbyService.IsHost);
         LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
 
@@ -902,12 +907,19 @@ public class LobbyViewModel : ObservableObject
 
     private Task ConnectToGameAsync()
     {
-        if (string.IsNullOrWhiteSpace(_lobbyService.CurrentTunnelAddress))
+        var address = _lobbyService.CurrentTunnelAddress;
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            address = _lastTunnelAddress;
+        }
+
+        if (string.IsNullOrWhiteSpace(address))
         {
             StatusText = "Адрес сервера не получен";
             return Task.CompletedTask;
         }
 
+        _lastTunnelAddress = address;
         IsBusy = true;
         StatusText = "Запуск игры...";
         StatusIcon = "🚀";
@@ -916,7 +928,7 @@ public class LobbyViewModel : ObservableObject
         {
             // Запускаем событие, которое MainViewModel перехватывает
             // для запуска игры с --quickPlayMultiplayer <tunnelAddress>
-            GuestConnectRequested?.Invoke(this, _lobbyService.CurrentTunnelAddress);
+            GuestConnectRequested?.Invoke(this, address);
 
             StatusText = "Игра запускается с подключением к серверу...";
             StatusIcon = "🎮";
@@ -932,6 +944,11 @@ public class LobbyViewModel : ObservableObject
         }
 
         return Task.CompletedTask;
+    }
+
+    private Task ReconnectAsync()
+    {
+        return ConnectToGameAsync();
     }
 
     /// <summary>
@@ -1165,10 +1182,21 @@ public class LobbyViewModel : ObservableObject
         if (players == null || players.Length == 0) return;
 
         // Build desired player descriptors
+        var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
         var incomingPlayers = new List<(string Nick, bool IsHost, ImageSource Avatar)>();
         foreach (var player in players)
         {
-            var isHost = string.Equals(player, hostName, StringComparison.OrdinalIgnoreCase);
+            // Игрок является хостом, если его ник совпадает с hostName сервера.
+            // Если hostName не передан, то только если текущий клиент является хостом и это его ник.
+            bool isHost;
+            if (!string.IsNullOrWhiteSpace(hostName))
+            {
+                isHost = string.Equals(player, hostName, StringComparison.OrdinalIgnoreCase);
+            }
+            else
+            {
+                isHost = _lobbyService.IsHost && string.Equals(player, myNick, StringComparison.OrdinalIgnoreCase);
+            }
             ImageSource avatar;
             if (_skinService != null)
             {
@@ -1251,9 +1279,11 @@ public class LobbyViewModel : ObservableObject
 
     private void RaiseAllCommands()
     {
+        OnPropertyChanged(nameof(CanReconnect));
         CreateLobbyCommand.RaiseCanExecuteChanged();
         JoinLobbyCommand.RaiseCanExecuteChanged();
         ConnectToGameCommand.RaiseCanExecuteChanged();
+        ReconnectCommand?.RaiseCanExecuteChanged();
         OpenWorldCommand.RaiseCanExecuteChanged();
         LeaveLobbyCommand.RaiseCanExecuteChanged();
         CopyCodeCommand.RaiseCanExecuteChanged();
