@@ -2212,6 +2212,66 @@ public static class SceneDiagnostics
         }
     }
 
+    public static async Task<bool> RunScalingCrispnessTestAsync(MainWindow window)
+    {
+        try
+        {
+            await Task.Delay(1200);
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+            try { Directory.CreateDirectory(brainDir); } catch { }
+
+            // Ensure window is precisely 1920x1080 for the test
+            window.Dispatcher.Invoke(() =>
+            {
+                window.WindowState = WindowState.Normal;
+                window.Width = 1920;
+                window.Height = 1080;
+                window.UpdateLayoutAndScale(1920, 1080);
+            });
+            await Task.Delay(800);
+
+            void SaveShot(string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(window, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+            }
+
+            // 1. Overview (Maximized / 1080p)
+            window.Dispatcher.Invoke(() =>
+            {
+                window.WindowState = WindowState.Maximized;
+                mainVm.SwitchTab("Overview");
+            });
+            await Task.Delay(800);
+            SaveShot("task1b_overview_maximized.png");
+
+            // 2. Toggle to Windowed (Normal 1280x720)
+            window.Dispatcher.Invoke(() => window.ToggleMaximizeRestore());
+            await Task.Delay(800);
+            SaveShot("task1b_overview_normal.png");
+
+            // 3. Toggle back to Maximized
+            window.Dispatcher.Invoke(() => window.ToggleMaximizeRestore());
+            await Task.Delay(800);
+            SaveShot("task1b_overview_restored_maximized.png");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[SCALING-CRISPNESS-TEST: ERROR] {ex}");
+            return false;
+        }
+    }
+
     public static async Task<bool> RunIconSelfTestAsync(MainWindow mainWindow)
     {
         try

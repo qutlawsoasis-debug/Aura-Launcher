@@ -100,7 +100,8 @@ public partial class App : Application
         bool isReportTest = Array.Exists(args, a => a.Equals("--selftest-report", StringComparison.OrdinalIgnoreCase));
         bool isLayoutAudit = Array.Exists(args, a => a.Equals("--layout-audit", StringComparison.OrdinalIgnoreCase));
         bool isColorsTest = Array.Exists(args, a => a.Equals("--selftest-colors", StringComparison.OrdinalIgnoreCase));
-        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isReportTest || isLayoutAudit || isColorsTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool isScaleCrispTest = Array.Exists(args, a => a.Equals("--selftest-scale-crisp", StringComparison.OrdinalIgnoreCase));
+        bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isReportTest || isLayoutAudit || isColorsTest || isScaleCrispTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -458,6 +459,18 @@ public partial class App : Application
             {
                 bool success = await Core.SceneDiagnostics.RunLayoutAuditAsync(mainWindow);
                 Environment.Exit(success ? 0 : 1);
+            });
+        }
+        else if (isScaleCrispTest)
+        {
+            _ = Task.Run(async () =>
+            {
+                bool success = await Core.SceneDiagnostics.RunScalingCrispnessTestAsync(mainWindow);
+                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await Task.Delay(1000);
+                    Environment.Exit(success ? 0 : 1);
+                }
             });
         }
         else if (isColorsTest)

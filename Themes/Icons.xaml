@@ -19,14 +19,17 @@
     <StreamGeometry x:Key="IconCopy">M8,10 A2,2 0 0,1 10,8 H18 A2,2 0 0,1 20,10 V18 A2,2 0 0,1 18,20 H10 A2,2 0 0,1 8,18 Z M4,16 A2,2 0 0,1 2,14 V4 A2,2 0 0,1 4,2 H14 A2,2 0 0,1 16,4</StreamGeometry>
     <StreamGeometry x:Key="IconImage">M19,3 H5 A2,2 0 0,0 3,5 V19 A2,2 0 0,0 5,21 H19 A2,2 0 0,0 21,19 V5 A2,2 0 0,0 19,3 Z M8.5,10 A1.5,1.5 0 1,0 8.5,7 A1.5,1.5 0 0,0 8.5,10 Z M21,15 L16,10 L5,21</StreamGeometry>
     <StreamGeometry x:Key="IconClose">M18,6 L6,18 M6,6 L18,18</StreamGeometry>
+    <StreamGeometry x:Key="IconMaximize">M3,3 H21 V21 H3 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconRestore">M7,3 H21 V17 H17 M3,7 H17 V21 H3 Z</StreamGeometry>
 
     <!-- Base Lucide Icon Style: uniform outline, inherits parent Foreground, default 14x14 -->
     <Style x:Key="IconPath" TargetType="Path">
         <Setter Property="Width" Value="14" />
         <Setter Property="Height" Value="14" />
         <Setter Property="Stretch" Value="Uniform" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="Stroke" Value="{Binding (TextElement.Foreground), RelativeSource={RelativeSource AncestorType=FrameworkElement}}" />
-        <Setter Property="StrokeThickness" Value="1.8" />
+        <Setter Property="StrokeThickness" Value="1.6667" />
         <Setter Property="StrokeStartLineCap" Value="Round" />
         <Setter Property="StrokeEndLineCap" Value="Round" />
         <Setter Property="StrokeLineJoin" Value="Round" />

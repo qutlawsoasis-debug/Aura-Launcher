@@ -800,6 +800,36 @@ public partial class MainWindow : Window
         UpdateLayoutAndScale();
     }
 
+    public void ToggleMaximizeRestore()
+    {
+        if (_isFullscreen)
+        {
+            _isFullscreen = false;
+            Topmost = false;
+            ResizeMode = ResizeMode.CanResize;
+        }
+
+        if (WindowState == WindowState.Maximized)
+        {
+            _lastNonFullscreenState = "Normal";
+            WindowState = WindowState.Normal;
+            Width = 1280;
+            Height = 720;
+            Left = (SystemParameters.WorkArea.Width - 1280) / 2 + SystemParameters.WorkArea.Left;
+            Top = (SystemParameters.WorkArea.Height - 720) / 2 + SystemParameters.WorkArea.Top;
+            SaveDisplayState("Normal");
+        }
+        else
+        {
+            _lastNonFullscreenState = "Maximized";
+            WindowState = WindowState.Maximized;
+            SaveDisplayState("Maximized");
+        }
+
+        UpdateWindowChromeAndBorders();
+        UpdateLayoutAndScale();
+    }
+
     protected override void OnStateChanged(EventArgs e)
     {
         base.OnStateChanged(e);
@@ -832,6 +862,10 @@ public partial class MainWindow : Window
         {
             AuraWindowChrome.CaptionHeight = _isFullscreen ? 0 : 40;
         }
+        if (DataContext is MainViewModel vm)
+        {
+            vm.IsWindowMaximized = (WindowState == WindowState.Maximized) || _isFullscreen;
+        }
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
@@ -848,10 +882,10 @@ public partial class MainWindow : Window
         double actualH = overrideH ?? (ActualHeight > 0 ? ActualHeight : Height);
         if (actualW <= 0 || actualH <= 0) return;
 
-        double baseW = 1280.0;
-        double baseH = 720.0;
+        double baseW = 1600.0;
+        double baseH = 900.0;
 
-        double scale = Math.Clamp(Math.Min(actualW / baseW, actualH / baseH), 1.0, 1.6);
+        double scale = Math.Clamp(Math.Min(actualW / baseW, actualH / baseH), 1.0, 1.2);
 
         ContentScaleTransform.ScaleX = scale;
         ContentScaleTransform.ScaleY = scale;

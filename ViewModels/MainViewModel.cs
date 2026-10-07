@@ -597,12 +597,28 @@ public class MainViewModel : ObservableObject
     public RelayCommand NavigateCommand { get; }
     public RelayCommand CloseWindowCommand { get; }
     public RelayCommand MinimizeWindowCommand { get; }
+    public RelayCommand ToggleMaximizeWindowCommand { get; }
     public AsyncRelayCommand ApplyBannerUpdateCommand { get; }
     public RelayCommand DismissBannerCommand { get; }
     public RelayCommand ToggleMuteCommand { get; }
     public RelayCommand TogglePlayPauseCommand { get; }
     public RelayCommand NextTrackCommand { get; }
     public RelayCommand PreviousTrackCommand { get; }
+
+    private bool _isWindowMaximized = true;
+    public bool IsWindowMaximized
+    {
+        get => _isWindowMaximized;
+        set
+        {
+            if (SetProperty(ref _isWindowMaximized, value))
+            {
+                OnPropertyChanged(nameof(MaximizeRestoreToolTip));
+            }
+        }
+    }
+
+    public string MaximizeRestoreToolTip => IsWindowMaximized ? "Оконный режим" : "Во весь экран";
 
     public IAnthemService? AnthemService { get; }
     public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "Aura Cyberpunk Anthem";
@@ -934,6 +950,13 @@ public class MainViewModel : ObservableObject
             if (System.Windows.Application.Current.MainWindow != null)
             {
                 System.Windows.Application.Current.MainWindow.WindowState = System.Windows.WindowState.Minimized;
+            }
+        });
+        ToggleMaximizeWindowCommand = new RelayCommand(_ =>
+        {
+            if (System.Windows.Application.Current.MainWindow is MainWindow mw)
+            {
+                mw.ToggleMaximizeRestore();
             }
         });
 

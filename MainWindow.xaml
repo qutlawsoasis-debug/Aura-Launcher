@@ -69,7 +69,7 @@
                                 <TextBlock x:Name="MenuText"
                                            Text="{TemplateBinding Content}"
                                            FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="40"
+                                           FontSize="36"
                                            FontWeight="Medium"
                                            Foreground="{StaticResource DimInkBrush}"
                                            VerticalAlignment="Center"
@@ -207,7 +207,12 @@
                     IsHitTestVisible="False" />
 
             <!-- SCALED CONTENT ROOT: All UI elements scale proportionally -->
-            <Grid x:Name="ScaledContentRoot" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <Grid x:Name="ScaledContentRoot"
+                  HorizontalAlignment="Left" VerticalAlignment="Top"
+                  UseLayoutRounding="True"
+                  SnapsToDevicePixels="True"
+                  TextOptions.TextFormattingMode="Ideal"
+                  TextOptions.TextRenderingMode="Auto">
                 <Grid.LayoutTransform>
                     <ScaleTransform x:Name="ContentScaleTransform" ScaleX="1.0" ScaleY="1.0" />
                 </Grid.LayoutTransform>
@@ -293,9 +298,29 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Minimize & Close Buttons -->
-                <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" />
-                <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" />
+                <!-- Minimize, Maximize/Restore & Close Buttons -->
+                <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" ToolTip="Свернуть" />
+                <Button Command="{Binding ToggleMaximizeWindowCommand}"
+                        Style="{StaticResource WinControlBtn}"
+                        ToolTip="{Binding MaximizeRestoreToolTip}">
+                    <Grid Width="11" Height="11">
+                        <!-- State 1: In windowed mode -> Single square (Expand / Во весь экран) -->
+                        <Path Style="{StaticResource IconPath}"
+                              Data="{StaticResource IconMaximize}"
+                              Width="10" Height="10"
+                              StrokeThickness="1.5"
+                              Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Visibility="{Binding IsWindowMaximized, Converter={StaticResource InverseBoolToVis}}" />
+                        <!-- State 2: In maximized mode -> Two overlapping squares (Restore / Оконный режим) -->
+                        <Path Style="{StaticResource IconPath}"
+                              Data="{StaticResource IconRestore}"
+                              Width="11" Height="11"
+                              StrokeThickness="1.3"
+                              Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              Visibility="{Binding IsWindowMaximized, Converter={StaticResource BoolToVis}}" />
+                    </Grid>
+                </Button>
+                <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" Content="✕" ToolTip="Закрыть" />
             </StackPanel>
 
             <!-- ============================================== -->
@@ -303,14 +328,14 @@
             <!-- ============================================== -->
             <Grid Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">
                 <Canvas VerticalAlignment="Top" Height="500">
-                    <!-- Large Title "Aura" (Oswald 600 124px): x=50, y=44, shown only on Overview tab -->
+                    <!-- Large Title "Aura" (Oswald 600, restricted to <= 110px on 1080p): x=50, y=44, shown only on Overview tab -->
                     <TextBlock Canvas.Left="50" Canvas.Top="44"
                                Text="Aura"
                                FontFamily="{StaticResource HeadingFont}"
-                               FontSize="124"
+                               FontSize="90"
                                FontWeight="SemiBold"
                                Foreground="{StaticResource InkBrush}"
-                               LineHeight="116"
+                               LineHeight="88"
                                LineStackingStrategy="BlockLineHeight"
                                IsHitTestVisible="False"
                                Visibility="{Binding IsOverviewActive, Converter={StaticResource BoolToVis}}">
