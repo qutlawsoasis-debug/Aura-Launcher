@@ -43,7 +43,7 @@ public partial class StartupWindow : Window
     {
         if (ProgressBarFill == null) return;
         double clamped = Math.Clamp(progress, 0.0, 100.0);
-        double targetWidth = (clamped / 100.0) * 340.0;
+        double targetWidth = (clamped / 100.0) * 240.0;
 
         var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
         {

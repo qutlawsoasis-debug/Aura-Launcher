@@ -21,21 +21,21 @@
         <EventTrigger RoutedEvent="FrameworkElement.Loaded">
             <BeginStoryboard>
                 <Storyboard>
-                    <!-- 1. Дальний слой гор (44s, влево от 0 до -340) -->
+                    <!-- 1. Дальний слой гор (44s, влево от 0 до -340, линейно) -->
                     <DoubleAnimation Storyboard.TargetName="DistantMountainCanvas"
                                      Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
                                      From="0" To="-340"
                                      Duration="0:0:44"
                                      RepeatBehavior="Forever" />
 
-                    <!-- 2. Средний слой гор (28s, влево от 0 до -340) -->
+                    <!-- 2. Средний слой гор (28s, влево от 0 до -340, линейно) -->
                     <DoubleAnimation Storyboard.TargetName="MiddleMountainCanvas"
                                      Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
                                      From="0" To="-340"
                                      Duration="0:0:28"
                                      RepeatBehavior="Forever" />
 
-                    <!-- 3. Ближний слой гор (17s, влево от 0 до -340) -->
+                    <!-- 3. Ближний слой гор (17s, влево от 0 до -340, линейно) -->
                     <DoubleAnimation Storyboard.TargetName="NearMountainCanvas"
                                      Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
                                      From="0" To="-340"
@@ -56,7 +56,7 @@
                     <DoubleAnimation Storyboard.TargetName="Star6" Storyboard.TargetProperty="Opacity"
                                      From="0" To="0.9" Duration="0:0:1.5" AutoReverse="True" RepeatBehavior="Forever" BeginTime="0:0:2.5" />
 
-                    <!-- 5. Подъём и затухание 6 светлячков (6s) -->
+                    <!-- 5. Подъём и затухание 6 светлячков (6s, подъем на 110px) -->
                     <DoubleAnimation Storyboard.TargetName="Firefly1" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
                                      From="0" To="-110" Duration="0:0:6" RepeatBehavior="Forever" BeginTime="0:0:0.0" />
                     <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Firefly1" Storyboard.TargetProperty="Opacity" RepeatBehavior="Forever" BeginTime="0:0:0.0">
@@ -122,7 +122,7 @@
                         </DoubleAnimation.EasingFunction>
                     </DoubleAnimation>
 
-                    <!-- 7. Бегущая полоска активности внизу окна (2s, влево-вправо) -->
+                    <!-- 7. Бегущая Accent-полоска 2px внизу окна -->
                     <DoubleAnimation Storyboard.TargetName="ActivityBar"
                                      Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
                                      From="-80" To="340"
@@ -133,186 +133,178 @@
         </EventTrigger>
     </Window.Triggers>
 
-    <!-- Внешняя рамка: 340x400, BgBase, Border 1px, CornerRadius 3 -->
+    <!-- Внешняя рамка: 340x400, BgBase, Border 1px, CornerRadius 3, ClipToBounds на всё окно -->
     <Border Background="{DynamicResource BgBase}"
             BorderBrush="{DynamicResource Border}"
             BorderThickness="1"
             CornerRadius="3"
             ClipToBounds="True">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="240" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+        <Grid Width="340" Height="400" ClipToBounds="True">
 
             <!-- ============================================== -->
-            <!-- РЯД 0: СЦЕНА-ПЕЙЗАЖ (340x240, ClipToBounds)    -->
+            <!-- СЛОЙ 0: ФОН ОКНА — СЦЕНА-ПЕЙЗАЖ (340x400)      -->
             <!-- ============================================== -->
-            <Grid Grid.Row="0" Width="340" Height="240" ClipToBounds="True">
-                <!-- 1. Небо: 6 горизонтальных полос -->
-                <StackPanel Orientation="Vertical" Width="340" Height="240">
-                    <Rectangle Width="340" Height="90" Fill="#0A131A" />
-                    <Rectangle Width="340" Height="50" Fill="#0F1C26" />
-                    <Rectangle Width="340" Height="40" Fill="#162733" />
-                    <Rectangle Width="340" Height="25" Fill="#22323C" />
-                    <Rectangle Width="340" Height="15" Fill="#3B3A38" />
-                    <Rectangle Width="340" Height="20" Fill="#6B4A2E" />
-                </StackPanel>
 
-                <!-- 2. Звёзды: 6 квадратиков 2x2 цвета текста -->
-                <Canvas Width="340" Height="240">
-                    <Rectangle x:Name="Star1" Canvas.Left="42" Canvas.Top="24" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
-                    <Rectangle x:Name="Star2" Canvas.Left="118" Canvas.Top="52" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
-                    <Rectangle x:Name="Star3" Canvas.Left="175" Canvas.Top="15" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
-                    <Rectangle x:Name="Star4" Canvas.Left="238" Canvas.Top="65" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
-                    <Rectangle x:Name="Star5" Canvas.Left="290" Canvas.Top="32" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
-                    <Rectangle x:Name="Star6" Canvas.Left="78" Canvas.Top="78" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
-                </Canvas>
+            <!-- 1. Небо: 6 горизонтальных полос + нижний заполнитель -->
+            <StackPanel Orientation="Vertical" Width="340" Height="400" VerticalAlignment="Top">
+                <Rectangle Width="340" Height="90" Fill="#0A131A" />
+                <Rectangle Width="340" Height="50" Fill="#0F1C26" />
+                <Rectangle Width="340" Height="40" Fill="#162733" />
+                <Rectangle Width="340" Height="25" Fill="#22323C" />
+                <Rectangle Width="340" Height="15" Fill="#3B3A38" />
+                <Rectangle Width="340" Height="20" Fill="#6B4A2E" />
+                <Rectangle Width="340" Height="160" Fill="#070D12" />
+            </StackPanel>
 
-                <!-- 3. Дальний слой гор (#16262F, 44s) -->
-                <Canvas x:Name="DistantMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-                    <Canvas.RenderTransform>
-                        <TranslateTransform X="0" />
-                    </Canvas.RenderTransform>
-                    <Path Canvas.Left="0" Canvas.Top="0" Fill="#16262F"
-                          Data="M0 80 H30 V60 H55 V40 H85 V25 H110 V45 H140 V65 H165 V50 H195 V30 H225 V20 H250 V40 H280 V60 H310 V80 H340 V190 H0Z" />
-                    <Path Canvas.Left="340" Canvas.Top="0" Fill="#16262F"
-                          Data="M0 80 H30 V60 H55 V40 H85 V25 H110 V45 H140 V65 H165 V50 H195 V30 H225 V20 H250 V40 H280 V60 H310 V80 H340 V190 H0Z" />
-                </Canvas>
+            <!-- 2. Звёзды: 6 квадратов 2x2 цвета текста -->
+            <Canvas Width="340" Height="400">
+                <Rectangle x:Name="Star1" Canvas.Left="42" Canvas.Top="24" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
+                <Rectangle x:Name="Star2" Canvas.Left="118" Canvas.Top="52" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
+                <Rectangle x:Name="Star3" Canvas.Left="175" Canvas.Top="15" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
+                <Rectangle x:Name="Star4" Canvas.Left="238" Canvas.Top="65" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
+                <Rectangle x:Name="Star5" Canvas.Left="290" Canvas.Top="32" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
+                <Rectangle x:Name="Star6" Canvas.Left="78" Canvas.Top="78" Width="2" Height="2" Fill="{DynamicResource TextPrimary}" Opacity="0" />
+            </Canvas>
 
-                <!-- 4. Средний слой гор (#0F1B23, 28s) -->
-                <Canvas x:Name="MiddleMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-                    <Canvas.RenderTransform>
-                        <TranslateTransform X="0" />
-                    </Canvas.RenderTransform>
-                    <Path Canvas.Left="0" Canvas.Top="0" Fill="#0F1B23"
-                          Data="M0 110 H25 V95 H50 V80 H80 V95 H105 V70 H135 V55 H160 V75 H190 V90 H215 V105 H245 V85 H275 V65 H300 V90 H325 V110 H340 V190 H0Z" />
-                    <Path Canvas.Left="340" Canvas.Top="0" Fill="#0F1B23"
-                          Data="M0 110 H25 V95 H50 V80 H80 V95 H105 V70 H135 V55 H160 V75 H190 V90 H215 V105 H245 V85 H275 V65 H300 V90 H325 V110 H340 V190 H0Z" />
-                </Canvas>
+            <!-- 3. Квадратное солнце 36x36 цвета Accent: слева 206, сверху 196 -->
+            <Canvas Width="340" Height="400">
+                <Rectangle Canvas.Left="206" Canvas.Top="196" Width="36" Height="36" Fill="{DynamicResource Accent}" />
+            </Canvas>
 
-                <!-- 5. Ближний слой гор (#070D12, 17s) -->
-                <Canvas x:Name="NearMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
-                    <Canvas.RenderTransform>
-                        <TranslateTransform X="0" />
-                    </Canvas.RenderTransform>
-                    <Path Canvas.Left="0" Canvas.Top="0" Fill="#070D12"
-                          Data="M0 150 H35 V135 H60 V120 H95 V135 H125 V150 H160 V140 H190 V125 H220 V110 H250 V125 H285 V140 H315 V150 H340 V190 H0Z" />
-                    <Path Canvas.Left="340" Canvas.Top="0" Fill="#070D12"
-                          Data="M0 150 H35 V135 H60 V120 H95 V135 H125 V150 H160 V140 H190 V125 H220 V110 H250 V125 H285 V140 H315 V150 H340 V190 H0Z" />
-                </Canvas>
+            <!-- 4. Дальний слой гор (#16262F, 44s, высота 190, прижат к низу) -->
+            <Canvas x:Name="DistantMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
+                <Canvas.RenderTransform>
+                    <TranslateTransform X="0" />
+                </Canvas.RenderTransform>
+                <Path Canvas.Left="0" Canvas.Top="0" Fill="#16262F"
+                      Data="M0 80 H30 V60 H55 V40 H85 V25 H110 V45 H140 V65 H165 V50 H195 V30 H225 V20 H250 V40 H280 V60 H310 V80 H340 V190 H0Z" />
+                <Path Canvas.Left="340" Canvas.Top="0" Fill="#16262F"
+                      Data="M0 80 H30 V60 H55 V40 H85 V25 H110 V45 H140 V65 H165 V50 H195 V30 H225 V20 H250 V40 H280 V60 H310 V80 H340 V190 H0Z" />
+            </Canvas>
 
-                <!-- 6. Квадратное солнце (pixel-art стиль): 36x36, Accent (#F2A63C), позиция X=206, Y=196 -->
-                <Canvas Width="340" Height="240">
-                    <Rectangle Canvas.Left="206" Canvas.Top="196" Width="36" Height="36" Fill="{DynamicResource Accent}" />
-                </Canvas>
+            <!-- 5. Средний слой гор (#0F1B23, 28s, высота 190, прижат к низу) -->
+            <Canvas x:Name="MiddleMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
+                <Canvas.RenderTransform>
+                    <TranslateTransform X="0" />
+                </Canvas.RenderTransform>
+                <Path Canvas.Left="0" Canvas.Top="0" Fill="#0F1B23"
+                      Data="M0 110 H25 V95 H50 V80 H80 V95 H105 V70 H135 V55 H160 V75 H190 V90 H215 V105 H245 V85 H275 V65 H300 V90 H325 V110 H340 V190 H0Z" />
+                <Path Canvas.Left="340" Canvas.Top="0" Fill="#0F1B23"
+                      Data="M0 110 H25 V95 H50 V80 H80 V95 H105 V70 H135 V55 H160 V75 H190 V90 H215 V105 H245 V85 H275 V65 H300 V90 H325 V110 H340 V190 H0Z" />
+            </Canvas>
 
-                <!-- 7. Светлячки: 6 квадратиков 3x3 Accent -->
-                <Canvas Width="340" Height="240">
-                    <Rectangle x:Name="Firefly1" Canvas.Left="55" Canvas.Top="220" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform Y="0" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                    <Rectangle x:Name="Firefly2" Canvas.Left="110" Canvas.Top="225" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform Y="0" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                    <Rectangle x:Name="Firefly3" Canvas.Left="165" Canvas.Top="215" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform Y="0" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                    <Rectangle x:Name="Firefly4" Canvas.Left="220" Canvas.Top="228" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform Y="0" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                    <Rectangle x:Name="Firefly5" Canvas.Left="275" Canvas.Top="218" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform Y="0" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                    <Rectangle x:Name="Firefly6" Canvas.Left="310" Canvas.Top="222" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform Y="0" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                </Canvas>
+            <!-- 6. Ближний слой гор (#070D12, 17s, высота 190, прижат к низу) -->
+            <Canvas x:Name="NearMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
+                <Canvas.RenderTransform>
+                    <TranslateTransform X="0" />
+                </Canvas.RenderTransform>
+                <Path Canvas.Left="0" Canvas.Top="0" Fill="#070D12"
+                      Data="M0 150 H35 V135 H60 V120 H95 V135 H125 V150 H160 V140 H190 V125 H220 V110 H250 V125 H285 V140 H315 V150 H340 V190 H0Z" />
+                <Path Canvas.Left="340" Canvas.Top="0" Fill="#070D12"
+                      Data="M0 150 H35 V135 H60 V120 H95 V135 H125 V150 H160 V140 H190 V125 H220 V110 H250 V125 H285 V140 H315 V150 H340 V190 H0Z" />
+            </Canvas>
 
-                <!-- 8. По центру: крупная надпись «Aura» и вращающийся янтарный кубик -->
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- 7. Светлячки: 6 квадратов 3x3 цвета Accent -->
+            <Canvas Width="340" Height="400">
+                <Rectangle x:Name="Firefly1" Canvas.Left="55" Canvas.Top="350" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="Firefly2" Canvas.Left="110" Canvas.Top="365" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="Firefly3" Canvas.Left="165" Canvas.Top="345" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="Firefly4" Canvas.Left="220" Canvas.Top="370" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="Firefly5" Canvas.Left="275" Canvas.Top="355" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+                <Rectangle x:Name="Firefly6" Canvas.Left="310" Canvas.Top="360" Width="3" Height="3" Fill="{DynamicResource Accent}" Opacity="0">
+                    <Rectangle.RenderTransform>
+                        <TranslateTransform Y="0" />
+                    </Rectangle.RenderTransform>
+                </Rectangle>
+            </Canvas>
+
+            <!-- ============================================== -->
+            <!-- СЛОЙ 1: КОНТЕНТ ПОВЕРХ СЦЕНЫ                   -->
+            <!-- ============================================== -->
+            <Grid Width="340" Height="400">
+                <!-- 1. По центру вверху: большое слово «Aura» и вращающийся amber-квадрат -->
+                <StackPanel HorizontalAlignment="Center" Margin="0,52,0,0">
                     <TextBlock Text="Aura"
                                FontFamily="{DynamicResource HeadingFont}"
                                FontWeight="SemiBold"
                                FontSize="92"
-                               Foreground="{DynamicResource TextPrimary}"
+                               Foreground="#E8F0F8"
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
-                               LineHeight="92"
+                               LineHeight="88"
                                LineStackingStrategy="BlockLineHeight" />
                     <Border x:Name="AmberCube"
                             Width="14" Height="14"
                             CornerRadius="3"
                             Background="{DynamicResource Accent}"
                             HorizontalAlignment="Center"
-                            Margin="0,4,0,0"
+                            Margin="0,6,0,0"
                             RenderTransformOrigin="0.5,0.5">
                         <Border.RenderTransform>
                             <RotateTransform Angle="0" />
                         </Border.RenderTransform>
                     </Border>
                 </StackPanel>
-            </Grid>
 
-            <!-- ============================================== -->
-            <!-- РЯД 1: СТАТУС, ПРОГРЕСС И НИЖНИЙ БЛОК          -->
-            <!-- ============================================== -->
-            <Grid Grid.Row="1">
-                <!-- Прогресс-бар скачивания обновления (2px) под сценой -->
-                <Grid VerticalAlignment="Top" Height="2"
-                      Background="{DynamicResource Border}"
-                      Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}">
-                    <Border x:Name="ProgressBarFill"
-                            HorizontalAlignment="Left"
-                            Height="2"
-                            Background="{DynamicResource Accent}"
-                            Width="{Binding ProgressBarWidth}" />
-                </Grid>
+                <!-- 2. Строка статуса по центру ниже + полоса прогресса -->
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="24,196,24,0">
+                    <!-- Строка статуса и точки (выровнены влево, строка не прыгает) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,6">
+                        <TextBlock Text="{Binding StatusText}"
+                                   FontFamily="{DynamicResource MainFont}"
+                                   FontSize="15"
+                                   FontWeight="Normal"
+                                   Foreground="{Binding StatusForeground}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                        <TextBlock Text="{Binding DotsText}"
+                                   FontFamily="{DynamicResource MainFont}"
+                                   FontSize="15"
+                                   FontWeight="Normal"
+                                   Foreground="{Binding StatusForeground}"
+                                   MinWidth="22"
+                                   TextAlignment="Left" />
+                    </StackPanel>
 
-                <!-- Процент скачивания числом под полосой -->
-                <TextBlock Text="{Binding ProgressPercentText}"
-                           FontFamily="{DynamicResource MainFont}"
-                           FontSize="12"
-                           Foreground="{DynamicResource Accent}"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Top"
-                           Margin="0,6,0,0"
-                           Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
-
-                <!-- Строка статуса по центру (Onest 15pt, не прыгает при смене точек) -->
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Margin="20,0,20,0">
-                    <TextBlock Text="{Binding StatusText}"
-                               FontFamily="{DynamicResource MainFont}"
-                               FontSize="15"
-                               FontWeight="Normal"
-                               Foreground="{Binding StatusForeground}"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center" />
-                    <TextBlock Text="{Binding DotsText}"
-                               FontFamily="{DynamicResource MainFont}"
-                               FontSize="15"
-                               FontWeight="Normal"
-                               Foreground="{Binding StatusForeground}"
-                               MinWidth="22"
-                               TextAlignment="Left" />
+                    <!-- Прогресс-бар скачивания обновления (2px Accent) и процент числом -->
+                    <StackPanel Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" Margin="0,4,0,0">
+                        <Grid Height="2" Width="240" Background="#26FFFFFF" HorizontalAlignment="Center">
+                            <Border x:Name="ProgressBarFill"
+                                    HorizontalAlignment="Left"
+                                    Height="2"
+                                    Background="{DynamicResource Accent}"
+                                    Width="{Binding ProgressBarWidth}" />
+                        </Grid>
+                        <TextBlock Text="{Binding ProgressPercentText}"
+                                   FontFamily="{DynamicResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Accent}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
                 </StackPanel>
 
-                <!-- В самом низу: надпись «beta 1.0.N» и тонкая бегущая полоска активности -->
+                <!-- 3. В самом низу: мелко «beta 1.0.N» цветом #E8F0F8 с 60% opacity и бегущая полоса -->
                 <Grid VerticalAlignment="Bottom">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -323,11 +315,12 @@
                                Text="{Binding VersionText}"
                                FontFamily="{DynamicResource MainFont}"
                                FontSize="11"
-                               Foreground="{DynamicResource AccentFaint}"
+                               Foreground="#E8F0F8"
+                               Opacity="0.6"
                                HorizontalAlignment="Center"
                                Margin="0,0,0,8" />
 
-                    <!-- Бегущая Accent-полоска 2px -->
+                    <!-- Бегущая полоса Accent 2px -->
                     <Grid Grid.Row="1" Height="2" ClipToBounds="True" Background="Transparent">
                         <Rectangle x:Name="ActivityBar"
                                    Width="80" Height="2"

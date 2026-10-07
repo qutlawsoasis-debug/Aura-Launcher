@@ -62,7 +62,7 @@ public class StartupWindowViewModel : ObservableObject
         }
     }
 
-    public double ProgressBarWidth => Math.Max(0, Math.Min(340, _progressValue * 3.4));
+    public double ProgressBarWidth => Math.Max(0, Math.Min(240, _progressValue * 2.4));
 
     public bool IsProgressVisible
     {

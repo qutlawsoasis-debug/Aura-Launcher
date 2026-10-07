@@ -1020,8 +1020,8 @@ public class MainViewModel : ObservableObject
 
             if (_isLauncherUpdatePending)
             {
-                // Открываем отдельное окно обновления лаунчера
-                OpenUpdateWindow();
+                // Открываем отдельное окно обновления лаунчера (StartupWindow)
+                OpenStartupWindow();
             }
             else
             {
@@ -1762,7 +1762,7 @@ public class MainViewModel : ObservableObject
         }
     }
 
-    public void OpenUpdateWindow()
+    public void OpenStartupWindow()
     {
         var mainWin = System.Windows.Application.Current.MainWindow;
         Views.StartupWindow? splashWin = null;
