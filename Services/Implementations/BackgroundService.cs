@@ -18,18 +18,51 @@ public class BackgroundService : IBackgroundService
         }
     }
 
+    private readonly IConfigService? _configService;
     private readonly List<Uri> _backgroundUris = new();
     private readonly Random _random = new();
     private DispatcherTimer? _rotationTimer;
     private int _currentIndex = -1;
+    private bool _autoRotationEnabled = true;
 
     public event EventHandler<BitmapImage>? BackgroundChanged;
     public BitmapImage? CurrentImage { get; private set; }
-    public bool AutoRotationEnabled { get; set; } = true;
+
+    public bool AutoRotationEnabled
+    {
+        get => _configService != null ? _configService.CurrentConfig.AutoRotateBackgrounds : _autoRotationEnabled;
+        set
+        {
+            _autoRotationEnabled = value;
+            if (_configService != null && _configService.CurrentConfig.AutoRotateBackgrounds != value)
+            {
+                _configService.CurrentConfig.AutoRotateBackgrounds = value;
+                _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
+            }
+        }
+    }
+
     public int TotalCount => _backgroundUris.Count;
+
+    public BackgroundService(IConfigService? configService = null)
+    {
+        _configService = configService;
+        if (_configService != null)
+        {
+            _autoRotationEnabled = _configService.CurrentConfig.AutoRotateBackgrounds;
+            _configService.ConfigChanged += (s, cfg) =>
+            {
+                _autoRotationEnabled = cfg.AutoRotateBackgrounds;
+            };
+        }
+    }
 
     public void Initialize()
     {
+        if (_configService != null)
+        {
+            _autoRotationEnabled = _configService.CurrentConfig.AutoRotateBackgrounds;
+        }
         _backgroundUris.Clear();
 
         // 1. Built-in 15 atmospheric Minecraft backgrounds

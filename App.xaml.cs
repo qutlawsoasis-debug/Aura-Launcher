@@ -169,6 +169,7 @@ public partial class App : Application
         var services = new ServiceCollection();
         ConfigureServices(services, useFakeTunnel);
         Services = services.BuildServiceProvider();
+        _ = Services.GetRequiredService<IConfigService>();
 
         // Логирование версии лаунчера при старте
         try

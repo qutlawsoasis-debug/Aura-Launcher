@@ -1057,6 +1057,8 @@ public class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(PlayerNickname));
             OnPropertyChanged(nameof(RamFormatted));
             OnPropertyChanged(nameof(AllocatedRamText));
+            OnPropertyChanged(nameof(AnthemVolume));
+            OnPropertyChanged(nameof(IsAnthemMuted));
             UpdateAvatar();
             OverviewVM.RefreshStats();
             UpdateIdleState();

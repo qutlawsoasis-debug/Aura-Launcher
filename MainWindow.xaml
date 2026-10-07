@@ -6,7 +6,6 @@
         xmlns:core="clr-namespace:AuraLauncher.Core"
         Title="Aura" Height="720" Width="1280"
         MinHeight="620" MinWidth="980"
-        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"

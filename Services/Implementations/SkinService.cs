@@ -519,11 +519,15 @@ public class SkinService : ISkinService
                 Content = content
             };
 
-            // Read auth tokens from %APPDATA%\Aura\config.json via DPAPI if available
+            // Read auth tokens from %APPDATA%\.aura\config.json via DPAPI if available
             try
             {
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                string cfgPath = Path.Combine(appData, "Aura", "config.json");
+                string cfgPath = Path.Combine(appData, ".aura", "config.json");
+                if (!File.Exists(cfgPath))
+                {
+                    cfgPath = Path.Combine(appData, "Aura", "config.json");
+                }
                 if (File.Exists(cfgPath))
                 {
                     var cfgJson = File.ReadAllText(cfgPath);

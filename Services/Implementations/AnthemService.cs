@@ -58,6 +58,19 @@ public class AnthemService : IAnthemService
     public AnthemService(IConfigService configService)
     {
         _configService = configService;
+        _volumePercent = Math.Clamp(_configService.CurrentConfig.AnthemVolume, 0, 100);
+        _isMuted = _configService.CurrentConfig.AnthemMuted;
+        _configService.ConfigChanged += (s, cfg) =>
+        {
+            int vol = Math.Clamp(cfg.AnthemVolume, 0, 100);
+            bool muted = cfg.AnthemMuted;
+            if (_volumePercent != vol || _isMuted != muted)
+            {
+                _volumePercent = vol;
+                _isMuted = muted;
+                ApplyVolume();
+            }
+        };
         StartPlayerThread();
     }
 
@@ -346,17 +359,18 @@ public class AnthemService : IAnthemService
 
     private void SaveSettings()
     {
+        _configService.CurrentConfig.AnthemVolume = _volumePercent;
+        _configService.CurrentConfig.AnthemMuted = _isMuted;
         _ = Task.Run(async () =>
         {
             try
             {
-                await _configService.UpdateConfigAsync(c =>
-                {
-                    c.AnthemVolume = _volumePercent;
-                    c.AnthemMuted = _isMuted;
-                }).ConfigureAwait(false);
+                await _configService.SaveConfigAsync(_configService.CurrentConfig).ConfigureAwait(false);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[ANTHEM: SAVE ERROR] {ex.Message}");
+            }
         });
     }
 
@@ -418,9 +432,9 @@ public class AnthemService : IAnthemService
             return Path.GetFullPath(candidate2);
         }
 
-        // 4. Check already extracted file in %APPDATA%\Aura\anthem.mp3
+        // 4. Check already extracted file in %APPDATA%\.aura\anthem.mp3
         string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        string targetDir = Path.Combine(appData, "Aura");
+        string targetDir = Path.Combine(appData, ".aura");
         string targetFile = Path.Combine(targetDir, "anthem.mp3");
         if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 10000)
         {

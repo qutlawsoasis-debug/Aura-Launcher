@@ -28,13 +28,24 @@ public class SettingsViewModel : ObservableObject
 
     public bool AutoRotateBackgrounds
     {
-        get => _backgroundService?.AutoRotationEnabled ?? true;
+        get => _backgroundService != null ? _backgroundService.AutoRotationEnabled : _configService.CurrentConfig.AutoRotateBackgrounds;
         set
         {
+            bool changed = false;
             if (_backgroundService != null && _backgroundService.AutoRotationEnabled != value)
             {
                 _backgroundService.AutoRotationEnabled = value;
+                changed = true;
+            }
+            if (_configService.CurrentConfig.AutoRotateBackgrounds != value)
+            {
+                _configService.CurrentConfig.AutoRotateBackgrounds = value;
+                changed = true;
+            }
+            if (changed)
+            {
                 OnPropertyChanged();
+                _ = SaveImmediatelyAsync();
             }
         }
     }
@@ -134,7 +145,7 @@ public class SettingsViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsRam6));
                 OnPropertyChanged(nameof(IsRam8));
                 OnPropertyChanged(nameof(IsRam12));
-                ScheduleDebouncedSave();
+                _ = SaveImmediatelyAsync();
             }
         }
     }
@@ -201,7 +212,7 @@ public class SettingsViewModel : ObservableObject
             {
                 _configService.CurrentConfig.PackRepo = value ?? string.Empty;
                 OnPropertyChanged();
-                ScheduleDebouncedSave();
+                _ = SaveImmediatelyAsync();
             }
         }
     }

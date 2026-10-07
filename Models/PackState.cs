@@ -25,7 +25,18 @@ public class PackState
     public static string GetDefaultStateFilePath()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appData, "Aura", "pack-state.json");
+        var newPath = Path.Combine(appData, ".aura", "pack-state.json");
+        var oldPath = Path.Combine(appData, "Aura", "pack-state.json");
+        if (!File.Exists(newPath) && File.Exists(oldPath))
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.Combine(appData, ".aura"));
+                File.Copy(oldPath, newPath, overwrite: true);
+            }
+            catch { }
+        }
+        return newPath;
     }
 
     /// <summary>

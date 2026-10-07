@@ -263,7 +263,12 @@ public class ReportService : IReportService
     {
         try
         {
-            string configPath = Path.Combine(auraAppData, "config.json");
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string configPath = Path.Combine(appData, ".aura", "config.json");
+            if (!File.Exists(configPath))
+            {
+                configPath = Path.Combine(auraAppData, "config.json");
+            }
             string json;
             if (File.Exists(configPath))
             {

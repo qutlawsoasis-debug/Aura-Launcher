@@ -36,19 +36,51 @@ public class WardrobeViewModel : ObservableObject
 
     public string Nickname => _configService.CurrentConfig.Nickname;
 
+    public static string CopySkinToPersistentStorage(string sourcePath)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
+                return sourcePath;
+
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var skinsDir = Path.Combine(appData, ".aura", "skins");
+            Directory.CreateDirectory(skinsDir);
+
+            var fileName = Path.GetFileName(sourcePath);
+            if (string.IsNullOrWhiteSpace(fileName))
+                fileName = "skin.png";
+
+            var targetPath = Path.Combine(skinsDir, fileName);
+            if (!string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(targetPath), StringComparison.OrdinalIgnoreCase))
+            {
+                File.Copy(sourcePath, targetPath, overwrite: true);
+            }
+            return targetPath;
+        }
+        catch
+        {
+            return sourcePath;
+        }
+    }
+
     public string SkinPath
     {
         get => _configService.CurrentConfig.SkinPath;
         set
         {
-            if (_configService.CurrentConfig.SkinPath != value)
+            var resolved = !string.IsNullOrWhiteSpace(value) && File.Exists(value)
+                ? CopySkinToPersistentStorage(value)
+                : (value ?? string.Empty);
+
+            if (_configService.CurrentConfig.SkinPath != resolved)
             {
-                _configService.CurrentConfig.SkinPath = value ?? string.Empty;
+                _configService.CurrentConfig.SkinPath = resolved;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(SkinDisplayName));
                 _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
                 UpdateSkinPreviews();
-                if (!string.IsNullOrWhiteSpace(value) && File.Exists(value))
+                if (!string.IsNullOrWhiteSpace(resolved) && File.Exists(resolved))
                 {
                     CustomSkinApplied?.Invoke();
                 }

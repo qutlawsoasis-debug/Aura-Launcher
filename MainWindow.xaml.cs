@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _currentActiveView = ViewOverview;
+        RestoreDisplayState();
         Loaded += MainWindow_Loaded;
     }
 
@@ -710,8 +711,6 @@ public partial class MainWindow : Window
             {
                 WindowState = WindowState.Maximized;
             }
-
-            SaveDisplayState(_lastNonFullscreenState);
         }
         else
         {
@@ -722,7 +721,6 @@ public partial class MainWindow : Window
             WindowState = WindowState.Normal;
 
             ApplyFullscreenBounds();
-            SaveDisplayState("Fullscreen");
         }
 
         UpdateWindowChromeAndBorders();
@@ -751,12 +749,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveDisplayState(string state)
-    {
-        // Задача 1в: Кнопка в шапке и F11 меняют режим только для текущей сессии и не сохраняются в настройки.
-        // Запуск лаунчера всегда происходит в режиме из StartMode.
-    }
-
     private void RestoreDisplayState()
     {
         var cfgService = App.Services?.GetService<IConfigService>();
@@ -766,7 +758,8 @@ public partial class MainWindow : Window
         Topmost = false;
         ResizeMode = ResizeMode.CanResize;
 
-        if (string.Equals(mode, "Windowed", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(mode, "Windowed", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(mode, "Normal", StringComparison.OrdinalIgnoreCase))
         {
             _lastNonFullscreenState = "Normal";
             WindowState = WindowState.Normal;

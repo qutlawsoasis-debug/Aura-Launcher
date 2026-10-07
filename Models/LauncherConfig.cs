@@ -37,6 +37,6 @@ public class LauncherConfig
     public int TotalGameLaunches { get; set; } = 0;
     public DateTime? LastPlayedUtc { get; set; }
     public string CurrentMusicTrack { get; set; } = "Aura Cyberpunk Anthem";
-    public string WindowDisplayState { get; set; } = "Maximized";
     public string StartMode { get; set; } = "Maximized";
+    public bool AutoRotateBackgrounds { get; set; } = true;
 }
