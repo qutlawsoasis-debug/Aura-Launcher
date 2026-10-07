@@ -22,6 +22,13 @@
     <Color x:Key="ColorBgBaseFadeStart">#E0071017</Color>
     <Color x:Key="ColorBgBaseFadeEnd">#8C071017</Color>
 
+    <Color x:Key="ColorStoriesShadeBottom">#CC091015</Color>
+    <Color x:Key="ColorStoriesShadeTransparent">#00091015</Color>
+    <Color x:Key="ColorStoriesHeaderShade">#99091015</Color>
+    <Color x:Key="ColorStoriesDim55">#8C091015</Color>
+    <Color x:Key="ColorStoriesTrack">#47FFFFFF</Color>
+    <Color x:Key="ColorStoriesTextSecondary">#80E8F0F8</Color>
+
     <!-- Named SolidColorBrush resources for UI controls -->
     <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" />
     <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" />
@@ -40,5 +47,9 @@
     <SolidColorBrush x:Key="Shade40" Color="{StaticResource ColorShade40}" />
     <SolidColorBrush x:Key="ShadeOverlay" Color="{StaticResource ColorShadeOverlay}" />
     <SolidColorBrush x:Key="MediaPlaceholder" Color="{StaticResource ColorMediaPlaceholder}" />
+    <SolidColorBrush x:Key="StoriesDim55" Color="{StaticResource ColorStoriesDim55}" />
+    <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" />
+    <SolidColorBrush x:Key="StoriesFill" Color="{StaticResource ColorTextPrimary}" />
+    <SolidColorBrush x:Key="StoriesTextSecondary" Color="{StaticResource ColorStoriesTextSecondary}" />
 
 </ResourceDictionary>

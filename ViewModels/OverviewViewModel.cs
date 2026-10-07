@@ -80,12 +80,32 @@ public class OverviewViewModel : ObservableObject
         private set => SetProperty(ref _isEnvironmentInstalled, value);
     }
 
+    private readonly IBackgroundService? _backgroundService;
+    private System.Windows.Media.ImageSource? _launcherBackground;
+    public System.Windows.Media.ImageSource? LauncherBackground
+    {
+        get => _launcherBackground;
+        private set => SetProperty(ref _launcherBackground, value);
+    }
+
+    public bool HasAchievementsPage => false;
+
     public RelayCommand OpenAchievementsCommand { get; }
 
-    public OverviewViewModel(IConfigService configService, IGameLaunchService launchService)
+    public OverviewViewModel(IConfigService configService, IGameLaunchService launchService, IBackgroundService? backgroundService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
+        _backgroundService = backgroundService ?? (App.Services?.GetService(typeof(IBackgroundService)) as IBackgroundService);
+
+        if (_backgroundService != null)
+        {
+            _launcherBackground = _backgroundService.CurrentImage;
+            _backgroundService.BackgroundChanged += (s, img) =>
+            {
+                if (img != null) LauncherBackground = img;
+            };
+        }
 
         OpenAchievementsCommand = new RelayCommand(_ =>
         {
@@ -279,10 +299,35 @@ public class OverviewViewModel : ObservableObject
 
     public void RefreshRightFeed()
     {
+        RefreshStoriesData();
+    }
+
+    public void RefreshStoriesData()
+    {
         RefreshLatestScreenshot();
         RefreshAchievementBlock();
         RefreshWhatsNewBlock();
+        UpdateLauncherBackground();
         UpdateHasRightFeed();
+    }
+
+    private void UpdateLauncherBackground()
+    {
+        if (_backgroundService?.CurrentImage != null)
+        {
+            LauncherBackground = _backgroundService.CurrentImage;
+        }
+        else if (LauncherBackground == null && System.Windows.Application.Current != null)
+        {
+            try
+            {
+                if (System.Windows.Application.Current.TryFindResource("WorldBackgroundBitmap") is System.Windows.Media.ImageSource src)
+                {
+                    LauncherBackground = src;
+                }
+            }
+            catch { }
+        }
     }
 
     private void RefreshLatestScreenshot()
@@ -328,7 +373,7 @@ public class OverviewViewModel : ObservableObject
                 bmp = new BitmapImage();
                 bmp.BeginInit();
                 bmp.UriSource = new Uri(latestFile.FullName, UriKind.Absolute);
-                bmp.DecodePixelWidth = 680;
+                bmp.DecodePixelWidth = 720;
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
                 bmp.Freeze();
@@ -439,6 +484,16 @@ public class OverviewViewModel : ObservableObject
             }
 
             // 3. Если вообще нет данных о прогрессе
+            if (defs.Count > 0)
+            {
+                var d = defs.FirstOrDefault(x => x.Id == "ten_launches") ?? defs[0];
+                AchievementTitle = d.Title;
+                AchievementDescription = d.Description;
+                AchievementDateOrProgress = $"{d.Title}: 0 из {d.Target} запусков";
+                HasAchievementBlock = true;
+                return;
+            }
+
             HasAchievementBlock = false;
         }
         catch

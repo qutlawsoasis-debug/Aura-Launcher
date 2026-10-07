@@ -12,8 +12,6 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
-        <SolidColorBrush x:Key="FeedTextPrimary" Color="#E8F0F8" />
-        <SolidColorBrush x:Key="FeedTextSecondary" Color="#B8E8F0F8" />
     </UserControl.Resources>
 
     <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
@@ -104,161 +102,264 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- ПРАВАЯ КОЛОНКА (ЛЕНТА НА ГЛАВНОМ ЭКРАНЕ) -->
-        <Grid HorizontalAlignment="Right"
+        <!-- ============================================== -->
+        <!-- STORIES RAIL (ПРАВАЯ КОЛОНКА В ФОРМАТЕ STORIES) -->
+        <!-- ============================================== -->
+        <Grid x:Name="StoriesRail"
+              HorizontalAlignment="Right"
               VerticalAlignment="Stretch"
-              Width="340"
-              MinWidth="300"
-              MaxWidth="380"
-              Margin="0,160,0,135"
-              ClipToBounds="False"
-              Visibility="{Binding HasRightFeed, Converter={StaticResource BoolToVis}}">
+              Width="320"
+              MinWidth="280"
+              MaxWidth="360"
+              Margin="0,-64,-56,-44"
+              ClipToBounds="True"
+              UseLayoutRounding="True"
+              RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="StoriesRailTranslate" X="0" />
+            </Grid.RenderTransform>
 
-            <!-- Мягкое затемнение фона под колонкой для читаемости текста на арт-фонах -->
-            <Border HorizontalAlignment="Stretch"
-                    VerticalAlignment="Stretch"
-                    IsHitTestVisible="False"
-                    Margin="-16,-16,-16,-16"
-                    CornerRadius="3">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#00091015" Offset="0.0" />
-                        <GradientStop Color="#60091015" Offset="0.25" />
-                        <GradientStop Color="#8C091015" Offset="1.0" />
-                    </LinearGradientBrush>
-                </Border.Background>
-            </Border>
+            <!-- СЛОЙ 1: СЛАЙДЫ (Слайд занимает колонку целиком, Stretch=UniformToFill) -->
+            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
+                <!-- СЛАЙД 0: «Скриншоты» -->
+                <Grid x:Name="SlideScreenshots" Opacity="1.0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
+                    <!-- Фон: скриншот если есть, иначе арт-фон лаунчера -->
+                    <Image Source="{Binding LatestScreenshot.Thumbnail}"
+                           Stretch="UniformToFill"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}" />
+                    <Image Source="{Binding LauncherBackground}"
+                           Stretch="UniformToFill"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}" />
 
-            <!-- ScrollViewer на случай нехватки вертикального места -->
-            <ScrollViewer Style="{StaticResource AuraScrollViewer}"
-                          HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto"
-                          Focusable="False">
-                <StackPanel Focusable="False">
-                    <!-- 1. Блок «Последний скриншот» -->
-                    <Border x:Name="FeedBlockScreenshot"
-                            Opacity="0"
-                            Margin="0,0,0,28"
-                            Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
-                        <Border.RenderTransform>
-                            <TranslateTransform X="16" />
-                        </Border.RenderTransform>
-                        <StackPanel>
+                    <!-- Локальное затемнение снизу вверх на нижних 55% высоты -->
+                    <Border VerticalAlignment="Stretch" HorizontalAlignment="Stretch" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="{StaticResource ColorStoriesShadeTransparent}" Offset="0.45" />
+                                <GradientStop Color="{StaticResource ColorStoriesShadeBottom}" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <!-- СЛОЙ ЗОН КЛИКА (Panel.ZIndex 5, под текстом со ссылками ZIndex 10) -->
+                    <Grid Panel.ZIndex="5"
+                          Background="Transparent"
+                          PreviewMouseLeftButtonDown="StoriesRail_MouseLeftButtonDown"
+                          PreviewMouseLeftButtonUp="StoriesRail_MouseLeftButtonUp"
+                          LostMouseCapture="StoriesRail_LostMouseCapture">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30*" />
+                            <ColumnDefinition Width="70*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="Transparent" />
+                        <Border Grid.Column="1" Background="Transparent" />
+                    </Grid>
+
+                    <!-- Текстовое содержимое внизу слайда (Panel.ZIndex 10 чтобы ссылки были выше зон клика) -->
+                    <Grid VerticalAlignment="Bottom" Margin="20,0,20,24" Panel.ZIndex="10">
+                        <!-- Если скриншот есть -->
+                        <StackPanel Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ"
                                        FontFamily="{StaticResource MainFont}"
-                                       FontSize="13"
+                                       FontSize="12"
                                        FontWeight="Medium"
-                                       Foreground="{StaticResource FeedTextSecondary}"
+                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       Margin="0,0,0,6" />
+
+                            <TextBlock Text="{Binding LatestScreenshotDateText}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextWrapping="Wrap"
                                        Margin="0,0,0,8" />
 
                             <Button Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                     CommandParameter="{Binding LatestScreenshot}"
                                     Style="{StaticResource GhostBtn}"
                                     Padding="0"
-                                    HorizontalAlignment="Stretch"
-                                    HorizontalContentAlignment="Stretch"
+                                    HorizontalAlignment="Left"
                                     Cursor="Hand">
-                                <StackPanel HorizontalAlignment="Stretch">
-                                    <Border CornerRadius="3"
-                                            ClipToBounds="True"
-                                            MaxHeight="190"
-                                            Background="#0C141A"
-                                            HorizontalAlignment="Stretch">
-                                        <Image Source="{Binding LatestScreenshot.Thumbnail}"
-                                               Stretch="UniformToFill"
-                                               MaxHeight="190"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               RenderOptions.BitmapScalingMode="HighQuality"
-                                               SizeChanged="ScreenshotImage_SizeChanged" />
-                                    </Border>
-
-                                    <TextBlock Text="{Binding LatestScreenshotDateText}"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="12"
-                                               Foreground="{StaticResource FeedTextSecondary}"
-                                               Margin="0,6,0,0" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- 2. Блок «Достижение» -->
-                    <Border x:Name="FeedBlockAchievement"
-                            Opacity="0"
-                            Margin="0,0,0,28"
-                            Visibility="{Binding HasAchievementBlock, Converter={StaticResource BoolToVis}}">
-                        <Border.RenderTransform>
-                            <TranslateTransform X="16" />
-                        </Border.RenderTransform>
-                        <Button Command="{Binding OpenAchievementsCommand}"
-                                Style="{StaticResource GhostBtn}"
-                                Padding="0"
-                                HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Stretch"
-                                Cursor="Hand">
-                            <StackPanel HorizontalAlignment="Stretch">
-                                <TextBlock Text="ДОСТИЖЕНИЕ"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
-                                           FontWeight="Medium"
-                                           Foreground="{StaticResource FeedTextSecondary}"
-                                           Margin="0,0,0,8" />
-
-                                <TextBlock Text="{Binding AchievementTitle}"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource FeedTextPrimary}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,0,4" />
-
-                                <TextBlock Text="{Binding AchievementDescription}"
+                                <TextBlock Text="Открыть"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="14"
-                                           Foreground="{StaticResource FeedTextSecondary}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,0,6" />
+                                           Foreground="{DynamicResource Accent}"
+                                           TextDecorations="Underline" />
+                            </Button>
+                        </StackPanel>
 
-                                <TextBlock Text="{Binding AchievementDateOrProgress}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource FeedTextSecondary}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Button>
+                        <!-- Если скриншотов нет -->
+                        <StackPanel Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}">
+                            <TextBlock Text="Нажмите F2 в игре, чтобы сделать скриншот"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- СЛАЙД 1: «Достижения» -->
+                <Grid x:Name="SlideAchievements" Opacity="0.0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
+                    <!-- Фон: арт-фон лаунчера другим кропом (HorizontalAlignment=Left) -->
+                    <Image Source="{Binding LauncherBackground}"
+                           Stretch="UniformToFill"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                    <!-- Затемнение BgBase 55% -->
+                    <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.55" IsHitTestVisible="False" />
+
+                    <!-- Локальное затемнение снизу вверх на нижних 55% высоты -->
+                    <Border VerticalAlignment="Stretch" HorizontalAlignment="Stretch" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="{StaticResource ColorStoriesShadeTransparent}" Offset="0.45" />
+                                <GradientStop Color="{StaticResource ColorStoriesShadeBottom}" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </Border.Background>
                     </Border>
 
-                    <!-- 3. Блок «Что нового» -->
-                    <Border x:Name="FeedBlockWhatsNew"
-                            Opacity="0"
-                            Margin="0,0,0,16"
-                            Visibility="{Binding HasWhatsNewBlock, Converter={StaticResource BoolToVis}}">
-                        <Border.RenderTransform>
-                            <TranslateTransform X="16" />
-                        </Border.RenderTransform>
+                    <!-- СЛОЙ ЗОН КЛИКА (Panel.ZIndex 5, под текстом со ссылками ZIndex 10) -->
+                    <Grid Panel.ZIndex="5"
+                          Background="Transparent"
+                          PreviewMouseLeftButtonDown="StoriesRail_MouseLeftButtonDown"
+                          PreviewMouseLeftButtonUp="StoriesRail_MouseLeftButtonUp"
+                          LostMouseCapture="StoriesRail_LostMouseCapture">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30*" />
+                            <ColumnDefinition Width="70*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="Transparent" />
+                        <Border Grid.Column="1" Background="Transparent" />
+                    </Grid>
+
+                    <!-- Текстовое содержимое внизу слайда -->
+                    <Grid VerticalAlignment="Bottom" Margin="20,0,20,24" Panel.ZIndex="10">
+                        <StackPanel>
+                            <TextBlock Text="ДОСТИЖЕНИЕ"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       FontWeight="Medium"
+                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       Margin="0,0,0,6" />
+
+                            <TextBlock Text="{Binding AchievementTitle}"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="30"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxHeight="76"
+                                       ToolTip="{Binding AchievementTitle}"
+                                       Margin="0,0,0,6" />
+
+                            <TextBlock Text="{Binding AchievementDescription}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       TextWrapping="Wrap"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxHeight="62"
+                                       ToolTip="{Binding AchievementDescription}"
+                                       Margin="0,0,0,8" />
+
+                            <TextBlock Text="{Binding AchievementDateOrProgress}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       TextWrapping="Wrap"
+                                       ToolTip="{Binding AchievementDateOrProgress}"
+                                       Margin="0,0,0,4" />
+
+                            <Button Command="{Binding OpenAchievementsCommand}"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    Cursor="Hand"
+                                    Visibility="{Binding HasAchievementsPage, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Открыть"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource Accent}"
+                                           TextDecorations="Underline" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <!-- СЛАЙД 2: «Обновления» -->
+                <Grid x:Name="SlideUpdates" Opacity="0.0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" ClipToBounds="True">
+                    <!-- Фон: арт-фон лаунчера другим кропом (HorizontalAlignment=Right) -->
+                    <Image Source="{Binding LauncherBackground}"
+                           Stretch="UniformToFill"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                    <!-- Затемнение 55% -->
+                    <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.55" IsHitTestVisible="False" />
+
+                    <!-- Локальное затемнение снизу вверх на нижних 55% высоты -->
+                    <Border VerticalAlignment="Stretch" HorizontalAlignment="Stretch" IsHitTestVisible="False">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="{StaticResource ColorStoriesShadeTransparent}" Offset="0.45" />
+                                <GradientStop Color="{StaticResource ColorStoriesShadeBottom}" Offset="1.0" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+
+                    <!-- СЛОЙ ЗОН КЛИКА (Panel.ZIndex 5, под текстом со ссылками ZIndex 10) -->
+                    <Grid Panel.ZIndex="5"
+                          Background="Transparent"
+                          PreviewMouseLeftButtonDown="StoriesRail_MouseLeftButtonDown"
+                          PreviewMouseLeftButtonUp="StoriesRail_MouseLeftButtonUp"
+                          LostMouseCapture="StoriesRail_LostMouseCapture">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="30*" />
+                            <ColumnDefinition Width="70*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="Transparent" />
+                        <Border Grid.Column="1" Background="Transparent" />
+                    </Grid>
+
+                    <!-- Текстовое содержимое внизу слайда -->
+                    <Grid VerticalAlignment="Bottom" Margin="20,0,20,24" Panel.ZIndex="10">
                         <StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="ЧТО НОВОГО • "
+                                <TextBlock Text="ЧТО НОВОГО · "
                                            FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
+                                           FontSize="12"
                                            FontWeight="Medium"
-                                           Foreground="{StaticResource FeedTextSecondary}" />
+                                           Foreground="{DynamicResource StoriesTextSecondary}"
+                                           VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding WhatsNewVersion}"
                                            FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
+                                           FontSize="12"
                                            FontWeight="SemiBold"
-                                           Foreground="{StaticResource Accent}" />
+                                           Foreground="{DynamicResource Accent}"
+                                           VerticalAlignment="Center" />
                             </StackPanel>
 
-                            <ItemsControl ItemsSource="{Binding WhatsNewLines}" Margin="0,0,0,8">
+                            <!-- 3 строки изменений текущей версии (Onest 14, суммарно MaxLines 5) -->
+                            <ItemsControl ItemsSource="{Binding WhatsNewLines}" MaxHeight="105" ClipToBounds="True" Margin="0,0,0,8">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding}"
                                                    FontFamily="{StaticResource MainFont}"
                                                    FontSize="14"
-                                                   Foreground="{StaticResource FeedTextPrimary}"
+                                                   Foreground="{DynamicResource TextPrimary}"
                                                    TextWrapping="Wrap"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding}"
                                                    Margin="0,0,0,6" />
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -271,14 +372,62 @@
                                     Cursor="Hand">
                                 <TextBlock Text="Все изменения"
                                            FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
-                                           Foreground="{StaticResource Accent}"
+                                           FontSize="14"
+                                           Foreground="{DynamicResource Accent}"
                                            TextDecorations="Underline" />
                             </Button>
                         </StackPanel>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- СЛОЙ 3: ВЕРТИКАЛЬНОЕ ЗАТЕМНЕНИЕ ВЕРХНИХ 56 PX (Panel.ZIndex 15) -->
+            <Border Height="56" VerticalAlignment="Top" IsHitTestVisible="False" Panel.ZIndex="15">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{StaticResource ColorStoriesHeaderShade}" Offset="0.0" />
+                        <GradientStop Color="{StaticResource ColorStoriesShadeTransparent}" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+
+            <!-- СЛОЙ 4: ПОЛОСЫ ПРОГРЕССА (3 СЕГМЕНТА) (Panel.ZIndex 20) -->
+            <Grid VerticalAlignment="Top" Margin="12,12,12,0" Panel.ZIndex="20" IsHitTestVisible="False">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="4" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Height="3" CornerRadius="3" Background="{DynamicResource StoriesTrack}" ClipToBounds="True">
+                    <Border x:Name="ProgressFill0" Height="3" CornerRadius="3" Background="{DynamicResource StoriesFill}"
+                            RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="ProgressScale0" ScaleX="0" />
+                        </Border.RenderTransform>
                     </Border>
-                </StackPanel>
-            </ScrollViewer>
+                </Border>
+
+                <Border Grid.Column="2" Height="3" CornerRadius="3" Background="{DynamicResource StoriesTrack}" ClipToBounds="True">
+                    <Border x:Name="ProgressFill1" Height="3" CornerRadius="3" Background="{DynamicResource StoriesFill}"
+                            RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="ProgressScale1" ScaleX="0" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+
+                <Border Grid.Column="4" Height="3" CornerRadius="3" Background="{DynamicResource StoriesTrack}" ClipToBounds="True">
+                    <Border x:Name="ProgressFill2" Height="3" CornerRadius="3" Background="{DynamicResource StoriesFill}"
+                            RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="ProgressScale2" ScaleX="0" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </Grid>
         </Grid>
     </Grid>
 </UserControl>
