@@ -175,22 +175,34 @@
             <Button Command="{Binding CopyLinkCommand}"
                     Style="{StaticResource GhostBtn}"
                     HorizontalAlignment="Left"
-                    MinWidth="180"
+                    Width="180"
                     Margin="0,0,0,20">
-                <Button.Content>
-                    <TextBlock Text="{Binding CopyLinkButtonText}">
+                <Grid HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="Копировать ссылку" Foreground="{StaticResource EmberBrush}" VerticalAlignment="Center">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{StaticResource EmberBrush}" />
+                                <Setter Property="Opacity" Value="1.0" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
-                                        <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
+                                        <Setter Property="Opacity" Value="0.0" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
-                </Button.Content>
+                    <TextBlock Text="Скопировано!" Foreground="{StaticResource OkBrush}" VerticalAlignment="Center">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Opacity" Value="0.0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                        <Setter Property="Opacity" Value="1.0" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
             </Button>
 
             <!-- SECTION 2: ДОБАВИТЬ ДРУГА -->
@@ -211,6 +223,8 @@
                          Background="#12FFFFFF"
                          BorderBrush="{StaticResource LineInkBrush}"
                          BorderThickness="1"
+                         CaretBrush="{StaticResource EmberBrush}"
+                         SelectionBrush="#80F2A63C"
                          VerticalContentAlignment="Center"
                          Padding="10,0"
                          Margin="0,0,12,0" />

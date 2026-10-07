@@ -91,16 +91,17 @@
 
                     <Border Grid.Row="0" Margin="0,0,0,12" Background="#0C141A" CornerRadius="6" Padding="14,10" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                         <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Резервные копии создаются в формате .zip в 1 клик перед установкой новых модов"
-                                           FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" />
-                            </StackPanel>
-                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                                <Button Command="{Binding OpenBackupsFolderCommand}"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Content="📁 Папка бэкапов"
-                                        Padding="12,5" FontSize="11" />
-                            </StackPanel>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Резервные копии создаются в формате .zip в 1 клик перед установкой новых модов"
+                                       FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,14,0" />
+                            <Button Grid.Column="1" Command="{Binding OpenBackupsFolderCommand}"
+                                    Style="{StaticResource SecondaryBtn}"
+                                    Content="📁 Папка бэкапов"
+                                    Padding="12,5" FontSize="11" />
                         </Grid>
                     </Border>
 
@@ -109,7 +110,7 @@
                         <StackPanel>
                             <!-- Empty message -->
                             <Border Background="#0B1318" CornerRadius="8" Padding="24" Margin="0,20,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
-                                    Visibility="{Binding WorldSaves.Count, Converter={StaticResource InverseBoolToVis}}">
+                                    Visibility="{Binding WorldSaves.Count, Converter={StaticResource InverseIntToVis}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <TextBlock Text="Сохранённых миров пока нет"
                                                FontFamily="{StaticResource MainFont}" FontSize="15" FontWeight="SemiBold"
@@ -139,21 +140,22 @@
                                                 </Border>
 
                                                 <!-- Info -->
-                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,14,0">
                                                     <TextBlock Text="{Binding DisplayName}"
                                                                FontFamily="{StaticResource MainFont}" FontSize="16" FontWeight="SemiBold"
-                                                               Foreground="{StaticResource InkBrush}" />
-                                                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                                               Foreground="{StaticResource InkBrush}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
                                                         <TextBlock Text="{Binding GameMode}"
                                                                    FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                                   Foreground="{StaticResource EmberBrush}" Margin="0,0,12,0" />
+                                                                   Foreground="{StaticResource EmberBrush}" Margin="0,0,10,0" />
                                                         <TextBlock Text="{Binding SizeFormatted}"
                                                                    FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                                   Foreground="{StaticResource MuteBrush}" Margin="0,0,12,0" />
+                                                                   Foreground="{StaticResource MuteBrush}" Margin="0,0,10,0" />
                                                         <TextBlock Text="{Binding LastPlayed, StringFormat='{}Изменен: {0:dd.MM.yyyy HH:mm}'}"
                                                                    FontFamily="{StaticResource MainFont}" FontSize="12"
                                                                    Foreground="{StaticResource MuteBrush}" />
-                                                    </StackPanel>
+                                                    </WrapPanel>
                                                     <TextBlock Text="{Binding BackupStatusText}"
                                                                FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold"
                                                                Foreground="{StaticResource EmberBrush}" Margin="0,4,0,0"
@@ -196,14 +198,19 @@
                     <Border Grid.Row="0" Margin="0,0,0,14" Background="#0C141A" CornerRadius="6" Padding="14,12" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                         <StackPanel>
                             <Grid Margin="0,0,0,8">
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                                     <TextBlock Text="Шейдерпаки (Iris Shaders)"
                                                FontFamily="{StaticResource MainFont}" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{StaticResource InkBrush}" />
                                     <TextBlock Text=" — выберите активный шейдер в 1 клик"
-                                               FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" />
+                                               FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}"
+                                               TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <Button HorizontalAlignment="Right" Command="{Binding OpenShadersFolderCommand}"
+                                <Button Grid.Column="1" Command="{Binding OpenShadersFolderCommand}"
                                         Style="{StaticResource SecondaryBtn}" Content="📂 Папка шейдеров" Padding="10,4" FontSize="11" />
                             </Grid>
 
@@ -254,10 +261,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <!-- Search Box -->
+                            <!-- Search Box with watermark and orange caret -->
                             <TextBox Grid.Column="0" Text="{Binding SearchModText, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource AuraTextBox}"
-                                     Padding="10,6" Margin="0,0,10,0"
+                                     Tag="🔍 Поиск мода по названию..."
+                                     Padding="12,8" Margin="0,0,10,0"
                                      ToolTip="Поиск мода по названию..." />
 
                             <!-- Open folder button -->
@@ -269,61 +277,76 @@
 
                         <!-- Mods Virtualized List -->
                         <ScrollViewer Grid.Row="1" behaviors:SmoothScroll.IsEnabled="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding FilteredMods}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="#0A1217" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1" Padding="8,8" Margin="0,0,0,2">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <!-- Empty state when no mods match search -->
+                                <Border Background="#0B1318" CornerRadius="8" Padding="24" Margin="0,16,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
+                                        Visibility="{Binding FilteredMods.Count, Converter={StaticResource InverseIntToVis}}">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <TextBlock Text="Моды не найдены"
+                                                   FontFamily="{StaticResource MainFont}" FontSize="15" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource DimInkBrush}" HorizontalAlignment="Center" />
+                                        <TextBlock Text="В папке mods нет установленных модов или ничего не найдено по текущему запросу."
+                                                   FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}"
+                                                   HorizontalAlignment="Center" Margin="0,6,0,0" />
+                                    </StackPanel>
+                                </Border>
 
-                                                <!-- Mod Name -->
-                                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                                    <TextBlock Text="{Binding DisplayName}"
-                                                               FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="Medium"
-                                                               Foreground="{Binding IsEnabled, Converter={StaticResource BoolToInkOrDimBrushConverter}}"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock Text="{Binding FileName}"
-                                                               FontFamily="{StaticResource MainFont}" FontSize="11"
+                                <ItemsControl ItemsSource="{Binding FilteredMods}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#0A1217" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1" Padding="8,8" Margin="0,0,0,2">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- Mod Name -->
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,10,0">
+                                                        <TextBlock Text="{Binding DisplayName}"
+                                                                   FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="Medium"
+                                                                   Foreground="{Binding IsEnabled, Converter={StaticResource BoolToInkOrDimBrushConverter}}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding FileName}"
+                                                                   FontFamily="{StaticResource MainFont}" FontSize="11"
+                                                                   Foreground="{StaticResource MuteBrush}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                    </StackPanel>
+
+                                                    <!-- Size -->
+                                                    <TextBlock Grid.Column="1" Text="{Binding SizeFormatted}"
+                                                               FontFamily="{StaticResource MainFont}" FontSize="12"
                                                                Foreground="{StaticResource MuteBrush}"
-                                                               TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
+                                                               VerticalAlignment="Center" Margin="14,0" />
 
-                                                <!-- Size -->
-                                                <TextBlock Grid.Column="1" Text="{Binding SizeFormatted}"
-                                                           FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                           Foreground="{StaticResource MuteBrush}"
-                                                           VerticalAlignment="Center" Margin="14,0" />
-
-                                                <!-- Toggle Switch Button -->
-                                                <Button Grid.Column="2" Command="{Binding DataContext.ToggleModCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{StaticResource GhostBtn}"
-                                                        VerticalAlignment="Center" Padding="0">
-                                                    <Border Width="64" Height="26" CornerRadius="13"
-                                                            Background="{Binding IsEnabled, Converter={StaticResource BoolToEmberOrDarkBgConverter}}"
-                                                            BorderBrush="{Binding IsEnabled, Converter={StaticResource BoolToEmberOrLineBorderConverter}}"
-                                                            BorderThickness="1">
-                                                        <TextBlock Text="{Binding IsEnabled, Converter={StaticResource BoolToEnabledTextConverter}}"
-                                                                   FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold"
-                                                                   Foreground="{Binding IsEnabled, Converter={StaticResource BoolToInkOrMuteBrushConverter}}"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                                    </Border>
-                                                </Button>
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                                                    <!-- Toggle Switch Button -->
+                                                    <Button Grid.Column="2" Command="{Binding DataContext.ToggleModCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource GhostBtn}"
+                                                            VerticalAlignment="Center" Padding="0">
+                                                        <Border Width="64" Height="26" CornerRadius="13"
+                                                                Background="{Binding IsEnabled, Converter={StaticResource BoolToEmberOrDarkBgConverter}}"
+                                                                BorderBrush="{Binding IsEnabled, Converter={StaticResource BoolToEmberOrLineBorderConverter}}"
+                                                                BorderThickness="1">
+                                                            <TextBlock Text="{Binding IsEnabled, Converter={StaticResource BoolToEnabledTextConverter}}"
+                                                                       FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold"
+                                                                       Foreground="{Binding IsEnabled, Converter={StaticResource BoolToInkOrMuteBrushConverter}}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </ScrollViewer>
                     </Grid>
                 </Grid>
 
                 <!-- ============================================== -->
-                <!-- SUB-PAGE 3: SCREENSHOTS GALLERY                -->
+                <!-- SUB-PAGE 3: SCREENSHOTS                        -->
                 <!-- ============================================== -->
                 <Grid Visibility="{Binding IsScreenshotsTabActive, Converter={StaticResource BoolToVis}}">
                     <Grid.RowDefinitions>
@@ -333,20 +356,23 @@
 
                     <Border Grid.Row="0" Margin="0,0,0,12" Background="#0C141A" CornerRadius="6" Padding="14,10" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                         <Grid>
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,14,0">
                                 <TextBlock Text="Делайте скриншоты в игре на F2 — они появятся здесь для быстрого копирования и просмотра"
-                                           FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" />
+                                           FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}"
+                                           TextTrimming="CharacterEllipsis" />
                                 <TextBlock Text="{Binding StatusMessage}"
                                            FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold"
                                            Foreground="{StaticResource EmberBrush}" Margin="12,0,0,0"
                                            Visibility="{Binding StatusMessage.Length, Converter={StaticResource BoolToVis}}" />
                             </StackPanel>
-                            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                                <Button Command="{Binding OpenScreenshotsFolderCommand}"
-                                        Style="{StaticResource SecondaryBtn}"
-                                        Content="📂 Папка скриншотов"
-                                        Padding="12,5" FontSize="11" />
-                            </StackPanel>
+                            <Button Grid.Column="1" Command="{Binding OpenScreenshotsFolderCommand}"
+                                    Style="{StaticResource SecondaryBtn}"
+                                    Content="📂 Папка скриншотов"
+                                    Padding="12,5" FontSize="11" />
                         </Grid>
                     </Border>
 
@@ -355,7 +381,7 @@
                         <StackPanel>
                             <!-- Empty message -->
                             <Border Background="#0B1318" CornerRadius="8" Padding="24" Margin="0,20,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
-                                    Visibility="{Binding Screenshots.Count, Converter={StaticResource InverseBoolToVis}}">
+                                    Visibility="{Binding Screenshots.Count, Converter={StaticResource InverseIntToVis}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <TextBlock Text="Скриншотов пока нет"
                                                FontFamily="{StaticResource MainFont}" FontSize="15" FontWeight="SemiBold"
