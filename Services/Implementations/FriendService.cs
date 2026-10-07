@@ -255,6 +255,26 @@ public class FriendService : IFriendService
         }
     }
 
+    public async Task ReportOfflineAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsRegistered) return;
+        try
+        {
+            string nick = _configService.CurrentConfig?.Nickname ?? "Player";
+            var body = new
+            {
+                nick,
+                status = "offline"
+            };
+
+            using var req = CreateAuthenticatedRequest(HttpMethod.Post, "api/sync", body);
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(2000);
+            using var resp = await _httpClient.SendAsync(req, cts.Token);
+        }
+        catch { }
+    }
+
     public async Task<(bool Success, string? ErrorMessage)> SendFriendRequestAsync(string friendCode, CancellationToken cancellationToken = default)
     {
         if (!IsRegistered) await EnsureRegisteredAsync(cancellationToken);

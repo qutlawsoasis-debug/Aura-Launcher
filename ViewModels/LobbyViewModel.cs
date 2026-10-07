@@ -1179,7 +1179,7 @@ public class LobbyViewModel : ObservableObject
 
     public async Task RefreshLobbyPlayersAsync(string[]? players, string? hostName)
     {
-        if (players == null || players.Length == 0) return;
+        if (players == null) return;
 
         // Build desired player descriptors
         var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;

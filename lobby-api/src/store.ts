@@ -32,7 +32,7 @@ export interface UserRecord {
 export interface UserPresence {
   userId: string;
   nick: string;
-  status: 'online' | 'lobby' | 'playing';
+  status: 'online' | 'lobby' | 'playing' | 'offline';
   lobbyCode?: string;
   lastSeen: number;
 }
@@ -150,6 +150,7 @@ export class InMemoryStore implements LobbyStore {
   private nickUsers = new Map<string, string>(); // lowerNick -> userId
   private friendCodes = new Map<string, string>(); // code -> userId
   private presences = new Map<string, { presence: UserPresence; expiresAt: number }>();
+  private lastSeens = new Map<string, number>();
   private friends = new Map<string, Set<string>>();
   private reqIn = new Map<string, Set<string>>();
   private reqOut = new Map<string, Set<string>>();
@@ -387,8 +388,14 @@ export class InMemoryStore implements LobbyStore {
 
   async sync(userId: string, presence: UserPresence): Promise<SyncResult> {
     const now = Date.now();
-    // 1. Обновляем присутствие (TTL 60 с)
-    this.presences.set(userId, { presence, expiresAt: now + 60_000 });
+    // 1. Обновляем присутствие (TTL 60 с) или удаляем при явном offline
+    if (presence.status === 'offline') {
+      this.presences.delete(userId);
+    } else {
+      this.presences.set(userId, { presence, expiresAt: now + 60_000 });
+    }
+    this.lastSeens.set(userId, presence.lastSeen || now);
+
     const user = this.users.get(userId);
     if (user && user.nick !== presence.nick) {
       user.nick = presence.nick;
@@ -400,13 +407,14 @@ export class InMemoryStore implements LobbyStore {
     for (const fId of friendIds) {
       const fUser = this.users.get(fId);
       const fPres = this.presences.get(fId);
-      const isOnline = Boolean(fPres && now <= fPres.expiresAt);
+      const isOnline = Boolean(fPres && now <= fPres.expiresAt && fPres.presence.status !== 'offline');
+      const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.createdAt || 0;
       friends.push({
         id: fId,
         nick: fUser?.nick || 'Unknown',
         online: isOnline,
         status: isOnline ? fPres!.presence.status : 'offline',
-        lastSeen: isOnline ? fPres!.presence.lastSeen : (fPres?.presence?.lastSeen || fUser?.createdAt || 0)
+        lastSeen: isOnline ? fPres!.presence.lastSeen : recordedLastSeen
       });
     }
 
@@ -798,25 +806,29 @@ export class UpstashStore implements LobbyStore {
     const now = Date.now();
 
     // Пайплайн 1: обновление присутствия + получение всех связей и хешей
-    const p1Results = await this.fetchPipeline([
-      ['SET', `presence:${userId}`, JSON.stringify(presence), 'EX', '60'],
+    const isOffline = presence.status === 'offline';
+    const p1Commands: any[][] = [
+      isOffline ? ['DEL', `presence:${userId}`] : ['SET', `presence:${userId}`, JSON.stringify(presence), 'EX', '60'],
+      ['SET', `lastseen:${userId}`, String(presence.lastSeen || now)],
       ['SMEMBERS', `friends:${userId}`],
       ['SMEMBERS', `req_in:${userId}`],
       ['SMEMBERS', `req_out:${userId}`],
       ['HGETALL', `invites:${userId}`],
       ['HGETALL', `sent_invites:${userId}`]
-    ]);
+    ];
+    const p1Results = await this.fetchPipeline(p1Commands);
 
-    const friendIds: string[] = Array.isArray(p1Results[1]) ? p1Results[1] : [];
-    const inIds: string[] = Array.isArray(p1Results[2]) ? p1Results[2] : [];
-    const outIds: string[] = Array.isArray(p1Results[3]) ? p1Results[3] : [];
-    const rawInvites = p1Results[4];
-    const rawSentInvites = p1Results[5];
+    const friendIds: string[] = Array.isArray(p1Results[2]) ? p1Results[2] : [];
+    const inIds: string[] = Array.isArray(p1Results[3]) ? p1Results[3] : [];
+    const outIds: string[] = Array.isArray(p1Results[4]) ? p1Results[4] : [];
+    const rawInvites = p1Results[5];
+    const rawSentInvites = p1Results[6];
 
     const allUserIds = Array.from(new Set([...friendIds, ...inIds, ...outIds]));
 
     const usersMap = new Map<string, UserRecord>();
     const presencesMap = new Map<string, UserPresence>();
+    const lastSeenMap = new Map<string, number>();
 
     // Пайплайн 2: загрузка профилей и присутствия друзей (при наличии)
     if (allUserIds.length > 0) {
@@ -825,6 +837,7 @@ export class UpstashStore implements LobbyStore {
       ];
       if (friendIds.length > 0) {
         p2Commands.push(['MGET', ...friendIds.map(id => `presence:${id}`)]);
+        p2Commands.push(['MGET', ...friendIds.map(id => `lastseen:${id}`)]);
       }
       const p2Results = await this.fetchPipeline(p2Commands);
 
@@ -852,6 +865,19 @@ export class UpstashStore implements LobbyStore {
             }
           }
         }
+
+        const rawLastSeens = p2Results[2];
+        if (Array.isArray(rawLastSeens)) {
+          for (let i = 0; i < friendIds.length; i++) {
+            const raw = rawLastSeens[i];
+            if (raw) {
+              const num = Number(raw);
+              if (!isNaN(num) && num > 0) {
+                lastSeenMap.set(friendIds[i], num);
+              }
+            }
+          }
+        }
       }
     }
 
@@ -860,13 +886,14 @@ export class UpstashStore implements LobbyStore {
     for (const fId of friendIds) {
       const u = usersMap.get(fId);
       const pres = presencesMap.get(fId);
-      const isOnline = Boolean(pres);
+      const isOnline = Boolean(pres && pres.status !== 'offline');
+      const recordedLastSeen = lastSeenMap.get(fId) || u?.createdAt || 0;
       friends.push({
         id: fId,
         nick: u?.nick || 'Unknown',
         online: isOnline,
         status: isOnline ? pres!.status : 'offline',
-        lastSeen: isOnline ? pres!.lastSeen : (u?.createdAt || 0)
+        lastSeen: isOnline ? pres!.lastSeen : recordedLastSeen
       });
     }
 

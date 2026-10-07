@@ -85,6 +85,10 @@ public partial class MainWindow : Window
                         AnimateInviteToastEntrance();
                     }
                 }
+                else if (args.PropertyName == nameof(MainViewModel.IsChangelogModalVisible))
+                {
+                    AnimateChangelogModal(vm.IsChangelogModalVisible);
+                }
             };
             TransitionToTab(vm.CurrentTabName, animate: false);
             UpdateScreenOverlay(vm.IsOverviewActive);
@@ -95,6 +99,10 @@ public partial class MainWindow : Window
             if (vm.IsInviteToastVisible)
             {
                 AnimateInviteToastEntrance();
+            }
+            if (vm.IsChangelogModalVisible)
+            {
+                AnimateChangelogModal(true);
             }
 
             var bgService = App.Services?.GetService<IBackgroundService>();
@@ -179,8 +187,39 @@ public partial class MainWindow : Window
 
         if (targetView == null) return;
 
+        // 1. Плавное скольжение оранжевой точки меню
+        int targetIndex = tabName switch
+        {
+            "Lobby" => 1,
+            "Friends" => 2,
+            "Wardrobe" => 3,
+            "Settings" => 4,
+            _ => 0
+        };
+        double targetDotY = targetIndex * 50.0;
+
+        if (NavIndicatorTrans != null)
+        {
+            if (!animate)
+            {
+                NavIndicatorTrans.BeginAnimation(TranslateTransform.YProperty, null);
+                NavIndicatorTrans.Y = targetDotY;
+            }
+            else
+            {
+                double currentDotY = NavIndicatorTrans.Y;
+                var dotAnim = new DoubleAnimation
+                {
+                    From = currentDotY,
+                    To = targetDotY,
+                    Duration = TimeSpan.FromMilliseconds(240),
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                NavIndicatorTrans.BeginAnimation(TranslateTransform.YProperty, dotAnim, HandoffBehavior.SnapshotAndReplace);
+            }
+        }
+
         // Единый контроллер навигации: «последний запрос побеждает».
-        // 1. При новом переключении все идущие Storyboard ОСТАНАВЛИВАТЬ (Stop, не ждать Completed).
         if (_activeTransitionStoryboard != null)
         {
             _activeTransitionStoryboard.Stop();
@@ -188,34 +227,24 @@ public partial class MainWindow : Window
         }
 
         var allScreens = new FrameworkElement[] { ViewOverview, ViewLobby, ViewFriends, ViewWardrobe, ViewSettings };
-
-        // 2. Уходящему экрану сразу ставить Opacity 0 и Visibility=Collapsed.
-        // Все неактивные экраны: Visibility=Collapsed, IsHitTestVisible=False.
-        foreach (var screen in allScreens)
-        {
-            if (screen == null) continue;
-            if (screen != targetView)
-            {
-                screen.BeginAnimation(UIElement.OpacityProperty, null);
-                screen.Opacity = 0.0;
-                screen.Visibility = Visibility.Collapsed;
-                screen.IsHitTestVisible = false;
-                if (screen.RenderTransform is TranslateTransform tt)
-                {
-                    tt.BeginAnimation(TranslateTransform.YProperty, null);
-                    tt.Y = 0.0;
-                }
-            }
-        }
-
+        var outgoingView = _currentActiveView;
         _currentActiveView = targetView;
 
-        // 3. Одновременно виден и кликабелен ровно один экран
-        targetView.Visibility = Visibility.Visible;
-        targetView.IsHitTestVisible = true;
-
-        if (!animate)
+        if (!animate || outgoingView == null || outgoingView == targetView)
         {
+            foreach (var screen in allScreens)
+            {
+                if (screen == null) continue;
+                if (screen != targetView)
+                {
+                    screen.BeginAnimation(UIElement.OpacityProperty, null);
+                    screen.Opacity = 0.0;
+                    screen.Visibility = Visibility.Collapsed;
+                    screen.IsHitTestVisible = false;
+                }
+            }
+            targetView.Visibility = Visibility.Visible;
+            targetView.IsHitTestVisible = true;
             targetView.BeginAnimation(UIElement.OpacityProperty, null);
             targetView.Opacity = 1.0;
             if (targetView.RenderTransform is TranslateTransform tt)
@@ -226,15 +255,27 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Входящий анимировать с текущего состояния
-        double currentOpacity = targetView.Opacity;
-        if (currentOpacity < 0.0 || currentOpacity >= 1.0) currentOpacity = 0.0;
+        // 2. Бесшовный кроссфейд страниц без провалов и резких переключений:
+        // Уходящий экран плавно растворяется (180 мс), не пропадая мгновенно
+        outgoingView.IsHitTestVisible = false;
+        var outFade = new DoubleAnimation
+        {
+            From = outgoingView.Opacity > 0.0 ? outgoingView.Opacity : 1.0,
+            To = 0.0,
+            Duration = TimeSpan.FromMilliseconds(180),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        outgoingView.BeginAnimation(UIElement.OpacityProperty, outFade);
 
-        double currentY = 8.0;
+        // Приходящий экран одновременно плавно проявляется (220 мс) со сдвигом на 6px
+        targetView.Visibility = Visibility.Visible;
+        targetView.IsHitTestVisible = true;
+
+        double currentY = 6.0;
         if (targetView.RenderTransform is TranslateTransform inTrans)
         {
             currentY = inTrans.Y;
-            if (currentY < 0.0 || currentY > 8.0) currentY = 8.0;
+            if (currentY < 0.0 || currentY > 6.0) currentY = 6.0;
         }
         else
         {
@@ -244,10 +285,9 @@ public partial class MainWindow : Window
 
         var sb = new Storyboard();
 
-        // Приходящий экран: Opacity с текущего состояния -> 1 за 220 мс
         var inOpacityAnim = new DoubleAnimation
         {
-            From = currentOpacity,
+            From = 0.0,
             To = 1.0,
             Duration = TimeSpan.FromMilliseconds(220),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
@@ -256,7 +296,6 @@ public partial class MainWindow : Window
         Storyboard.SetTargetProperty(inOpacityAnim, new PropertyPath(UIElement.OpacityProperty));
         sb.Children.Add(inOpacityAnim);
 
-        // Приходящий экран: TranslateTransform.Y с текущего состояния -> 0 за 220 мс
         var inSlideAnim = new DoubleAnimation
         {
             From = currentY,
@@ -292,6 +331,57 @@ public partial class MainWindow : Window
 
         _activeTransitionStoryboard = sb;
         sb.Begin();
+    }
+
+    private void AnimateChangelogModal(bool isVisible)
+    {
+        if (ChangelogModalOverlay == null || ChangelogModalTrans == null) return;
+
+        ChangelogModalOverlay.BeginAnimation(UIElement.OpacityProperty, null);
+        ChangelogModalTrans.BeginAnimation(TranslateTransform.YProperty, null);
+
+        if (isVisible)
+        {
+            ChangelogModalOverlay.Visibility = Visibility.Visible;
+            ChangelogModalOverlay.IsHitTestVisible = true;
+
+            var fadeAnim = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            var slideAnim = new DoubleAnimation(12.0, 0.0, TimeSpan.FromMilliseconds(240))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+
+            ChangelogModalOverlay.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+            ChangelogModalTrans.BeginAnimation(TranslateTransform.YProperty, slideAnim);
+        }
+        else
+        {
+            ChangelogModalOverlay.IsHitTestVisible = false;
+
+            var fadeAnim = new DoubleAnimation(ChangelogModalOverlay.Opacity, 0.0, TimeSpan.FromMilliseconds(180))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+            var slideAnim = new DoubleAnimation(ChangelogModalTrans.Y, 10.0, TimeSpan.FromMilliseconds(180))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+            };
+
+            fadeAnim.Completed += (s, e) =>
+            {
+                if (!(DataContext is MainViewModel vm && vm.IsChangelogModalVisible))
+                {
+                    ChangelogModalOverlay.Visibility = Visibility.Collapsed;
+                    ChangelogModalOverlay.Opacity = 0.0;
+                }
+            };
+
+            ChangelogModalOverlay.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+            ChangelogModalTrans.BeginAnimation(TranslateTransform.YProperty, slideAnim);
+        }
     }
 
     private void UpdateScreenOverlay(bool isOverview)

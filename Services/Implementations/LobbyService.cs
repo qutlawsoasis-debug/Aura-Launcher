@@ -11,6 +11,7 @@ public class LobbyService : ILobbyService, IDisposable
     private readonly ILobbyApiClient _apiClient;
     private readonly ITunnelProvider _tunnelProvider;
     private CancellationTokenSource? _pollCts;
+    private string? _currentGuestPlayerName;
 
     public string? CurrentLobbyCode { get; private set; }
     public string? CurrentHostToken { get; private set; }
@@ -176,6 +177,7 @@ public class LobbyService : ILobbyService, IDisposable
         CurrentLobbyCode = response.Code;
         CurrentStatus = response.Status;
         CurrentTunnelAddress = response.TunnelAddress;
+        _currentGuestPlayerName = playerName;
         IsHost = false;
 
         StatusChanged?.Invoke(CurrentStatus);
@@ -275,14 +277,31 @@ public class LobbyService : ILobbyService, IDisposable
 
     public void LeaveLobby()
     {
+        var codeToLeave = CurrentLobbyCode;
+        var guestName = _currentGuestPlayerName;
+        bool wasGuest = !IsHost && !string.IsNullOrWhiteSpace(codeToLeave) && !string.IsNullOrWhiteSpace(guestName);
+
         _pollCts?.Cancel();
         _pollCts = null;
         CurrentLobbyCode = null;
         CurrentHostToken = null;
         CurrentTunnelAddress = null;
+        _currentGuestPlayerName = null;
         CurrentStatus = "idle";
         IsHost = false;
         StatusChanged?.Invoke(CurrentStatus);
+
+        if (wasGuest && codeToLeave != null && guestName != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _apiClient.LeaveLobbyAsync(codeToLeave, guestName);
+                }
+                catch { }
+            });
+        }
     }
 
     public void Dispose()

@@ -13,5 +13,6 @@ public interface ILobbyApiClient
     Task<bool> OpenLobbyAsync(string code, string hostToken, string tunnelAddress, CancellationToken cancellationToken = default);
     Task<bool> HeartbeatAsync(string code, string hostToken, CancellationToken cancellationToken = default);
     Task<bool> CloseLobbyAsync(string code, string hostToken, CancellationToken cancellationToken = default);
+    Task<bool> LeaveLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default);
     Task<TunnelConfigResponse?> GetTunnelConfigAsync(CancellationToken cancellationToken = default);
 }

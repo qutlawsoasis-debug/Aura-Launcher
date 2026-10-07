@@ -171,6 +171,30 @@ export const server = http.createServer(async (req, res) => {
             });
             return;
         }
+        // 2b. POST /api/lobby/leave
+        if (req.method === 'POST' && (pathname === '/api/lobby/leave' || pathname === '/api/leave' || pathname === '/leave')) {
+            const body = await parseBody(req);
+            const code = (body.code || '').toUpperCase().trim();
+            const playerName = (body.playerName || '').trim();
+            if (!code || !playerName) {
+                sendJson(res, 400, { error: 'code and playerName required' });
+                return;
+            }
+            const lobby = await store.get(code);
+            if (!lobby || lobby.status === 'closed') {
+                sendJson(res, 200, { success: true, message: 'Lobby closed or not found' });
+                return;
+            }
+            lobby.players = lobby.players.filter(p => p.toLowerCase() !== playerName.toLowerCase());
+            await store.set(lobby, 1800);
+            sendJson(res, 200, {
+                success: true,
+                code: lobby.code,
+                players: lobby.players,
+                playerCount: lobby.players.length
+            });
+            return;
+        }
         // 3. GET /api/lobby/status
         if (req.method === 'GET' && (pathname === '/api/lobby/status' || pathname === '/api/status' || pathname === '/status')) {
             const code = (parsedUrl.query.code || '').toUpperCase().trim();

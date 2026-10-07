@@ -83,24 +83,19 @@
                             </StackPanel>
                         </Grid>
                         <ControlTemplate.Triggers>
-                            <!-- Checked state: ALWAYS Scale 1, Color Ink, Opacity 1 -->
+                            <!-- Checked state: ALWAYS text Color Ink, active dot is handled by sliding ActiveNavIndicator -->
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="MenuText" Property="Foreground" Value="{StaticResource InkBrush}" />
-                                <Setter TargetName="DotSquare" Property="Opacity" Value="1.0" />
-                                <Setter TargetName="DotSquare" Property="RenderTransform">
-                                    <Setter.Value>
-                                        <ScaleTransform ScaleX="1.0" ScaleY="1.0" />
-                                    </Setter.Value>
-                                </Setter>
+                                <Setter TargetName="DotSquare" Property="Opacity" Value="0.0" />
                             </Trigger>
 
-                            <!-- Hover state for unchecked items: Scale 0.6, Opacity 0.75 -->
+                            <!-- Hover state for unchecked items: faint preview dot Scale 0.6, Opacity 0.45 -->
                             <MultiTrigger>
                                 <MultiTrigger.Conditions>
                                     <Condition Property="IsMouseOver" Value="True" />
                                     <Condition Property="IsChecked" Value="False" />
                                 </MultiTrigger.Conditions>
-                                <Setter TargetName="DotSquare" Property="Opacity" Value="0.75" />
+                                <Setter TargetName="DotSquare" Property="Opacity" Value="0.45" />
                                 <Setter TargetName="DotSquare" Property="RenderTransform">
                                     <Setter.Value>
                                         <ScaleTransform ScaleX="0.6" ScaleY="0.6" />
@@ -335,6 +330,21 @@
                                  Style="{StaticResource GameMenuRadio}"
                                  MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
                 </StackPanel>
+
+                <!-- Smooth sliding active navigation indicator dot (Ember 10x10 square) -->
+                <Border x:Name="ActiveNavIndicator"
+                        Canvas.Left="50" Canvas.Top="262"
+                        Width="10" Height="10"
+                        CornerRadius="2"
+                        Background="{StaticResource EmberBrush}"
+                        IsHitTestVisible="False">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="NavIndicatorTrans" Y="0" />
+                    </Border.RenderTransform>
+                    <Border.Effect>
+                        <DropShadowEffect Color="#F2A63C" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
+                    </Border.Effect>
+                </Border>
 
                 <!-- Player info: x=56, bottom 40px (top = 620 - 40 - 40 = 540)
                      head 40x40 (nearest neighbor / aliased pixel scaling), nickname 16px 600, below "N ГБ памяти" 12px mute -->
@@ -614,16 +624,22 @@
             </Border>
 
             <!-- 3.5 CHANGELOG MODAL OVERLAY (СПИСОК ИЗМЕНЕНИЙ СБОРКИ МОДОВ) -->
-            <Grid Panel.ZIndex="120"
-                  Visibility="{Binding IsChangelogModalVisible, Converter={StaticResource BoolToVis}}"
+            <Grid x:Name="ChangelogModalOverlay"
+                  Panel.ZIndex="120"
+                  Visibility="Collapsed"
+                  Opacity="0"
                   Background="#99071017">
-                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                <Border x:Name="ChangelogModalCard"
+                        HorizontalAlignment="Center" VerticalAlignment="Center"
                         Width="640" MaxHeight="520"
                         Background="#0F1B22"
                         BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
                         CornerRadius="4"
                         Padding="24,20,24,20">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="ChangelogModalTrans" Y="10" />
+                    </Border.RenderTransform>
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />

@@ -280,16 +280,18 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
                         <TextBlock Text="Автосмена фона (каждые 60 сек)"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="14"
                                    FontWeight="Medium"
-                                   Foreground="{StaticResource InkBrush}" />
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
                         <TextBlock Text="Коллекция из 15 арт-пейзажей Minecraft с плавным кроссфейдом"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
                                    Foreground="{StaticResource MuteBrush}"
+                                   TextWrapping="Wrap"
                                    Margin="0,2,0,0" />
                     </StackPanel>
 
@@ -317,22 +319,24 @@
                 <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,12" />
 
                 <!-- 3.1 "Отправить отчёт" и "Сохранить на рабочий стол" -->
-                <Grid Margin="0,2,0,8">
+                <Grid Margin="0,4,0,12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,24,0">
                         <TextBlock Text="Диагностические данные и логи"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="14"
                                    FontWeight="Medium"
-                                   Foreground="{StaticResource InkBrush}" />
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
                         <TextBlock Text="Логи лаунчера, игры и системная информация"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
                                    Foreground="{StaticResource MuteBrush}"
+                                   TextWrapping="Wrap"
                                    Margin="0,2,0,0" />
                     </StackPanel>
 

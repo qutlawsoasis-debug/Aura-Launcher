@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/lobby/join", "destination": "/api/join" },
+    { "source": "/api/lobby/leave", "destination": "/api/leave" },
     { "source": "/api/lobby/status", "destination": "/api/status" },
     { "source": "/api/lobby/open", "destination": "/api/open" },
     { "source": "/api/lobby/heartbeat", "destination": "/api/heartbeat" },

@@ -173,6 +173,24 @@ public class LobbyApiClient : ILobbyApiClient
         }
     }
 
+    public async Task<bool> LeaveLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = new StringContent(
+                JsonSerializer.Serialize(new { code, playerName }),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/leave"), content, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<TunnelConfigResponse?> GetTunnelConfigAsync(CancellationToken cancellationToken = default)
     {
         try

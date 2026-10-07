@@ -127,7 +127,7 @@ export async function handleSync(req, res) {
     const body = await parseJson(req);
     const nick = (typeof body.nick === 'string' && body.nick.trim()) ? body.nick.trim() : user.nick;
     const statusRaw = body.status;
-    const status = (statusRaw === 'lobby' || statusRaw === 'playing') ? statusRaw : 'online';
+    const status = (statusRaw === 'lobby' || statusRaw === 'playing' || statusRaw === 'offline') ? statusRaw : 'online';
     const lobbyCode = typeof body.lobbyCode === 'string' && body.lobbyCode.trim()
         ? body.lobbyCode.trim().toUpperCase()
         : undefined;

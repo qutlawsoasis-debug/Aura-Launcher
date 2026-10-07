@@ -166,6 +166,7 @@ public class LobbyViewModelTests
         public Task<bool> OpenLobbyAsync(string code, string hostToken, string tunnelAddress, CancellationToken cancellationToken = default) => Task.FromResult(true);
         public Task<bool> HeartbeatAsync(string code, string hostToken, CancellationToken cancellationToken = default) => Task.FromResult(true);
         public Task<bool> CloseLobbyAsync(string code, string hostToken, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<bool> LeaveLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default) => Task.FromResult(true);
         public Task<TunnelConfigResponse?> GetTunnelConfigAsync(CancellationToken cancellationToken = default) => Task.FromResult<TunnelConfigResponse?>(null);
     }
 

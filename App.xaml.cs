@@ -629,6 +629,26 @@ public partial class App : Application
     {
         try
         {
+            var lobbyService = Services?.GetService<ILobbyService>();
+            lobbyService?.LeaveLobby();
+        }
+        catch { }
+
+        try
+        {
+            var friendService = Services?.GetService<IFriendService>();
+            if (friendService != null)
+            {
+                // Synchronously wait max 1.5s for offline status delivery to server
+                Task.Run(async () => await friendService.ReportOfflineAsync()).Wait(TimeSpan.FromMilliseconds(1500));
+                friendService.Stop();
+                friendService.Dispose();
+            }
+        }
+        catch { }
+
+        try
+        {
             var anthemService = Services?.GetService<IAnthemService>();
             anthemService?.Stop();
             anthemService?.Dispose();

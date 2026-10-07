@@ -472,36 +472,121 @@
                         <!-- "Копировать" / "Скопировано" Button -->
                         <Button Command="{Binding CopyCodeCommand}"
                                 Height="48"
-                                Padding="20,0"
+                                Width="155"
+                                Style="{StaticResource StandardBtn}"
                                 Margin="0,0,12,8">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
-                                    <Setter Property="Content" Value="Копировать" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CodeCopied}" Value="True">
-                                            <Setter Property="Content" Value="Скопировано" />
-                                            <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Копировать" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CodeCopied}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Скопировано!" Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="0.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CodeCopied}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
                         </Button>
 
                         <!-- "Копировать ссылку" Button -->
                         <Button Command="{Binding CopyLinkCommand}"
                                 Height="48"
-                                Padding="16,0"
+                                Width="195"
+                                Style="{StaticResource StandardBtn}"
                                 Margin="0,0,12,8">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
-                                    <Setter Property="Content" Value="{Binding CopyLinkButtonText}" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
-                                            <Setter Property="Foreground" Value="{StaticResource OkBrush}" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Копировать ссылку" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Скопировано!" Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="0.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <DataTrigger.ExitActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.ExitActions>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
                         </Button>
 
                         <!-- "Выйти из лобби" link in bad color -->

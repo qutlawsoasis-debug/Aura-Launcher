@@ -9,6 +9,7 @@ export class InMemoryStore {
     nickUsers = new Map(); // lowerNick -> userId
     friendCodes = new Map(); // code -> userId
     presences = new Map();
+    lastSeens = new Map();
     friends = new Map();
     reqIn = new Map();
     reqOut = new Map();
@@ -226,8 +227,14 @@ export class InMemoryStore {
     }
     async sync(userId, presence) {
         const now = Date.now();
-        // 1. Обновляем присутствие (TTL 60 с)
-        this.presences.set(userId, { presence, expiresAt: now + 60_000 });
+        // 1. Обновляем присутствие (TTL 60 с) или удаляем при явном offline
+        if (presence.status === 'offline') {
+            this.presences.delete(userId);
+        }
+        else {
+            this.presences.set(userId, { presence, expiresAt: now + 60_000 });
+        }
+        this.lastSeens.set(userId, presence.lastSeen || now);
         const user = this.users.get(userId);
         if (user && user.nick !== presence.nick) {
             user.nick = presence.nick;
@@ -238,13 +245,14 @@ export class InMemoryStore {
         for (const fId of friendIds) {
             const fUser = this.users.get(fId);
             const fPres = this.presences.get(fId);
-            const isOnline = Boolean(fPres && now <= fPres.expiresAt);
+            const isOnline = Boolean(fPres && now <= fPres.expiresAt && fPres.presence.status !== 'offline');
+            const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.createdAt || 0;
             friends.push({
                 id: fId,
                 nick: fUser?.nick || 'Unknown',
                 online: isOnline,
                 status: isOnline ? fPres.presence.status : 'offline',
-                lastSeen: isOnline ? fPres.presence.lastSeen : (fPres?.presence?.lastSeen || fUser?.createdAt || 0)
+                lastSeen: isOnline ? fPres.presence.lastSeen : recordedLastSeen
             });
         }
         // 3. Входящие заявки
@@ -613,22 +621,26 @@ export class UpstashStore {
     async sync(userId, presence) {
         const now = Date.now();
         // Пайплайн 1: обновление присутствия + получение всех связей и хешей
-        const p1Results = await this.fetchPipeline([
-            ['SET', `presence:${userId}`, JSON.stringify(presence), 'EX', '60'],
+        const isOffline = presence.status === 'offline';
+        const p1Commands = [
+            isOffline ? ['DEL', `presence:${userId}`] : ['SET', `presence:${userId}`, JSON.stringify(presence), 'EX', '60'],
+            ['SET', `lastseen:${userId}`, String(presence.lastSeen || now)],
             ['SMEMBERS', `friends:${userId}`],
             ['SMEMBERS', `req_in:${userId}`],
             ['SMEMBERS', `req_out:${userId}`],
             ['HGETALL', `invites:${userId}`],
             ['HGETALL', `sent_invites:${userId}`]
-        ]);
-        const friendIds = Array.isArray(p1Results[1]) ? p1Results[1] : [];
-        const inIds = Array.isArray(p1Results[2]) ? p1Results[2] : [];
-        const outIds = Array.isArray(p1Results[3]) ? p1Results[3] : [];
-        const rawInvites = p1Results[4];
-        const rawSentInvites = p1Results[5];
+        ];
+        const p1Results = await this.fetchPipeline(p1Commands);
+        const friendIds = Array.isArray(p1Results[2]) ? p1Results[2] : [];
+        const inIds = Array.isArray(p1Results[3]) ? p1Results[3] : [];
+        const outIds = Array.isArray(p1Results[4]) ? p1Results[4] : [];
+        const rawInvites = p1Results[5];
+        const rawSentInvites = p1Results[6];
         const allUserIds = Array.from(new Set([...friendIds, ...inIds, ...outIds]));
         const usersMap = new Map();
         const presencesMap = new Map();
+        const lastSeenMap = new Map();
         // Пайплайн 2: загрузка профилей и присутствия друзей (при наличии)
         if (allUserIds.length > 0) {
             const p2Commands = [
@@ -636,6 +648,7 @@ export class UpstashStore {
             ];
             if (friendIds.length > 0) {
                 p2Commands.push(['MGET', ...friendIds.map(id => `presence:${id}`)]);
+                p2Commands.push(['MGET', ...friendIds.map(id => `lastseen:${id}`)]);
             }
             const p2Results = await this.fetchPipeline(p2Commands);
             const rawUsers = p2Results[0];
@@ -663,6 +676,18 @@ export class UpstashStore {
                         }
                     }
                 }
+                const rawLastSeens = p2Results[2];
+                if (Array.isArray(rawLastSeens)) {
+                    for (let i = 0; i < friendIds.length; i++) {
+                        const raw = rawLastSeens[i];
+                        if (raw) {
+                            const num = Number(raw);
+                            if (!isNaN(num) && num > 0) {
+                                lastSeenMap.set(friendIds[i], num);
+                            }
+                        }
+                    }
+                }
             }
         }
         // 1. Друзья (только друзья видят присутствие и статус)
@@ -670,13 +695,14 @@ export class UpstashStore {
         for (const fId of friendIds) {
             const u = usersMap.get(fId);
             const pres = presencesMap.get(fId);
-            const isOnline = Boolean(pres);
+            const isOnline = Boolean(pres && pres.status !== 'offline');
+            const recordedLastSeen = lastSeenMap.get(fId) || u?.createdAt || 0;
             friends.push({
                 id: fId,
                 nick: u?.nick || 'Unknown',
                 online: isOnline,
                 status: isOnline ? pres.status : 'offline',
-                lastSeen: isOnline ? pres.lastSeen : (u?.createdAt || 0)
+                lastSeen: isOnline ? pres.lastSeen : recordedLastSeen
             });
         }
         // 2. Входящие заявки
