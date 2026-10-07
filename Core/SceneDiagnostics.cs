@@ -47,7 +47,6 @@ public record SelfTestReport(
 /// Выполняет снимки RenderTargetBitmap для всех трех вкладок (Играть, Скин, Настройки)
 /// и проверяет наличие изображения программным анализом пикселей.
 /// </summary>
-#if DEBUG
 public static class SceneDiagnostics
 {
     public static PixelAnalysisResult AnalyzeImage(string pngFilePath)
@@ -3269,4 +3268,3 @@ public static class SceneDiagnostics
         }
     }
 }
-#endif
