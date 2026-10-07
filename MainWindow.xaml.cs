@@ -1,10 +1,13 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Shell;
 using AuraLauncher.Services.Interfaces;
 using AuraLauncher.ViewModels;
 using Hardcodet.Wpf.TaskbarNotification;
@@ -25,6 +28,8 @@ public partial class MainWindow : Window
     private FrameworkElement? _currentActiveView;
     private Storyboard? _activeTransitionStoryboard;
     private TaskbarIcon? _trayIcon;
+    private bool _isFullscreen = false;
+    private string _lastNonFullscreenState = "Maximized";
 
     public MainWindow()
     {
@@ -118,6 +123,7 @@ public partial class MainWindow : Window
                 }
             }
         }
+        RestoreDisplayState();
     }
 
     public void AnimateInviteToastEntrance()
@@ -583,14 +589,323 @@ public partial class MainWindow : Window
 
         Show();
         ShowInTaskbar = true;
-        WindowState = WindowState.Normal;
+        if (_isFullscreen)
+        {
+            ApplyFullscreenBounds();
+            Topmost = true;
+        }
+        else
+        {
+            WindowState = _lastNonFullscreenState == "Normal" ? WindowState.Normal : WindowState.Maximized;
+            Topmost = false;
+        }
 
         // Гарантированно выводим окно поверх остальных и активируем фокус
-        Topmost = true;
-        Topmost = false;
         Activate();
         Focus();
     }
+
+    #region WindowChrome & Fullscreen Scaling System
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        var handle = new WindowInteropHelper(this).Handle;
+        var hwndSource = HwndSource.FromHwnd(handle);
+        hwndSource?.AddHook(HwndHook);
+    }
+
+    private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        const int WM_GETMINMAXINFO = 0x0024;
+        if (msg == WM_GETMINMAXINFO)
+        {
+            WmGetMinMaxInfo(hwnd, lParam);
+            handled = true;
+        }
+        return IntPtr.Zero;
+    }
+
+    private void WmGetMinMaxInfo(IntPtr hwnd, IntPtr lParam)
+    {
+        MINMAXINFO mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+
+        IntPtr hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        if (hMonitor != IntPtr.Zero && (_isFullscreen || WindowState == WindowState.Maximized))
+        {
+            MONITORINFO mi = new MONITORINFO();
+            mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+            if (GetMonitorInfo(hMonitor, ref mi))
+            {
+                if (_isFullscreen)
+                {
+                    mmi.ptMaxPosition.x = mi.rcMonitor.left;
+                    mmi.ptMaxPosition.y = mi.rcMonitor.top;
+                    mmi.ptMaxSize.x = Math.Abs(mi.rcMonitor.right - mi.rcMonitor.left);
+                    mmi.ptMaxSize.y = Math.Abs(mi.rcMonitor.bottom - mi.rcMonitor.top);
+                    mmi.ptMaxTrackSize.x = mmi.ptMaxSize.x;
+                    mmi.ptMaxTrackSize.y = mmi.ptMaxSize.y;
+                }
+                else
+                {
+                    mmi.ptMaxPosition.x = Math.Abs(mi.rcWork.left - mi.rcMonitor.left);
+                    mmi.ptMaxPosition.y = Math.Abs(mi.rcWork.top - mi.rcMonitor.top);
+                    mmi.ptMaxSize.x = Math.Abs(mi.rcWork.right - mi.rcWork.left);
+                    mmi.ptMaxSize.y = Math.Abs(mi.rcWork.bottom - mi.rcWork.top);
+                    mmi.ptMaxTrackSize.x = mmi.ptMaxSize.x;
+                    mmi.ptMaxTrackSize.y = mmi.ptMaxSize.y;
+                }
+            }
+        }
+        else if (hMonitor != IntPtr.Zero)
+        {
+            mmi.ptMaxTrackSize.x = Math.Max(mmi.ptMaxTrackSize.x, 4000);
+            mmi.ptMaxTrackSize.y = Math.Max(mmi.ptMaxTrackSize.y, 4000);
+        }
+
+        try
+        {
+            var source = PresentationSource.FromVisual(this);
+            double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+            mmi.ptMinTrackSize.x = (int)(MinWidth * dpiX);
+            mmi.ptMinTrackSize.y = (int)(MinHeight * dpiY);
+        }
+        catch
+        {
+            mmi.ptMinTrackSize.x = 980;
+            mmi.ptMinTrackSize.y = 620;
+        }
+
+        Marshal.StructureToPtr(mmi, lParam, true);
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        if (e.Key == Key.F11)
+        {
+            ToggleFullscreen();
+            e.Handled = true;
+        }
+    }
+
+    public void ToggleFullscreen()
+    {
+        if (_isFullscreen)
+        {
+            _isFullscreen = false;
+            Topmost = false;
+            ResizeMode = ResizeMode.CanResize;
+
+            if (_lastNonFullscreenState == "Normal")
+            {
+                WindowState = WindowState.Normal;
+                Width = 1280;
+                Height = 720;
+                Left = (SystemParameters.WorkArea.Width - 1280) / 2 + SystemParameters.WorkArea.Left;
+                Top = (SystemParameters.WorkArea.Height - 720) / 2 + SystemParameters.WorkArea.Top;
+            }
+            else
+            {
+                WindowState = WindowState.Maximized;
+            }
+
+            SaveDisplayState(_lastNonFullscreenState);
+        }
+        else
+        {
+            _lastNonFullscreenState = (WindowState == WindowState.Maximized) ? "Maximized" : "Normal";
+            _isFullscreen = true;
+            Topmost = true;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Normal;
+
+            ApplyFullscreenBounds();
+            SaveDisplayState("Fullscreen");
+        }
+
+        UpdateWindowChromeAndBorders();
+        UpdateLayoutAndScale();
+    }
+
+    private void ApplyFullscreenBounds()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle == IntPtr.Zero) return;
+        IntPtr hMonitor = MonitorFromWindow(handle, MONITOR_DEFAULTTONEAREST);
+        if (hMonitor != IntPtr.Zero)
+        {
+            MONITORINFO mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+            if (GetMonitorInfo(hMonitor, ref mi))
+            {
+                var source = PresentationSource.FromVisual(this);
+                double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+
+                Left = mi.rcMonitor.left / dpiX;
+                Top = mi.rcMonitor.top / dpiY;
+                Width = (mi.rcMonitor.right - mi.rcMonitor.left) / dpiX;
+                Height = (mi.rcMonitor.bottom - mi.rcMonitor.top) / dpiY;
+            }
+        }
+    }
+
+    private void SaveDisplayState(string state)
+    {
+        var cfgService = App.Services?.GetService<IConfigService>();
+        if (cfgService != null)
+        {
+            _ = cfgService.UpdateConfigAsync(c =>
+            {
+                c.WindowDisplayState = state;
+            });
+        }
+    }
+
+    private void RestoreDisplayState()
+    {
+        var cfgService = App.Services?.GetService<IConfigService>();
+        string state = cfgService?.CurrentConfig.WindowDisplayState ?? "Maximized";
+
+        if (state == "Fullscreen")
+        {
+            _lastNonFullscreenState = "Maximized";
+            _isFullscreen = true;
+            Topmost = true;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Normal;
+            ApplyFullscreenBounds();
+        }
+        else if (state == "Normal")
+        {
+            _isFullscreen = false;
+            _lastNonFullscreenState = "Normal";
+            Topmost = false;
+            ResizeMode = ResizeMode.CanResize;
+            WindowState = WindowState.Normal;
+            Width = 1280;
+            Height = 720;
+        }
+        else
+        {
+            _isFullscreen = false;
+            _lastNonFullscreenState = "Maximized";
+            Topmost = false;
+            ResizeMode = ResizeMode.CanResize;
+            WindowState = WindowState.Maximized;
+        }
+
+        UpdateWindowChromeAndBorders();
+        UpdateLayoutAndScale();
+    }
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (!_isFullscreen)
+        {
+            if (WindowState == WindowState.Maximized)
+            {
+                _lastNonFullscreenState = "Maximized";
+                SaveDisplayState("Maximized");
+            }
+            else if (WindowState == WindowState.Normal)
+            {
+                _lastNonFullscreenState = "Normal";
+                SaveDisplayState("Normal");
+            }
+        }
+        UpdateWindowChromeAndBorders();
+        UpdateLayoutAndScale();
+    }
+
+    private void UpdateWindowChromeAndBorders()
+    {
+        bool isBorderFull = _isFullscreen || WindowState == WindowState.Maximized;
+        if (OuterWindowBorder != null)
+        {
+            OuterWindowBorder.CornerRadius = isBorderFull ? new CornerRadius(0) : new CornerRadius(3);
+            OuterWindowBorder.BorderThickness = isBorderFull ? new Thickness(0) : new Thickness(1);
+        }
+        if (AuraWindowChrome != null)
+        {
+            AuraWindowChrome.CaptionHeight = _isFullscreen ? 0 : 40;
+        }
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        UpdateLayoutAndScale();
+    }
+
+    public void UpdateLayoutAndScale(double? overrideW = null, double? overrideH = null)
+    {
+        if (ScaledContentRoot == null || ContentScaleTransform == null) return;
+
+        double actualW = overrideW ?? (ActualWidth > 0 ? ActualWidth : Width);
+        double actualH = overrideH ?? (ActualHeight > 0 ? ActualHeight : Height);
+        if (actualW <= 0 || actualH <= 0) return;
+
+        double baseW = 1280.0;
+        double baseH = 720.0;
+
+        double scale = Math.Clamp(Math.Min(actualW / baseW, actualH / baseH), 1.0, 1.6);
+
+        ContentScaleTransform.ScaleX = scale;
+        ContentScaleTransform.ScaleY = scale;
+
+        ScaledContentRoot.Width = actualW / scale;
+        ScaledContentRoot.Height = actualH / scale;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int x;
+        public int y;
+        public POINT(int x, int y) { this.x = x; this.y = y; }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MINMAXINFO
+    {
+        public POINT ptReserved;
+        public POINT ptMaxSize;
+        public POINT ptMaxPosition;
+        public POINT ptMinTrackSize;
+        public POINT ptMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    public struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public int dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+
+    #endregion
 
     public void AnimateBackgroundTransition(System.Windows.Media.Imaging.BitmapImage nextImage)
     {

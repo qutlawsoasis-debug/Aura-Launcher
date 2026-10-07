@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\aura-icon.ico</ApplicationIcon>
-    <Version>1.2.38</Version>
+    <Version>1.2.39</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 

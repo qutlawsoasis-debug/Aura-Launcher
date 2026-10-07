@@ -4,18 +4,22 @@
         xmlns:vm="clr-namespace:AuraLauncher.ViewModels"
         xmlns:views="clr-namespace:AuraLauncher.Views"
         xmlns:core="clr-namespace:AuraLauncher.Core"
-        Title="Aura" Height="620" Width="980"
+        Title="Aura" Height="720" Width="1280"
+        MinHeight="620" MinWidth="980"
+        WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
         Icon="pack://application:,,,/Resources/aura-icon.ico"
         FontFamily="{StaticResource MainFont}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
         FocusVisualStyle="{x:Null}">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome GlassFrameThickness="0" CornerRadius="3" CaptionHeight="40" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
+        <WindowChrome x:Name="AuraWindowChrome" GlassFrameThickness="0" CornerRadius="3" CaptionHeight="40" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -131,8 +135,8 @@
         </Style>
     </Window.Resources>
 
-    <!-- Outer Window Border: 980x620, radius 3px -->
-    <Border Background="{StaticResource NightBrush}" BorderThickness="1" BorderBrush="{StaticResource LineInkBrush}" CornerRadius="3" ClipToBounds="True">
+    <!-- Outer Window Border -->
+    <Border x:Name="OuterWindowBorder" Background="{StaticResource NightBrush}" BorderThickness="0" BorderBrush="{StaticResource LineInkBrush}" CornerRadius="0" ClipToBounds="True">
         <Grid>
             <!-- 0. DYNAMIC ROTATING BACKGROUND WITH SMOOTH CROSS-FADE -->
             <Grid x:Name="BackgroundHost" ClipToBounds="True">
@@ -201,6 +205,12 @@
                     Background="#A8060E12"
                     Opacity="0"
                     IsHitTestVisible="False" />
+
+            <!-- SCALED CONTENT ROOT: All UI elements scale proportionally -->
+            <Grid x:Name="ScaledContentRoot" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <Grid.LayoutTransform>
+                    <ScaleTransform x:Name="ContentScaleTransform" ScaleX="1.0" ScaleY="1.0" />
+                </Grid.LayoutTransform>
 
             <!-- ============================================== -->
             <!-- 1. TOP HEADER                                  -->
@@ -291,91 +301,94 @@
             <!-- ============================================== -->
             <!-- 2. GAME MENU & PLAYER INFO (LEFT SIDE)         -->
             <!-- ============================================== -->
-            <Canvas Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">
-                <!-- Large Title "Aura" (Oswald 600 124px): x=50, y=44, shown only on Overview tab -->
-                <TextBlock Canvas.Left="50" Canvas.Top="44"
-                           Text="Aura"
-                           FontFamily="{StaticResource HeadingFont}"
-                           FontSize="124"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource InkBrush}"
-                           LineHeight="116"
-                           LineStackingStrategy="BlockLineHeight"
-                           IsHitTestVisible="False"
-                           Visibility="{Binding IsOverviewActive, Converter={StaticResource BoolToVis}}">
-                    <TextBlock.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
-                    </TextBlock.Effect>
-                </TextBlock>
+            <Grid Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">
+                <Canvas VerticalAlignment="Top" Height="500">
+                    <!-- Large Title "Aura" (Oswald 600 124px): x=50, y=44, shown only on Overview tab -->
+                    <TextBlock Canvas.Left="50" Canvas.Top="44"
+                               Text="Aura"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="124"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="116"
+                               LineStackingStrategy="BlockLineHeight"
+                               IsHitTestVisible="False"
+                               Visibility="{Binding IsOverviewActive, Converter={StaticResource BoolToVis}}">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                        </TextBlock.Effect>
+                    </TextBlock>
 
-                <!-- Game Menu (6 words: Играть, Лобби, Друзья, Мастерская, Профиль, Настройки):
-                     x=50, top=224 -->
-                <StackPanel x:Name="GameMenuPanel"
-                            Canvas.Left="50" Canvas.Top="224"
-                            Width="250"
-                            WindowChrome.IsHitTestVisibleInChrome="True">
-                    
-                    <!-- 1. Играть -->
-                    <RadioButton x:Name="MenuBtnPlay" Content="Играть"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Overview"
-                                 IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
-                                 Style="{StaticResource GameMenuRadio}"
-                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                    <!-- Game Menu (6 words: Играть, Лобби, Друзья, Мастерская, Профиль, Настройки):
+                         x=50, top=224 -->
+                    <StackPanel x:Name="GameMenuPanel"
+                                Canvas.Left="50" Canvas.Top="224"
+                                Width="250"
+                                WindowChrome.IsHitTestVisibleInChrome="True">
+                        
+                        <!-- 1. Играть -->
+                        <RadioButton x:Name="MenuBtnPlay" Content="Играть"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Overview"
+                                     IsChecked="{Binding IsOverviewActive, Mode=TwoWay}"
+                                     Style="{StaticResource GameMenuRadio}"
+                                     MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 2. Лобби -->
-                    <RadioButton x:Name="MenuBtnLobby" Content="Лобби"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Lobby"
-                                 IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
-                                 Style="{StaticResource GameMenuRadio}"
-                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                        <!-- 2. Лобби -->
+                        <RadioButton x:Name="MenuBtnLobby" Content="Лобби"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Lobby"
+                                     IsChecked="{Binding IsLobbyActive, Mode=TwoWay}"
+                                     Style="{StaticResource GameMenuRadio}"
+                                     MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 3. Друзья -->
-                    <RadioButton x:Name="MenuBtnFriends" Content="Друзья"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Friends"
-                                 IsChecked="{Binding IsFriendsActive, Mode=TwoWay}"
-                                 Style="{StaticResource GameMenuRadio}"
-                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                        <!-- 3. Друзья -->
+                        <RadioButton x:Name="MenuBtnFriends" Content="Друзья"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Friends"
+                                     IsChecked="{Binding IsFriendsActive, Mode=TwoWay}"
+                                     Style="{StaticResource GameMenuRadio}"
+                                     MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 4. Мастерская -->
-                    <RadioButton x:Name="MenuBtnWorkshop" Content="Мастерская"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Workshop"
-                                 IsChecked="{Binding IsWorkshopActive, Mode=TwoWay}"
-                                 Style="{StaticResource GameMenuRadio}"
-                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                        <!-- 4. Мастерская -->
+                        <RadioButton x:Name="MenuBtnWorkshop" Content="Мастерская"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Workshop"
+                                     IsChecked="{Binding IsWorkshopActive, Mode=TwoWay}"
+                                     Style="{StaticResource GameMenuRadio}"
+                                     MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 5. Профиль -->
-                    <RadioButton x:Name="MenuBtnSkin" Content="Профиль"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
-                                 IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
-                                 Style="{StaticResource GameMenuRadio}"
-                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                        <!-- 5. Профиль -->
+                        <RadioButton x:Name="MenuBtnSkin" Content="Профиль"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Wardrobe"
+                                     IsChecked="{Binding IsWardrobeActive, Mode=TwoWay}"
+                                     Style="{StaticResource GameMenuRadio}"
+                                     MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
 
-                    <!-- 6. Настройки -->
-                    <RadioButton x:Name="MenuBtnSettings" Content="Настройки"
-                                 Command="{Binding NavigateCommand}" CommandParameter="Settings"
-                                 IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
-                                 Style="{StaticResource GameMenuRadio}"
-                                 MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
-                </StackPanel>
+                        <!-- 6. Настройки -->
+                        <RadioButton x:Name="MenuBtnSettings" Content="Настройки"
+                                     Command="{Binding NavigateCommand}" CommandParameter="Settings"
+                                     IsChecked="{Binding IsSettingsActive, Mode=TwoWay}"
+                                     Style="{StaticResource GameMenuRadio}"
+                                     MouseEnter="MenuItem_MouseEnter" MouseLeave="MenuItem_MouseLeave" />
+                    </StackPanel>
 
-                <!-- Smooth sliding active navigation indicator dot (Ember 10x10 square) -->
-                <Border x:Name="ActiveNavIndicator"
-                        Canvas.Left="50" Canvas.Top="242"
-                        Width="10" Height="10"
-                        CornerRadius="2"
-                        Background="{StaticResource EmberBrush}"
-                        IsHitTestVisible="False">
-                    <Border.RenderTransform>
-                        <TranslateTransform x:Name="NavIndicatorTrans" Y="0" />
-                    </Border.RenderTransform>
-                    <Border.Effect>
-                        <DropShadowEffect Color="#F2A63C" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
-                    </Border.Effect>
-                </Border>
+                    <!-- Smooth sliding active navigation indicator dot (Ember 10x10 square) -->
+                    <Border x:Name="ActiveNavIndicator"
+                            Canvas.Left="50" Canvas.Top="242"
+                            Width="10" Height="10"
+                            CornerRadius="2"
+                            Background="{StaticResource EmberBrush}"
+                            IsHitTestVisible="False">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="NavIndicatorTrans" Y="0" />
+                        </Border.RenderTransform>
+                        <Border.Effect>
+                            <DropShadowEffect Color="#F2A63C" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
+                        </Border.Effect>
+                    </Border>
+                </Canvas>
 
-                <!-- Player info: x=56, bottom 40px (top = 620 - 40 - 40 = 540)
+                <!-- Player info: x=56, bottom 40px
                      head 40x40 (nearest neighbor / aliased pixel scaling), nickname 16px 600, below "N ГБ памяти" 12px mute -->
-                <StackPanel Canvas.Left="56" Canvas.Top="540" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                            Margin="56,0,0,40" Orientation="Horizontal">
                     <Border Width="40" Height="40" CornerRadius="2" ClipToBounds="True" Background="#141E26" Margin="0,0,12,0">
                         <Image Source="{Binding PlayerAvatar}" Width="40" Height="40"
                                RenderOptions.BitmapScalingMode="NearestNeighbor"
@@ -395,7 +408,7 @@
                                    Margin="0,2,0,0" />
                     </StackPanel>
                 </StackPanel>
-            </Canvas>
+            </Grid>
 
             <!-- ============================================== -->
             <!-- 3. CONTENT AREA (BOUNDS: LEFT 340, RIGHT 56,  -->
@@ -965,6 +978,7 @@
                            FontWeight="Normal"
                            Foreground="{StaticResource MuteBrush}" />
             </StackPanel>
+            </Grid>
         </Grid>
     </Border>
 </Window>

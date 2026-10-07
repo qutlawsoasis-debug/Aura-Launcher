@@ -8,3 +8,4 @@ publish_standalone/
 aura_config.json
 *.pdb
 *.zip
+shots/

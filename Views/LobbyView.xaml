@@ -17,16 +17,16 @@
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
         <!-- Converter or DataTrigger styles for Code Cell bottom lines -->
-        <!-- Empty: 18% white (#2EFFFFFF) -->
-        <!-- Filled: ember 60% (#99F2A63C) -->
-        <!-- Current: ember (#F2A63C) with blinking caret 1s -->
+        <!-- Empty: 18% white -->
+        <!-- Filled: ember 60% -->
+        <!-- Current: ember with blinking caret 1s -->
         <Style x:Key="CodeCellBorderStyle" TargetType="Border">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="58" />
-            <Setter Property="Background" Value="#12FFFFFF" /> <!-- White 7% -->
+            <Setter Property="Background" Value="{DynamicResource Border}" /> <!-- White 7% -->
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="BorderThickness" Value="0,0,0,3" />
-            <Setter Property="BorderBrush" Value="#2EFFFFFF" /> <!-- 18% white -->
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" /> <!-- 18% white -->
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
 
@@ -55,7 +55,7 @@
                        LineStackingStrategy="BlockLineHeight"
                        Margin="0,6,0,6">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
             <TextBlock Text="Совместная игра по сети через защищённый туннель"
@@ -135,7 +135,7 @@
                                         <Style TargetType="Border" BasedOn="{StaticResource CodeCellBorderStyle}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCellFilled0}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#99F2A63C" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsCellCurrent0}" Value="True">
                                                     <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
@@ -162,7 +162,7 @@
                                         <Style TargetType="Border" BasedOn="{StaticResource CodeCellBorderStyle}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCellFilled1}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#99F2A63C" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsCellCurrent1}" Value="True">
                                                     <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
@@ -188,7 +188,7 @@
                                         <Style TargetType="Border" BasedOn="{StaticResource CodeCellBorderStyle}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCellFilled2}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#99F2A63C" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsCellCurrent2}" Value="True">
                                                     <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
@@ -214,7 +214,7 @@
                                         <Style TargetType="Border" BasedOn="{StaticResource CodeCellBorderStyle}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCellFilled3}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#99F2A63C" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsCellCurrent3}" Value="True">
                                                     <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
@@ -240,7 +240,7 @@
                                         <Style TargetType="Border" BasedOn="{StaticResource CodeCellBorderStyle}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCellFilled4}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#99F2A63C" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsCellCurrent4}" Value="True">
                                                     <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
@@ -266,7 +266,7 @@
                                         <Style TargetType="Border" BasedOn="{StaticResource CodeCellBorderStyle}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding IsCellFilled5}" Value="True">
-                                                    <Setter Property="BorderBrush" Value="#99F2A63C" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                                                 </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsCellCurrent5}" Value="True">
                                                     <Setter Property="BorderBrush" Value="{StaticResource EmberBrush}" />
@@ -309,13 +309,13 @@
                                 Margin="0,0,0,8" />
                     </WrapPanel>
 
-                    <!-- Error message under code line: 13px, #FF8A7A, disappears on typing -->
+                    <!-- Error message under code line: 13px, disappears on typing -->
                     <StackPanel Orientation="Vertical" Margin="0,0,0,16" Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="{Binding JoinErrorMessage}"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="13"
                                    FontWeight="Medium"
-                                   Foreground="#FF8A7A"
+                                   Foreground="{DynamicResource Danger}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,6" />
                         <Button Command="{Binding SendReportCommand}"
@@ -349,28 +349,28 @@
 
                     <!-- Six cells displaying LobbyCode (304px total width) -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
                             <TextBlock Text="{Binding CodeChar0}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
                             <TextBlock Text="{Binding CodeChar1}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
                             <TextBlock Text="{Binding CodeChar2}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
                             <TextBlock Text="{Binding CodeChar3}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="#99F2A63C">
+                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
                             <TextBlock Text="{Binding CodeChar4}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" BorderBrush="#99F2A63C">
+                        <Border Style="{StaticResource CodeCellBorderStyle}" BorderBrush="{DynamicResource AccentDim}">
                             <TextBlock Text="{Binding CodeChar5}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                     </StackPanel>
 
                     <!-- Status string with square 10x10 dot (radius 2):
-                         waiting ember pulsing 1.4s, ok #5FD39A static -->
+                         waiting ember pulsing 1.4s, ok static -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
                         <!-- 10x10 status square -->
                         <Border Width="10" Height="10" CornerRadius="2" Margin="0,0,10,0" VerticalAlignment="Center">
@@ -703,7 +703,7 @@
                                     </Grid.ColumnDefinitions>
 
                                     <!-- Head 40x40 nearest neighbor -->
-                                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="2" ClipToBounds="True" Background="#141E26">
+                                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="2" ClipToBounds="True" Background="{DynamicResource PanelRaised}">
                                         <Image Source="{Binding Avatar}" Width="40" Height="40"
                                                RenderOptions.BitmapScalingMode="NearestNeighbor"
                                                RenderOptions.EdgeMode="Aliased"

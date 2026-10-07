@@ -35,7 +35,7 @@
                        LineStackingStrategy="BlockLineHeight"
                        Margin="0,6,0,0">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
 

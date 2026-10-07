@@ -15,10 +15,10 @@
         <Style x:Key="FriendCodeCellStyle" TargetType="Border">
             <Setter Property="Width" Value="36" />
             <Setter Property="Height" Value="50" />
-            <Setter Property="Background" Value="#12FFFFFF" />
+            <Setter Property="Background" Value="{DynamicResource Border}" />
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="BorderThickness" Value="0,0,0,3" />
-            <Setter Property="BorderBrush" Value="#99F2A63C" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
             <Setter Property="Margin" Value="0,0,6,0" />
         </Style>
@@ -51,12 +51,12 @@
                        LineStackingStrategy="BlockLineHeight"
                        Margin="0,6,0,14">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
 
             <!-- Banner: "Лобби создано, ждём друзей" со ссылкой "Открыть лобби" -->
-            <Border Background="#142129" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
+            <Border Background="{DynamicResource PanelRaised}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
                     CornerRadius="3" Height="40" Margin="0,0,0,16"
                     Visibility="{Binding IsLobbyActiveBannerVisible, Converter={StaticResource BoolToVis}}">
                 <Grid Margin="12,0">
@@ -220,11 +220,11 @@
                          FontSize="22"
                          FontWeight="SemiBold"
                          Foreground="{StaticResource InkBrush}"
-                         Background="#12FFFFFF"
+                         Background="{DynamicResource Border}"
                          BorderBrush="{StaticResource LineInkBrush}"
                          BorderThickness="1"
                          CaretBrush="{StaticResource EmberBrush}"
-                         SelectionBrush="#80F2A63C"
+                         SelectionBrush="{DynamicResource AccentFaint}"
                          VerticalContentAlignment="Center"
                          Padding="10,0"
                          Margin="0,0,12,0" />
@@ -237,12 +237,12 @@
                         Content="Добавить" />
             </StackPanel>
 
-            <!-- Error under add friend field (#FF8A7A) -->
+            <!-- Error under add friend field -->
             <TextBlock Text="{Binding AddFriendErrorMessage}"
                        FontFamily="{StaticResource MainFont}"
                        FontSize="13"
                        FontWeight="Medium"
-                       Foreground="#FF8A7A"
+                       Foreground="{DynamicResource Danger}"
                        TextWrapping="Wrap"
                        Margin="0,4,0,8"
                        Visibility="{Binding HasAddFriendError, Converter={StaticResource BoolToVis}}" />
@@ -334,7 +334,7 @@
 
                                     <!-- 40px Head Avatar -->
                                     <Border Grid.Column="0" Width="40" Height="40" CornerRadius="2"
-                                            ClipToBounds="True" Background="#141E26" Margin="0,0,14,0"
+                                            ClipToBounds="True" Background="{DynamicResource PanelRaised}" Margin="0,0,14,0"
                                             VerticalAlignment="Center">
                                         <Image Source="{Binding Avatar}" Width="40" Height="40"
                                                RenderOptions.BitmapScalingMode="NearestNeighbor"
@@ -420,7 +420,7 @@
                                                         <Style.Triggers>
                                                             <Trigger Property="IsMouseOver" Value="True">
                                                                 <Setter Property="Opacity" Value="1.0" />
-                                                                <Setter Property="Foreground" Value="#FF8A7A" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource Danger}" />
                                                             </Trigger>
                                                             <DataTrigger Binding="{Binding IsConfirmingDelete}" Value="True">
                                                                 <Setter Property="Visibility" Value="Collapsed" />
@@ -433,8 +433,8 @@
                                             <!-- Inline Confirmation: "Удалить?" [Да] [Отмена] -->
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                                         Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="Удалить?" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="#FF8A7A" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                                <Button Command="{Binding ConfirmDeleteCommand}" Style="{StaticResource GhostBtn}" Content="Да" Foreground="#FF8A7A" FontWeight="SemiBold" FontSize="12" Margin="0,0,6,0" />
+                                                <TextBlock Text="Удалить?" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                                <Button Command="{Binding ConfirmDeleteCommand}" Style="{StaticResource GhostBtn}" Content="Да" Foreground="{DynamicResource Danger}" FontWeight="SemiBold" FontSize="12" Margin="0,0,6,0" />
                                                 <Button Command="{Binding CancelDeleteCommand}" Style="{StaticResource GhostBtn}" Content="Отмена" Foreground="{StaticResource MuteBrush}" FontSize="12" />
                                             </StackPanel>
                                         </Grid>

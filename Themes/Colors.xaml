@@ -1,0 +1,44 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Color definitions (accessible for DropShadowEffect, GradientStops, etc.) -->
+    <Color x:Key="ColorBgBase">#091015</Color>
+    <Color x:Key="ColorPanel">#0C141A</Color>
+    <Color x:Key="ColorPanelRaised">#141E26</Color>
+    <Color x:Key="ColorTextPrimary">#E8F0F8</Color>
+    <Color x:Key="ColorTextWhite">#FFFFFF</Color>
+    <Color x:Key="ColorAccent">#F2A63C</Color>
+    <Color x:Key="ColorAccentDim">#99F2A63C</Color>
+    <Color x:Key="ColorAccentFaint">#80F2A63C</Color>
+    <Color x:Key="ColorDanger">#FF8A7A</Color>
+    <Color x:Key="ColorSuccess">#5FD39A</Color>
+    <Color x:Key="ColorBorder">#12FFFFFF</Color>
+    <Color x:Key="ColorBorderStrong">#2EFFFFFF</Color>
+    <Color x:Key="ColorBorderSubtle">#1FFFFFFF</Color>
+    <Color x:Key="ColorShade">#000000</Color>
+    <Color x:Key="ColorShade40">#40000000</Color>
+    <Color x:Key="ColorShadeOverlay">#D6050C10</Color>
+    <Color x:Key="ColorMediaPlaceholder">#060E12</Color>
+    <Color x:Key="ColorBgBaseFadeStart">#E0071017</Color>
+    <Color x:Key="ColorBgBaseFadeEnd">#8C071017</Color>
+
+    <!-- Named SolidColorBrush resources for UI controls -->
+    <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" />
+    <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" />
+    <SolidColorBrush x:Key="PanelRaised" Color="{StaticResource ColorPanelRaised}" />
+    <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource ColorTextPrimary}" />
+    <SolidColorBrush x:Key="TextWhite" Color="{StaticResource ColorTextWhite}" />
+    <SolidColorBrush x:Key="Accent" Color="{StaticResource ColorAccent}" />
+    <SolidColorBrush x:Key="AccentDim" Color="{StaticResource ColorAccentDim}" />
+    <SolidColorBrush x:Key="AccentFaint" Color="{StaticResource ColorAccentFaint}" />
+    <SolidColorBrush x:Key="Danger" Color="{StaticResource ColorDanger}" />
+    <SolidColorBrush x:Key="Success" Color="{StaticResource ColorSuccess}" />
+    <SolidColorBrush x:Key="Border" Color="{StaticResource ColorBorder}" />
+    <SolidColorBrush x:Key="BorderStrong" Color="{StaticResource ColorBorderStrong}" />
+    <SolidColorBrush x:Key="BorderSubtle" Color="{StaticResource ColorBorderSubtle}" />
+    <SolidColorBrush x:Key="Shade" Color="{StaticResource ColorShade}" />
+    <SolidColorBrush x:Key="Shade40" Color="{StaticResource ColorShade40}" />
+    <SolidColorBrush x:Key="ShadeOverlay" Color="{StaticResource ColorShadeOverlay}" />
+    <SolidColorBrush x:Key="MediaPlaceholder" Color="{StaticResource ColorMediaPlaceholder}" />
+
+</ResourceDictionary>

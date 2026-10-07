@@ -34,7 +34,7 @@
                                        FontFamily="{StaticResource HeadingFont}"
                                        FontSize="28" FontWeight="SemiBold"
                                        Foreground="{StaticResource InkBrush}" />
-                            <Border Background="#1C2833" CornerRadius="4" Padding="8,2" Margin="14,0,0,0" VerticalAlignment="Center">
+                            <Border Background="{DynamicResource PanelRaised}" CornerRadius="4" Padding="8,2" Margin="14,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="Контент и данные"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="12" Foreground="{StaticResource EmberBrush}" />
@@ -44,22 +44,34 @@
                         <!-- SUB-NAVIGATION PILLS -->
                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                             <!-- 1. Worlds Tab -->
-                            <RadioButton Content="🗺️  Миры и бэкапы"
-                                         IsChecked="{Binding IsWorldsTabActive, Mode=TwoWay}"
+                            <RadioButton IsChecked="{Binding IsWorldsTabActive, Mode=TwoWay}"
                                          Command="{Binding SwitchSubTabCommand}" CommandParameter="Worlds"
-                                         Style="{StaticResource SubNavPillRadio}" Margin="0,0,8,0" />
+                                         Style="{StaticResource SubNavPillRadio}" Margin="0,0,8,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconMap}" Margin="0,0,8,0" />
+                                    <TextBlock Text="Миры и бэкапы" />
+                                </StackPanel>
+                            </RadioButton>
 
                             <!-- 2. Mods Tab -->
-                            <RadioButton Content="🧩  Моды и шейдеры"
-                                         IsChecked="{Binding IsModsTabActive, Mode=TwoWay}"
+                            <RadioButton IsChecked="{Binding IsModsTabActive, Mode=TwoWay}"
                                          Command="{Binding SwitchSubTabCommand}" CommandParameter="Mods"
-                                         Style="{StaticResource SubNavPillRadio}" Margin="0,0,8,0" />
+                                         Style="{StaticResource SubNavPillRadio}" Margin="0,0,8,0">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPuzzle}" Margin="0,0,8,0" />
+                                    <TextBlock Text="Моды и шейдеры" />
+                                </StackPanel>
+                            </RadioButton>
 
                             <!-- 3. Screenshots Tab -->
-                            <RadioButton Content="📸  Скриншоты"
-                                         IsChecked="{Binding IsScreenshotsTabActive, Mode=TwoWay}"
+                            <RadioButton IsChecked="{Binding IsScreenshotsTabActive, Mode=TwoWay}"
                                          Command="{Binding SwitchSubTabCommand}" CommandParameter="Screenshots"
-                                         Style="{StaticResource SubNavPillRadio}" />
+                                         Style="{StaticResource SubNavPillRadio}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Margin="0,0,8,0" />
+                                    <TextBlock Text="Скриншоты" />
+                                </StackPanel>
+                            </RadioButton>
                         </StackPanel>
                     </StackPanel>
 
@@ -69,8 +81,9 @@
                                 Style="{StaticResource GhostBtn}"
                                 ToolTip="Обновить все списки"
                                 Padding="10,6">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🔄 Обновить" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRefresh}" Margin="0,0,6,0" />
+                                <TextBlock Text="Обновить" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                             </StackPanel>
                         </Button>
                     </StackPanel>
@@ -89,7 +102,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Margin="0,0,0,12" Background="#0C141A" CornerRadius="6" Padding="14,10" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
+                    <Border Grid.Row="0" Margin="0,0,0,12" Background="{DynamicResource Panel}" CornerRadius="6" Padding="14,10" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -100,8 +113,12 @@
                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,14,0" />
                             <Button Grid.Column="1" Command="{Binding OpenBackupsFolderCommand}"
                                     Style="{StaticResource SecondaryBtn}"
-                                    Content="📁 Папка бэкапов"
-                                    Padding="12,5" FontSize="11" />
+                                    Padding="12,5">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolder}" Margin="0,0,6,0" />
+                                    <TextBlock Text="Папка бэкапов" FontSize="11" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </Border>
 
@@ -109,7 +126,7 @@
                     <ScrollViewer Grid.Row="1" behaviors:SmoothScroll.IsEnabled="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <!-- Empty message -->
-                            <Border Background="#0B1318" CornerRadius="8" Padding="24" Margin="0,20,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
+                            <Border Background="{DynamicResource Panel}" CornerRadius="8" Padding="24" Margin="0,20,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
                                     Visibility="{Binding WorldSaves.Count, Converter={StaticResource InverseIntToVis}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <TextBlock Text="Сохранённых миров пока нет"
@@ -125,7 +142,7 @@
                             <ItemsControl ItemsSource="{Binding WorldSaves}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="#0C141A" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,10">
+                                        <Border Background="{DynamicResource Panel}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,10">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto" />
@@ -134,7 +151,7 @@
                                                 </Grid.ColumnDefinitions>
 
                                                 <!-- World Icon / Default thumbnail -->
-                                                <Border Grid.Column="0" Width="54" Height="54" CornerRadius="4" ClipToBounds="True" Background="#141E26" Margin="0,0,14,0">
+                                                <Border Grid.Column="0" Width="54" Height="54" CornerRadius="4" ClipToBounds="True" Background="{DynamicResource PanelRaised}" Margin="0,0,14,0">
                                                     <Image Source="{Binding IconSource}" Stretch="UniformToFill"
                                                            RenderOptions.BitmapScalingMode="NearestNeighbor" />
                                                 </Border>
@@ -167,14 +184,22 @@
                                                     <Button Command="{Binding DataContext.CreateBackupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource PrimaryActionBtn}"
-                                                            Content="💾 Создать бэкап"
-                                                            Padding="12,7" FontSize="12" Margin="0,0,8,0" />
+                                                            Padding="12,7" Margin="0,0,8,0">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconBackup}" Margin="0,0,6,0" />
+                                                            <TextBlock Text="Создать бэкап" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Button>
 
                                                     <Button Command="{Binding DataContext.OpenWorldFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SecondaryBtn}"
-                                                            Content="📂 Папка"
-                                                            Padding="10,7" FontSize="12" />
+                                                            Padding="10,7">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Margin="0,0,6,0" />
+                                                            <TextBlock Text="Папка" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Button>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -195,7 +220,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- TOP SHADER PACK SELECTOR -->
-                    <Border Grid.Row="0" Margin="0,0,0,14" Background="#0C141A" CornerRadius="6" Padding="14,12" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
+                    <Border Grid.Row="0" Margin="0,0,0,14" Background="{DynamicResource Panel}" CornerRadius="6" Padding="14,12" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                         <StackPanel>
                             <Grid Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
@@ -211,7 +236,12 @@
                                                TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
                                 <Button Grid.Column="1" Command="{Binding OpenShadersFolderCommand}"
-                                        Style="{StaticResource SecondaryBtn}" Content="📂 Папка шейдеров" Padding="10,4" FontSize="11" />
+                                        Style="{StaticResource SecondaryBtn}" Padding="10,4">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Margin="0,0,6,0" />
+                                        <TextBlock Text="Папка шейдеров" FontSize="11" />
+                                    </StackPanel>
+                                </Button>
                             </Grid>
 
                             <!-- Shader pills -->
@@ -231,13 +261,14 @@
                                                     BorderThickness="1"
                                                     Background="{Binding IsActive, Converter={StaticResource BoolToEmberOrDarkBgConverter}}"
                                                     BorderBrush="{Binding IsActive, Converter={StaticResource BoolToEmberOrLineBorderConverter}}">
-                                                <StackPanel Orientation="Horizontal">
+                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}"
                                                                FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="Medium"
                                                                Foreground="{Binding IsActive, Converter={StaticResource BoolToInkOrDimBrushConverter}}" />
-                                                    <TextBlock Text="  ✓" FontFamily="{StaticResource MainFont}" FontSize="11"
-                                                               Foreground="{StaticResource EmberBrush}"
-                                                               Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}" />
+                                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCheck}"
+                                                          Width="12" Height="12" Margin="6,0,0,0"
+                                                          Stroke="{StaticResource EmberBrush}"
+                                                          Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
                                             </Border>
                                         </Button>
@@ -262,24 +293,35 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Search Box with watermark and orange caret -->
-                            <TextBox Grid.Column="0" Text="{Binding SearchModText, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource AuraTextBox}"
-                                     Tag="🔍 Поиск мода по названию..."
-                                     Padding="12,8" Margin="0,0,10,0"
-                                     ToolTip="Поиск мода по названию..." />
+                            <Grid Grid.Column="0" Margin="0,0,10,0">
+                                <TextBox Text="{Binding SearchModText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource AuraTextBox}"
+                                         Tag="Поиск мода по названию..."
+                                         Padding="32,8,12,8"
+                                         ToolTip="Поиск мода по названию..." />
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSearch}"
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                      Margin="10,0,0,0" Width="14" Height="14"
+                                      Stroke="{StaticResource DimInkBrush}"
+                                      IsHitTestVisible="False" />
+                            </Grid>
 
                             <!-- Open folder button -->
                             <Button Grid.Column="1" Command="{Binding OpenModsFolderCommand}"
                                     Style="{StaticResource SecondaryBtn}"
-                                    Content="📂 Папка mods"
-                                    Padding="12,6" FontSize="12" />
+                                    Padding="12,6">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Margin="0,0,6,0" />
+                                    <TextBlock Text="Папка mods" FontSize="12" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
 
                         <!-- Mods Virtualized List -->
                         <ScrollViewer Grid.Row="1" behaviors:SmoothScroll.IsEnabled="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
                                 <!-- Empty state when no mods match search -->
-                                <Border Background="#0B1318" CornerRadius="8" Padding="24" Margin="0,16,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
+                                <Border Background="{DynamicResource Panel}" CornerRadius="8" Padding="24" Margin="0,16,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
                                         Visibility="{Binding FilteredMods.Count, Converter={StaticResource InverseIntToVis}}">
                                     <StackPanel HorizontalAlignment="Center">
                                         <TextBlock Text="Моды не найдены"
@@ -294,7 +336,7 @@
                                 <ItemsControl ItemsSource="{Binding FilteredMods}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#0A1217" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1" Padding="8,8" Margin="0,0,0,2">
+                                            <Border Background="{DynamicResource Panel}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1" Padding="8,8" Margin="0,0,0,2">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*" />
@@ -354,7 +396,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Margin="0,0,0,12" Background="#0C141A" CornerRadius="6" Padding="14,10" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
+                    <Border Grid.Row="0" Margin="0,0,0,12" Background="{DynamicResource Panel}" CornerRadius="6" Padding="14,10" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -371,8 +413,12 @@
                             </StackPanel>
                             <Button Grid.Column="1" Command="{Binding OpenScreenshotsFolderCommand}"
                                     Style="{StaticResource SecondaryBtn}"
-                                    Content="📂 Папка скриншотов"
-                                    Padding="12,5" FontSize="11" />
+                                    Padding="12,5">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Margin="0,0,6,0" />
+                                    <TextBlock Text="Папка скриншотов" FontSize="11" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </Border>
 
@@ -380,7 +426,7 @@
                     <ScrollViewer Grid.Row="1" behaviors:SmoothScroll.IsEnabled="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
                             <!-- Empty message -->
-                            <Border Background="#0B1318" CornerRadius="8" Padding="24" Margin="0,20,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
+                            <Border Background="{DynamicResource Panel}" CornerRadius="8" Padding="24" Margin="0,20,0,0" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1"
                                     Visibility="{Binding Screenshots.Count, Converter={StaticResource InverseIntToVis}}">
                                 <StackPanel HorizontalAlignment="Center">
                                     <TextBlock Text="Скриншотов пока нет"
@@ -400,16 +446,16 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Width="196" Margin="0,0,12,14" Background="#0C141A" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
+                                        <Border Width="196" Margin="0,0,12,14" Background="{DynamicResource Panel}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
                                             <StackPanel>
                                                 <!-- Image Preview Button -->
                                                 <Button Command="{Binding DataContext.PreviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource GhostBtn}"
                                                         Padding="0">
-                                                    <Grid Width="196" Height="110" Background="#060E12">
+                                                    <Grid Width="196" Height="110" Background="{DynamicResource MediaPlaceholder}">
                                                         <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                                                        <Border Background="#40000000" Opacity="0" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                        <Border Background="{DynamicResource Shade40}" Opacity="0" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
                                                                     <Style.Triggers>
@@ -419,13 +465,16 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Border.Style>
-                                                            <TextBlock Text="🔍 Просмотр" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSearch}" Stroke="{DynamicResource TextWhite}" Margin="0,0,6,0" />
+                                                                <TextBlock Text="Просмотр" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextWhite}" VerticalAlignment="Center" />
+                                                            </StackPanel>
                                                         </Border>
                                                     </Grid>
                                                 </Button>
 
                                                 <!-- Footer info & buttons -->
-                                                <Border Padding="8,6" Background="#091015">
+                                                <Border Padding="8,6" Background="{DynamicResource BgBase}">
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="*" />
@@ -443,16 +492,16 @@
                                                                     CommandParameter="{Binding}"
                                                                     Style="{StaticResource GhostBtn}"
                                                                     ToolTip="Скопировать в буфер обмена (для вставки в Discord/Telegram)"
-                                                                    Padding="4,2">
-                                                                <TextBlock Text="📋" FontSize="13" />
+                                                                    Padding="5,4">
+                                                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCopy}" Width="13" Height="13" />
                                                             </Button>
                                                             <!-- Delete -->
                                                             <Button Command="{Binding DataContext.DeleteScreenshotCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding}"
                                                                     Style="{StaticResource GhostBtn}"
                                                                     ToolTip="Удалить скриншот"
-                                                                    Padding="4,2" Margin="4,0,0,0">
-                                                                <TextBlock Text="🗑️" FontSize="12" />
+                                                                    Padding="5,4" Margin="4,0,0,0">
+                                                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconTrash}" Width="13" Height="13" />
                                                             </Button>
                                                         </StackPanel>
                                                     </Grid>
@@ -469,7 +518,7 @@
         </Grid>
 
         <!-- FULLSCREEN SCREENSHOT PREVIEW MODAL LIGHTBOX -->
-        <Border Background="#D6050C10" Panel.ZIndex="100"
+        <Border Background="{DynamicResource ShadeOverlay}" Panel.ZIndex="100"
                 Visibility="{Binding IsScreenshotPreviewOpen, Converter={StaticResource BoolToVis}}"
                 ClipToBounds="True">
             <Grid Margin="32">
@@ -490,22 +539,42 @@
                                    Foreground="{StaticResource MuteBrush}" />
                     </StackPanel>
                     <Button HorizontalAlignment="Right" Command="{Binding CloseScreenshotPreviewCommand}"
-                            Style="{StaticResource GhostBtn}" Content="✕ Закрыть" FontSize="14" Foreground="{StaticResource DimInkBrush}" />
+                            Style="{StaticResource GhostBtn}" Padding="8,4">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconClose}" Width="12" Height="12" Margin="0,0,6,0" />
+                            <TextBlock Text="Закрыть" FontSize="14" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
 
                 <!-- Image -->
-                <Border Grid.Row="1" Background="#000000" CornerRadius="4" ClipToBounds="True">
+                <Border Grid.Row="1" Background="{DynamicResource Shade}" CornerRadius="4" ClipToBounds="True">
                     <Image Source="{Binding FullPreviewImage}" Stretch="Uniform" />
                 </Border>
 
                 <!-- Bottom Actions -->
                 <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,14,0,0">
                     <Button Command="{Binding CopyScreenshotCommand}" CommandParameter="{Binding SelectedScreenshot}"
-                            Style="{StaticResource PrimaryActionBtn}" Content="📋 Скопировать в буфер обмена" Padding="16,8" FontSize="13" Margin="0,0,12,0" />
+                            Style="{StaticResource PrimaryActionBtn}" Padding="16,8" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCopy}" Margin="0,0,8,0" />
+                            <TextBlock Text="Скопировать в буфер обмена" FontSize="13" />
+                        </StackPanel>
+                    </Button>
                     <Button Command="{Binding OpenScreenshotFileCommand}" CommandParameter="{Binding SelectedScreenshot}"
-                            Style="{StaticResource SecondaryBtn}" Content="🖼️ Открыть файл" Padding="14,8" FontSize="13" Margin="0,0,12,0" />
+                            Style="{StaticResource SecondaryBtn}" Padding="14,8" Margin="0,0,12,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconImage}" Margin="0,0,8,0" />
+                            <TextBlock Text="Открыть файл" FontSize="13" />
+                        </StackPanel>
+                    </Button>
                     <Button Command="{Binding DeleteScreenshotCommand}" CommandParameter="{Binding SelectedScreenshot}"
-                            Style="{StaticResource SecondaryBtn}" Content="🗑️ Удалить" Padding="14,8" FontSize="13" />
+                            Style="{StaticResource SecondaryBtn}" Padding="14,8">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconTrash}" Margin="0,0,8,0" />
+                            <TextBlock Text="Удалить" FontSize="13" />
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

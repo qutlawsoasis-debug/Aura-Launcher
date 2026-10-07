@@ -26,9 +26,9 @@
                 ClipToBounds="True"
                 BorderBrush="{StaticResource LineInkBrush}"
                 BorderThickness="1"
-                Background="#071017">
+                Background="{DynamicResource BgBase}">
             <Border.Effect>
-                <DropShadowEffect Color="#000000" BlurRadius="20" Opacity="0.8" Direction="270" ShadowDepth="4" />
+                <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="20" Opacity="0.8" Direction="270" ShadowDepth="4" />
             </Border.Effect>
 
             <Grid>
@@ -42,20 +42,20 @@
                 <Border>
                     <Border.Background>
                         <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
-                            <GradientStop Color="#E0071017" Offset="0" />
-                            <GradientStop Color="#8C071017" Offset="1" />
+                            <GradientStop Color="{DynamicResource ColorBgBaseFadeStart}" Offset="0" />
+                            <GradientStop Color="{DynamicResource ColorBgBaseFadeEnd}" Offset="1" />
                         </LinearGradientBrush>
                     </Border.Background>
                 </Border>
 
                 <!-- 3. Top-left titles: "Aura" + version transition -->
                 <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Margin="24,20,0,0">
-                    <!-- Title: Oswald 600, 40px, белый (#FFFFFF) -->
+                    <!-- Title: Oswald 600, 40px, белый -->
                     <TextBlock Text="Aura"
                                FontFamily="{StaticResource HeadingFont}"
                                FontWeight="SemiBold"
                                FontSize="40"
-                               Foreground="#FFFFFF"
+                               Foreground="{DynamicResource TextWhite}"
                                LineHeight="38"
                                LineStackingStrategy="BlockLineHeight" />
 
@@ -70,7 +70,7 @@
 
                 <!-- 4. Bottom-left status & error controls -->
                 <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="24,0,0,16">
-                    <!-- Status: Onest 500 14px (Normal/Ember/Ink or #FF8A7A on error) -->
+                    <!-- Status: Onest 500 14px (Normal/Ember/Ink or Danger on error) -->
                     <TextBlock Text="{Binding StatusText}"
                                FontFamily="{StaticResource MainFont}"
                                FontWeight="Medium"
@@ -80,7 +80,7 @@
                                 <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasError}" Value="True">
-                                        <Setter Property="Foreground" Value="#FF8A7A" />
+                                        <Setter Property="Foreground" Value="{DynamicResource Danger}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -120,7 +120,7 @@
                 </StackPanel>
 
                 <!-- 5. Bottom 4px progress line across entire window width -->
-                <Grid Height="4" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="#1FFFFFFF">
+                <Grid Height="4" VerticalAlignment="Bottom" HorizontalAlignment="Stretch" Background="{DynamicResource BorderSubtle}">
                     <!-- A. Definite progress bar (ember fill, smooth transitions) -->
                     <Border x:Name="DefiniteProgressBar"
                             HorizontalAlignment="Left"
@@ -131,7 +131,7 @@
                             <Style TargetType="Border">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding HasError}" Value="True">
-                                        <Setter Property="Background" Value="#FF8A7A" />
+                                        <Setter Property="Background" Value="{DynamicResource Danger}" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -163,11 +163,11 @@
                         </Border>
                     </Canvas>
 
-                    <!-- C. Error state progress line: #FF8A7A across full width -->
+                    <!-- C. Error state progress line: Danger across full width -->
                     <Border x:Name="ErrorProgressBar"
                             HorizontalAlignment="Stretch"
                             Height="4"
-                            Background="#FF8A7A"
+                            Background="{DynamicResource Danger}"
                             Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}" />
                 </Grid>
             </Grid>

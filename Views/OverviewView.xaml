@@ -29,7 +29,7 @@
                            FontWeight="Normal"
                            Foreground="{StaticResource DimInkBrush}">
                     <TextBlock.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                        <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                     </TextBlock.Effect>
                 </TextBlock>
                 <Border Width="1" Height="12" Background="{StaticResource LineInkBrush}" Margin="10,0,10,0" VerticalAlignment="Center" />
@@ -42,7 +42,7 @@
                                Foreground="{StaticResource EmberBrush}"
                                TextDecorations="Underline">
                         <TextBlock.Effect>
-                            <DropShadowEffect Color="#000000" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
+                            <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
                         </TextBlock.Effect>
                     </TextBlock>
                 </Button>
@@ -56,7 +56,7 @@
                        Foreground="{StaticResource MuteBrush}"
                        Margin="0,0,0,14">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
+                    <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="8" Opacity="0.6" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
 
@@ -98,7 +98,7 @@
                                MaxWidth="300"
                                TextWrapping="Wrap">
                         <TextBlock.Effect>
-                            <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                            <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                         </TextBlock.Effect>
                     </TextBlock>
                 </StackPanel>

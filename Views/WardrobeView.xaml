@@ -35,7 +35,7 @@
                        LineStackingStrategy="BlockLineHeight"
                        Margin="0,6,0,6">
                 <TextBlock.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                 </TextBlock.Effect>
             </TextBlock>
             <TextBlock Text="Управление профилем и внешним видом персонажа"
@@ -67,7 +67,7 @@
 
                     <!-- Soft oval shadow under feet -->
                     <Ellipse Width="96" Height="8"
-                             Fill="#40000000"
+                             Fill="{DynamicResource Shade40}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Bottom"
                              Margin="0,0,0,14" />
@@ -282,7 +282,7 @@
                            LineHeight="18"
                            Margin="0,0,0,12" />
 
-                <!-- Status message in OkBrush (#5FD39A) for success or BadBrush (#FF8A7A) for error, 13px -->
+                <!-- Status message in OkBrush for success or BadBrush for error, 13px -->
                 <TextBlock Text="{Binding StatusMessage}"
                            FontFamily="{StaticResource MainFont}"
                            FontSize="13"

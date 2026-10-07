@@ -2135,6 +2135,83 @@ public static class SceneDiagnostics
         encoder.Save(fs);
     }
 
+    public static async Task<bool> RunColorsTestAsync(MainWindow window)
+    {
+        try
+        {
+            await Task.Delay(1000);
+            var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
+            if (mainVm == null) return false;
+
+            string shotsDir = ResolveShotsDir();
+            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+            try { Directory.CreateDirectory(brainDir); } catch { }
+
+            void SaveShot(string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(window, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+            }
+
+            void SaveWindowShot(Window targetWin, string fileName)
+            {
+                string localPath = Path.Combine(shotsDir, fileName);
+                CaptureWindowToPng(targetWin, localPath);
+                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
+                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+            }
+
+            // 1. Lobby
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Lobby"));
+            await Task.Delay(800);
+            SaveShot("lobby.png");
+
+            // 2. Friends
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Friends"));
+            await Task.Delay(800);
+            SaveShot("friends.png");
+
+            // 3. Wardrobe
+            window.Dispatcher.Invoke(() => mainVm.SwitchTab("Wardrobe"));
+            await Task.Delay(800);
+            SaveShot("wardrobe.png");
+
+            // 4. Update Window
+            UpdateWindowViewModel? updateVm = null;
+            UpdateWindow? updateWin = null;
+            window.Dispatcher.Invoke(() =>
+            {
+                updateVm = new UpdateWindowViewModel(
+                    App.Services.GetRequiredService<ILauncherUpdateService>(),
+                    onCloseRequested: () => { },
+                    onRestoreMainWindow: () => { window.Show(); });
+                updateWin = new UpdateWindow
+                {
+                    DataContext = updateVm
+                };
+                window.Hide();
+                updateWin.Show();
+                updateVm.SetFakeState("downloading");
+            });
+            await Task.Delay(800);
+            if (updateWin != null)
+            {
+                SaveWindowShot(updateWin, "update_window.png");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[COLORS-TEST: ERROR] {ex}");
+            return false;
+        }
+    }
+
     public static async Task<bool> RunIconSelfTestAsync(MainWindow mainWindow)
     {
         try
