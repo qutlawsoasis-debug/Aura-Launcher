@@ -1765,22 +1765,33 @@ public class MainViewModel : ObservableObject
     public void OpenUpdateWindow()
     {
         var mainWin = System.Windows.Application.Current.MainWindow;
-        var updateVm = new UpdateWindowViewModel(
+        Views.StartupWindow? splashWin = null;
+        var startupVm = new StartupWindowViewModel(
             _launcherUpdateService,
-            onCloseRequested: () => { },
-            onRestoreMainWindow: () =>
+            onLaunchMainRequested: () =>
             {
-                if (mainWin != null)
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
-                    mainWin.Show();
-                    mainWin.Activate();
-                }
+                    splashWin?.Close();
+                    if (mainWin != null)
+                    {
+                        mainWin.Show();
+                        mainWin.Activate();
+                    }
+                });
             },
-            targetVersion: _pendingNewVersion);
+            onCloseRequested: () =>
+            {
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    splashWin?.Close();
+                    System.Windows.Application.Current.Shutdown(0);
+                });
+            });
 
-        var updateWin = new Views.UpdateWindow
+        splashWin = new Views.StartupWindow
         {
-            DataContext = updateVm
+            DataContext = startupVm
         };
 
         if (mainWin != null)
@@ -1788,8 +1799,8 @@ public class MainViewModel : ObservableObject
             mainWin.Hide();
         }
 
-        updateWin.Show();
-        _ = updateVm.StartUpdateFlowAsync();
+        splashWin.Show();
+        _ = startupVm.StartStartupFlowAsync();
     }
 
     public void PromptSendReport(string? errorText = null)

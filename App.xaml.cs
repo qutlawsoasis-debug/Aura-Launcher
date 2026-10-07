@@ -186,7 +186,7 @@ public partial class App : Application
                         {
                             if (splashWin != null)
                             {
-                                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(220));
+                                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(250));
                                 fadeOut.Completed += (s, ev) =>
                                 {
                                     splashWin.Close();
@@ -337,6 +337,7 @@ public partial class App : Application
         }
         catch { }
 
+#if DEBUG
         if (!string.IsNullOrWhiteSpace(fakeUpdateUiMode))
         {
             _ = Task.Run(async () =>
@@ -545,6 +546,7 @@ public partial class App : Application
                 Environment.Exit(success ? 0 : 1);
             });
         }
+#endif
     }
 
     private static void ConfigureServices(IServiceCollection services, bool useFakeTunnel = false)

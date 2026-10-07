@@ -4,6 +4,8 @@ using System.IO;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
 using AuraLauncher.Core;
 using AuraLauncher.Models;
 using AuraLauncher.Services.Interfaces;
@@ -12,15 +14,20 @@ namespace AuraLauncher.ViewModels;
 
 public class StartupWindowViewModel : ObservableObject
 {
+    private static readonly Brush DefaultTextPrimary = new SolidColorBrush(Color.FromRgb(0xE8, 0xF0, 0xF8));
+    private static readonly Brush DefaultAccent = new SolidColorBrush(Color.FromRgb(0xF2, 0xA6, 0x3C));
+
     private readonly ILauncherUpdateService _launcherUpdateService;
     private readonly Action _onLaunchMainRequested;
     private readonly Action _onCloseRequested;
 
-    private string _statusText = "Проверка обновления.";
+    private string _statusText = "Проверка обновления";
+    private string _dotsText = "";
+    private Brush _statusForeground = DefaultTextPrimary;
     private double _progressValue = 0;
     private bool _isProgressVisible = false;
     private string _progressPercentText = "";
-    private string _versionText = "beta 1.0.32";
+    private string _versionText = "beta 1.0.33";
     private bool _isFlowRunning = false;
     private CancellationTokenSource? _flowCts;
 
@@ -30,6 +37,18 @@ public class StartupWindowViewModel : ObservableObject
         set => SetProperty(ref _statusText, value);
     }
 
+    public string DotsText
+    {
+        get => _dotsText;
+        set => SetProperty(ref _dotsText, value);
+    }
+
+    public Brush StatusForeground
+    {
+        get => _statusForeground;
+        set => SetProperty(ref _statusForeground, value);
+    }
+
     public double ProgressValue
     {
         get => _progressValue;
@@ -37,10 +56,13 @@ public class StartupWindowViewModel : ObservableObject
         {
             if (SetProperty(ref _progressValue, value))
             {
+                OnPropertyChanged(nameof(ProgressBarWidth));
                 ProgressPercentText = $"{Math.Round(value)}%";
             }
         }
     }
+
+    public double ProgressBarWidth => Math.Max(0, Math.Min(340, _progressValue * 3.4));
 
     public bool IsProgressVisible
     {
@@ -69,7 +91,42 @@ public class StartupWindowViewModel : ObservableObject
         _onLaunchMainRequested = onLaunchMainRequested ?? throw new ArgumentNullException(nameof(onLaunchMainRequested));
         _onCloseRequested = onCloseRequested ?? throw new ArgumentNullException(nameof(onCloseRequested));
 
+        ResolveResources();
         ResolveVersionText();
+    }
+
+    private void ResolveResources()
+    {
+        try
+        {
+            if (Application.Current != null)
+            {
+                if (Application.Current.TryFindResource("TextPrimary") is Brush tp)
+                {
+                    _statusForeground = tp;
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void SetStatusColor(bool isAccent)
+    {
+        try
+        {
+            if (Application.Current != null)
+            {
+                string key = isAccent ? "Accent" : "TextPrimary";
+                if (Application.Current.TryFindResource(key) is Brush brush)
+                {
+                    StatusForeground = brush;
+                    return;
+                }
+            }
+        }
+        catch { }
+
+        StatusForeground = isAccent ? DefaultAccent : DefaultTextPrimary;
     }
 
     private void ResolveVersionText()
@@ -106,7 +163,7 @@ public class StartupWindowViewModel : ObservableObject
         }
         catch { }
 
-        VersionText = "beta 1.0.32";
+        VersionText = "beta 1.0.33";
     }
 
     public async Task StartStartupFlowAsync()
@@ -122,9 +179,14 @@ public class StartupWindowViewModel : ObservableObject
 
         try
         {
-            // 1. Анимация точек при проверке: «Проверка обновления.» -> «..» -> «...»
+            // 1. Начальное: «Проверка обновления» + анимированные точки каждые 0.4s
+            StatusText = "Проверка обновления";
+            DotsText = ".";
+            SetStatusColor(isAccent: false);
+            IsProgressVisible = false;
+
             using var dotsCts = new CancellationTokenSource();
-            var dotsTask = AnimateDotsAsync("Проверка обновления", dotsCts.Token);
+            var dotsTask = AnimateDotsAsync(dotsCts.Token);
 
             string? newVersion = null;
             bool checkSucceeded = true;
@@ -140,7 +202,7 @@ public class StartupWindowViewModel : ObservableObject
                 }
                 else
                 {
-                    // В dev-режиме даем спиннеру показаться
+                    // В dev-режиме даем сцене показаться
                     await Task.Delay(1200, timeoutCts.Token);
                 }
             }
@@ -151,18 +213,23 @@ public class StartupWindowViewModel : ObservableObject
 
             dotsCts.Cancel();
             try { await dotsTask; } catch { }
+            DotsText = "";
 
             if (!checkSucceeded)
             {
-                // Если проверка не удалась (нет сети): «Не удалось проверить обновления», через 2 сек продолжить запуск без обновления.
+                // Ошибка сети/нет связи: «Не удалось проверить обновления», через 2s запуск без обновления
                 StatusText = "Не удалось проверить обновления";
+                DotsText = "";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
                 await Task.Delay(2000, ct);
             }
             else if (!string.IsNullOrWhiteSpace(newVersion))
             {
-                // Есть обновление: «Загрузка обновления» + тонкая полоса прогресса amber и процент; затем «Установка...» и автоматический перезапуск
+                // Если есть обновление: «Загрузка обновления», тонкий Accent-прогрессбар 2px под сценой + процент числом, затем «Установка...» -> автоперезапуск
                 StatusText = "Загрузка обновления";
+                DotsText = "";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = true;
                 ProgressValue = 0;
 
@@ -176,6 +243,7 @@ public class StartupWindowViewModel : ObservableObject
                 if (updateResult.Status == LauncherUpdateStatus.UpdatedRestarting)
                 {
                     StatusText = "Установка...";
+                    DotsText = "";
                     IsProgressVisible = false;
                     await Task.Delay(1200, ct);
                     _onCloseRequested();
@@ -184,31 +252,37 @@ public class StartupWindowViewModel : ObservableObject
                 else
                 {
                     StatusText = "Не удалось обновить";
+                    DotsText = "";
                     IsProgressVisible = false;
                     await Task.Delay(1500, ct);
                 }
             }
             else
             {
-                // Обновлений нет: «Установлено последнее обновление!» (держится около 1 сек)
+                // Если обновлений нет: «Установлено последнее обновление!» (Accent, ~1s)
                 StatusText = "Установлено последнее обновление!";
+                DotsText = "";
+                SetStatusColor(isAccent: true);
                 IsProgressVisible = false;
                 await Task.Delay(1000, ct);
             }
 
-            // Минимальное время показа окна 1.5 сек, чтобы оно не мигало на быстрой сети
+            // Минимальное время показа: 1.5s (даже если проверка мгновенная), чтобы окно не мелькало
             long elapsedMs = stopwatch.ElapsedMilliseconds;
             if (elapsedMs < 1500)
             {
                 await Task.Delay((int)(1500 - elapsedMs), ct);
             }
 
-            // Затем «Запуск лаунчера.» → «..» → «...» (около 1 сек), после чего окно плавно гаснет и открывается главное окно
+            // «Запуск лаунчера» с точками (~1s) -> плавное угасание окна (Opacity 250ms) -> открытие главного окна
+            StatusText = "Запуск лаунчера";
+            SetStatusColor(isAccent: false);
             using var launchDotsCts = new CancellationTokenSource();
-            var launchDotsTask = AnimateDotsAsync("Запуск лаунчера", launchDotsCts.Token);
+            var launchDotsTask = AnimateDotsAsync(launchDotsCts.Token);
             await Task.Delay(1000, ct);
             launchDotsCts.Cancel();
             try { await launchDotsTask; } catch { }
+            DotsText = "";
 
             _onLaunchMainRequested();
         }
@@ -222,16 +296,16 @@ public class StartupWindowViewModel : ObservableObject
         }
     }
 
-    private async Task AnimateDotsAsync(string baseText, CancellationToken token)
+    private async Task AnimateDotsAsync(CancellationToken token)
     {
         int dots = 1;
         while (!token.IsCancellationRequested)
         {
-            StatusText = baseText + new string('.', dots);
+            DotsText = new string('.', dots);
             dots = (dots % 3) + 1;
             try
             {
-                await Task.Delay(320, token);
+                await Task.Delay(400, token);
             }
             catch (OperationCanceledException)
             {
@@ -246,29 +320,41 @@ public class StartupWindowViewModel : ObservableObject
         switch (state.ToLowerInvariant())
         {
             case "checking":
-                StatusText = "Проверка обновления...";
+                StatusText = "Проверка обновления";
+                DotsText = "...";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
                 break;
             case "latest":
             case "uptodate":
                 StatusText = "Установлено последнее обновление!";
+                DotsText = "";
+                SetStatusColor(isAccent: true);
                 IsProgressVisible = false;
                 break;
             case "downloading":
                 StatusText = "Загрузка обновления";
+                DotsText = "";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = true;
                 ProgressValue = 63;
                 break;
             case "launching":
-                StatusText = "Запуск лаунчера...";
+                StatusText = "Запуск лаунчера";
+                DotsText = "...";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
                 break;
             case "error":
                 StatusText = "Не удалось проверить обновления";
+                DotsText = "";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
                 break;
             case "installing":
                 StatusText = "Установка...";
+                DotsText = "";
+                SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
                 break;
         }

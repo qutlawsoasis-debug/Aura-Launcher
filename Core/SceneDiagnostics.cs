@@ -126,6 +126,7 @@ public static class SceneDiagnostics
         }, DispatcherPriority.Render);
     }
 
+#if DEBUG
     public static async Task<bool> RunSelfTestShotsAsync(MainWindow window)
     {
         try
@@ -396,12 +397,12 @@ public static class SceneDiagnostics
             await Task.Delay(500);
 
             string shotsDir = ResolveShotsDir();
-            var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var artifactDir = ResolveArtifactDir();
 
             string initialShot = Path.Combine(shotsDir, "clean_host_lobby_initial.png");
             CaptureWindowToPng(window, initialShot);
             App.Log($"[LIVE-TEST-LOBBY] Captured initial lobby UI: {initialShot}");
-            if (Directory.Exists(artifactDir))
+            if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
             {
                 try { File.Copy(initialShot, Path.Combine(artifactDir, "clean_host_lobby_initial.png"), true); } catch { }
             }
@@ -422,7 +423,7 @@ public static class SceneDiagnostics
             string createdShot = Path.Combine(shotsDir, "clean_host_lobby_created.png");
             CaptureWindowToPng(window, createdShot);
             App.Log($"[LIVE-TEST-LOBBY] Captured lobby created UI: {createdShot}");
-            if (Directory.Exists(artifactDir))
+            if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
             {
                 try { File.Copy(createdShot, Path.Combine(artifactDir, "clean_host_lobby_created.png"), true); } catch { }
             }
@@ -441,7 +442,7 @@ public static class SceneDiagnostics
             string openShot = Path.Combine(shotsDir, "clean_host_lobby_open.png");
             CaptureWindowToPng(window, openShot);
             App.Log($"[LIVE-TEST-LOBBY] Captured lobby open UI: {openShot}");
-            if (Directory.Exists(artifactDir))
+            if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
             {
                 try { File.Copy(openShot, Path.Combine(artifactDir, "clean_host_lobby_open.png"), true); } catch { }
             }
@@ -830,19 +831,19 @@ public static class SceneDiagnostics
             await RunRapidTabSwitchStressTestAsync(window);
 
             string shotsDir = ResolveShotsDir();
-            var artifactDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
+            var artifactDir = ResolveArtifactDir();
+            var repoShotsDir = ResolveRepoShotsDir();
             try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
             void SaveShot(string fileName)
             {
                 string path = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(window, path);
-                if (Directory.Exists(artifactDir))
+                if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
                 {
                     try { File.Copy(path, Path.Combine(artifactDir, fileName), true); } catch { }
                 }
-                if (Directory.Exists(repoShotsDir))
+                if (!string.IsNullOrWhiteSpace(repoShotsDir) && Directory.Exists(repoShotsDir))
                 {
                     try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
                 }
@@ -1130,8 +1131,8 @@ public static class SceneDiagnostics
         try
         {
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
             var frameBitmaps = new List<RenderTargetBitmap>();
@@ -1230,6 +1231,47 @@ public static class SceneDiagnostics
         }
     }
 
+        private static string? ResolveArtifactDir()
+    {
+        var env = Environment.GetEnvironmentVariable("AURA_ARTIFACT_DIR");
+        if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
+        return null;
+    }
+
+    private static string? ResolveRepoShotsDir()
+    {
+        var env = Environment.GetEnvironmentVariable("AURA_REPO_SHOTS_DIR");
+        if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
+        var candidates = new[]
+        {
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shots"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "shots"),
+            Path.Combine(Directory.GetCurrentDirectory(), "shots")
+        };
+        foreach (var c in candidates)
+        {
+            try { if (Directory.Exists(c)) return Path.GetFullPath(c); } catch { }
+        }
+        return null;
+    }
+
+    private static string? ResolveArtifactsScreensDir()
+    {
+        var env = Environment.GetEnvironmentVariable("AURA_ARTIFACTS_SCREENS_DIR");
+        if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
+        var candidates = new[]
+        {
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "artifacts_screens"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "artifacts_screens"),
+            Path.Combine(Directory.GetCurrentDirectory(), "artifacts_screens")
+        };
+        foreach (var c in candidates)
+        {
+            try { if (Directory.Exists(c)) return Path.GetFullPath(c); } catch { }
+        }
+        return null;
+    }
+
     private static string ResolveShotsDir()
     {
         var args = Environment.GetCommandLineArgs();
@@ -1309,8 +1351,8 @@ public static class SceneDiagnostics
         await Task.Delay(1000);
 
         string shotsDir = ResolveShotsDir();
-        var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-        var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+        var repoShotsDir = ResolveRepoShotsDir();
+        var brainDir = ResolveArtifactDir();
         try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
         var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
@@ -1350,17 +1392,17 @@ public static class SceneDiagnostics
         }
 
         // Для оконных состояний: checking, downloading (63%), error, animation
-        UpdateWindowViewModel? updateVm = null;
-        UpdateWindow? updateWin = null;
+        StartupWindowViewModel? updateVm = null;
+        StartupWindow? updateWin = null;
 
         window.Dispatcher.Invoke(() =>
         {
-            updateVm = new UpdateWindowViewModel(
+            updateVm = new StartupWindowViewModel(
                 App.Services.GetRequiredService<ILauncherUpdateService>(),
-                onCloseRequested: () => { },
-                onRestoreMainWindow: () => { window.Show(); });
+                onLaunchMainRequested: () => { window.Show(); },
+                onCloseRequested: () => { });
             
-            updateWin = new UpdateWindow
+            updateWin = new StartupWindow
             {
                 DataContext = updateVm
             };
@@ -1469,13 +1511,13 @@ public static class SceneDiagnostics
         return false;
     }
 
-    public static async Task RecordUpdateSequenceAsync(MainWindow mainWindow, Window updateWin, UpdateWindowViewModel updateVm)
+    public static async Task RecordUpdateSequenceAsync(MainWindow mainWindow, Window updateWin, StartupWindowViewModel updateVm)
     {
         try
         {
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             var frames = new List<(string Name, BitmapSource Bitmap)>();
 
             // Frame 1: Checking
@@ -1491,9 +1533,9 @@ public static class SceneDiagnostics
             // Frame 2: Downloading 35%
             mainWindow.Dispatcher.Invoke(() =>
             {
-                updateVm.HasError = false;
+                updateVm.StatusText = "Загрузка обновления";
+                updateVm.IsProgressVisible = true;
                 updateVm.ProgressValue = 35;
-                updateVm.StatusText = "Скачиваем… 35%";
             });
             await Task.Delay(400);
             frames.Add(("update_seq_2_downloading.png", CaptureWindow(updateWin)));
@@ -1502,7 +1544,7 @@ public static class SceneDiagnostics
             mainWindow.Dispatcher.Invoke(() =>
             {
                 updateVm.ProgressValue = 85;
-                updateVm.StatusText = "Скачиваем… 85%";
+                updateVm.StatusText = "Загрузка обновления";
             });
             await Task.Delay(400);
             frames.Add(("update_seq_3_downloading.png", CaptureWindow(updateWin)));
@@ -1511,7 +1553,7 @@ public static class SceneDiagnostics
             mainWindow.Dispatcher.Invoke(() =>
             {
                 updateVm.ProgressValue = 100;
-                updateVm.StatusText = "Устанавливаем…";
+                updateVm.SetFakeState("installing");
             });
             await Task.Delay(400);
             frames.Add(("update_seq_4_installing.png", CaptureWindow(updateWin)));
@@ -1520,7 +1562,7 @@ public static class SceneDiagnostics
             mainWindow.Dispatcher.Invoke(() =>
             {
                 updateVm.ProgressValue = 100;
-                updateVm.StatusText = "Запускаем Aura…";
+                updateVm.SetFakeState("launching");
             });
             await Task.Delay(400);
             frames.Add(("update_seq_5_restarting.png", CaptureWindow(updateWin)));
@@ -1569,8 +1611,8 @@ public static class SceneDiagnostics
         try
         {
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
             var frameBitmaps = new List<RenderTargetBitmap>();
@@ -1700,8 +1742,8 @@ public static class SceneDiagnostics
             await Task.Delay(600);
 
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
             string shotPath = Path.Combine(shotsDir, "beta112_settings_hide_toggle.png");
@@ -1793,8 +1835,8 @@ public static class SceneDiagnostics
             await Task.Delay(600);
 
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(repoShotsDir);
             Directory.CreateDirectory(brainDir);
 
@@ -1947,8 +1989,8 @@ public static class SceneDiagnostics
             }
 
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(repoShotsDir);
             Directory.CreateDirectory(brainDir);
 
@@ -2022,8 +2064,8 @@ public static class SceneDiagnostics
 
             string baseDir = AppContext.BaseDirectory;
             string shotsDir = Path.Combine(baseDir, "artifacts_screens");
-            string repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\artifacts_screens";
-            string brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            string repoShotsDir = ResolveArtifactsScreensDir();
+            string brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(shotsDir);
             Directory.CreateDirectory(repoShotsDir);
             Directory.CreateDirectory(brainDir);
@@ -2144,8 +2186,8 @@ public static class SceneDiagnostics
             if (mainVm == null) return false;
 
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             try { Directory.CreateDirectory(repoShotsDir); } catch { }
             try { Directory.CreateDirectory(brainDir); } catch { }
 
@@ -2181,15 +2223,15 @@ public static class SceneDiagnostics
             SaveShot("wardrobe.png");
 
             // 4. Update Window
-            UpdateWindowViewModel? updateVm = null;
-            UpdateWindow? updateWin = null;
+            StartupWindowViewModel? updateVm = null;
+            StartupWindow? updateWin = null;
             window.Dispatcher.Invoke(() =>
             {
-                updateVm = new UpdateWindowViewModel(
-                    App.Services.GetRequiredService<ILauncherUpdateService>(),
-                    onCloseRequested: () => { },
-                    onRestoreMainWindow: () => { window.Show(); });
-                updateWin = new UpdateWindow
+                updateVm = new StartupWindowViewModel(
+                App.Services.GetRequiredService<ILauncherUpdateService>(),
+                onLaunchMainRequested: () => { window.Show(); },
+                onCloseRequested: () => { });
+                updateWin = new StartupWindow
                 {
                     DataContext = updateVm
                 };
@@ -2221,8 +2263,8 @@ public static class SceneDiagnostics
             if (mainVm == null) return false;
 
             string shotsDir = ResolveShotsDir();
-            var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var repoShotsDir = ResolveRepoShotsDir();
+            var brainDir = ResolveArtifactDir();
             try { Directory.CreateDirectory(repoShotsDir); } catch { }
             try { Directory.CreateDirectory(brainDir); } catch { }
 
@@ -2280,8 +2322,8 @@ public static class SceneDiagnostics
 
             string baseDir = AppContext.BaseDirectory;
             string shotsDir = Path.Combine(baseDir, "artifacts_screens");
-            string repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\artifacts_screens";
-            string brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            string repoShotsDir = ResolveArtifactsScreensDir();
+            string brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(shotsDir);
             Directory.CreateDirectory(repoShotsDir);
             Directory.CreateDirectory(brainDir);
@@ -2699,14 +2741,14 @@ public static class SceneDiagnostics
             if (mainVm == null) return false;
 
             string shotsDir = ResolveShotsDir();
-            var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            var brainDir = ResolveArtifactDir();
 
             void CaptureScreen(string name)
             {
                 string path = Path.Combine(shotsDir, $"{name}.png");
                 CaptureWindowToPng(window, path);
                 Console.WriteLine($"[SCREENSHOT] Captured: {name}.png");
-                if (Directory.Exists(brainDir))
+                if (!string.IsNullOrWhiteSpace(brainDir) && Directory.Exists(brainDir))
                 {
                     try { File.Copy(path, Path.Combine(brainDir, $"{name}.png"), true); } catch { }
                 }
@@ -3082,8 +3124,8 @@ public static class SceneDiagnostics
 
             string baseDir = AppContext.BaseDirectory;
             string shotsDir = Path.Combine(baseDir, "artifacts_screens");
-            string repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\artifacts_screens";
-            string brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+            string repoShotsDir = ResolveArtifactsScreensDir();
+            string brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(shotsDir);
             Directory.CreateDirectory(repoShotsDir);
             Directory.CreateDirectory(brainDir);
@@ -3179,8 +3221,8 @@ public static class SceneDiagnostics
     {
         App.Log("[TEST: SPLASH] Starting splash and settings self-test...");
         string shotsDir = ResolveShotsDir();
-        var repoShotsDir = @"C:\Users\magne\Documents\GitHub\Aura-Launcher\shots";
-        var brainDir = @"C:\Users\magne\.gemini\antigravity\brain\5c57d232-70d4-4edf-b4d4-5effb51fb059";
+        var repoShotsDir = ResolveRepoShotsDir();
+        var brainDir = ResolveArtifactDir();
         try { Directory.CreateDirectory(repoShotsDir); } catch { }
 
         void SaveWindowShot(Window targetWin, string fileName)
@@ -3267,4 +3309,24 @@ public static class SceneDiagnostics
             return false;
         }
     }
+#else
+    public static Task<bool> RunSplashSelfTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunFakeUpdateUiAsync(MainWindow window, string mode) => Task.FromResult(true);
+    public static Task<bool> CaptureAllScreenshotsAsync(MainWindow window, string? prefix = null) => Task.FromResult(true);
+    public static Task<bool> LiveTestKillPlayitAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunLobbyLifecycleTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> LiveTestLobbyAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunAnthemTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunRapidTabSwitchStressTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunTrayAndHideLauncherTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunFriendsSelfTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunProtocolSelfTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunNotificationsAndReportTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunIconSelfTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunReportSelfTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunLayoutAuditAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunScalingCrispnessTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunColorsTestAsync(MainWindow window) => Task.FromResult(true);
+    public static Task<bool> RunSelfTestShotsAsync(MainWindow window) => Task.FromResult(true);
+#endif
 }
