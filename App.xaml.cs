@@ -161,6 +161,38 @@ public partial class App : Application
         }
         catch { }
 
+        // Проверка наличия обновлений лаунчера ПЕРЕД созданием интерфейса
+        bool isUpdatedRestart = Array.Exists(args, a => a.Equals("--updated-restart", StringComparison.OrdinalIgnoreCase));
+        bool skipPreUpdate = isUpdatedRestart || isSelfTest || Array.Exists(args, a => a.Equals("--no-preupdate", StringComparison.OrdinalIgnoreCase));
+        if (!skipPreUpdate)
+        {
+            try
+            {
+                var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
+                if (launcherUpdateService.IsInstalled)
+                {
+                    FabricGameLaunchService.LogLauncherEvent("[PRE-STARTUP] Проверка обновлений перед запуском...");
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                    var updateAvailable = Task.Run(() => launcherUpdateService.CheckForUpdatesAsync(cts.Token)).GetAwaiter().GetResult();
+                    if (!string.IsNullOrWhiteSpace(updateAvailable))
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[PRE-STARTUP] Обнаружена новая версия {updateAvailable}. Скачивание и применение обновления перед открытием окна...");
+                        var result = Task.Run(() => launcherUpdateService.DownloadAndApplyAsync(ct: cts.Token)).GetAwaiter().GetResult();
+                        if (result.Status == LauncherUpdateStatus.UpdatedRestarting)
+                        {
+                            FabricGameLaunchService.LogLauncherEvent("[PRE-STARTUP] Обновление применено! Выполняется перезапуск...");
+                            Shutdown(0);
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[PRE-STARTUP: WARNING] Предстартовая проверка обновлений: {ex.Message}");
+            }
+        }
+
         // Инициализация сервиса динамических фонов
         try
         {
@@ -170,10 +202,39 @@ public partial class App : Application
         catch { }
 
         // Создаем главное окно и передаем MainViewModel в качестве DataContext
-        var mainWindow = new MainWindow
+        MainWindow mainWindow;
+        try
         {
-            DataContext = Services.GetRequiredService<MainViewModel>()
-        };
+            mainWindow = new MainWindow
+            {
+                DataContext = Services.GetRequiredService<MainViewModel>()
+            };
+        }
+        catch (Exception ex)
+        {
+            LogCrash(ex, isFatal: true);
+            try
+            {
+                var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
+                if (launcherUpdateService.IsInstalled)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[EMERGENCY-UPDATE] Сбой запуска интерфейса ({ex.Message}). Запуск аварийного обновления...");
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                    var emergencyResult = Task.Run(() => launcherUpdateService.CheckAndApplyAsync(ct: cts.Token)).GetAwaiter().GetResult();
+                    if (emergencyResult.Status == LauncherUpdateStatus.UpdatedRestarting)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent("[EMERGENCY-UPDATE] Аварийное обновление применено! Перезапуск...");
+                        Environment.Exit(0);
+                        return;
+                    }
+                }
+            }
+            catch { }
+
+            MessageBox.Show($"Не удалось запустить интерфейс Aura Launcher:\n\n{ex.Message}\n\nЛог ошибки сохранён в:\n%APPDATA%\\Aura\\launcher.log", "Aura Launcher - Ошибка запуска", MessageBoxButton.OK, MessageBoxImage.Error);
+            Environment.Exit(1);
+            return;
+        }
 
         StartPipeServer(pipeName, mainWindow);
 
