@@ -38,20 +38,33 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         // Перехват и логирование необработанных исключений
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
         {
+            if (Current?.Dispatcher?.HasShutdownStarted == true) return;
             LogCrash(args.ExceptionObject as Exception, isFatal: args.IsTerminating);
         };
 
         DispatcherUnhandledException += (s, args) =>
         {
+            if (Dispatcher.HasShutdownStarted)
+            {
+                args.Handled = true;
+                return;
+            }
             LogCrash(args.Exception, isFatal: false);
             args.Handled = true; // Предотвращаем падение приложения при сбоях в UI/рендере
         };
 
         TaskScheduler.UnobservedTaskException += (s, args) =>
         {
+            if (Current?.Dispatcher?.HasShutdownStarted == true)
+            {
+                args.SetObserved();
+                return;
+            }
             LogCrash(args.Exception, isFatal: false);
             args.SetObserved();
         };
@@ -169,13 +182,14 @@ public partial class App : Application
         bool isUpdatedRestart = Array.Exists(args, a => a.Equals("--updated-restart", StringComparison.OrdinalIgnoreCase));
         bool skipSplash = isUpdatedRestart || isSelfTest || Array.Exists(args, a => a.Equals("--no-splash", StringComparison.OrdinalIgnoreCase) || a.Equals("--no-preupdate", StringComparison.OrdinalIgnoreCase));
 
+        StartupWindow? splashWin = null;
+
         if (!skipSplash)
         {
             try
             {
                 var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
                 var startupCompletedTcs = new TaskCompletionSource<bool>();
-                StartupWindow? splashWin = null;
                 StartupWindowViewModel? startupVm = null;
 
                 startupVm = new StartupWindowViewModel(
@@ -184,26 +198,15 @@ public partial class App : Application
                     {
                         Dispatcher.Invoke(() =>
                         {
-                            if (splashWin != null)
-                            {
-                                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(250));
-                                fadeOut.Completed += (s, ev) =>
-                                {
-                                    splashWin.Close();
-                                    startupCompletedTcs.TrySetResult(true);
-                                };
-                                splashWin.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-                            }
-                            else
-                            {
-                                startupCompletedTcs.TrySetResult(true);
-                            }
+                            if (Dispatcher.HasShutdownStarted) return;
+                            startupCompletedTcs.TrySetResult(true);
                         });
                     },
                     onCloseRequested: () =>
                     {
                         Dispatcher.Invoke(() =>
                         {
+                            if (Dispatcher.HasShutdownStarted) return;
                             splashWin?.Close();
                             Shutdown(0);
                         });
@@ -246,6 +249,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
+            if (Current?.Dispatcher?.HasShutdownStarted == true) return;
             LogCrash(ex, isFatal: true);
             try
             {
@@ -272,7 +276,27 @@ public partial class App : Application
 
         StartPipeServer(pipeName, mainWindow);
 
+        MainWindow = mainWindow;
         mainWindow.Show();
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+        // Плавное закрытие splash-окна ПОСЛЕ показа главного окна
+        if (splashWin != null)
+        {
+            try
+            {
+                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(250));
+                fadeOut.Completed += (s, ev) =>
+                {
+                    try { splashWin.Close(); } catch { }
+                };
+                splashWin.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            }
+            catch
+            {
+                try { splashWin.Close(); } catch { }
+            }
+        }
 
         // Запускаем фоновую инициализацию ViewModel
         if (mainWindow.DataContext is MainViewModel mainVM)
@@ -611,7 +635,7 @@ public partial class App : Application
 
     private static void LogCrash(Exception? ex, bool isFatal = false)
     {
-        if (ex == null) return;
+        if (ex == null || Current?.Dispatcher?.HasShutdownStarted == true) return;
         try
         {
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -627,8 +651,8 @@ public partial class App : Application
             }
             catch { }
 
-            // Показываем диалог пользователю ТОЛЬКО при фатальных сбоях
-            if (isFatal && Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
+            // Показываем диалог пользователю ТОЛЬКО при фатальных сбоях (и если не идет штатное завершение)
+            if (isFatal && Current?.Dispatcher?.HasShutdownStarted != true && Interlocked.CompareExchange(ref _hasShownCrashDialog, 1, 0) == 0)
             {
                 var result = MessageBox.Show(
                     $"Произошла фатальная ошибка в работе AURA Launcher:\n\n{ex.Message}\n\nОтправить отчёт разработчикам?",

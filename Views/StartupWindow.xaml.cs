@@ -45,7 +45,10 @@ public partial class StartupWindow : Window
         double clamped = Math.Clamp(progress, 0.0, 100.0);
         double targetWidth = (clamped / 100.0) * 240.0;
 
-        var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
+        double currentWidth = ProgressBarFill.ActualWidth;
+        if (double.IsNaN(currentWidth) || currentWidth < 0) currentWidth = 0.0;
+
+        var anim = new DoubleAnimation(currentWidth, targetWidth, TimeSpan.FromMilliseconds(200))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };

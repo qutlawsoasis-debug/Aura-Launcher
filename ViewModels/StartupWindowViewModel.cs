@@ -99,7 +99,7 @@ public class StartupWindowViewModel : ObservableObject
     {
         try
         {
-            if (Application.Current != null)
+            if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
             {
                 if (Application.Current.TryFindResource("TextPrimary") is Brush tp)
                 {
@@ -114,7 +114,7 @@ public class StartupWindowViewModel : ObservableObject
     {
         try
         {
-            if (Application.Current != null)
+            if (Application.Current != null && !Application.Current.Dispatcher.HasShutdownStarted)
             {
                 string key = isAccent ? "Accent" : "TextPrimary";
                 if (Application.Current.TryFindResource(key) is Brush brush)

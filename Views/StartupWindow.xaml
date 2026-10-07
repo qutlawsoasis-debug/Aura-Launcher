@@ -293,7 +293,7 @@
                                     HorizontalAlignment="Left"
                                     Height="2"
                                     Background="{DynamicResource Accent}"
-                                    Width="{Binding ProgressBarWidth}" />
+                                    Width="0" />
                         </Grid>
                         <TextBlock Text="{Binding ProgressPercentText}"
                                    FontFamily="{DynamicResource MainFont}"
