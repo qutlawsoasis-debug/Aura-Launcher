@@ -1,4 +1,4 @@
-import { getStore } from '../src/store.js';
+import { getStore, computeLobbyModSync } from '../src/store.js';
 import { sendJson } from './_utils.js';
 
 export default async function handler(req: any, res: any) {
@@ -26,6 +26,8 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 404, { error: 'Lobby not found' });
     }
 
+    const modSync = computeLobbyModSync(lobby);
+
     return sendJson(res, 200, {
       code: lobby.code,
       status: lobby.status,
@@ -33,7 +35,8 @@ export default async function handler(req: any, res: any) {
       playerCount: lobby.players.length,
       players: lobby.players,
       hostName: lobby.hostName,
-      lastHeartbeat: lobby.lastHeartbeat
+      lastHeartbeat: lobby.lastHeartbeat,
+      modSync
     });
   } catch (err: any) {
     return sendJson(res, 500, { error: err.message || 'Internal Server Error' });

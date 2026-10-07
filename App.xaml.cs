@@ -556,6 +556,7 @@ public partial class App : Application
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
         services.AddSingleton<ISkinService, SkinService>();
         services.AddSingleton<IServerListSyncService, ServerListSyncService>();
+        services.AddSingleton<IModManifestService, ModManifestService>();
         services.AddSingleton<ILobbyApiClient>(sp => new LobbyApiClient(null, "https://lobby-api.vercel.app", sp.GetRequiredService<IConfigService>()));
         
         if (useFakeTunnel)
@@ -567,7 +568,12 @@ public partial class App : Application
             services.AddSingleton<ITunnelProvider, PlayitTunnelProvider>();
         }
 
-        services.AddSingleton<ILobbyService, LobbyService>();
+        services.AddSingleton<ILobbyService>(sp => new LobbyService(
+            sp.GetRequiredService<ILobbyApiClient>(),
+            sp.GetRequiredService<ITunnelProvider>(),
+            sp.GetRequiredService<IConfigService>(),
+            sp.GetRequiredService<IModManifestService>(),
+            sp.GetRequiredService<IGameLaunchService>()));
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();
         services.AddSingleton<IAnthemService, AnthemService>();
         services.AddSingleton<IFriendService, FriendService>();
@@ -595,7 +601,8 @@ public partial class App : Application
             sp.GetRequiredService<ISkinService>(),
             sp.GetRequiredService<ILobbyApiClient>(),
             sp.GetRequiredService<INotificationService>(),
-            sp.GetRequiredService<IDiscordRpcService>()));
+            sp.GetRequiredService<IDiscordRpcService>(),
+            sp.GetRequiredService<IModManifestService>()));
         services.AddSingleton<FriendsViewModel>();
         services.AddSingleton<MainViewModel>();
     }

@@ -1,4 +1,4 @@
-import { getStore, computeModManifestHash } from '../src/store.js';
+import { getStore, computeModManifestHash, computeLobbyModSync } from '../src/store.js';
 import { parseJson, sendJson } from './_utils.js';
 
 export default async function handler(req: any, res: any) {
@@ -16,40 +16,39 @@ export default async function handler(req: any, res: any) {
   try {
     const body = await parseJson(req);
     const code = (body.code || '').toUpperCase().trim();
-    const playerName = body.playerName || 'Guest';
+    const playerName = (body.playerName || '').trim();
+
+    if (!code || !playerName) {
+      return sendJson(res, 400, { error: 'code and playerName required' });
+    }
 
     const store = getStore();
     const lobby = await store.get(code);
-
     if (!lobby || lobby.status === 'closed') {
       return sendJson(res, 404, { error: 'Lobby not found or closed' });
     }
 
-    if (!lobby.players.includes(playerName)) {
-      lobby.players.push(playerName);
-    }
+    const rawManifest = Array.isArray(body.manifest) ? body.manifest : [];
+    const cleanManifest = rawManifest.slice(0, 400).map((m: any) => ({
+      id: String(m.id || '').slice(0, 100),
+      name: String(m.name || m.id || '').slice(0, 100),
+      version: String(m.version || '').slice(0, 50),
+      enabled: Boolean(m.enabled)
+    }));
+    const hash = computeModManifestHash(cleanManifest);
 
-    if (Array.isArray(body.manifest)) {
-      lobby.manifests = lobby.manifests || {};
-      lobby.manifestHashes = lobby.manifestHashes || {};
-      const cleanManifest = body.manifest.slice(0, 400).map((m: any) => ({
-        id: String(m.id || '').slice(0, 100),
-        name: String(m.name || m.id || '').slice(0, 100),
-        version: String(m.version || '').slice(0, 50),
-        enabled: Boolean(m.enabled)
-      }));
-      lobby.manifests[playerName] = cleanManifest;
-      lobby.manifestHashes[playerName] = computeModManifestHash(cleanManifest);
-    }
+    lobby.manifests = lobby.manifests || {};
+    lobby.manifestHashes = lobby.manifestHashes || {};
+    lobby.manifests[playerName] = cleanManifest;
+    lobby.manifestHashes[playerName] = hash;
 
     await store.set(lobby, 1800);
 
+    const modSync = computeLobbyModSync(lobby);
     return sendJson(res, 200, {
       success: true,
-      code: lobby.code,
-      status: lobby.status,
-      tunnelAddress: lobby.tunnelAddress,
-      playerCount: lobby.players.length
+      hash,
+      modSync
     });
   } catch (err: any) {
     return sendJson(res, 500, { error: err.message || 'Internal Server Error' });

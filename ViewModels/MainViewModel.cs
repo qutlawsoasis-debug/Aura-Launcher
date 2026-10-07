@@ -692,11 +692,13 @@ public class MainViewModel : ObservableObject
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
-        LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient()), launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService);
+        var manifestService = new ModManifestService();
+        LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient(), configService: configService, manifestService: manifestService, launchService: launchService), launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService, modManifestService: manifestService);
         WorkshopVM = workshopViewModel ?? new WorkshopViewModel(workshopService ?? new WorkshopService(), _configService, _launchService);
+        WorkshopVM.ModToggled += () => _ = LobbyVM.UpdateManifestAsync();
         
         _friendService = friendService;
-        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), new LobbyService(new LobbyApiClient()), _skinService, LobbyVM);
+        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), new LobbyService(new LobbyApiClient(), configService: configService, manifestService: manifestService, launchService: launchService), _skinService, LobbyVM);
         FriendsVM.OpenLobbyRequested += () => SwitchTab("Lobby");
 
         if (_notificationService != null)

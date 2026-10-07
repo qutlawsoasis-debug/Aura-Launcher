@@ -23,6 +23,7 @@ public class LobbyViewModel : ObservableObject
     private readonly ILobbyService _lobbyService;
     private readonly IGameLaunchService _launchService;
     private readonly IConfigService _configService;
+    private readonly IModManifestService _modManifestService;
     private readonly ILanWorldWatcher _worldWatcher;
     private readonly ITunnelProvider? _tunnelProvider;
     private readonly ISkinService? _skinService;
@@ -30,6 +31,12 @@ public class LobbyViewModel : ObservableObject
     private readonly INotificationService? _notificationService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _lastPlayerMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _ignoredMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _syncNoticeCts;
+    private List<ModMismatchItem> _currentMismatchItems = new();
+    private Func<Task>? _pendingConnectAction;
+    private string _lastSelfMismatchSignature = string.Empty;
     private bool _previousWorldIsOpen;
 
     public event Action? LobbyCreated;
@@ -38,6 +45,117 @@ public class LobbyViewModel : ObservableObject
 
     // === Список игроков лобби ===
     public ObservableCollection<LobbyPlayerItem> LobbyPlayers { get; } = new();
+
+    // === Уведомление вверху списка игроков (6 секунд) ===
+    private bool _isSyncNoticeVisible;
+    public bool IsSyncNoticeVisible
+    {
+        get => _isSyncNoticeVisible;
+        set => SetProperty(ref _isSyncNoticeVisible, value);
+    }
+
+    private string _syncNoticeText = string.Empty;
+    public string SyncNoticeText
+    {
+        get => _syncNoticeText;
+        set => SetProperty(ref _syncNoticeText, value);
+    }
+
+    // === Модальный диалог расхождений модов (ModMismatchDialog) ===
+    private bool _isModMismatchDialogVisible;
+    public bool IsModMismatchDialogVisible
+    {
+        get => _isModMismatchDialogVisible;
+        set => SetProperty(ref _isModMismatchDialogVisible, value);
+    }
+
+    private string _modMismatchTitle = "Моды не совпадают";
+    public string ModMismatchTitle
+    {
+        get => _modMismatchTitle;
+        set => SetProperty(ref _modMismatchTitle, value);
+    }
+
+    private string _modMismatchSummary = string.Empty;
+    public string ModMismatchSummary
+    {
+        get => _modMismatchSummary;
+        set => SetProperty(ref _modMismatchSummary, value);
+    }
+
+    public ObservableCollection<ModMismatchItem> ModMismatchItems { get; } = new();
+
+    private bool _hasUnfixableMods;
+    public bool HasUnfixableMods
+    {
+        get => _hasUnfixableMods;
+        set => SetProperty(ref _hasUnfixableMods, value);
+    }
+
+    private bool _canFixAny;
+    public bool CanFixAny
+    {
+        get => _canFixAny;
+        set
+        {
+            if (SetProperty(ref _canFixAny, value))
+            {
+                FixAndProceedCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private bool _isGameRunningWarning;
+    public bool IsGameRunningWarning
+    {
+        get => _isGameRunningWarning;
+        set
+        {
+            if (SetProperty(ref _isGameRunningWarning, value))
+            {
+                FixAndProceedCommand?.RaiseCanExecuteChanged();
+                OnPropertyChanged(nameof(CancelButtonText));
+            }
+        }
+    }
+
+    private bool _isJoinDialogMode;
+    public bool IsJoinDialogMode
+    {
+        get => _isJoinDialogMode;
+        set
+        {
+            if (SetProperty(ref _isJoinDialogMode, value))
+            {
+                OnPropertyChanged(nameof(FixButtonText));
+                OnPropertyChanged(nameof(CancelButtonText));
+            }
+        }
+    }
+
+    private bool _isViewOnlyDialogMode;
+    public bool IsViewOnlyDialogMode
+    {
+        get => _isViewOnlyDialogMode;
+        set
+        {
+            if (SetProperty(ref _isViewOnlyDialogMode, value))
+            {
+                OnPropertyChanged(nameof(CancelButtonText));
+            }
+        }
+    }
+
+    public string FixButtonText => IsJoinDialogMode ? "Включить и войти" : "Включить";
+
+    public string CancelButtonText
+    {
+        get
+        {
+            if (IsViewOnlyDialogMode || IsGameRunningWarning) return "Закрыть";
+            return IsJoinDialogMode ? "Отмена" : "Позже";
+        }
+    }
 
     // === Общее состояние ===
     private bool _isInLobby;
@@ -126,6 +244,9 @@ public class LobbyViewModel : ObservableObject
     public RelayCommand LeaveLobbyCommand { get; }
     public RelayCommand CopyTunnelLogCommand { get; }
     public RelayCommand SendReportCommand { get; }
+    public AsyncRelayCommand FixAndProceedCommand { get; }
+    public RelayCommand JoinAsIsCommand { get; }
+    public RelayCommand CancelMismatchDialogCommand { get; }
 
     public event Action<string?>? SendReportRequested;
 
@@ -138,11 +259,13 @@ public class LobbyViewModel : ObservableObject
         ISkinService? skinService = null,
         ILobbyApiClient? lobbyApiClient = null,
         INotificationService? notificationService = null,
-        IDiscordRpcService? discordRpcService = null)
+        IDiscordRpcService? discordRpcService = null,
+        IModManifestService? modManifestService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _modManifestService = modManifestService ?? new ModManifestService();
         _worldWatcher = worldWatcher ?? new LanWorldWatcher();
         _tunnelProvider = tunnelProvider;
         _skinService = skinService;
@@ -158,6 +281,9 @@ public class LobbyViewModel : ObservableObject
         ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, () => CanReconnect);
         OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && _lobbyService.IsHost);
         LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
+        FixAndProceedCommand = new AsyncRelayCommand(FixAndProceedAsync, () => CanFixAny && !IsGameRunningWarning);
+        JoinAsIsCommand = new RelayCommand(_ => JoinAsIs());
+        CancelMismatchDialogCommand = new RelayCommand(_ => CancelMismatchDialog());
 
         CopyTunnelLogCommand = new RelayCommand(_ =>
         {
@@ -199,6 +325,7 @@ public class LobbyViewModel : ObservableObject
         _lobbyService.StatusChanged += OnLobbyStatusChanged;
         _lobbyService.TunnelAddressReady += OnTunnelAddressReady;
         _lobbyService.LobbyStatusUpdated += OnLobbyStatusUpdated;
+        _lobbyService.ModSyncUpdated += OnModSyncUpdated;
 
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
@@ -875,6 +1002,16 @@ public class LobbyViewModel : ObservableObject
                 IsInLobby = true;
                 _discordRpcService?.SetInLobby(1);
                 UpdateGuestStatus();
+
+                var status = await _lobbyService.RefreshGuestStatusAsync(cts.Token);
+                if (status?.ModSync != null && HasUnresolvedMismatches(status.ModSync, out var myMismatches))
+                {
+                    var sig = ComputeMismatchSignature(myMismatches);
+                    if (!_ignoredMismatchSignatures.Contains($"{LobbyCode}:{sig}"))
+                    {
+                        ShowMismatchDialog(myMismatches, isJoinMode: true, onProceed: null);
+                    }
+                }
             }
             else
             {
@@ -918,7 +1055,7 @@ public class LobbyViewModel : ObservableObject
         return IsInLobby;
     }
 
-    private Task ConnectToGameAsync()
+    private async Task ConnectToGameAsync()
     {
         var address = _lobbyService.CurrentTunnelAddress;
         if (string.IsNullOrWhiteSpace(address))
@@ -929,9 +1066,24 @@ public class LobbyViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(address))
         {
             StatusText = "Адрес сервера не получен";
-            return Task.CompletedTask;
+            return;
         }
 
+        if (_lobbyService.CurrentModSync != null && HasUnresolvedMismatches(_lobbyService.CurrentModSync, out var myMismatches))
+        {
+            var sig = ComputeMismatchSignature(myMismatches);
+            if (!_ignoredMismatchSignatures.Contains($"{LobbyCode}:{sig}"))
+            {
+                ShowMismatchDialog(myMismatches, isJoinMode: true, onProceed: () => ExecuteConnectToGameAsync(address));
+                return;
+            }
+        }
+
+        await ExecuteConnectToGameAsync(address);
+    }
+
+    private Task ExecuteConnectToGameAsync(string address)
+    {
         _lastTunnelAddress = address;
         IsBusy = true;
         StatusText = "Запуск игры...";
@@ -1056,6 +1208,12 @@ public class LobbyViewModel : ObservableObject
         _previousWorldIsOpen = false;
 
         LobbyPlayers.Clear();
+        _lastPlayerMismatchSignatures.Clear();
+        _ignoredMismatchSignatures.Clear();
+        _lastSelfMismatchSignature = string.Empty;
+        _syncNoticeCts?.Cancel();
+        IsSyncNoticeVisible = false;
+        IsModMismatchDialogVisible = false;
         JoinErrorMessage = string.Empty;
         IsJoiningLobby = false;
         OnPropertyChanged(nameof(IsHost));
@@ -1189,10 +1347,10 @@ public class LobbyViewModel : ObservableObject
             _previousWorldIsOpen = false;
         }
 
-        _ = RefreshLobbyPlayersAsync(status.Players, status.HostName);
+        _ = RefreshLobbyPlayersAsync(status.Players, status.HostName, status.ModSync);
     }
 
-    public async Task RefreshLobbyPlayersAsync(string[]? players, string? hostName)
+    public async Task RefreshLobbyPlayersAsync(string[]? players, string? hostName, IReadOnlyDictionary<string, PlayerModSyncInfo>? modSync = null)
     {
         if (players == null) return;
         if (!string.IsNullOrWhiteSpace(hostName))
@@ -1293,6 +1451,8 @@ public class LobbyViewModel : ObservableObject
                     }
                 }
             }
+
+            UpdatePlayerModSync(modSync ?? _lobbyService.CurrentModSync);
             PlayerCountChanged?.Invoke(LobbyPlayers.Count);
         });
     }
@@ -1309,6 +1469,7 @@ public class LobbyViewModel : ObservableObject
         CopyCodeCommand.RaiseCanExecuteChanged();
         CopyLinkCommand.RaiseCanExecuteChanged();
         CopyTunnelLogCommand.RaiseCanExecuteChanged();
+        FixAndProceedCommand?.RaiseCanExecuteChanged();
     }
 
     private async Task EnsureSkinUploadedAsync()
@@ -1331,5 +1492,409 @@ public class LobbyViewModel : ObservableObject
             }
         }
         catch { }
+    }
+
+    // === Методы проверки и синхронизации модов ===
+
+    public async Task UpdateManifestAsync()
+    {
+        if (IsInLobby)
+        {
+            await _lobbyService.UpdateManifestAsync();
+        }
+    }
+
+    private string GetGameDir() => _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+
+    public void ShowSyncNotice(string text)
+    {
+        _syncNoticeCts?.Cancel();
+        _syncNoticeCts = new CancellationTokenSource();
+        var ct = _syncNoticeCts.Token;
+        SyncNoticeText = text;
+        IsSyncNoticeVisible = true;
+        _ = Task.Delay(6000, ct).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+            {
+                Dispatch(() => IsSyncNoticeVisible = false);
+            }
+        }, ct);
+    }
+
+    private void OnModSyncUpdated(IReadOnlyDictionary<string, PlayerModSyncInfo> modSync)
+    {
+        Dispatch(() =>
+        {
+            UpdatePlayerModSync(modSync);
+        });
+    }
+
+    private void UpdatePlayerModSync(IReadOnlyDictionary<string, PlayerModSyncInfo>? modSync)
+    {
+        if (modSync == null) return;
+
+        foreach (var p in LobbyPlayers)
+        {
+            PlayerModSyncInfo? info = null;
+            foreach (var kvp in modSync)
+            {
+                if (string.Equals(kvp.Key, p.Nickname, StringComparison.OrdinalIgnoreCase))
+                {
+                    info = kvp.Value;
+                    break;
+                }
+            }
+
+            if (info != null)
+            {
+                p.ModSyncStatus = info.Status;
+                p.Mismatches = info.Mismatches ?? new();
+                p.MismatchCount = p.Mismatches.Count;
+                p.ModSyncTooltip = BuildModSyncTooltip(p.Nickname, info);
+                p.OpenMismatchDialogCommand = new RelayCommand(_ => OpenPlayerMismatchDialog(p));
+
+                string newSig = info.Status switch
+                {
+                    "synced" => "synced",
+                    "mismatch" => "mismatch:" + ComputeMismatchSignature(info.Mismatches),
+                    _ => "unverified"
+                };
+
+                if (_lastPlayerMismatchSignatures.TryGetValue(p.Nickname, out var oldSig))
+                {
+                    if (oldSig != newSig)
+                    {
+                        if (newSig == "synced" && oldSig.StartsWith("mismatch:"))
+                        {
+                            ShowSyncNotice($"У {p.Nickname} моды совпадают");
+                        }
+                        else if (newSig.StartsWith("mismatch:"))
+                        {
+                            var first = info.Mismatches.FirstOrDefault();
+                            if (first != null)
+                            {
+                                string action = first.Type switch
+                                {
+                                    "disabled" => "выключен мод",
+                                    "missing" => "нет мода",
+                                    "extra" => "лишний мод",
+                                    "version" => "другая версия мода",
+                                    _ => "расходится мод"
+                                };
+                                string suffix = info.Mismatches.Count > 1 ? $" и ещё {info.Mismatches.Count - 1}" : "";
+                                ShowSyncNotice($"У {p.Nickname} {action} «{first.ModName}»{suffix}");
+                            }
+                        }
+                    }
+                }
+                _lastPlayerMismatchSignatures[p.Nickname] = newSig;
+            }
+            else
+            {
+                p.ModSyncStatus = "unverified";
+                p.Mismatches = new();
+                p.MismatchCount = 0;
+                p.ModSyncTooltip = "Не проверен";
+                p.OpenMismatchDialogCommand = null;
+            }
+        }
+
+        if (!_lobbyService.IsHost && !IsModMismatchDialogVisible)
+        {
+            var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
+            if (modSync.TryGetValue(myNick, out var myInfo) && myInfo.Status == "mismatch" && myInfo.Mismatches != null && myInfo.Mismatches.Count > 0)
+            {
+                var sig = ComputeMismatchSignature(myInfo.Mismatches);
+                if (!_ignoredMismatchSignatures.Contains($"{LobbyCode}:{sig}"))
+                {
+                    if (_lastSelfMismatchSignature != sig)
+                    {
+                        _lastSelfMismatchSignature = sig;
+                        ShowMismatchDialog(myInfo.Mismatches, isJoinMode: false, onProceed: null);
+                    }
+                }
+            }
+            else
+            {
+                _lastSelfMismatchSignature = string.Empty;
+            }
+        }
+    }
+
+    private void OpenPlayerMismatchDialog(LobbyPlayerItem player)
+    {
+        if (player.Mismatches == null || player.Mismatches.Count == 0) return;
+
+        var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
+        bool isSelf = string.Equals(player.Nickname, myNick, StringComparison.OrdinalIgnoreCase);
+
+        if (isSelf && !_lobbyService.IsHost)
+        {
+            ShowMismatchDialog(player.Mismatches, isJoinMode: false, onProceed: null);
+        }
+        else
+        {
+            ShowMismatchDialog(player.Mismatches, isJoinMode: false, onProceed: null, playerNick: player.Nickname);
+        }
+    }
+
+    private static string BuildModSyncTooltip(string nick, PlayerModSyncInfo info)
+    {
+        if (info.Status == "synced") return "Моды совпадают";
+        if (info.Status == "unverified") return "Не проверен";
+        if (info.Mismatches == null || info.Mismatches.Count == 0) return "Расхождений нет";
+
+        var lines = new List<string> { $"Расхождений: {info.Mismatches.Count}" };
+        foreach (var m in info.Mismatches.Take(8))
+        {
+            string desc = m.Type switch
+            {
+                "disabled" => "выключен",
+                "missing" => "нет",
+                "extra" => "лишний",
+                "version" => $"версия ({m.Version})",
+                _ => m.Type
+            };
+            lines.Add($"• {m.ModName}: {desc}");
+        }
+        if (info.Mismatches.Count > 8)
+        {
+            lines.Add($"… и ещё {info.Mismatches.Count - 8}");
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    public static string ComputeMismatchSignature(IEnumerable<ModMismatchItem> items)
+    {
+        if (items == null) return string.Empty;
+        var parts = items.OrderBy(i => i.ModId, StringComparer.OrdinalIgnoreCase)
+                         .Select(i => $"{i.ModId}:{i.Type}:{i.Version}");
+        return string.Join(";", parts);
+    }
+
+    private bool HasUnresolvedMismatches(IReadOnlyDictionary<string, PlayerModSyncInfo> modSync, out List<ModMismatchItem> mismatches)
+    {
+        mismatches = new List<ModMismatchItem>();
+        if (_lobbyService.IsHost) return false;
+
+        var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
+        foreach (var kvp in modSync)
+        {
+            if (string.Equals(kvp.Key, myNick, StringComparison.OrdinalIgnoreCase))
+            {
+                if (kvp.Value.Status == "mismatch" && kvp.Value.Mismatches != null && kvp.Value.Mismatches.Count > 0)
+                {
+                    mismatches = kvp.Value.Mismatches;
+                    return true;
+                }
+                break;
+            }
+        }
+        return false;
+    }
+
+    public void ShowMismatchDialog(List<ModMismatchItem> mismatches, bool isJoinMode, Func<Task>? onProceed = null, string? playerNick = null)
+    {
+        _currentMismatchItems = mismatches ?? new();
+        _pendingConnectAction = onProceed;
+
+        IsJoinDialogMode = isJoinMode;
+        IsViewOnlyDialogMode = !string.IsNullOrWhiteSpace(playerNick);
+        IsGameRunningWarning = _launchService?.IsGameRunning == true;
+
+        ModMismatchItems.Clear();
+        foreach (var m in _currentMismatchItems)
+        {
+            ModMismatchItems.Add(m);
+        }
+
+        CanFixAny = _currentMismatchItems.Any(m => m.Type == "disabled" || m.Type == "extra");
+        HasUnfixableMods = _currentMismatchItems.Any(m => m.Type == "missing" || m.Type == "version");
+
+        if (IsViewOnlyDialogMode)
+        {
+            ModMismatchTitle = $"Моды игрока {playerNick}";
+            ModMismatchSummary = $"С хостом расходится {_currentMismatchItems.Count} {GetMismatchesPlural(_currentMismatchItems.Count)}";
+        }
+        else
+        {
+            ModMismatchTitle = "Моды не совпадают";
+            if (_currentMismatchItems.Count == 1)
+            {
+                var single = _currentMismatchItems[0];
+                if (single.Type == "disabled")
+                {
+                    ModMismatchSummary = $"У хоста включён мод «{single.ModName}», у вас он выключен. Включить?";
+                }
+                else if (single.Type == "extra")
+                {
+                    ModMismatchSummary = $"У вас включён лишний мод «{single.ModName}». Отключить?";
+                }
+                else if (single.Type == "missing")
+                {
+                    ModMismatchSummary = $"У хоста включён мод «{single.ModName}», у вас его нет.";
+                }
+                else
+                {
+                    ModMismatchSummary = $"У вас другая версия мода «{single.ModName}».";
+                }
+            }
+            else
+            {
+                ModMismatchSummary = $"С хостом расходится {_currentMismatchItems.Count} {GetMismatchesPlural(_currentMismatchItems.Count)}";
+            }
+        }
+
+        IsModMismatchDialogVisible = true;
+    }
+
+    private async Task FixAndProceedAsync()
+    {
+        if (_launchService?.IsGameRunning == true)
+        {
+            IsGameRunningWarning = true;
+            return;
+        }
+
+        try
+        {
+            string gameDir = GetGameDir();
+            _modManifestService.FixMismatches(gameDir, _currentMismatchItems);
+            await _lobbyService.UpdateManifestAsync();
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[MOD-SYNC: FIX ERROR] {ex.Message}");
+        }
+
+        IsModMismatchDialogVisible = false;
+
+        if (IsJoinDialogMode && _pendingConnectAction != null)
+        {
+            var action = _pendingConnectAction;
+            _pendingConnectAction = null;
+            await action();
+        }
+    }
+
+    private void JoinAsIs()
+    {
+        if (!string.IsNullOrWhiteSpace(LobbyCode))
+        {
+            var sig = ComputeMismatchSignature(_currentMismatchItems);
+            _ignoredMismatchSignatures.Add($"{LobbyCode}:{sig}");
+        }
+
+        IsModMismatchDialogVisible = false;
+
+        if (_pendingConnectAction != null)
+        {
+            var action = _pendingConnectAction;
+            _pendingConnectAction = null;
+            _ = action();
+        }
+    }
+
+    private void CancelMismatchDialog()
+    {
+        if (!IsJoinDialogMode && !IsViewOnlyDialogMode && !string.IsNullOrWhiteSpace(LobbyCode))
+        {
+            var sig = ComputeMismatchSignature(_currentMismatchItems);
+            _ignoredMismatchSignatures.Add($"{LobbyCode}:{sig}");
+        }
+
+        IsModMismatchDialogVisible = false;
+        _pendingConnectAction = null;
+    }
+
+    private static string GetMismatchesPlural(int n)
+    {
+        int mod100 = n % 100;
+        int mod10 = n % 10;
+        if (mod100 >= 11 && mod100 <= 19) return "модов";
+        if (mod10 == 1) return "мод";
+        if (mod10 >= 2 && mod10 <= 4) return "мода";
+        return "модов";
+    }
+
+    public void ShowDebugMismatchDialog(int count = 1)
+    {
+        var list = new List<ModMismatchItem>();
+        if (count == 1)
+        {
+            list.Add(new ModMismatchItem { ModId = "lithium", ModName = "Lithium", Type = "disabled", Version = "0.11.2" });
+        }
+        else if (count == 5)
+        {
+            list.Add(new ModMismatchItem { ModId = "lithium", ModName = "Lithium", Type = "disabled", Version = "0.11.2" });
+            list.Add(new ModMismatchItem { ModId = "sodium", ModName = "Sodium", Type = "version", Version = "0.5.8", PlayerVersion = "0.5.3", HostVersion = "0.5.8" });
+            list.Add(new ModMismatchItem { ModId = "iris", ModName = "Iris Shaders", Type = "missing", Version = "1.7.0" });
+            list.Add(new ModMismatchItem { ModId = "xaeros-minimap", ModName = "Xaero's Minimap", Type = "extra", Version = "23.9.7" });
+            list.Add(new ModMismatchItem { ModId = "ferritecore", ModName = "FerriteCore", Type = "disabled", Version = "6.0.1" });
+        }
+        else
+        {
+            for (int i = 1; i <= count; i++)
+            {
+                string type = (i % 4) switch
+                {
+                    0 => "disabled",
+                    1 => "missing",
+                    2 => "extra",
+                    _ => "version"
+                };
+                list.Add(new ModMismatchItem
+                {
+                    ModId = $"sample-mod-{i}",
+                    ModName = $"Sample Mod {i} (Extra Long Name For Testing Ellipsis)",
+                    Type = type,
+                    Version = $"1.{i}.0",
+                    PlayerVersion = $"1.{i}.0",
+                    HostVersion = $"1.{i}.1"
+                });
+            }
+        }
+
+        ShowMismatchDialog(list, isJoinMode: true, onProceed: null);
+    }
+
+    public void EmulateParticipantMismatch(string? playerNick = null, int mismatchCount = 1)
+    {
+        string targetNick = playerNick ?? "Vetements";
+        var existing = LobbyPlayers.FirstOrDefault(p => string.Equals(p.Nickname, targetNick, StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
+        {
+            existing = new LobbyPlayerItem
+            {
+                Nickname = targetNick,
+                IsHost = false,
+                Avatar = SkinService.LoadDefaultSteveBitmap()
+            };
+            LobbyPlayers.Add(existing);
+        }
+
+        var list = new List<ModMismatchItem>();
+        for (int i = 1; i <= mismatchCount; i++)
+        {
+            list.Add(new ModMismatchItem
+            {
+                ModId = i == 1 ? "lithium" : $"mod-{i}",
+                ModName = i == 1 ? "Lithium" : $"Mod {i}",
+                Type = i % 2 == 1 ? "disabled" : "missing",
+                Version = "1.0.0"
+            });
+        }
+
+        var dict = new Dictionary<string, PlayerModSyncInfo>
+        {
+            [targetNick] = new PlayerModSyncInfo
+            {
+                Status = "mismatch",
+                Mismatches = list
+            }
+        };
+
+        UpdatePlayerModSync(dict);
     }
 }

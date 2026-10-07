@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AuraLauncher.Models;
@@ -10,8 +12,14 @@ public class LobbyService : ILobbyService, IDisposable
 {
     private readonly ILobbyApiClient _apiClient;
     private readonly ITunnelProvider _tunnelProvider;
+    private readonly IConfigService? _configService;
+    private readonly IModManifestService _manifestService;
+    private readonly IGameLaunchService? _launchService;
     private CancellationTokenSource? _pollCts;
     private string? _currentGuestPlayerName;
+    private string? _currentHostPlayerName;
+    private FileSystemWatcher? _modsWatcher;
+    private Timer? _modsDebounceTimer;
 
     public string? CurrentLobbyCode { get; private set; }
     public string? CurrentHostToken { get; private set; }
@@ -19,22 +27,50 @@ public class LobbyService : ILobbyService, IDisposable
     public string CurrentStatus { get; private set; } = "idle";
     public bool IsHost { get; private set; }
     public bool IsReadyToPlay => CurrentStatus.Equals("open", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(CurrentTunnelAddress);
+    public IReadOnlyDictionary<string, PlayerModSyncInfo>? CurrentModSync { get; private set; }
 
     public event Action<string>? StatusChanged;
     public event Action<string>? TunnelAddressReady;
     public event Action<LobbyStatusResponse>? LobbyStatusUpdated;
+    public event Action<IReadOnlyDictionary<string, PlayerModSyncInfo>>? ModSyncUpdated;
 
-    public LobbyService(ILobbyApiClient apiClient, ITunnelProvider? tunnelProvider = null)
+    public LobbyService(
+        ILobbyApiClient apiClient,
+        ITunnelProvider? tunnelProvider = null,
+        IConfigService? configService = null,
+        IModManifestService? manifestService = null,
+        IGameLaunchService? launchService = null)
     {
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
         _tunnelProvider = tunnelProvider ?? new FakeTunnelProvider();
+        _configService = configService;
+        _manifestService = manifestService ?? new ModManifestService();
+        _launchService = launchService;
+    }
+
+    private string GetGameDir()
+    {
+        string? configuredDir = _configService?.CurrentConfig?.GameDir;
+        if (_launchService != null && !string.IsNullOrWhiteSpace(configuredDir))
+        {
+            return _launchService.ResolveMinecraftDirectory(configuredDir);
+        }
+        if (!string.IsNullOrWhiteSpace(configuredDir))
+        {
+            return Path.GetFullPath(configuredDir);
+        }
+        return AppDomain.CurrentDomain.BaseDirectory;
     }
 
     public async Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default)
     {
         LeaveLobby();
 
-        var response = await _apiClient.CreateLobbyAsync(hostName, cancellationToken);
+        _currentHostPlayerName = hostName;
+        string gameDir = GetGameDir();
+        var manifest = _manifestService.BuildModManifest(gameDir);
+
+        var response = await _apiClient.CreateLobbyAsync(hostName, manifest, cancellationToken);
         if (response == null) return null;
 
         CurrentLobbyCode = response.Code;
@@ -43,6 +79,7 @@ public class LobbyService : ILobbyService, IDisposable
         IsHost = true;
 
         StatusChanged?.Invoke(CurrentStatus);
+        StartModsWatcher(gameDir);
         StartGuestPolling();
         return CurrentLobbyCode;
     }
@@ -171,7 +208,10 @@ public class LobbyService : ILobbyService, IDisposable
         LeaveLobby();
 
         var cleanCode = code?.Trim().ToUpperInvariant() ?? string.Empty;
-        var response = await _apiClient.JoinLobbyAsync(cleanCode, playerName, cancellationToken);
+        string gameDir = GetGameDir();
+        var manifest = _manifestService.BuildModManifest(gameDir);
+
+        var response = await _apiClient.JoinLobbyAsync(cleanCode, playerName, manifest, cancellationToken);
         if (response == null || !response.Success) return false;
 
         CurrentLobbyCode = response.Code;
@@ -186,6 +226,7 @@ public class LobbyService : ILobbyService, IDisposable
             TunnelAddressReady?.Invoke(CurrentTunnelAddress);
         }
 
+        StartModsWatcher(gameDir);
         // Start background polling for guest
         StartGuestPolling();
         return true;
@@ -214,9 +255,85 @@ public class LobbyService : ILobbyService, IDisposable
                 TunnelAddressReady?.Invoke(CurrentTunnelAddress);
             }
 
+            CurrentModSync = status.ModSync;
+            if (status.ModSync != null)
+            {
+                ModSyncUpdated?.Invoke(status.ModSync);
+            }
+
             LobbyStatusUpdated?.Invoke(status);
         }
         return status;
+    }
+
+    public async Task UpdateManifestAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(CurrentLobbyCode)) return;
+
+        string myNick = IsHost ? (_currentHostPlayerName ?? "Host") : (_currentGuestPlayerName ?? "Guest");
+        string gameDir = GetGameDir();
+        var manifest = _manifestService.BuildModManifest(gameDir);
+
+        await _apiClient.UpdateManifestAsync(CurrentLobbyCode, myNick, manifest, cancellationToken);
+        await RefreshGuestStatusAsync(cancellationToken);
+    }
+
+    private void StartModsWatcher(string gameDir)
+    {
+        StopModsWatcher();
+        string modsDir = Path.Combine(gameDir, "mods");
+        if (!Directory.Exists(modsDir))
+        {
+            try { Directory.CreateDirectory(modsDir); } catch { return; }
+        }
+
+        try
+        {
+            _modsWatcher = new FileSystemWatcher(modsDir)
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                EnableRaisingEvents = true,
+                IncludeSubdirectories = false
+            };
+            _modsWatcher.Changed += OnModsDirectoryChanged;
+            _modsWatcher.Created += OnModsDirectoryChanged;
+            _modsWatcher.Deleted += OnModsDirectoryChanged;
+            _modsWatcher.Renamed += (s, e) => OnModsDirectoryChanged(s, e);
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[MOD-SYNC] FileSystemWatcher failed: {ex.Message}");
+        }
+    }
+
+    private void OnModsDirectoryChanged(object sender, FileSystemEventArgs e)
+    {
+        // 1.5 сек задержка (debounce)
+        _modsDebounceTimer?.Dispose();
+        _modsDebounceTimer = new Timer(async _ =>
+        {
+            try
+            {
+                await UpdateManifestAsync();
+            }
+            catch { }
+        }, null, 1500, Timeout.Infinite);
+    }
+
+    private void StopModsWatcher()
+    {
+        _modsDebounceTimer?.Dispose();
+        _modsDebounceTimer = null;
+        if (_modsWatcher != null)
+        {
+            try
+            {
+                _modsWatcher.EnableRaisingEvents = false;
+                _modsWatcher.Dispose();
+            }
+            catch { }
+            _modsWatcher = null;
+        }
     }
 
     private void StartGuestPolling()
@@ -281,14 +398,17 @@ public class LobbyService : ILobbyService, IDisposable
         var guestName = _currentGuestPlayerName;
         bool wasGuest = !IsHost && !string.IsNullOrWhiteSpace(codeToLeave) && !string.IsNullOrWhiteSpace(guestName);
 
+        StopModsWatcher();
         _pollCts?.Cancel();
         _pollCts = null;
         CurrentLobbyCode = null;
         CurrentHostToken = null;
         CurrentTunnelAddress = null;
         _currentGuestPlayerName = null;
+        _currentHostPlayerName = null;
         CurrentStatus = "idle";
         IsHost = false;
+        CurrentModSync = null;
         StatusChanged?.Invoke(CurrentStatus);
 
         if (wasGuest && codeToLeave != null && guestName != null)
@@ -306,6 +426,7 @@ public class LobbyService : ILobbyService, IDisposable
 
     public void Dispose()
     {
+        StopModsWatcher();
         _pollCts?.Cancel();
         _pollCts?.Dispose();
     }

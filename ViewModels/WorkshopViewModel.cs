@@ -126,6 +126,8 @@ public class WorkshopViewModel : ObservableObject
     public AsyncRelayCommand CreateBackupCommand { get; }
     public RelayCommand OpenWorldFolderCommand { get; }
     public RelayCommand OpenBackupsFolderCommand { get; }
+    public event Action? ModToggled;
+
     public RelayCommand ToggleModCommand { get; }
     public RelayCommand SelectShaderCommand { get; }
     public RelayCommand OpenModsFolderCommand { get; }
@@ -213,6 +215,7 @@ public class WorkshopViewModel : ObservableObject
             if (_workshopService.ToggleMod(mod, newState))
             {
                 ApplyModFilter();
+                ModToggled?.Invoke();
             }
         });
 

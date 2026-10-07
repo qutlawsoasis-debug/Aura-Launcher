@@ -1,7 +1,7 @@
 import http from 'http';
 import crypto from 'crypto';
 import url from 'url';
-import { getStore, Lobby, SkinRecord } from './store.js';
+import { getStore, Lobby, SkinRecord, computeLobbyModSync, computeModManifestHash } from './store.js';
 import { validatePngSkin, isValidNickname, getClientIp } from './skinUtils.js';
 import {
   handleRegister,
@@ -158,6 +158,17 @@ export const server = http.createServer(async (req, res) => {
         players: [hostName]
       };
 
+      if (Array.isArray(body.manifest)) {
+        const cleanManifest = body.manifest.slice(0, 400).map((m: any) => ({
+          id: String(m.id || '').slice(0, 100),
+          name: String(m.name || m.id || '').slice(0, 100),
+          version: String(m.version || '').slice(0, 50),
+          enabled: Boolean(m.enabled)
+        }));
+        lobby.manifests = { [hostName]: cleanManifest };
+        lobby.manifestHashes = { [hostName]: computeModManifestHash(cleanManifest) };
+      }
+
       await store.set(lobby, 1800);
 
       sendJson(res, 201, {
@@ -183,8 +194,22 @@ export const server = http.createServer(async (req, res) => {
 
       if (!lobby.players.includes(playerName)) {
         lobby.players.push(playerName);
-        await store.set(lobby, 1800);
       }
+
+      if (Array.isArray(body.manifest)) {
+        lobby.manifests = lobby.manifests || {};
+        lobby.manifestHashes = lobby.manifestHashes || {};
+        const cleanManifest = body.manifest.slice(0, 400).map((m: any) => ({
+          id: String(m.id || '').slice(0, 100),
+          name: String(m.name || m.id || '').slice(0, 100),
+          version: String(m.version || '').slice(0, 50),
+          enabled: Boolean(m.enabled)
+        }));
+        lobby.manifests[playerName] = cleanManifest;
+        lobby.manifestHashes[playerName] = computeModManifestHash(cleanManifest);
+      }
+
+      await store.set(lobby, 1800);
 
       sendJson(res, 200, {
         success: true,
@@ -225,6 +250,48 @@ export const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // 2c. POST /api/lobby/manifest (обновление манифеста модов)
+    if (req.method === 'POST' && (pathname === '/api/lobby/manifest' || pathname === '/api/manifest')) {
+      const body = await parseBody(req);
+      const code = (body.code || '').toUpperCase().trim();
+      const playerName = (body.playerName || '').trim();
+
+      if (!code || !playerName) {
+        sendJson(res, 400, { error: 'code and playerName required' });
+        return;
+      }
+
+      const lobby = await store.get(code);
+      if (!lobby || lobby.status === 'closed') {
+        sendJson(res, 404, { error: 'Lobby not found or closed' });
+        return;
+      }
+
+      const rawManifest = Array.isArray(body.manifest) ? body.manifest : [];
+      const cleanManifest = rawManifest.slice(0, 400).map((m: any) => ({
+        id: String(m.id || '').slice(0, 100),
+        name: String(m.name || m.id || '').slice(0, 100),
+        version: String(m.version || '').slice(0, 50),
+        enabled: Boolean(m.enabled)
+      }));
+      const hash = computeModManifestHash(cleanManifest);
+
+      lobby.manifests = lobby.manifests || {};
+      lobby.manifestHashes = lobby.manifestHashes || {};
+      lobby.manifests[playerName] = cleanManifest;
+      lobby.manifestHashes[playerName] = hash;
+
+      await store.set(lobby, 1800);
+
+      const modSync = computeLobbyModSync(lobby);
+      sendJson(res, 200, {
+        success: true,
+        hash,
+        modSync
+      });
+      return;
+    }
+
     // 3. GET /api/lobby/status
     if (req.method === 'GET' && (pathname === '/api/lobby/status' || pathname === '/api/status' || pathname === '/status')) {
       const code = ((parsedUrl.query.code as string) || '').toUpperCase().trim();
@@ -239,6 +306,8 @@ export const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const modSync = computeLobbyModSync(lobby);
+
       sendJson(res, 200, {
         code: lobby.code,
         status: lobby.status,
@@ -246,7 +315,8 @@ export const server = http.createServer(async (req, res) => {
         playerCount: lobby.players.length,
         players: lobby.players,
         hostName: lobby.hostName,
-        lastHeartbeat: lobby.lastHeartbeat
+        lastHeartbeat: lobby.lastHeartbeat,
+        modSync
       });
       return;
     }

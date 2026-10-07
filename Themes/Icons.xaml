@@ -21,6 +21,7 @@
     <StreamGeometry x:Key="IconClose">M18,6 L6,18 M6,6 L18,18</StreamGeometry>
     <StreamGeometry x:Key="IconMaximize">M3,3 H21 V21 H3 Z</StreamGeometry>
     <StreamGeometry x:Key="IconRestore">M7,3 H21 V17 H17 M3,7 H17 V21 H3 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconWarning">M12,9 V13 M12,17 A0.5,0.5 0 1,0 12,17.01 M10.29,3.86 L1.82,18 A2,2 0 0,0 3.55,21 H20.45 A2,2 0 0,0 22.18,18 L13.71,3.86 A2,2 0 0,0 10.29,3.86 Z</StreamGeometry>
 
     <!-- Base Lucide Icon Style: uniform outline, inherits parent Foreground, default 14x14 -->
     <Style x:Key="IconPath" TargetType="Path">

@@ -62,12 +62,12 @@
                        Foreground="{StaticResource DimInkBrush}" />
         </StackPanel>
 
-        <!-- Fixed 2 Columns: left 344px, gap 40px, right 200px (total 584px) -->
+        <!-- Fixed 2 Columns: left 344px, gap 40px, right flexible (min 260px) -->
         <Grid Grid.Row="1" Focusable="False" ClipToBounds="False">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="344" />
                 <ColumnDefinition Width="40" />
-                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="*" MinWidth="260" MaxWidth="340" />
             </Grid.ColumnDefinitions>
 
             <!-- ============================================== -->
@@ -617,7 +617,11 @@
             <!-- RIGHT COLUMN: Players list (width 200px)       -->
             <!-- 54px rows with 1px lines top/bottom            -->
             <!-- ============================================== -->
-            <StackPanel Grid.Column="2" Width="200" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <!-- ============================================== -->
+            <!-- RIGHT COLUMN: Players list                      -->
+            <!-- 54px rows with 1px lines top/bottom            -->
+            <!-- ============================================== -->
+            <StackPanel Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Top">
                 <TextBlock Text="Игроки"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="18"
@@ -625,13 +629,23 @@
                            Foreground="{StaticResource DimInkBrush}"
                            Margin="0,0,0,8" />
 
+                <!-- Quiet notification bar (Requirement 6, 6 seconds) -->
+                <Border Margin="0,0,0,8"
+                        Padding="0,2"
+                        Visibility="{Binding IsSyncNoticeVisible, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding SyncNoticeText}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource Accent}"
+                               TextWrapping="Wrap" />
+                </Border>
+
                 <!-- Empty State -->
                 <TextBlock Text="Игроки появятся здесь, когда вы создадите лобби или войдёте по коду."
                            FontFamily="{StaticResource MainFont}"
                            FontSize="13"
                            Foreground="{StaticResource MuteBrush}"
                            TextWrapping="Wrap"
-                           MaxWidth="200"
                            LineHeight="18">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -697,6 +711,7 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
                                     <!-- Head 40x40 nearest neighbor -->
@@ -707,14 +722,15 @@
                                                Stretch="UniformToFill" />
                                     </Border>
 
-                                    <!-- Nick 15px 600 -->
+                                    <!-- Nick 14px 600 -->
                                     <TextBlock Grid.Column="1" Text="{Binding Nickname}"
                                                FontFamily="{StaticResource MainFont}"
-                                               FontSize="15" FontWeight="SemiBold"
+                                               FontSize="14" FontWeight="SemiBold"
                                                Foreground="{StaticResource InkBrush}"
                                                VerticalAlignment="Center"
-                                               Margin="10,0,6,0"
-                                               TextWrapping="Wrap" />
+                                               Margin="8,0,6,0"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding Nickname}" />
 
                                     <!-- Badge "хост" 12px ember -->
                                     <TextBlock Grid.Column="2" Text="хост"
@@ -725,8 +741,66 @@
                                                Margin="0,0,8,0"
                                                Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
 
+                                    <!-- Mod Sync Badge (Requirement 4) -->
+                                    <Button Grid.Column="3"
+                                            Command="{Binding OpenMismatchDialogCommand}"
+                                            Cursor="Hand"
+                                            Margin="0,0,8,0"
+                                            VerticalAlignment="Center"
+                                            ToolTip="{Binding ModSyncTooltip}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <ContentPresenter />
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <!-- Synced state -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        Visibility="{Binding IsModSyncSynced, Converter={StaticResource BoolToVis}}">
+                                                <Path Data="{StaticResource IconCheck}"
+                                                      Fill="{StaticResource MuteBrush}"
+                                                      Width="11" Height="11"
+                                                      Stretch="Uniform"
+                                                      Margin="0,0,4,0"
+                                                      VerticalAlignment="Center" />
+                                                <TextBlock Text="Моды совпадают"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource MuteBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <!-- Mismatch state -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        Visibility="{Binding IsModSyncMismatch, Converter={StaticResource BoolToVis}}">
+                                                <Path Data="{StaticResource IconWarning}"
+                                                      Fill="{DynamicResource Accent}"
+                                                      Width="11" Height="11"
+                                                      Stretch="Uniform"
+                                                      Margin="0,0,4,0"
+                                                      VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding ModSyncBadgeText}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="11"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource Accent}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+
+                                            <!-- Unverified state -->
+                                            <StackPanel Orientation="Horizontal"
+                                                        Visibility="{Binding IsModSyncUnverified, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="Не проверен"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="11"
+                                                           Foreground="{StaticResource MuteBrush}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Button>
+
                                     <!-- Green dot -->
-                                    <Border Grid.Column="3" Width="8" Height="8" CornerRadius="2"
+                                    <Border Grid.Column="4" Width="8" Height="8" CornerRadius="2"
                                             Background="{StaticResource OkBrush}"
                                             VerticalAlignment="Center" />
                                 </Grid>
@@ -735,6 +809,169 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
+        </Grid>
+
+        <!-- ============================================== -->
+        <!-- MOD MISMATCH DIALOG (MODAL OVERLAY)           -->
+        <!-- ============================================== -->
+        <Grid Grid.RowSpan="2"
+              Visibility="{Binding IsModMismatchDialogVisible, Converter={StaticResource BoolToVis}}"
+              Background="#B2071017"
+              KeyboardNavigation.TabNavigation="Cycle">
+            <Grid.InputBindings>
+                <KeyBinding Key="Escape" Command="{Binding CancelMismatchDialogCommand}" />
+            </Grid.InputBindings>
+
+            <Border Background="{DynamicResource Panel}"
+                    BorderBrush="{DynamicResource Border}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    MinWidth="420"
+                    MaxWidth="560"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="28,24">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Title: Oswald 26 -->
+                    <TextBlock Grid.Row="0"
+                               Text="{Binding ModMismatchTitle}"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="26"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10" />
+
+                    <!-- Summary -->
+                    <TextBlock Grid.Row="1"
+                               Text="{Binding ModMismatchSummary}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="14"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,16" />
+
+                    <!-- Discrepancies List in ScrollViewer (MaxHeight ~280) -->
+                    <ScrollViewer Grid.Row="2"
+                                  MaxHeight="280"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Margin="0,0,0,12">
+                        <ItemsControl ItemsSource="{Binding ModMismatchItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource LineInkBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="0,8">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Mod name: wrap or ellipsis with tooltip -->
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding ModName}"
+                                                       FontFamily="{StaticResource MainFont}"
+                                                       FontSize="13"
+                                                       FontWeight="Medium"
+                                                       Foreground="{DynamicResource TextPrimary}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding ModName}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,12,0" />
+
+                                            <!-- Mismatch description on right -->
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding DisplayDescription}"
+                                                       FontFamily="{StaticResource MainFont}"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource MuteBrush}"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <!-- Warning Notices -->
+                    <StackPanel Grid.Row="3" Margin="0,4,0,16">
+                        <TextBlock Text="Эти моды нужно обновить в сборке"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Accent}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,4"
+                                   Visibility="{Binding HasUnfixableMods, Converter={StaticResource BoolToVis}}" />
+
+                        <TextBlock Text="Изменения вступят в силу после перезапуска игры"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Danger}"
+                                   TextWrapping="Wrap"
+                                   Visibility="{Binding IsGameRunningWarning, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+
+                    <!-- Buttons Row -->
+                    <WrapPanel Grid.Row="4"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center">
+                        <!-- Fix & Proceed / Fix button (Accent filled) -->
+                        <Button Command="{Binding FixAndProceedCommand}"
+                                Content="{Binding FixButtonText}"
+                                Padding="16,8"
+                                Margin="0,0,10,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding CanFixAny}" Value="True" />
+                                                <Condition Binding="{Binding IsGameRunningWarning}" Value="False" />
+                                                <Condition Binding="{Binding IsViewOnlyDialogMode}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </MultiDataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- "Войти как есть" button -->
+                        <Button Command="{Binding JoinAsIsCommand}"
+                                Content="Войти как есть"
+                                Padding="14,8"
+                                Margin="0,0,10,0">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsJoinDialogMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+
+                        <!-- Cancel / Later / Close button -->
+                        <Button Command="{Binding CancelMismatchDialogCommand}"
+                                Content="{Binding CancelButtonText}"
+                                Style="{StaticResource StandardBtn}"
+                                Padding="14,8" />
+                    </WrapPanel>
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

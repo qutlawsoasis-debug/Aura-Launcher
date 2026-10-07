@@ -35,12 +35,13 @@ public class LobbyApiClient : ILobbyApiClient
         return new Uri(new Uri(baseStr), relativePath);
     }
 
-    public async Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, CancellationToken cancellationToken = default)
+    public async Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, IReadOnlyList<ModManifestEntry>? manifest = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            var payload = manifest != null ? (object)new { hostName, manifest } : new { hostName };
             var content = new StringContent(
-                JsonSerializer.Serialize(new { hostName }),
+                JsonSerializer.Serialize(payload),
                 Encoding.UTF8,
                 "application/json");
 
@@ -56,12 +57,13 @@ public class LobbyApiClient : ILobbyApiClient
         }
     }
 
-    public async Task<LobbyJoinResponse?> JoinLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default)
+    public async Task<LobbyJoinResponse?> JoinLobbyAsync(string code, string playerName, IReadOnlyList<ModManifestEntry>? manifest = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            var payload = manifest != null ? (object)new { code, playerName, manifest } : new { code, playerName };
             var content = new StringContent(
-                JsonSerializer.Serialize(new { code, playerName }),
+                JsonSerializer.Serialize(payload),
                 Encoding.UTF8,
                 "application/json");
 
@@ -74,6 +76,24 @@ public class LobbyApiClient : ILobbyApiClient
         catch
         {
             return null;
+        }
+    }
+
+    public async Task<bool> UpdateManifestAsync(string code, string playerName, IReadOnlyList<ModManifestEntry> manifest, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = new StringContent(
+                JsonSerializer.Serialize(new { code, playerName, manifest }),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/manifest"), content, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
         }
     }
 
