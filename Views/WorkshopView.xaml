@@ -44,22 +44,31 @@
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="behaviors:SmoothToggle.IsEnabled" Value="True" />
+            <Setter Property="behaviors:SmoothToggle.UncheckedLeft" Value="3" />
+            <Setter Property="behaviors:SmoothToggle.CheckedLeft" Value="21" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type CheckBox}">
-                        <Border x:Name="Track" Width="38" Height="20" CornerRadius="3"
-                                Background="{StaticResource TrackSubtle}">
-                            <Grid>
-                                <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="2"
-                                        Background="{StaticResource TextPrimary}"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center"
-                                        Margin="3,0,0,0" />
-                            </Grid>
-                        </Border>
+                        <Grid Width="38" Height="20">
+                            <Border x:Name="Track" CornerRadius="3"
+                                    Background="{StaticResource TrackSubtle}" />
+                            <Border x:Name="ActiveTrack" CornerRadius="3"
+                                    Background="{StaticResource Accent}"
+                                    Opacity="0" />
+                            <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="2"
+                                    Background="{StaticResource TextPrimary}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Margin="3,0,0,0">
+                                <Border x:Name="ThumbActive" CornerRadius="2"
+                                        Background="{StaticResource Night}"
+                                        Opacity="0" />
+                            </Border>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}" />
-                                <Setter TargetName="Thumb" Property="Background" Value="{StaticResource Night}" />
+                                <Setter TargetName="ActiveTrack" Property="Opacity" Value="1" />
+                                <Setter TargetName="ThumbActive" Property="Opacity" Value="1" />
                                 <Setter TargetName="Thumb" Property="Margin" Value="21,0,0,0" />
                             </Trigger>
                         </ControlTemplate.Triggers>
