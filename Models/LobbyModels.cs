@@ -88,6 +88,11 @@ public record TunnelConfigResponse(string? Secret, string? PublicAddress, int? P
 
 public class LobbyPlayerItem : System.ComponentModel.INotifyPropertyChanged
 {
+    private static System.Windows.Media.Media3D.Model3D? _defaultSteveModel3D;
+    public static System.Windows.Media.Media3D.Model3D DefaultSteveModel3D =>
+        _defaultSteveModel3D ??= AuraLauncher.Core.SkinModel3DBuilder.BuildPlayerModel(
+            AuraLauncher.Services.Implementations.SkinService.LoadDefaultSteveBitmap(), false);
+
     private string _nickname = "";
     public string Nickname
     {
@@ -99,14 +104,75 @@ public class LobbyPlayerItem : System.ComponentModel.INotifyPropertyChanged
     public bool IsHost
     {
         get => _isHost;
-        set { if (_isHost != value) { _isHost = value; OnPropertyChanged(nameof(IsHost)); } }
+        set
+        {
+            if (_isHost != value)
+            {
+                _isHost = value;
+                OnPropertyChanged(nameof(IsHost));
+                OnPropertyChanged(nameof(IsGuest));
+            }
+        }
     }
+
+    public bool IsGuest => !_isHost;
 
     private System.Windows.Media.ImageSource? _avatar;
     public System.Windows.Media.ImageSource? Avatar
     {
         get => _avatar;
         set { if (_avatar != value) { _avatar = value; OnPropertyChanged(nameof(Avatar)); } }
+    }
+
+    private System.Windows.Media.Media3D.Model3D? _playerModel3D;
+    public System.Windows.Media.Media3D.Model3D PlayerModel3D
+    {
+        get => _playerModel3D ?? DefaultSteveModel3D;
+        set { if (_playerModel3D != value) { _playerModel3D = value; OnPropertyChanged(nameof(PlayerModel3D)); } }
+    }
+
+    public bool HasCustomModel3D => _playerModel3D != null;
+
+    private int _stageSlotIndex;
+    public int StageSlotIndex
+    {
+        get => _stageSlotIndex;
+        set { if (_stageSlotIndex != value) { _stageSlotIndex = value; OnPropertyChanged(nameof(StageSlotIndex)); } }
+    }
+
+    private double _stageOffsetX;
+    public double StageOffsetX
+    {
+        get => _stageOffsetX;
+        set { if (System.Math.Abs(_stageOffsetX - value) > 0.01) { _stageOffsetX = value; OnPropertyChanged(nameof(StageOffsetX)); } }
+    }
+
+    private double _stageOffsetY;
+    public double StageOffsetY
+    {
+        get => _stageOffsetY;
+        set { if (System.Math.Abs(_stageOffsetY - value) > 0.01) { _stageOffsetY = value; OnPropertyChanged(nameof(StageOffsetY)); } }
+    }
+
+    private double _stageScale = 1.0;
+    public double StageScale
+    {
+        get => _stageScale;
+        set { if (System.Math.Abs(_stageScale - value) > 0.001) { _stageScale = value; OnPropertyChanged(nameof(StageScale)); } }
+    }
+
+    private double _stageYawAngle = -8.0;
+    public double StageYawAngle
+    {
+        get => _stageYawAngle;
+        set { if (System.Math.Abs(_stageYawAngle - value) > 0.01) { _stageYawAngle = value; OnPropertyChanged(nameof(StageYawAngle)); } }
+    }
+
+    private int _stageZIndex = 10;
+    public int StageZIndex
+    {
+        get => _stageZIndex;
+        set { if (_stageZIndex != value) { _stageZIndex = value; OnPropertyChanged(nameof(StageZIndex)); } }
     }
 
     private bool _isNewlyAdded;

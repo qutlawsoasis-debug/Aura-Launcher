@@ -2859,6 +2859,12 @@ public static class SceneDiagnostics
                             IsHost = false,
                             Avatar = mainVm.PlayerAvatar
                         });
+                        lvm.LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = "AlexBuilder",
+                            IsHost = false,
+                            Avatar = SkinService.LoadDefaultSteveBitmap()
+                        });
                         typeof(LobbyViewModel).GetMethod("NotifyCellPropertiesChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
                         typeof(LobbyViewModel).GetMethod("NotifyStatusStateChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.Invoke(lvm, null);
                     });

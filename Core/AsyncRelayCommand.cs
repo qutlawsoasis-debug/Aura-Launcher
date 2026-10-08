@@ -13,10 +13,20 @@ public class AsyncRelayCommand : ICommand
     private readonly Predicate<object?>? _canExecute;
     private bool _isExecuting;
 
+    private event EventHandler? _canExecuteChanged;
+
     public event EventHandler? CanExecuteChanged
     {
-        add => CommandManager.RequerySuggested += value;
-        remove => CommandManager.RequerySuggested -= value;
+        add
+        {
+            _canExecuteChanged += value;
+            CommandManager.RequerySuggested += value;
+        }
+        remove
+        {
+            _canExecuteChanged -= value;
+            CommandManager.RequerySuggested -= value;
+        }
     }
 
     public bool IsExecuting
@@ -78,5 +88,14 @@ public class AsyncRelayCommand : ICommand
         }
     }
 
-    public void RaiseCanExecuteChanged() => CommandManager.InvalidateRequerySuggested();
+    public void RaiseCanExecuteChanged()
+    {
+        if (System.Windows.Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(new Action(RaiseCanExecuteChanged));
+            return;
+        }
+        _canExecuteChanged?.Invoke(this, EventArgs.Empty);
+        CommandManager.InvalidateRequerySuggested();
+    }
 }

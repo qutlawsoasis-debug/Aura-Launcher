@@ -9,25 +9,29 @@
              ClipToBounds="False"
              Background="Transparent">
 
-
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
 
-        <!-- Converter or DataTrigger styles for Code Cell bottom lines -->
-        <!-- Empty: 18% white -->
-        <!-- Filled: ember 60% -->
-        <!-- Current: ember with blinking caret 1s -->
         <Style x:Key="CodeCellBorderStyle" TargetType="Border">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="58" />
-            <Setter Property="Background" Value="{DynamicResource Border}" /> <!-- White 7% -->
+            <Setter Property="Background" Value="{DynamicResource Border}" />
             <Setter Property="CornerRadius" Value="3" />
             <Setter Property="BorderThickness" Value="0,0,0,3" />
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" /> <!-- 18% white -->
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
 
-        <!-- Blinking caret 1s animation -->
+        <Style x:Key="CompactCodeCellBorderStyle" TargetType="Border">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Background" Value="{DynamicResource Border}" />
+            <Setter Property="CornerRadius" Value="3" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+        </Style>
+
         <Storyboard x:Key="BlinkingCaretAnim" RepeatBehavior="Forever">
             <DoubleAnimation Storyboard.TargetProperty="Opacity"
                              From="1.0" To="0.0" Duration="0:0:0.5" AutoReverse="True" />
@@ -35,57 +39,56 @@
     </UserControl.Resources>
 
     <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <!-- Header -->
-            <RowDefinition Height="*" />    <!-- Content -->
-        </Grid.RowDefinitions>
 
-        <!-- Header: Oswald 600 60px on top-left edge, 15px dim subtitle (Height=Auto, LineHeight 66, Margin сверху 6px) -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,24" Focusable="False">
-            <TextBlock Text="Лобби"
-                       FontFamily="{StaticResource HeadingFont}"
-                       FontSize="60"
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource InkBrush}"
-                       Height="Auto"
-                       LineHeight="66"
-                       LineStackingStrategy="BlockLineHeight"
-                       Margin="0,6,0,6">
-                <TextBlock.Effect>
-                    <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
-                </TextBlock.Effect>
-            </TextBlock>
-            <TextBlock Text="Совместная игра по сети через защищённый туннель"
-                       FontFamily="{StaticResource MainFont}"
-                       FontSize="15"
-                       FontWeight="Normal"
-                       Foreground="{StaticResource DimInkBrush}" />
-        </StackPanel>
+        <!-- СОСТОЯНИЕ 1: ВНЕ ЛОББИ (Создание / Вход по коду + 3D-превью своего персонажа) -->
+        <Grid Focusable="False">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsInLobby}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
 
-        <!-- Fixed 2 Columns: left 344px, gap 40px, right flexible (min 260px) -->
-        <Grid Grid.Row="1" Focusable="False" ClipToBounds="False">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="344" />
-                <ColumnDefinition Width="40" />
-                <ColumnDefinition Width="*" MinWidth="260" MaxWidth="340" />
-            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <!-- Left column: Lobby creation, join, and active lobby state -->
-            <Grid Grid.Column="0">
-                <!-- Not in lobby -->
-                <StackPanel VerticalAlignment="Top">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Visible" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsInLobby}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Margin="0,0,0,24" Focusable="False">
+                <TextBlock Text="Лобби"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="60"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource InkBrush}"
+                           Height="Auto"
+                           LineHeight="66"
+                           LineStackingStrategy="BlockLineHeight"
+                           Margin="0,6,0,6">
+                    <TextBlock.Effect>
+                        <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock Text="Совместная игра по сети через защищённый туннель"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="15"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource DimInkBrush}" />
+            </StackPanel>
 
-                    <!-- Main Button: "Создать лобби" -->
+            <Grid Grid.Row="1" Focusable="False">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="344" />
+                    <ColumnDefinition Width="24" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Левая колонка: Создать лобби / Код от друга -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Top">
                     <Button Command="{Binding CreateLobbyCommand}"
                             Style="{StaticResource PrimaryNeonBtn}"
                             Height="48"
@@ -94,7 +97,6 @@
                             Width="260"
                             Margin="0,0,0,20" />
 
-                    <!-- Line "или" with flanking lines -->
                     <Grid Width="260" HorizontalAlignment="Left" Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -110,17 +112,14 @@
                         <Border Grid.Column="2" Height="1" Background="{StaticResource LineInkBrush}" VerticalAlignment="Center" />
                     </Grid>
 
-                    <!-- "Код от друга" 13px mute -->
                     <TextBlock Text="Код от друга"
                                FontFamily="{StaticResource MainFont}"
                                FontSize="13"
                                Foreground="{StaticResource MuteBrush}"
                                Margin="0,0,0,8" />
 
-                    <!-- Six 44x58 code cells with gap 8 and hidden input + "Войти" button in WrapPanel -->
-                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,24">
+                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,20">
                         <Grid Margin="0,0,12,8">
-                            <!-- 6 visual cells -->
                             <StackPanel Orientation="Horizontal">
                                 <!-- Cell 0 -->
                                 <Border Margin="0,0,8,0">
@@ -142,7 +141,6 @@
                                                    FontSize="32" FontWeight="SemiBold"
                                                    Foreground="{StaticResource InkBrush}"
                                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                        <!-- Blinking Caret when current -->
                                         <Border Width="2" Height="28" Background="{StaticResource EmberBrush}"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"
                                                 Visibility="{Binding IsCellCurrent0, Converter={StaticResource BoolToVis}}" />
@@ -280,7 +278,6 @@
                                 </Border>
                             </StackPanel>
 
-                            <!-- Hidden transparent TextBox overlaid on the cells for real keyboard typing -->
                             <TextBox x:Name="HiddenCodeInputBox"
                                      Text="{Binding GuestCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                      MaxLength="6"
@@ -294,7 +291,6 @@
                                      VerticalAlignment="Stretch" />
                         </Grid>
 
-                        <!-- "Войти" button (height 58, disabled until 6 chars, shows "Входим…" while joining) -->
                         <Button Command="{Binding JoinLobbyCommand}"
                                 Style="{StaticResource StandardBtn}"
                                 Height="58"
@@ -302,8 +298,7 @@
                                 Margin="0,0,0,8" />
                     </WrapPanel>
 
-                    <!-- Error message under code line: 13px, disappears on typing -->
-                    <StackPanel Orientation="Vertical" Margin="0,0,0,16" Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}">
+                    <StackPanel Orientation="Vertical" Margin="0,0,0,12" Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="{Binding JoinErrorMessage}"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="13"
@@ -318,57 +313,104 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- In lobby -->
-                <StackPanel VerticalAlignment="Top">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsInLobby}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </StackPanel.Style>
+                <!-- Правая колонка: Подиум 3D-персонажа игрока до входа в лобби -->
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0">
+                    <Grid Width="156" Height="244">
+                        <Ellipse Width="88" Height="8"
+                                 Fill="{DynamicResource Shade40}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Bottom"
+                                 Margin="0,0,0,12" />
+                        <Viewport3D Width="156" Height="244" ClipToBounds="False" IsHitTestVisible="False">
+                            <Viewport3D.Camera>
+                                <PerspectiveCamera Position="0,0,27.5"
+                                                   LookDirection="0,0,-1"
+                                                   UpDirection="0,1,0"
+                                                   FieldOfView="45" />
+                            </Viewport3D.Camera>
+                            <ModelVisual3D Content="{Binding LocalPlayerModel3D}">
+                                <ModelVisual3D.Transform>
+                                    <Transform3DGroup>
+                                        <RotateTransform3D>
+                                            <RotateTransform3D.Rotation>
+                                                <AxisAngleRotation3D Axis="0,1,0" Angle="-14" />
+                                            </RotateTransform3D.Rotation>
+                                        </RotateTransform3D>
+                                        <RotateTransform3D>
+                                            <RotateTransform3D.Rotation>
+                                                <AxisAngleRotation3D Axis="1,0,0" Angle="4" />
+                                            </RotateTransform3D.Rotation>
+                                        </RotateTransform3D>
+                                    </Transform3DGroup>
+                                </ModelVisual3D.Transform>
+                            </ModelVisual3D>
+                        </Viewport3D>
+                    </Grid>
 
-                    <!-- "Код лобби" -->
-                    <TextBlock Text="Код лобби"
+                    <TextBlock Text="{Binding LocalPlayerNickname}"
                                FontFamily="{StaticResource MainFont}"
-                               FontSize="13"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,4,0,0" />
+
+                    <TextBlock Text="Готов к лобби"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
                                Foreground="{StaticResource MuteBrush}"
-                               Margin="0,0,0,8" />
+                               HorizontalAlignment="Center"
+                               Margin="0,2,0,0" />
+                </StackPanel>
+            </Grid>
+        </Grid>
 
-                    <!-- Six cells displaying LobbyCode (304px total width) -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
-                            <TextBlock Text="{Binding CodeChar0}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
-                            <TextBlock Text="{Binding CodeChar1}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
-                            <TextBlock Text="{Binding CodeChar2}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
-                            <TextBlock Text="{Binding CodeChar3}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" Margin="0,0,8,0" BorderBrush="{DynamicResource AccentDim}">
-                            <TextBlock Text="{Binding CodeChar4}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <Border Style="{StaticResource CodeCellBorderStyle}" BorderBrush="{DynamicResource AccentDim}">
-                            <TextBlock Text="{Binding CodeChar5}" FontFamily="{StaticResource HeadingFont}" FontSize="32" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                    </StackPanel>
+        <!-- СОСТОЯНИЕ 2: В ЛОББИ (Сцена в стиле CS2 / Brawl Stars: Хост по центру с короной, друзья по бокам) -->
+        <Grid Focusable="False">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsInLobby}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
 
-                    <!-- Status string with square 10x10 dot (radius 2):
-                         waiting ember pulsing 1.4s, ok static -->
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
-                        <!-- 10x10 status square -->
-                        <Border Width="10" Height="10" CornerRadius="2" Margin="0,0,10,0" VerticalAlignment="Center">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" /> <!-- Верхняя панель: заголовок + статус слева, код лобби справа -->
+                <RowDefinition Height="*" />    <!-- Центральная сцена с персонажами -->
+                <RowDefinition Height="Auto" /> <!-- Нижняя панель действий -->
+            </Grid.RowDefinitions>
+
+            <!-- Верхняя панель -->
+            <Grid Grid.Row="0" Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Слева: Заголовок Лобби + Статус -->
+                <StackPanel Grid.Column="0" VerticalAlignment="Top">
+                    <TextBlock Text="Лобби"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="42"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkBrush}"
+                               LineHeight="46"
+                               LineStackingStrategy="BlockLineHeight"
+                               Margin="0,2,0,6">
+                        <TextBlock.Effect>
+                            <DropShadowEffect Color="{DynamicResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                        </TextBlock.Effect>
+                    </TextBlock>
+
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="10" Height="10" CornerRadius="2" Margin="0,0,8,0" VerticalAlignment="Center">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Background" Value="{StaticResource EmberBrush}" />
-                                    <!-- Default: waiting pulse 1.4s -->
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsStatusWaiting}" Value="True">
                                             <Setter Property="Background" Value="{StaticResource EmberBrush}" />
@@ -390,397 +432,365 @@
                             </Border.Style>
                         </Border>
 
-                        <!-- Status text ("Ждём, пока вы откроете мир" / "Мир открыт для сети" / "Ждём хоста" / "Хост открыл мир") -->
                         <TextBlock Text="{Binding CombinedStatusText}"
                                    FontFamily="{StaticResource MainFont}"
-                                   FontSize="14"
+                                   FontSize="13"
                                    FontWeight="Medium"
                                    Foreground="{StaticResource InkBrush}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <!-- Ошибка туннеля: кнопка "Отправить отчёт" -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16"
-                                Visibility="{Binding ShowTunnelFailedLogButton, Converter={StaticResource BoolToVis}}">
-                        <Button Command="{Binding SendReportCommand}"
-                                Style="{StaticResource BadLinkBtn}"
-                                Content="Отправить отчёт об ошибке туннеля"
-                                VerticalAlignment="Center"
-                                Margin="0,0,14,0" />
-                        <Button Command="{Binding CopyTunnelLogCommand}"
-                                Style="{StaticResource StandardBtn}"
-                                Height="28"
-                                Padding="12,0"
-                                FontSize="12"
-                                Content="Копировать лог туннеля"
-                                VerticalAlignment="Center" />
-                    </StackPanel>
+                    <Border Margin="0,4,0,0"
+                            Visibility="{Binding IsSyncNoticeVisible, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding SyncNoticeText}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Accent}"
+                                   TextWrapping="Wrap" />
+                    </Border>
+                </StackPanel>
 
-                    <!-- Main buttons row in WrapPanel: [Открыть мир / Подключиться к игре] [Копировать] [Выйти из лобби] -->
-                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,20">
-                        <!-- Host: "Открыть мир" button -->
-                        <Button Command="{Binding OpenWorldCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Height="48"
-                                Content="Открыть мир"
-                                Margin="0,0,12,8"
-                                Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
-
-                        <!-- Guest: "Подключиться к игре" button -->
-                        <Button Command="{Binding ConnectToGameCommand}"
-                                Style="{StaticResource LobbyGuestConnectBtn}"
-                                Height="48"
-                                Content="Подключиться к игре"
-                                Margin="0,0,12,8" />
-
-                        <!-- Guest: "Переподключиться" button (активна при вылете или возможности повторного подключения) -->
-                        <Button Command="{Binding ReconnectCommand}"
-                                Style="{StaticResource LobbyGuestReconnectBtn}"
-                                Height="48"
-                                Content="Переподключиться"
-                                Margin="0,0,12,8" />
-
-                        <!-- "Копировать" / "Скопировано" Button -->
-                        <Button Command="{Binding CopyCodeCommand}"
-                                Height="48"
-                                Width="155"
-                                Style="{StaticResource StandardBtn}"
-                                Margin="0,0,12,8">
-                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="Копировать" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Opacity" Value="1.0" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding CodeCopied}" Value="True">
-                                                    <DataTrigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.EnterActions>
-                                                    <DataTrigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.ExitActions>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="Скопировано!" Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Opacity" Value="0.0" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding CodeCopied}" Value="True">
-                                                    <DataTrigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.EnterActions>
-                                                    <DataTrigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.ExitActions>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </Button>
-
-                        <!-- "Копировать ссылку" Button -->
-                        <Button Command="{Binding CopyLinkCommand}"
-                                Height="48"
-                                Width="195"
-                                Style="{StaticResource StandardBtn}"
-                                Margin="0,0,12,8">
-                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock Text="Копировать ссылку" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Opacity" Value="1.0" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
-                                                    <DataTrigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.EnterActions>
-                                                    <DataTrigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.ExitActions>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="Скопировано!" Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Opacity" Value="0.0" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
-                                                    <DataTrigger.EnterActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.EnterActions>
-                                                    <DataTrigger.ExitActions>
-                                                        <BeginStoryboard>
-                                                            <Storyboard>
-                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0.0" Duration="0:0:0.15" />
-                                                            </Storyboard>
-                                                        </BeginStoryboard>
-                                                    </DataTrigger.ExitActions>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </Button>
-
-                        <!-- "Выйти из лобби" link in bad color -->
+                <!-- Справа: Код лобби + кнопки Копировать / Ссылка / Выйти -->
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
+                    <Grid Margin="0,0,0,4">
+                        <TextBlock Text="Код лобби"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center" />
                         <Button Command="{Binding LeaveLobbyCommand}"
                                 Style="{StaticResource BadLinkBtn}"
                                 Content="Выйти из лобби"
-                                Margin="0,0,0,8"
+                                HorizontalAlignment="Right"
                                 VerticalAlignment="Center" />
-                    </WrapPanel>
+                    </Grid>
 
-                    <!-- Warning note for host: "Не показывайте код посторонним: в этом режиме проверка лицензии отключена."
-                         13px dim, 2px ember left border, padding 12px -->
-                    <Border BorderBrush="{StaticResource EmberBrush}"
-                            BorderThickness="2,0,0,0"
-                            Padding="12,4,0,4"
-                            Margin="0,4,0,0"
-                            HorizontalAlignment="Left"
-                            Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="Не показывайте код посторонним: в этом режиме проверка лицензии отключена."
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="13"
-                                   FontWeight="Normal"
-                                   Foreground="{StaticResource DimInkBrush}"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="360" />
-                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <Border Style="{StaticResource CompactCodeCellBorderStyle}" Margin="0,0,6,0">
+                            <TextBlock Text="{Binding CodeChar0}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CompactCodeCellBorderStyle}" Margin="0,0,6,0">
+                            <TextBlock Text="{Binding CodeChar1}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CompactCodeCellBorderStyle}" Margin="0,0,6,0">
+                            <TextBlock Text="{Binding CodeChar2}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CompactCodeCellBorderStyle}" Margin="0,0,6,0">
+                            <TextBlock Text="{Binding CodeChar3}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CompactCodeCellBorderStyle}" Margin="0,0,6,0">
+                            <TextBlock Text="{Binding CodeChar4}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Border Style="{StaticResource CompactCodeCellBorderStyle}">
+                            <TextBlock Text="{Binding CodeChar5}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Command="{Binding CopyCodeCommand}"
+                                Height="30"
+                                Width="98"
+                                FontSize="12"
+                                Padding="8,0"
+                                Style="{StaticResource StandardBtn}"
+                                Margin="0,0,6,0">
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Копировать" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CodeCopied}" Value="True">
+                                                    <Setter Property="Opacity" Value="0.0" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Скопировано" FontSize="12" Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="0.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding CodeCopied}" Value="True">
+                                                    <Setter Property="Opacity" Value="1.0" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Button>
+
+                        <Button Command="{Binding CopyLinkCommand}"
+                                Height="30"
+                                Width="106"
+                                FontSize="12"
+                                Padding="8,0"
+                                Style="{StaticResource StandardBtn}">
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="Ссылка" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                                    <Setter Property="Opacity" Value="0.0" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="Скопировано" FontSize="12" Foreground="{StaticResource OkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Opacity" Value="0.0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsLinkCopied}" Value="True">
+                                                    <Setter Property="Opacity" Value="1.0" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
 
-            <!-- Right column: Players list (54px rows with 1px lines top/bottom) -->
-            <StackPanel Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                <TextBlock Text="Игроки"
-                           FontFamily="{StaticResource HeadingFont}"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           Foreground="{StaticResource DimInkBrush}"
-                           Margin="0,0,0,8" />
+            <!-- Центральная сцена с персонажами (CS2 / Brawl Stars раскладка) -->
+            <Grid Grid.Row="1" ClipToBounds="True" Margin="0,2,0,2">
+                <!-- Линия подиума на фоне -->
+                <Border Height="1"
+                        Background="{StaticResource LineInkBrush}"
+                        VerticalAlignment="Bottom"
+                        Margin="16,0,16,52" />
 
-                <!-- Quiet notification bar (Requirement 6, 6 seconds) -->
-                <Border Margin="0,0,0,8"
-                        Padding="0,2"
-                        Visibility="{Binding IsSyncNoticeVisible, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="{Binding SyncNoticeText}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="12"
-                               Foreground="{DynamicResource Accent}"
-                               TextWrapping="Wrap" />
-                </Border>
-
-                <!-- Empty State -->
-                <TextBlock Text="Игроки появятся здесь, когда вы создадите лобби или войдёте по коду."
-                           FontFamily="{StaticResource MainFont}"
-                           FontSize="13"
-                           Foreground="{StaticResource MuteBrush}"
-                           TextWrapping="Wrap"
-                           LineHeight="18">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Visibility" Value="Visible" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsInLobby}" Value="True">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                </DataTrigger>
-                            </Style.Triggers>
+                <ItemsControl ItemsSource="{Binding LobbyPlayers}"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="HorizontalAlignment" Value="Center" />
+                            <Setter Property="VerticalAlignment" Value="Bottom" />
+                            <Setter Property="Panel.ZIndex" Value="{Binding StageZIndex}" />
                         </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-
-                <!-- Players Rows (when in lobby) -->
-                <ItemsControl ItemsSource="{Binding LobbyPlayers}">
-                    <ItemsControl.Style>
-                        <Style TargetType="ItemsControl">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsInLobby}" Value="True">
-                                    <Setter Property="Visibility" Value="Visible" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </ItemsControl.Style>
+                    </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <!-- 54px row with 1px top border (and bottom on last item) -->
-                            <Border Height="54" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,1,0,0" Background="Transparent">
-                                <!-- Animation: new player slides in from -14px in 320ms ONLY when IsNewlyAdded=True -->
+                            <Border Width="132"
+                                    Background="Transparent"
+                                    RenderTransformOrigin="0.5,0.85"
+                                    Margin="0,0,0,4">
                                 <Border.RenderTransform>
-                                    <TranslateTransform x:Name="PlayerTrans" X="0" />
+                                    <TransformGroup>
+                                        <ScaleTransform ScaleX="{Binding StageScale}" ScaleY="{Binding StageScale}" />
+                                        <TranslateTransform X="{Binding StageOffsetX}" Y="{Binding StageOffsetY}" />
+                                    </TransformGroup>
                                 </Border.RenderTransform>
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsNewlyAdded}" Value="True">
-                                                <DataTrigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                                             From="-14" To="0" Duration="0:0:0.320">
-                                                                <DoubleAnimation.EasingFunction>
-                                                                    <CubicEase EasingMode="EaseOut" />
-                                                                </DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                                             From="0" To="1" Duration="0:0:0.320">
-                                                                <DoubleAnimation.EasingFunction>
-                                                                    <CubicEase EasingMode="EaseOut" />
-                                                                </DoubleAnimation.EasingFunction>
-                                                            </DoubleAnimation>
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </DataTrigger.EnterActions>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <Grid VerticalAlignment="Center">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="40" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
 
-                                    <!-- Head 40x40 nearest neighbor -->
-                                    <Border Grid.Column="0" Width="40" Height="40" CornerRadius="2" ClipToBounds="True" Background="{DynamicResource PanelRaised}">
-                                        <Image Source="{Binding Avatar}" Width="40" Height="40"
-                                               RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                               RenderOptions.EdgeMode="Aliased"
-                                               Stretch="UniformToFill" />
-                                    </Border>
+                                <StackPanel HorizontalAlignment="Center">
+                                    <!-- 3D Персонаж + тень под ногами -->
+                                    <Grid Width="128" Height="210">
+                                        <!-- Овальная тень под ногами -->
+                                        <Ellipse Width="78" Height="8"
+                                                 Fill="{DynamicResource Shade40}"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Bottom"
+                                                 Margin="0,0,0,10" />
 
-                                    <!-- Nick 14px 600 -->
-                                    <TextBlock Grid.Column="1" Text="{Binding Nickname}"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{StaticResource InkBrush}"
-                                               VerticalAlignment="Center"
-                                               Margin="8,0,6,0"
-                                               TextTrimming="CharacterEllipsis"
-                                               ToolTip="{Binding Nickname}" />
+                                        <!-- Тонкий акцентный ободок подиума у хоста -->
+                                        <Ellipse Width="86" Height="10"
+                                                 Stroke="{DynamicResource AccentDim}"
+                                                 StrokeThickness="1"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Bottom"
+                                                 Margin="0,0,0,9"
+                                                 Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
 
-                                    <!-- Badge "хост" 12px ember -->
-                                    <TextBlock Grid.Column="2" Text="хост"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{StaticResource EmberBrush}"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,8,0"
-                                               Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
+                                        <Viewport3D Width="128" Height="210"
+                                                    ClipToBounds="False"
+                                                    IsHitTestVisible="False">
+                                            <Viewport3D.Camera>
+                                                <PerspectiveCamera Position="0,0,27.5"
+                                                                   LookDirection="0,0,-1"
+                                                                   UpDirection="0,1,0"
+                                                                   FieldOfView="45" />
+                                            </Viewport3D.Camera>
+                                            <ModelVisual3D Content="{Binding PlayerModel3D}">
+                                                <ModelVisual3D.Transform>
+                                                    <Transform3DGroup>
+                                                        <RotateTransform3D>
+                                                            <RotateTransform3D.Rotation>
+                                                                <AxisAngleRotation3D Axis="0,1,0" Angle="{Binding StageYawAngle}" />
+                                                            </RotateTransform3D.Rotation>
+                                                        </RotateTransform3D>
+                                                        <RotateTransform3D>
+                                                            <RotateTransform3D.Rotation>
+                                                                <AxisAngleRotation3D Axis="1,0,0" Angle="4" />
+                                                            </RotateTransform3D.Rotation>
+                                                        </RotateTransform3D>
+                                                    </Transform3DGroup>
+                                                </ModelVisual3D.Transform>
+                                            </ModelVisual3D>
+                                        </Viewport3D>
+                                    </Grid>
 
-                                    <!-- Mod Sync Badge (Requirement 4) -->
-                                    <Button Grid.Column="3"
-                                            Command="{Binding OpenMismatchDialogCommand}"
-                                            Cursor="Hand"
-                                            Margin="0,0,8,0"
-                                            VerticalAlignment="Center"
-                                            ToolTip="{Binding ModSyncTooltip}">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <ContentPresenter />
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <!-- Synced state -->
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding IsModSyncSynced, Converter={StaticResource BoolToVis}}">
-                                                <Path Data="{StaticResource IconCheck}"
-                                                      Fill="{StaticResource MuteBrush}"
-                                                      Width="11" Height="11"
-                                                      Stretch="Uniform"
-                                                      Margin="0,0,4,0"
-                                                      VerticalAlignment="Center" />
-                                                <TextBlock Text="Моды совпадают"
-                                                           FontFamily="{StaticResource MainFont}"
-                                                           FontSize="11"
-                                                           Foreground="{StaticResource MuteBrush}"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
-
-                                            <!-- Mismatch state -->
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding IsModSyncMismatch, Converter={StaticResource BoolToVis}}">
-                                                <Path Data="{StaticResource IconWarning}"
-                                                      Fill="{DynamicResource Accent}"
-                                                      Width="11" Height="11"
-                                                      Stretch="Uniform"
-                                                      Margin="0,0,4,0"
-                                                      VerticalAlignment="Center" />
-                                                <TextBlock Text="{Binding ModSyncBadgeText}"
-                                                           FontFamily="{StaticResource MainFont}"
-                                                           FontSize="11"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource Accent}"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
-
-                                            <!-- Unverified state -->
-                                            <StackPanel Orientation="Horizontal"
-                                                        Visibility="{Binding IsModSyncUnverified, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="Не проверен"
-                                                           FontFamily="{StaticResource MainFont}"
-                                                           FontSize="11"
-                                                           Foreground="{StaticResource MuteBrush}"
-                                                           VerticalAlignment="Center" />
-                                            </StackPanel>
+                                    <!-- Подпись под персонажем: Ник + Корона у хоста / Статус модов у друзей -->
+                                    <StackPanel HorizontalAlignment="Center" Margin="0,2,0,0" MinHeight="38">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Border Width="6" Height="6"
+                                                    CornerRadius="1.5"
+                                                    Background="{StaticResource OkBrush}"
+                                                    VerticalAlignment="Center"
+                                                    Margin="0,0,5,0" />
+                                            <TextBlock Text="{Binding Nickname}"
+                                                       FontFamily="{StaticResource MainFont}"
+                                                       FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource InkBrush}"
+                                                       VerticalAlignment="Center"
+                                                       ToolTip="{Binding Nickname}" />
                                         </StackPanel>
-                                    </Button>
 
-                                    <!-- Green dot -->
-                                    <Border Grid.Column="4" Width="8" Height="8" CornerRadius="2"
-                                            Background="{StaticResource OkBrush}"
-                                            VerticalAlignment="Center" />
-                                </Grid>
+                                        <!-- Корона под ником у хоста -->
+                                        <Path Data="{StaticResource IconCrown}"
+                                              Fill="{DynamicResource Accent}"
+                                              Width="16" Height="13"
+                                              Stretch="Uniform"
+                                              HorizontalAlignment="Center"
+                                              Margin="0,4,0,0"
+                                              ToolTip="Хост лобби"
+                                              Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
+
+                                        <!-- Бейдж синхронизации модов под ником у друга -->
+                                        <Button Command="{Binding OpenMismatchDialogCommand}"
+                                                Cursor="Hand"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,3,0,0"
+                                                ToolTip="{Binding ModSyncTooltip}"
+                                                Visibility="{Binding IsGuest, Converter={StaticResource BoolToVis}}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <ContentPresenter />
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal"
+                                                            Visibility="{Binding IsModSyncSynced, Converter={StaticResource BoolToVis}}">
+                                                    <Path Data="{StaticResource IconCheck}"
+                                                          Fill="{StaticResource MuteBrush}"
+                                                          Width="10" Height="10"
+                                                          Stretch="Uniform"
+                                                          Margin="0,0,3,0"
+                                                          VerticalAlignment="Center" />
+                                                    <TextBlock Text="Моды совпадают"
+                                                               FontFamily="{StaticResource MainFont}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource MuteBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+
+                                                <StackPanel Orientation="Horizontal"
+                                                            Visibility="{Binding IsModSyncMismatch, Converter={StaticResource BoolToVis}}">
+                                                    <Path Data="{StaticResource IconWarning}"
+                                                          Fill="{DynamicResource Accent}"
+                                                          Width="10" Height="10"
+                                                          Stretch="Uniform"
+                                                          Margin="0,0,3,0"
+                                                          VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding ModSyncBadgeText}"
+                                                               FontFamily="{StaticResource MainFont}"
+                                                               FontSize="11"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource Accent}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+
+                                                <StackPanel Orientation="Horizontal"
+                                                            Visibility="{Binding IsModSyncUnverified, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Text="В лобби"
+                                                               FontFamily="{StaticResource MainFont}"
+                                                               FontSize="11"
+                                                               Foreground="{StaticResource MuteBrush}"
+                                                               VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+            </Grid>
+
+            <!-- Нижняя панель действий -->
+            <StackPanel Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="0,4,0,0">
+                <!-- Ошибка туннеля: кнопка "Отправить отчёт" -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,8"
+                            Visibility="{Binding ShowTunnelFailedLogButton, Converter={StaticResource BoolToVis}}">
+                    <Button Command="{Binding SendReportCommand}"
+                            Style="{StaticResource BadLinkBtn}"
+                            Content="Отправить отчёт об ошибке туннеля"
+                            VerticalAlignment="Center"
+                            Margin="0,0,12,0" />
+                    <Button Command="{Binding CopyTunnelLogCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Height="28"
+                            Padding="12,0"
+                            FontSize="12"
+                            Content="Копировать лог туннеля"
+                            VerticalAlignment="Center" />
+                </StackPanel>
+
+                <!-- Главная кнопка действия по центру (как в CS2 / Brawl Stars) -->
+                <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <!-- Host: "Открыть мир" -->
+                    <Button Command="{Binding OpenWorldCommand}"
+                            Style="{StaticResource PrimaryNeonBtn}"
+                            Height="44"
+                            MinWidth="220"
+                            Content="Открыть мир"
+                            Margin="6,0"
+                            Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
+
+                    <!-- Guest: "Подключиться к игре" -->
+                    <Button Command="{Binding ConnectToGameCommand}"
+                            Style="{StaticResource LobbyGuestConnectBtn}"
+                            Height="44"
+                            MinWidth="200"
+                            Content="Подключиться к игре"
+                            Margin="6,0" />
+
+                    <!-- Guest: "Переподключиться" -->
+                    <Button Command="{Binding ReconnectCommand}"
+                            Style="{StaticResource LobbyGuestReconnectBtn}"
+                            Height="44"
+                            Content="Переподключиться"
+                            Margin="6,0" />
+                </WrapPanel>
+
+                <!-- Предупреждение для хоста -->
+                <TextBlock Text="Не показывайте код посторонним: в этом режиме проверка лицензии отключена."
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           Foreground="{StaticResource MuteBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,6,0,0"
+                           Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
             </StackPanel>
         </Grid>
 
         <!-- Mod mismatch dialog (modal overlay) -->
-        <Grid Grid.RowSpan="2"
-              Visibility="{Binding IsModMismatchDialogVisible, Converter={StaticResource BoolToVis}}"
+        <Grid Visibility="{Binding IsModMismatchDialogVisible, Converter={StaticResource BoolToVis}}"
               Background="{DynamicResource DialogBackdrop}"
               KeyboardNavigation.TabNavigation="Cycle">
             <Grid.InputBindings>
@@ -842,7 +852,6 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- Mod name: wrap or ellipsis with tooltip -->
                                             <TextBlock Grid.Column="0"
                                                        Text="{Binding ModName}"
                                                        FontFamily="{StaticResource MainFont}"
@@ -854,7 +863,6 @@
                                                        VerticalAlignment="Center"
                                                        Margin="0,0,12,0" />
 
-                                            <!-- Mismatch description on right -->
                                             <TextBlock Grid.Column="1"
                                                        Text="{Binding DisplayDescription}"
                                                        FontFamily="{StaticResource MainFont}"
@@ -890,21 +898,18 @@
                     <WrapPanel Grid.Row="4"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Center">
-                        <!-- Fix & Proceed / Fix button (Accent filled) -->
                         <Button Command="{Binding FixAndProceedCommand}"
                                 Style="{StaticResource LobbyFixAndProceedBtn}"
                                 Content="{Binding FixButtonText}"
                                 Padding="16,8"
                                 Margin="0,0,10,0" />
 
-                        <!-- "Войти как есть" button -->
                         <Button Command="{Binding JoinAsIsCommand}"
                                 Style="{StaticResource LobbyJoinAsIsBtn}"
                                 Content="Войти как есть"
                                 Padding="14,8"
                                 Margin="0,0,10,0" />
 
-                        <!-- Cancel / Later / Close button -->
                         <Button Command="{Binding CancelMismatchDialogCommand}"
                                 Content="{Binding CancelButtonText}"
                                 Style="{StaticResource StandardBtn}"

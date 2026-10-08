@@ -46,6 +46,15 @@ public class LobbyViewModel : ObservableObject
     // Список игроков лобби
     public ObservableCollection<LobbyPlayerItem> LobbyPlayers { get; } = new();
 
+    private System.Windows.Media.Media3D.Model3D? _localPlayerModel3D;
+    public System.Windows.Media.Media3D.Model3D LocalPlayerModel3D
+    {
+        get => _localPlayerModel3D ?? LobbyPlayerItem.DefaultSteveModel3D;
+        private set => SetProperty(ref _localPlayerModel3D, value);
+    }
+
+    public string LocalPlayerNickname => _configService.CurrentConfig?.Nickname ?? "Player";
+
     // Уведомление вверху списка игроков (6 секунд)
     private bool _isSyncNoticeVisible;
     public bool IsSyncNoticeVisible
@@ -279,7 +288,7 @@ public class LobbyViewModel : ObservableObject
         CopyLinkCommand = new RelayCommand(_ => CopyLobbyLink(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         ConnectToGameCommand = new AsyncRelayCommand(ConnectToGameAsync, () => !IsBusy && CanGuestConnect);
         ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, () => CanReconnect);
-        OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && _lobbyService.IsHost);
+        OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && IsHost);
         LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
         FixAndProceedCommand = new AsyncRelayCommand(FixAndProceedAsync, () => CanFixAny && !IsGameRunningWarning);
         JoinAsIsCommand = new RelayCommand(_ => JoinAsIs());
@@ -336,6 +345,9 @@ public class LobbyViewModel : ObservableObject
         {
             _tunnelProvider.StatusChanged += OnTunnelStatusChanged;
         }
+
+        LobbyPlayers.CollectionChanged += OnLobbyPlayersCollectionChanged;
+        RefreshLocalPlayerModel();
     }
 
     // Свойства
@@ -443,7 +455,7 @@ public class LobbyViewModel : ObservableObject
     public string CopyLinkButtonText => IsLinkCopied ? "Скопировано!" : "Копировать ссылку";
     public RelayCommand CopyLinkCommand { get; }
 
-    public bool IsHost => _lobbyService.IsHost;
+    public bool IsHost => _lobbyService.IsHost || _isLobbyCreated;
 
     // Гость
 
@@ -564,10 +576,16 @@ public class LobbyViewModel : ObservableObject
 
     private void NotifyStatusStateChanged()
     {
+        OnPropertyChanged(nameof(IsInLobby));
+        OnPropertyChanged(nameof(IsLobbyCreated));
+        OnPropertyChanged(nameof(IsWorldOpen));
+        OnPropertyChanged(nameof(CanGuestConnect));
+        OnPropertyChanged(nameof(LobbyCode));
         OnPropertyChanged(nameof(IsStatusOpen));
         OnPropertyChanged(nameof(IsStatusWaiting));
         OnPropertyChanged(nameof(CombinedStatusText));
         OnPropertyChanged(nameof(IsHost));
+        RaiseAllCommands();
     }
 
     public async Task<string?> CreateLobbyAsync()
@@ -631,6 +649,8 @@ public class LobbyViewModel : ObservableObject
                 StatusIcon = string.Empty;
 
                 ImageSource? hostAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
+                var hostModel3D = BuildLocalPlayerModel3D();
+                RefreshLocalPlayerModel();
                 _knownPlayerNicks.Clear();
                 _knownPlayerNicks.Add(hostName);
                 _discordRpcService?.SetInLobby(1);
@@ -641,8 +661,10 @@ public class LobbyViewModel : ObservableObject
                     {
                         Nickname = hostName,
                         IsHost = true,
-                        Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap()
+                        Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap(),
+                        PlayerModel3D = hostModel3D
                     });
+                    UpdateStagePositions();
                 });
                 LobbyCreated?.Invoke();
                 return code;
@@ -1360,7 +1382,7 @@ public class LobbyViewModel : ObservableObject
 
         // Build desired player descriptors
         var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
-        var incomingPlayers = new List<(string Nick, bool IsHost, ImageSource Avatar)>();
+        var incomingPlayers = new List<(string Nick, bool IsHost, ImageSource Avatar, System.Windows.Media.Media3D.Model3D Model3D)>();
         foreach (var player in players)
         {
             // Игрок является хостом, если его ник совпадает с hostName сервера.
@@ -1374,17 +1396,29 @@ public class LobbyViewModel : ObservableObject
             {
                 isHost = _lobbyService.IsHost && string.Equals(player, myNick, StringComparison.OrdinalIgnoreCase);
             }
+
             ImageSource avatar;
-            if (_skinService != null)
+            System.Windows.Media.Media3D.Model3D model3D;
+
+            if (string.Equals(player, myNick, StringComparison.OrdinalIgnoreCase))
+            {
+                avatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath) ?? SkinService.LoadDefaultSteveBitmap();
+                model3D = BuildLocalPlayerModel3D();
+            }
+            else if (_skinService != null)
             {
                 avatar = await _skinService.GetAvatarForPlayerAsync(player);
+                var (skinTex, isSlim) = await _skinService.GetSkinTextureForPlayerAsync(player);
+                var skinBmp = skinTex as System.Windows.Media.Imaging.BitmapSource ?? SkinService.LoadDefaultSteveBitmap();
+                model3D = SkinModel3DBuilder.BuildPlayerModel(skinBmp, isSlim);
             }
             else
             {
                 avatar = SkinService.LoadDefaultSteveBitmap();
+                model3D = LobbyPlayerItem.DefaultSteveModel3D;
             }
 
-            incomingPlayers.Add((player, isHost, avatar));
+            incomingPlayers.Add((player, isHost, avatar, model3D));
         }
 
         Dispatch(() =>
@@ -1422,6 +1456,10 @@ public class LobbyViewModel : ObservableObject
                     {
                         existingItem.Avatar = incoming.Avatar;
                     }
+                    if (incoming.Model3D != null && !existingItem.HasCustomModel3D)
+                    {
+                        existingItem.PlayerModel3D = incoming.Model3D;
+                    }
                     existingItem.IsNewlyAdded = false;
 
                     // Ensure matching order if needed
@@ -1438,6 +1476,7 @@ public class LobbyViewModel : ObservableObject
                         Nickname = incoming.Nick,
                         IsHost = incoming.IsHost,
                         Avatar = incoming.Avatar,
+                        PlayerModel3D = incoming.Model3D,
                         IsNewlyAdded = true
                     };
 
@@ -1452,9 +1491,146 @@ public class LobbyViewModel : ObservableObject
                 }
             }
 
+            UpdateStagePositions();
             UpdatePlayerModSync(modSync ?? _lobbyService.CurrentModSync);
             PlayerCountChanged?.Invoke(LobbyPlayers.Count);
         });
+    }
+
+    public void RefreshLocalPlayerModel()
+    {
+        try
+        {
+            LocalPlayerModel3D = BuildLocalPlayerModel3D();
+            OnPropertyChanged(nameof(LocalPlayerNickname));
+        }
+        catch { }
+    }
+
+    private System.Windows.Media.Media3D.Model3D BuildLocalPlayerModel3D()
+    {
+        try
+        {
+            var cfg = _configService.CurrentConfig;
+            bool isSlim = string.Equals(cfg?.SkinModel, "slim", StringComparison.OrdinalIgnoreCase);
+            var skinBmp = _skinService?.LoadSkinImage(cfg?.SkinPath) as System.Windows.Media.Imaging.BitmapSource
+                          ?? SkinService.LoadDefaultSteveBitmap();
+            return SkinModel3DBuilder.BuildPlayerModel(skinBmp, isSlim);
+        }
+        catch
+        {
+            return LobbyPlayerItem.DefaultSteveModel3D;
+        }
+    }
+
+    private void OnLobbyPlayersCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems != null)
+        {
+            foreach (var oldObj in e.OldItems)
+            {
+                if (oldObj is LobbyPlayerItem oldItem)
+                {
+                    oldItem.PropertyChanged -= OnLobbyPlayerItemPropertyChanged;
+                }
+            }
+        }
+
+        if (e.NewItems != null)
+        {
+            var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
+            foreach (var newObj in e.NewItems)
+            {
+                if (newObj is LobbyPlayerItem newItem)
+                {
+                    newItem.PropertyChanged -= OnLobbyPlayerItemPropertyChanged;
+                    newItem.PropertyChanged += OnLobbyPlayerItemPropertyChanged;
+
+                    if (!newItem.HasCustomModel3D)
+                    {
+                        if (string.Equals(newItem.Nickname, myNick, StringComparison.OrdinalIgnoreCase))
+                        {
+                            newItem.PlayerModel3D = BuildLocalPlayerModel3D();
+                        }
+                        else if (_skinService != null && !string.IsNullOrWhiteSpace(newItem.Nickname))
+                        {
+                            var nick = newItem.Nickname;
+                            _ = Task.Run(async () =>
+                            {
+                                try
+                                {
+                                    var (skinTex, isSlim) = await _skinService.GetSkinTextureForPlayerAsync(nick);
+                                    var bmp = skinTex as System.Windows.Media.Imaging.BitmapSource ?? SkinService.LoadDefaultSteveBitmap();
+                                    var model = SkinModel3DBuilder.BuildPlayerModel(bmp, isSlim);
+                                    Dispatch(() => newItem.PlayerModel3D = model);
+                                }
+                                catch { }
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        UpdateStagePositions();
+    }
+
+    private void OnLobbyPlayerItemPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LobbyPlayerItem.IsHost))
+        {
+            UpdateStagePositions();
+        }
+    }
+
+    /// <summary>
+    /// Раскладка персонажей на сцене лобби по принципу CS2 / Brawl Stars:
+    /// - Хост всегда стоит ровно по центру (StageOffsetX = 0, масштаб 1.0, передний план).
+    /// - Друзья встают поочерёдно справа и слева от центра:
+    ///   1-й друг -> справа от центра (+1),
+    ///   2-й друг -> слева от центра (-1),
+    ///   3-й друг -> справа дальше (+2),
+    ///   4-й друг -> слева дальше (-2).
+    /// </summary>
+    public void UpdateStagePositions()
+    {
+        if (LobbyPlayers.Count == 0) return;
+
+        var host = LobbyPlayers.FirstOrDefault(p => p.IsHost) ?? LobbyPlayers[0];
+        host.StageSlotIndex = 0;
+        host.StageOffsetX = 0.0;
+        host.StageOffsetY = 0.0;
+        host.StageScale = 1.0;
+        host.StageYawAngle = -8.0;
+        host.StageZIndex = 10;
+
+        var guests = LobbyPlayers.Where(p => !ReferenceEquals(p, host)).ToList();
+        int maxRank = (guests.Count + 1) / 2;
+
+        for (int i = 0; i < guests.Count; i++)
+        {
+            var guest = guests[i];
+            int rank = (i / 2) + 1;
+            int direction = (i % 2 == 0) ? 1 : -1;
+            guest.StageSlotIndex = direction * rank;
+
+            double offsetX;
+            if (maxRank <= 2)
+            {
+                offsetX = rank == 1 ? direction * 124.0 : direction * 228.0;
+            }
+            else
+            {
+                double step = 228.0 / maxRank;
+                offsetX = direction * rank * step;
+            }
+
+            guest.StageOffsetX = offsetX;
+            guest.StageOffsetY = rank == 1 ? -10.0 : -18.0;
+            guest.StageScale = rank == 1 ? 0.90 : 0.82;
+            guest.StageYawAngle = direction > 0 ? -(14.0 + rank * 4.0) : (14.0 + rank * 4.0);
+            guest.StageZIndex = Math.Max(1, 10 - rank * 2);
+        }
     }
 
     private void RaiseAllCommands()

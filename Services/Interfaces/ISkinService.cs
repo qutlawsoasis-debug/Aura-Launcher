@@ -58,6 +58,11 @@ public interface ISkinService
     Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Получение полной текстуры скина (64x64) и модели рук (isSlim) для игрока по никнейму (из lobby-api /csl/{nick}.json или дефолтный Стив).
+    /// </summary>
+    Task<(ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Мерж конфига CustomSkinLoader.json: добавление AuraLobby первым источником в loadlist.
     /// </summary>
     void EnsureCustomSkinLoaderConfig(string gameDir);

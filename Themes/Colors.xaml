@@ -37,16 +37,6 @@
     <Color x:Key="ColorStoriesTrack">#47FFFFFF</Color>
     <Color x:Key="ColorStoriesTextSecondary">#80E8F0F8</Color>
 
-    <Color x:Key="ColorStartupSky1">#0A131A</Color>
-    <Color x:Key="ColorStartupSky2">#0F1C26</Color>
-    <Color x:Key="ColorStartupSky3">#162733</Color>
-    <Color x:Key="ColorStartupSky4">#22323C</Color>
-    <Color x:Key="ColorStartupSky5">#3B3A38</Color>
-    <Color x:Key="ColorStartupSky6">#6B4A2E</Color>
-    <Color x:Key="ColorStartupGround">#070D12</Color>
-    <Color x:Key="ColorStartupMountainDistant">#16262F</Color>
-    <Color x:Key="ColorStartupMountainMiddle">#0F1B23</Color>
-
     <!-- Named SolidColorBrush resources for UI controls -->
     <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" />
     <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" />
@@ -77,15 +67,5 @@
     <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" />
     <SolidColorBrush x:Key="StoriesFill" Color="{StaticResource ColorTextPrimary}" />
     <SolidColorBrush x:Key="StoriesTextSecondary" Color="{StaticResource ColorStoriesTextSecondary}" />
-
-    <SolidColorBrush x:Key="StartupSky1" Color="{StaticResource ColorStartupSky1}" />
-    <SolidColorBrush x:Key="StartupSky2" Color="{StaticResource ColorStartupSky2}" />
-    <SolidColorBrush x:Key="StartupSky3" Color="{StaticResource ColorStartupSky3}" />
-    <SolidColorBrush x:Key="StartupSky4" Color="{StaticResource ColorStartupSky4}" />
-    <SolidColorBrush x:Key="StartupSky5" Color="{StaticResource ColorStartupSky5}" />
-    <SolidColorBrush x:Key="StartupSky6" Color="{StaticResource ColorStartupSky6}" />
-    <SolidColorBrush x:Key="StartupGround" Color="{StaticResource ColorStartupGround}" />
-    <SolidColorBrush x:Key="StartupMountainDistant" Color="{StaticResource ColorStartupMountainDistant}" />
-    <SolidColorBrush x:Key="StartupMountainMiddle" Color="{StaticResource ColorStartupMountainMiddle}" />
 
 </ResourceDictionary>

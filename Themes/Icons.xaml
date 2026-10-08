@@ -25,6 +25,7 @@
     <StreamGeometry x:Key="IconSkipBack">M19,20 L9,12 L19,4 V20 Z M5,19 V5</StreamGeometry>
     <StreamGeometry x:Key="IconPlayPause">M5,4 L13,12 L5,20 V4 Z M16,5 V19 M20,5 V19</StreamGeometry>
     <StreamGeometry x:Key="IconSkipForward">M5,4 L15,12 L5,20 V4 Z M19,5 V19</StreamGeometry>
+    <StreamGeometry x:Key="IconCrown">M2,4 L5,16 H19 L22,4 L17,9 L12,3 L7,9 L2,4 Z M5,19 H19 V21 H5 Z</StreamGeometry>
 
     <!-- Base Lucide Icon Style: uniform outline, inherits parent Foreground, default 14x14 -->
     <Style x:Key="IconPath" TargetType="Path">

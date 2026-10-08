@@ -701,6 +701,7 @@ public class SkinService : ISkinService
     }
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource> _avatarCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (ImageSource SkinTexture, bool IsSlim)> _skinTextureCache = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default)
     {
@@ -712,6 +713,31 @@ public class SkinService : ISkinService
         if (_avatarCache.TryGetValue(nickname, out var cached))
         {
             return cached;
+        }
+
+        var (skinTexture, _) = await GetSkinTextureForPlayerAsync(nickname, cancellationToken);
+        if (skinTexture is BitmapSource bmp)
+        {
+            var avatar = ExtractHeadAvatarFromBitmap(bmp);
+            _avatarCache[nickname] = avatar;
+            return avatar;
+        }
+
+        var fallback = LoadDefaultSteveBitmap();
+        _avatarCache[nickname] = fallback;
+        return fallback;
+    }
+
+    public async Task<(ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(nickname))
+        {
+            return (LoadDefaultSteveBitmap(), false);
+        }
+
+        if (_skinTextureCache.TryGetValue(nickname, out var cachedSkin))
+        {
+            return cachedSkin;
         }
 
         try
@@ -726,13 +752,15 @@ public class SkinService : ISkinService
                 if (doc.RootElement.TryGetProperty("skins", out var skinsProp))
                 {
                     string? textureUrl = null;
-                    if (skinsProp.TryGetProperty("default", out var defProp) && defProp.ValueKind == System.Text.Json.JsonValueKind.String)
-                    {
-                        textureUrl = defProp.GetString();
-                    }
-                    else if (skinsProp.TryGetProperty("slim", out var slimProp) && slimProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    bool isSlimFromApi = false;
+                    if (skinsProp.TryGetProperty("slim", out var slimProp) && slimProp.ValueKind == System.Text.Json.JsonValueKind.String)
                     {
                         textureUrl = slimProp.GetString();
+                        isSlimFromApi = true;
+                    }
+                    else if (skinsProp.TryGetProperty("default", out var defProp) && defProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        textureUrl = defProp.GetString();
                     }
 
                     if (!string.IsNullOrWhiteSpace(textureUrl))
@@ -741,12 +769,18 @@ public class SkinService : ISkinService
                         using var ms = new MemoryStream(pngBytes);
                         var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
                         var frame = decoder.Frames[0];
-                        var converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
-                        if (converted.CanFreeze) converted.Freeze();
+                        BitmapSource converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                        if (converted.PixelWidth == 64 && converted.PixelHeight == 32)
+                        {
+                            converted = Convert64x32To64x64(converted);
+                        }
+                        if (converted.CanFreeze && !converted.IsFrozen) converted.Freeze();
 
-                        var avatar = ExtractHeadAvatarFromBitmap(converted);
-                        _avatarCache[nickname] = avatar;
-                        return avatar;
+                        bool isSlim = isSlimFromApi || DetectIsSlim(converted);
+                        var entry = ((ImageSource)converted, isSlim);
+                        _skinTextureCache[nickname] = entry;
+                        _avatarCache[nickname] = ExtractHeadAvatarFromBitmap(converted);
+                        return entry;
                     }
                 }
             }
@@ -755,9 +789,10 @@ public class SkinService : ISkinService
         {
         }
 
-        var fallback = LoadDefaultSteveBitmap();
-        _avatarCache[nickname] = fallback;
-        return fallback;
+        var fallbackBmp = LoadDefaultSteveBitmap();
+        var fallbackEntry = ((ImageSource)fallbackBmp, false);
+        _skinTextureCache[nickname] = fallbackEntry;
+        return fallbackEntry;
     }
 
     private ImageSource ExtractHeadAvatarFromBitmap(BitmapSource skinBmp)

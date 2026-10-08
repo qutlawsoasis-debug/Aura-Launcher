@@ -43,7 +43,10 @@ public partial class StartupWindow : Window
     {
         if (ProgressBarFill == null) return;
         double clamped = Math.Clamp(progress, 0.0, 100.0);
-        double targetWidth = (clamped / 100.0) * 240.0;
+        double trackWidth = ProgressTrack != null && ProgressTrack.ActualWidth > 0
+            ? ProgressTrack.ActualWidth
+            : 258.0;
+        double targetWidth = (clamped / 100.0) * trackWidth;
 
         double currentWidth = ProgressBarFill.ActualWidth;
         if (double.IsNaN(currentWidth) || currentWidth < 0) currentWidth = 0.0;

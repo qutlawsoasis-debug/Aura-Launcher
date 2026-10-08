@@ -148,7 +148,9 @@ public static class SkinModel3DBuilder
         };
         RenderOptions.SetBitmapScalingMode(baseBrush, BitmapScalingMode.NearestNeighbor);
         RenderOptions.SetEdgeMode(baseBrush, EdgeMode.Aliased);
+        if (baseBrush.CanFreeze) baseBrush.Freeze();
         var baseMaterial = new DiffuseMaterial(baseBrush);
+        if (baseMaterial.CanFreeze) baseMaterial.Freeze();
 
         var overlayUpscaled = UpscaleNearestNeighbor(skinBmp, 8);
         var overlayBrush = new ImageBrush(overlayUpscaled)
@@ -159,7 +161,9 @@ public static class SkinModel3DBuilder
         };
         RenderOptions.SetBitmapScalingMode(overlayBrush, BitmapScalingMode.NearestNeighbor);
         RenderOptions.SetEdgeMode(overlayBrush, EdgeMode.Aliased);
+        if (overlayBrush.CanFreeze) overlayBrush.Freeze();
         var overlayMaterial = new DiffuseMaterial(overlayBrush);
+        if (overlayMaterial.CanFreeze) overlayMaterial.Freeze();
 
         // Группа базовых частей (непрозрачные, рендерятся первыми)
         var baseGroup = new Model3DGroup();
@@ -283,8 +287,11 @@ public static class SkinModel3DBuilder
             if (leftPant != null) overlayGroup.Children.Add(leftPant);
         }
 
+        if (baseGroup.CanFreeze) baseGroup.Freeze();
+        if (overlayGroup.CanFreeze) overlayGroup.Freeze();
         rootGroup.Children.Add(baseGroup);
         rootGroup.Children.Add(overlayGroup);
+        if (rootGroup.CanFreeze) rootGroup.Freeze();
 
         return rootGroup;
     }
@@ -453,11 +460,14 @@ public static class SkinModel3DBuilder
             mirrorU);
 
         if (mesh.Positions.Count == 0) return null;
+        if (mesh.CanFreeze) mesh.Freeze();
 
-        return new GeometryModel3D(mesh, material)
+        var geomModel = new GeometryModel3D(mesh, material)
         {
             BackMaterial = material
         };
+        if (geomModel.CanFreeze) geomModel.Freeze();
+        return geomModel;
     }
 
     /// <summary>

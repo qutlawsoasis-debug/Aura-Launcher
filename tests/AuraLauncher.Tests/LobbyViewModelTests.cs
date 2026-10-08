@@ -243,4 +243,48 @@ public class LobbyViewModelTests
         Assert.True(vm.HasJoinError);
         Assert.Contains("Нет связи с сервером лобби", vm.JoinErrorMessage);
     }
+
+    [Fact]
+    public void LobbyStageLayout_PositionsHostInCenter_AndFriendsAlternatingRightAndLeft()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        var launchService = new TestLaunchService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService);
+
+        var host = new LobbyPlayerItem { Nickname = "HostPlayer", IsHost = true };
+        vm.LobbyPlayers.Add(host);
+
+        Assert.Equal(0, host.StageSlotIndex);
+        Assert.Equal(0, host.StageOffsetX);
+        Assert.Equal(1.0, host.StageScale);
+        Assert.True(host.IsHost);
+        Assert.False(host.IsGuest);
+
+        var friend1 = new LobbyPlayerItem { Nickname = "FriendRight1", IsHost = false };
+        vm.LobbyPlayers.Add(friend1);
+
+        Assert.Equal(0, host.StageOffsetX);
+        Assert.Equal(1, friend1.StageSlotIndex);
+        Assert.True(friend1.StageOffsetX > 0);
+        Assert.True(friend1.IsGuest);
+
+        var friend2 = new LobbyPlayerItem { Nickname = "FriendLeft1", IsHost = false };
+        vm.LobbyPlayers.Add(friend2);
+
+        Assert.Equal(0, host.StageOffsetX);
+        Assert.Equal(1, friend1.StageSlotIndex);
+        Assert.Equal(-1, friend2.StageSlotIndex);
+        Assert.Equal(-friend1.StageOffsetX, friend2.StageOffsetX);
+
+        var friend3 = new LobbyPlayerItem { Nickname = "FriendRight2", IsHost = false };
+        var friend4 = new LobbyPlayerItem { Nickname = "FriendLeft2", IsHost = false };
+        vm.LobbyPlayers.Add(friend3);
+        vm.LobbyPlayers.Add(friend4);
+
+        Assert.Equal(2, friend3.StageSlotIndex);
+        Assert.Equal(-2, friend4.StageSlotIndex);
+        Assert.True(friend3.StageOffsetX > friend1.StageOffsetX);
+        Assert.Equal(-friend3.StageOffsetX, friend4.StageOffsetX);
+    }
 }

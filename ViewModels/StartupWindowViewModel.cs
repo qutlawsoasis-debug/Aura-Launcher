@@ -14,8 +14,15 @@ namespace AuraLauncher.ViewModels;
 
 public class StartupWindowViewModel : ObservableObject
 {
-    private static readonly Brush DefaultTextPrimary = new SolidColorBrush(Color.FromRgb(0xE8, 0xF0, 0xF8));
-    private static readonly Brush DefaultAccent = new SolidColorBrush(Color.FromRgb(0xF2, 0xA6, 0x3C));
+    private static readonly Brush DefaultTextPrimary = CreateFrozenBrush(0xE8, 0xF0, 0xF8);
+    private static readonly Brush DefaultAccent = CreateFrozenBrush(0xF2, 0xA6, 0x3C);
+
+    private static Brush CreateFrozenBrush(byte r, byte g, byte b)
+    {
+        var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
 
     private readonly ILauncherUpdateService _launcherUpdateService;
     private readonly Action _onLaunchMainRequested;
@@ -27,7 +34,7 @@ public class StartupWindowViewModel : ObservableObject
     private double _progressValue = 0;
     private bool _isProgressVisible = false;
     private string _progressPercentText = "";
-    private string _versionText = "beta 1.0.33";
+    private string _versionText = "beta 1.0.38";
     private bool _isFlowRunning = false;
     private CancellationTokenSource? _flowCts;
 
@@ -62,7 +69,7 @@ public class StartupWindowViewModel : ObservableObject
         }
     }
 
-    public double ProgressBarWidth => Math.Max(0, Math.Min(240, _progressValue * 2.4));
+    public double ProgressBarWidth => Math.Max(0, Math.Min(258, _progressValue * 2.58));
 
     public bool IsProgressVisible
     {
