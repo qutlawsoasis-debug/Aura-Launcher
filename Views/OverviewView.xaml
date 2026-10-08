@@ -144,7 +144,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- 1. ПОСЛЕДНИЙ СКРИНШОТ: Картинка -->
+                <!-- 1. ПОСЛЕДНИЙ СКРИНШОТ: Картинка или пустое состояние -->
                 <Border Grid.Row="0"
                         CornerRadius="3"
                         ClipToBounds="True"
@@ -153,12 +153,35 @@
                         BorderThickness="1"
                         Margin="0,0,0,8">
                     <Grid>
-                        <Image Source="{Binding FeedImage0}"
-                               Stretch="UniformToFill"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               RenderOptions.BitmapScalingMode="HighQuality" />
-                        <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.14" IsHitTestVisible="False" />
+                        <Grid Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
+                            <Image Source="{Binding FeedImage0}"
+                                   Stretch="UniformToFill"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                            <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.14" IsHitTestVisible="False" />
+                        </Grid>
+
+                        <StackPanel HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Margin="12,8"
+                                    Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}">
+                            <Path Style="{StaticResource IconPath}"
+                                  Data="{StaticResource IconCamera}"
+                                  Width="20"
+                                  Height="20"
+                                  Stroke="{DynamicResource StoriesTextSecondary}"
+                                  HorizontalAlignment="Center"
+                                  Margin="0,0,0,6" />
+                            <TextBlock Text="Последних скриншотов нет"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       FontWeight="Medium"
+                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
                     </Grid>
                 </Border>
 

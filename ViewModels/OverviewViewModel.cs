@@ -437,10 +437,13 @@ public class OverviewViewModel : ObservableObject
 
     private void RefreshLatestScreenshot()
     {
-        var fallback0 = s_defaultFeedBackgrounds[0] ?? LauncherBackground;
         var fallback1 = s_defaultFeedBackgrounds[1] ?? LauncherBackground;
         var fallback2 = s_defaultFeedBackgrounds[2] ?? LauncherBackground;
         var fallback3 = s_defaultFeedBackgrounds[3] ?? LauncherBackground;
+
+        FeedImage1 = fallback1;
+        FeedImage2 = fallback2;
+        FeedImage3 = fallback3;
 
         try
         {
@@ -451,28 +454,24 @@ public class OverviewViewModel : ObservableObject
             if (!Directory.Exists(screensDir))
             {
                 LatestScreenshot = null;
+                LatestScreenshotDateText = string.Empty;
                 HasLatestScreenshot = false;
-                FeedImage0 = fallback0;
-                FeedImage1 = fallback1;
-                FeedImage2 = fallback2;
-                FeedImage3 = fallback3;
+                FeedImage0 = null;
                 return;
             }
 
             var di = new DirectoryInfo(screensDir);
             var recentFiles = di.GetFiles("*.png")
                 .OrderByDescending(f => f.LastWriteTimeUtc)
-                .Take(4)
+                .Take(1)
                 .ToArray();
 
             if (recentFiles.Length == 0)
             {
                 LatestScreenshot = null;
+                LatestScreenshotDateText = string.Empty;
                 HasLatestScreenshot = false;
-                FeedImage0 = fallback0;
-                FeedImage1 = fallback1;
-                FeedImage2 = fallback2;
-                FeedImage3 = fallback3;
+                FeedImage0 = null;
                 return;
             }
 
@@ -486,11 +485,9 @@ public class OverviewViewModel : ObservableObject
                 if (bmp0 == null)
                 {
                     LatestScreenshot = null;
+                    LatestScreenshotDateText = string.Empty;
                     HasLatestScreenshot = false;
-                    FeedImage0 = fallback0;
-                    FeedImage1 = fallback1;
-                    FeedImage2 = fallback2;
-                    FeedImage3 = fallback3;
+                    FeedImage0 = null;
                     return;
                 }
 
@@ -505,20 +502,14 @@ public class OverviewViewModel : ObservableObject
 
             LatestScreenshotDateText = latestFile.LastWriteTime.ToString("dd.MM.yyyy HH:mm");
             HasLatestScreenshot = true;
-
-            FeedImage0 = LatestScreenshot.Thumbnail ?? fallback0;
-            FeedImage1 = (recentFiles.Length > 1 ? TryLoadScreenshotBitmap(recentFiles[1].FullName) : null) ?? fallback1;
-            FeedImage2 = (recentFiles.Length > 2 ? TryLoadScreenshotBitmap(recentFiles[2].FullName) : null) ?? fallback2;
-            FeedImage3 = (recentFiles.Length > 3 ? TryLoadScreenshotBitmap(recentFiles[3].FullName) : null) ?? fallback3;
+            FeedImage0 = LatestScreenshot.Thumbnail;
         }
         catch
         {
             LatestScreenshot = null;
+            LatestScreenshotDateText = string.Empty;
             HasLatestScreenshot = false;
-            FeedImage0 = fallback0;
-            FeedImage1 = fallback1;
-            FeedImage2 = fallback2;
-            FeedImage3 = fallback3;
+            FeedImage0 = null;
         }
     }
 

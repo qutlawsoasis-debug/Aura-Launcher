@@ -696,6 +696,7 @@ public class MainViewModel : ObservableObject
         LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient(), configService: configService, manifestService: manifestService, launchService: launchService), launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService, modManifestService: manifestService);
         WorkshopVM = workshopViewModel ?? new WorkshopViewModel(workshopService ?? new WorkshopService(), _configService, _launchService);
         WorkshopVM.ModToggled += () => _ = LobbyVM.UpdateManifestAsync();
+        WorkshopVM.ScreenshotsCountChanged += _ => OverviewVM.RefreshRightFeed();
         
         _friendService = friendService;
         FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), new LobbyService(new LobbyApiClient(), configService: configService, manifestService: manifestService, launchService: launchService), _skinService, LobbyVM);
