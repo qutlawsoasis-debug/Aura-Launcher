@@ -141,19 +141,17 @@
             ClipToBounds="True">
         <Grid Width="340" Height="400" ClipToBounds="True">
 
-            <!-- ============================================== -->
-            <!-- СЛОЙ 0: ФОН ОКНА — СЦЕНА-ПЕЙЗАЖ (340x400)      -->
-            <!-- ============================================== -->
+            <!-- Слой 0: фон окна (340x400) -->
 
             <!-- 1. Небо: 6 горизонтальных полос + нижний заполнитель -->
             <StackPanel Orientation="Vertical" Width="340" Height="400" VerticalAlignment="Top">
-                <Rectangle Width="340" Height="90" Fill="#0A131A" />
-                <Rectangle Width="340" Height="50" Fill="#0F1C26" />
-                <Rectangle Width="340" Height="40" Fill="#162733" />
-                <Rectangle Width="340" Height="25" Fill="#22323C" />
-                <Rectangle Width="340" Height="15" Fill="#3B3A38" />
-                <Rectangle Width="340" Height="20" Fill="#6B4A2E" />
-                <Rectangle Width="340" Height="160" Fill="#070D12" />
+                <Rectangle Width="340" Height="90" Fill="{DynamicResource StartupSky1}" />
+                <Rectangle Width="340" Height="50" Fill="{DynamicResource StartupSky2}" />
+                <Rectangle Width="340" Height="40" Fill="{DynamicResource StartupSky3}" />
+                <Rectangle Width="340" Height="25" Fill="{DynamicResource StartupSky4}" />
+                <Rectangle Width="340" Height="15" Fill="{DynamicResource StartupSky5}" />
+                <Rectangle Width="340" Height="20" Fill="{DynamicResource StartupSky6}" />
+                <Rectangle Width="340" Height="160" Fill="{DynamicResource StartupGround}" />
             </StackPanel>
 
             <!-- 2. Звёзды: 6 квадратов 2x2 цвета текста -->
@@ -171,36 +169,36 @@
                 <Rectangle Canvas.Left="206" Canvas.Top="196" Width="36" Height="36" Fill="{DynamicResource Accent}" />
             </Canvas>
 
-            <!-- 4. Дальний слой гор (#16262F, 44s, высота 190, прижат к низу) -->
+            <!-- 4. Дальний слой гор (44s, высота 190, прижат к низу) -->
             <Canvas x:Name="DistantMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
                 <Canvas.RenderTransform>
                     <TranslateTransform X="0" />
                 </Canvas.RenderTransform>
-                <Path Canvas.Left="0" Canvas.Top="0" Fill="#16262F"
+                <Path Canvas.Left="0" Canvas.Top="0" Fill="{DynamicResource StartupMountainDistant}"
                       Data="M0 80 H30 V60 H55 V40 H85 V25 H110 V45 H140 V65 H165 V50 H195 V30 H225 V20 H250 V40 H280 V60 H310 V80 H340 V190 H0Z" />
-                <Path Canvas.Left="340" Canvas.Top="0" Fill="#16262F"
+                <Path Canvas.Left="340" Canvas.Top="0" Fill="{DynamicResource StartupMountainDistant}"
                       Data="M0 80 H30 V60 H55 V40 H85 V25 H110 V45 H140 V65 H165 V50 H195 V30 H225 V20 H250 V40 H280 V60 H310 V80 H340 V190 H0Z" />
             </Canvas>
 
-            <!-- 5. Средний слой гор (#0F1B23, 28s, высота 190, прижат к низу) -->
+            <!-- 5. Средний слой гор (28s, высота 190, прижат к низу) -->
             <Canvas x:Name="MiddleMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
                 <Canvas.RenderTransform>
                     <TranslateTransform X="0" />
                 </Canvas.RenderTransform>
-                <Path Canvas.Left="0" Canvas.Top="0" Fill="#0F1B23"
+                <Path Canvas.Left="0" Canvas.Top="0" Fill="{DynamicResource StartupMountainMiddle}"
                       Data="M0 110 H25 V95 H50 V80 H80 V95 H105 V70 H135 V55 H160 V75 H190 V90 H215 V105 H245 V85 H275 V65 H300 V90 H325 V110 H340 V190 H0Z" />
-                <Path Canvas.Left="340" Canvas.Top="0" Fill="#0F1B23"
+                <Path Canvas.Left="340" Canvas.Top="0" Fill="{DynamicResource StartupMountainMiddle}"
                       Data="M0 110 H25 V95 H50 V80 H80 V95 H105 V70 H135 V55 H160 V75 H190 V90 H215 V105 H245 V85 H275 V65 H300 V90 H325 V110 H340 V190 H0Z" />
             </Canvas>
 
-            <!-- 6. Ближний слой гор (#070D12, 17s, высота 190, прижат к низу) -->
+            <!-- 6. Ближний слой гор (17s, высота 190, прижат к низу) -->
             <Canvas x:Name="NearMountainCanvas" Width="680" Height="190" VerticalAlignment="Bottom" HorizontalAlignment="Left">
                 <Canvas.RenderTransform>
                     <TranslateTransform X="0" />
                 </Canvas.RenderTransform>
-                <Path Canvas.Left="0" Canvas.Top="0" Fill="#070D12"
+                <Path Canvas.Left="0" Canvas.Top="0" Fill="{DynamicResource StartupGround}"
                       Data="M0 150 H35 V135 H60 V120 H95 V135 H125 V150 H160 V140 H190 V125 H220 V110 H250 V125 H285 V140 H315 V150 H340 V190 H0Z" />
-                <Path Canvas.Left="340" Canvas.Top="0" Fill="#070D12"
+                <Path Canvas.Left="340" Canvas.Top="0" Fill="{DynamicResource StartupGround}"
                       Data="M0 150 H35 V135 H60 V120 H95 V135 H125 V150 H160 V140 H190 V125 H220 V110 H250 V125 H285 V140 H315 V150 H340 V190 H0Z" />
             </Canvas>
 
@@ -238,9 +236,7 @@
                 </Rectangle>
             </Canvas>
 
-            <!-- ============================================== -->
-            <!-- СЛОЙ 1: КОНТЕНТ ПОВЕРХ СЦЕНЫ                   -->
-            <!-- ============================================== -->
+            <!-- Слой 1: контент поверх сцены -->
             <Grid Width="340" Height="400">
                 <!-- 1. По центру вверху: большое слово «Aura» и вращающийся amber-квадрат -->
                 <StackPanel HorizontalAlignment="Center" Margin="0,52,0,0">
@@ -248,7 +244,7 @@
                                FontFamily="{DynamicResource HeadingFont}"
                                FontWeight="SemiBold"
                                FontSize="92"
-                               Foreground="#E8F0F8"
+                               Foreground="{DynamicResource TextPrimary}"
                                HorizontalAlignment="Center"
                                TextAlignment="Center"
                                LineHeight="88"
@@ -288,7 +284,7 @@
 
                     <!-- Прогресс-бар скачивания обновления (2px Accent) и процент числом -->
                     <StackPanel Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" Margin="0,4,0,0">
-                        <Grid Height="2" Width="240" Background="#26FFFFFF" HorizontalAlignment="Center">
+                        <Grid Height="2" Width="240" Background="{DynamicResource TrackSubtle}" HorizontalAlignment="Center">
                             <Border x:Name="ProgressBarFill"
                                     HorizontalAlignment="Left"
                                     Height="2"
@@ -304,7 +300,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- 3. В самом низу: мелко «beta 1.0.N» цветом #E8F0F8 с 60% opacity и бегущая полоса -->
+                <!-- 3. В самом низу: мелко «beta 1.0.N» с 60% opacity и бегущая полоса -->
                 <Grid VerticalAlignment="Bottom">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -315,7 +311,7 @@
                                Text="{Binding VersionText}"
                                FontFamily="{DynamicResource MainFont}"
                                FontSize="11"
-                               Foreground="#E8F0F8"
+                               Foreground="{DynamicResource TextPrimary}"
                                Opacity="0.6"
                                HorizontalAlignment="Center"
                                Margin="0,0,0,8" />

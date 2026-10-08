@@ -151,25 +151,25 @@ sequenceDiagram
 ```mermaid
 graph TD
     subgraph UI ["🎨 Презентационный слой (WPF XAML)"]
-        MainWindow["MainWindow (Анимированный хост)"]
-        Views["Вкладки: Play, Lobby, Wardrobe, Friends, Settings"]
+        MainWindow["MainWindow & StartupWindow"]
+        Views["Вкладки: Overview, Lobby, Friends, Wardrobe, Workshop, Settings"]
         Behaviors["Behaviors: SmoothScroll, DragMove, Easing"]
-        Styles["Cyberpunk Theme / Glassmorphism Brushes"]
+        Styles["Themes/Colors.xaml, Icons.xaml & Styles/UiTheme.xaml"]
     end
 
     subgraph Core ["🧠 Слой логики (ViewModels & Services)"]
-        VMs["MainViewModel, LobbyViewModel, WardrobeViewModel"]
-        LobbySvc["LobbyService (P2P Discovery, STUN/UPnP)"]
+        VMs["MainViewModel, LobbyViewModel, WardrobeViewModel, WorkshopViewModel"]
+        LobbySvc["LobbyService (P2P Discovery, Playit Tunnel)"]
         FriendSvc["FriendService (Realtime Presence & Cloud Sync)"]
-        PackSvc["ModpackService (SHA-256 Manifest Validator)"]
-        LaunchSvc["FabricGameLaunchService (JVM Arguments, Proc Watcher)"]
+        PackSvc["PackUpdateService (SHA-256 Manifest Validator)"]
+        LaunchSvc["FabricGameLaunchService (CmlLib.Core, JVM Arguments)"]
     end
 
     subgraph External ["🌐 Внешние сервисы и бэкенд"]
         LobbyApi["lobby-api (Vercel Serverless + Upstash Redis)"]
         VelopackEngine["Velopack (Дельта-пакеты обновлений)"]
-        AuraPackRepo["Aura-Pack (GitHub Releases / Git CDN)"]
-        FabricGame["Minecraft 1.20.1 Client + Fabric Loader"]
+        AuraPackRepo["Aura-Pack (GitHub Raw / SHA-256 Manifest)"]
+        FabricGame["Minecraft 1.20.1 Client + Fabric Loader 0.19.5"]
     end
 
     UI --> Core
@@ -200,11 +200,12 @@ cd Aura-Launcher
 dotnet restore
 dotnet build -c Release
 
-# 3. Запустите модульные тесты
-dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj
+# 3. Запустите модульные тесты и проверку дизайн-системы
+dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --filter "Category!=Integration"
+.\scripts\check-design.ps1
 
 # 4. Создайте релизный дистрибутив и установщик Velopack
-.\scripts\build-release.ps1 -Increment
+.\scripts\build-release.ps1
 ```
 
 ---
@@ -218,7 +219,7 @@ Aura Launcher поддерживает как авторизованные пр�
 
 <details>
 <summary><b>Почему P2P лучше обычных виртуальных сетей (Hamachi/Radmin)?</b></summary>
-Aura Connect устанавливает прямое UDP-соединение напрямую между компьютерами игроков без посредников. Это минимизирует сетевой пинг, убирает паразитный оверхед виртуального сетевого адаптера и исключает ограничения по количеству участников в комнате.
+Aura Connect устанавливает соединение напрямую без установки виртуальных сетевых драйверов. Это минимизирует сетевой пинг, убирает паразитный оверхед и исключает ограничения по количеству участников в комнате.
 </details>
 
 <details>
@@ -227,8 +228,8 @@ Aura Connect устанавливает прямое UDP-соединение н
 </details>
 
 <details>
-<summary><b>Где хранятся настройки и логи лаунчера?</b></summary>
-Все данные хранятся изолированно в папке пользователя: <code>%APPDATA%\AuraLauncher</code>. Вы также можете в 1 клик сгенерировать полный диагностический отчет в разделе настроек.
+<summary><b>Где хранятся настройки, моды и логи?</b></summary>
+Конфигурация лаунчера, моды и логи игры хранятся в папке <code>%APPDATA%\.aura</code> (конфиг: <code>%APPDATA%\.aura\config.json</code>, логи игры: <code>%APPDATA%\.aura\logs\latest.log</code>, лог лаунчера: <code>%APPDATA%\Aura\launcher.log</code>). Вы также можете в 1 клик сгенерировать полный диагностический отчёт в разделе настроек.
 </details>
 
 ---

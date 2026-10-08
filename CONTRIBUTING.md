@@ -34,6 +34,9 @@ dotnet build
 
 # Run unit tests
 dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --filter "Category!=Integration"
+
+# Verify UI design system compliance
+.\scripts\check-design.ps1
 ```
 
 ---
@@ -47,7 +50,7 @@ dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --filter "Categor
    git checkout -b fix/lobby-presence
    ```
 2. Make concise, well-documented changes adhering to the repository coding style.
-3. Verify that all existing unit tests pass before submitting.
+3. Verify that all existing unit tests and `.\scripts\check-design.ps1` pass before submitting.
 4. Commit with descriptive Conventional Commits messages:
    - `feat: add quick reconnect button`
    - `fix: prevent button jumping on copy event`
@@ -62,10 +65,12 @@ dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --filter "Categor
   - Follow standard .NET naming conventions (PascalCase for classes/methods, camelCase with `_` prefix for private fields).
   - Use file-scoped namespaces where appropriate.
   - Strive for clean MVVM separation (Views in `Views/`, ViewModels in `ViewModels/`, Services behind interfaces in `Services/`).
-- **WPF / XAML**:
-  - Prefer styles and dynamic resource references from `Styles/UiTheme.xaml`.
-  - Avoid hardcoded magic sizes that cause text clipping across different display DPIs or system scaling.
-  - Implement smooth easing curves (`CubicEase`, `QuadraticEase`) for user-facing transitions.
+  - Freeze all `Freezable` WPF resources (`Brush`, `BitmapImage`, 3D materials) when created in C#.
+- **WPF / XAML ([DESIGN.md](DESIGN.md))**:
+  - Strictly follow [DESIGN.md](DESIGN.md): use named color/brush tokens from `Themes/Colors.xaml`, vector icon paths from `Themes/Icons.xaml`, and shared control styles from `Styles/UiTheme.xaml`.
+  - Fonts: `HeadingFont` (**Oswald**) for headings/statuses and `MainFont` (**Onest**) for body text (`Inter` and pixel fonts are strictly forbidden).
+  - Corner radius is strictly `CornerRadius="3"`. Do not use emojis in UI or colored glow effects (`DropShadowEffect`).
+  - Avoid hardcoded fixed `Width`/`Height` on text controls and buttons.
 
 ---
 

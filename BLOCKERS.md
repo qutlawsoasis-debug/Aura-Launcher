@@ -18,11 +18,11 @@
 
 ## 4. Discord Rich Presence Application ID
 - Интеграция Discord Rich Presence требует зарегистрированного приложения в Discord Developer Portal.
-- Пока поле `discordAppId` в `%AppData%\Aura\config.json` пустое или отсутствует, функция Rich Presence автоматически отключена.
+- Пока поле `discordAppId` в `%APPDATA%\.aura\config.json` пустое или отсутствует, функция Rich Presence автоматически отключена.
 - **Как включить:**
   1. Создайте приложение на https://discord.com/developers/applications и скопируйте его **APPLICATION ID** (Client ID).
   2. Загрузите ассеты (логотип `aura_logo` или `logo`) в вкладке *Rich Presence -> Art Assets*, если требуется отображение иконки.
-  3. Откройте `%AppData%\Aura\config.json` и добавьте/измените ключ:
+  3. Откройте `%APPDATA%\.aura\config.json` и добавьте/измените ключ:
      ```json
      "discordAppId": "123456789012345678"
      ```

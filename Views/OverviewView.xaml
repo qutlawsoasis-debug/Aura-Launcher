@@ -102,9 +102,7 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- ============================================== -->
-        <!-- STORIES RAIL (КОМПАКТНЫЙ БЛОК STORIES СПРАВА)  -->
-        <!-- ============================================== -->
+        <!-- Stories Rail (компактный блок справа) -->
         <Border x:Name="StoriesRail"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"

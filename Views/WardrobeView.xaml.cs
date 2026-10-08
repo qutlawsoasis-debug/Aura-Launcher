@@ -157,9 +157,7 @@ public partial class WardrobeView : UserControl
         }
     }
 
-    // ==========================================
-    // УПРАВЛЕНИЕ МЫШЬЮ И ИНЕРЦИЯ
-    // ==========================================
+    // Управление мышью и инерция
 
     private void Skin_MouseDown(object sender, MouseButtonEventArgs e)
     {
@@ -289,9 +287,7 @@ public partial class WardrobeView : UserControl
         _inertiaStoryboard.Begin();
     }
 
-    // ==========================================
-    // ПРОГРАММНЫЕ МЕТОДЫ ДЛЯ ТЕСТОВ И СКРИНШОТОВ
-    // ==========================================
+    // Программные методы для тестов и скриншотов
 
     public void RotateTo(double yaw, double pitch = 0)
     {

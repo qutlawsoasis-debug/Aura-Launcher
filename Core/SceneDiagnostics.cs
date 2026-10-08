@@ -2393,7 +2393,7 @@ public static class SceneDiagnostics
                 });
                 rightPanel.Children.Add(new TextBlock
                 {
-                    Text = "✕",
+                    Text = "X",
                     FontSize = 14,
                     Foreground = new SolidColorBrush(Color.FromRgb(0x8A, 0x9B, 0xA8)),
                     VerticalAlignment = VerticalAlignment.Center
@@ -2419,16 +2419,16 @@ public static class SceneDiagnostics
                 };
                 tbStack.Children.Add(new TextBlock
                 {
-                    Text = "❖",
-                    FontSize = 18,
+                    Text = "Win",
+                    FontSize = 13,
                     Foreground = new SolidColorBrush(Color.FromRgb(0x00, 0xA4, 0xEF)),
                     Margin = new Thickness(0, 0, 16, 0),
                     VerticalAlignment = VerticalAlignment.Center
                 });
                 tbStack.Children.Add(new TextBlock
                 {
-                    Text = "🔍",
-                    FontSize = 14,
+                    Text = "Search",
+                    FontSize = 12,
                     Foreground = new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
                     Margin = new Thickness(0, 0, 20, 0),
                     VerticalAlignment = VerticalAlignment.Center
@@ -2437,7 +2437,7 @@ public static class SceneDiagnostics
                 var activeApp = new Border
                 {
                     Background = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x28)),
-                    CornerRadius = new CornerRadius(4),
+                    CornerRadius = new CornerRadius(3),
                     Padding = new Thickness(10, 6, 12, 6)
                 };
                 var appStack = new StackPanel { Orientation = Orientation.Horizontal };
@@ -2485,7 +2485,7 @@ public static class SceneDiagnostics
                     Background = new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x24)),
                     BorderBrush = new SolidColorBrush(Color.FromRgb(0x38, 0x38, 0x38)),
                     BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(4),
+                    CornerRadius = new CornerRadius(3),
                     Padding = new Thickness(4)
                 };
                 var menuStack = new StackPanel();
@@ -2528,8 +2528,8 @@ public static class SceneDiagnostics
                 };
                 trayIcons.Children.Add(new TextBlock
                 {
-                    Text = "🔊",
-                    FontSize = 13,
+                    Text = "Vol",
+                    FontSize = 11,
                     Foreground = Brushes.LightGray,
                     Margin = new Thickness(0, 0, 10, 0),
                     VerticalAlignment = VerticalAlignment.Center

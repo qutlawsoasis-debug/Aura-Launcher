@@ -13,9 +13,7 @@
     <core:BoolToInkOrMuteBrushConverter x:Key="BoolToInkOrMuteBrushConverter" />
     <core:BoolToEnabledTextConverter x:Key="BoolToEnabledTextConverter" />
 
-    <!-- ============================================== -->
-    <!-- 1. DESIGN TOKENS (TASK 27A & 27B)              -->
-    <!-- ============================================== -->
+    <!-- Design Tokens -->
     <Color x:Key="ColorEmber">#F2A63C</Color>
     <Color x:Key="ColorEmberDark">#A85F12</Color>
     <Color x:Key="ColorInk">#EAF1EF</Color>
@@ -194,12 +192,9 @@
         </Setter>
     </Style>
 
-    <!-- ============================================== -->
-    <!-- 2. BUTTON STYLES                               -->
-    <!-- ============================================== -->
+    <!-- Button Styles -->
 
     <!-- Standard Button: height 48, Oswald 600 18, padding 24, bg white 10%, bottom border 3px black 28%, radius 3px -->
-    <!-- Smooth hover & non-jumping stable press -->
     <Style x:Key="StandardBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
@@ -258,7 +253,7 @@
                     <Border x:Name="OuterBrd"
                             BorderBrush="{StaticResource EmberDarkBrush}"
                             BorderThickness="0,0,0,2"
-                            CornerRadius="4"
+                            CornerRadius="3"
                             SnapsToDevicePixels="True">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -284,7 +279,7 @@
         </Setter>
     </Style>
 
-    <!-- SubNavPillRadio: compact tab pill radio button -->
+    <!-- SubNavPillRadio: compact tab radio button -->
     <Style x:Key="SubNavPillRadio" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -293,7 +288,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="PillBorder"
-                            CornerRadius="5"
+                            CornerRadius="3"
                             Background="#0C141A"
                             BorderBrush="{StaticResource LineInkBrush}"
                             BorderThickness="1"
@@ -326,8 +321,7 @@
         </Setter>
     </Style>
 
-    <!-- Main Button (Primary): gradient #F7B44F -> #EB962B, text #1C1106, bottom border 4px #A85F12, glow shadow ember, radius 3px -->
-    <!-- Non-jumping rock-solid layout with smooth glow and press opacity -->
+    <!-- Main Button (Primary): gradient #F7B44F -> #EB962B, text #1C1106, bottom border 4px #A85F12, radius 3px -->
     <Style x:Key="PrimaryNeonBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
@@ -339,47 +333,34 @@
         <Setter Property="Padding" Value="24,0" />
         <Setter Property="Template">
             <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="OuterBrd"
-                                BorderBrush="{StaticResource EmberDarkBrush}"
-                                BorderThickness="0,0,0,4"
-                                CornerRadius="3"
-                                SnapsToDevicePixels="True">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#F7B44F" Offset="0" />
-                                    <GradientStop Color="#EB962B" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <Border.Effect>
-                                <DropShadowEffect Color="#F2A63C" BlurRadius="12" Opacity="0.45" Direction="270" ShadowDepth="2" />
-                            </Border.Effect>
-                            <Grid>
-                                <ContentPresenter HorizontalAlignment="Center"
-                                                  VerticalAlignment="Center"
-                                                  Margin="{TemplateBinding Padding}"
-                                                  RecognizesAccessKey="True" />
-                            </Grid>
-                        </Border>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="OuterBrd"
+                            BorderBrush="{StaticResource EmberDarkBrush}"
+                            BorderThickness="0,0,0,4"
+                            CornerRadius="3"
+                            SnapsToDevicePixels="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#F7B44F" Offset="0" />
+                                <GradientStop Color="#EB962B" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Grid>
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True" />
+                        </Grid>
+                    </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="OuterBrd" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect Color="#F2A63C" BlurRadius="18" Opacity="0.75" Direction="270" ShadowDepth="2" />
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.92" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.85" />
-                            <Setter TargetName="OuterBrd" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect Color="#F2A63C" BlurRadius="8" Opacity="0.25" Direction="270" ShadowDepth="1" />
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.82" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="OuterBrd" Property="Opacity" Value="0.4" />
-                            <Setter TargetName="OuterBrd" Property="Effect" Value="{x:Null}" />
                             <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -388,7 +369,7 @@
         </Setter>
     </Style>
 
-    <!-- Large Play Button (260x70, font 28) with sheen sweep and bottom launch progress bar -->
+    <!-- Large Play Button (260x70, font 28, radius 3px, no glow or sheen) -->
     <Style x:Key="OverviewPlayBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
@@ -414,24 +395,7 @@
                                     <GradientStop Color="#EB962B" Offset="1" />
                                 </LinearGradientBrush>
                             </Border.Background>
-                            <Border.Effect>
-                                <DropShadowEffect Color="#F2A63C" BlurRadius="16" Opacity="0.5" Direction="270" ShadowDepth="2" />
-                            </Border.Effect>
                             <Grid>
-                                <!-- Single Sheen sweep layer on hover (700ms) -->
-                                <Border x:Name="SheenLayer" IsHitTestVisible="False" Opacity="0" HorizontalAlignment="Left" Width="60">
-                                    <Border.RenderTransform>
-                                        <TranslateTransform x:Name="SheenTrans" X="-70" />
-                                    </Border.RenderTransform>
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                            <GradientStop Color="#00FFFFFF" Offset="0" />
-                                            <GradientStop Color="#80FFFFFF" Offset="0.5" />
-                                            <GradientStop Color="#00FFFFFF" Offset="1" />
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                </Border>
-
                                 <ContentPresenter HorizontalAlignment="Center"
                                                   VerticalAlignment="Center"
                                                   RecognizesAccessKey="True" />
@@ -439,41 +403,14 @@
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
-                        <!-- Hover: single sheen sweep (700ms) and bright glow -->
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="OuterBrd" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect Color="#F2A63C" BlurRadius="22" Opacity="0.8" Direction="270" ShadowDepth="2" />
-                                </Setter.Value>
-                            </Setter>
-                            <Trigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetName="SheenLayer" Storyboard.TargetProperty="Opacity"
-                                                         From="0.0" To="0.7" Duration="0:0:0.1" />
-                                        <DoubleAnimation Storyboard.TargetName="SheenTrans" Storyboard.TargetProperty="X"
-                                                         From="-80" To="280" Duration="0:0:0.7">
-                                            <DoubleAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut" />
-                                            </DoubleAnimation.EasingFunction>
-                                        </DoubleAnimation>
-                                        <DoubleAnimation Storyboard.TargetName="SheenLayer" Storyboard.TargetProperty="Opacity"
-                                                         To="0.0" Duration="0:0:0.1" BeginTime="0:0:0.6" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </Trigger.EnterActions>
+                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.93" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.88" />
-                            <Setter TargetName="OuterBrd" Property="Effect">
-                                <Setter.Value>
-                                    <DropShadowEffect Color="#F2A63C" BlurRadius="8" Opacity="0.25" Direction="270" ShadowDepth="1" />
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="OuterBrd" Property="Opacity" Value="0.84" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="OuterBrd" Property="Opacity" Value="0.45" />
-                            <Setter TargetName="OuterBrd" Property="Effect" Value="{x:Null}" />
                             <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -528,6 +465,72 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Friend delete inline link button (FriendsView) -->
+    <Style x:Key="FriendDeleteLinkBtn" TargetType="Button" BasedOn="{StaticResource GhostBtn}">
+        <Setter Property="Opacity" Value="0.6" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="1.0" />
+                <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+            </Trigger>
+            <DataTrigger Binding="{Binding IsConfirmingDelete}" Value="True">
+                <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Lobby conditional action buttons (LobbyView) -->
+    <Style x:Key="LobbyGuestConnectBtn" TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
+        <Setter Property="Visibility" Value="Collapsed" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsHost}" Value="False">
+                <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="LobbyGuestReconnectBtn" TargetType="Button" BasedOn="{StaticResource SecondaryBtn}">
+        <Setter Property="Visibility" Value="Collapsed" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding CanReconnect}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="LobbyFixAndProceedBtn" TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
+        <Setter Property="Visibility" Value="Collapsed" />
+        <Style.Triggers>
+            <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                    <Condition Binding="{Binding CanFixAny}" Value="True" />
+                    <Condition Binding="{Binding IsGameRunningWarning}" Value="False" />
+                    <Condition Binding="{Binding IsViewOnlyDialogMode}" Value="False" />
+                </MultiDataTrigger.Conditions>
+                <Setter Property="Visibility" Value="Visible" />
+            </MultiDataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="LobbyJoinAsIsBtn" TargetType="Button" BasedOn="{StaticResource StandardBtn}">
+        <Setter Property="Visibility" Value="Collapsed" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsJoinDialogMode}" Value="True">
+                <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Report modal submit button (MainWindow) -->
+    <Style x:Key="ReportSubmitBtn" TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
+        <Setter Property="Content" Value="Отправить" />
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsSubmittingReport}" Value="True">
+                <Setter Property="Content" Value="Отправка..." />
+            </DataTrigger>
+        </Style.Triggers>
     </Style>
 
     <!-- Window Caption Controls: 32x34, hover white 10% -->
@@ -699,11 +702,7 @@
                                                     Background="{StaticResource EmberBrush}"
                                                     BorderBrush="{StaticResource EmberDarkBrush}"
                                                     BorderThickness="1"
-                                                    Cursor="Hand">
-                                                <Border.Effect>
-                                                    <DropShadowEffect Color="#F2A63C" BlurRadius="6" Opacity="0.4" Direction="270" ShadowDepth="1" />
-                                                </Border.Effect>
-                                            </Border>
+                                                    Cursor="Hand" />
                                         </ControlTemplate>
                                     </Thumb.Template>
                                 </Thumb>

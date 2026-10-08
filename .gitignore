@@ -13,3 +13,9 @@ shots/
 build/
 aura-defaults/data/
 aura-defaults/run/
+task_plan.md
+findings.md
+progress.md
+.planning/
+.active_plan
+*.bak

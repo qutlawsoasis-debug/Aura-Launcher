@@ -43,10 +43,10 @@ public class LobbyViewModel : ObservableObject
     public event Action<int>? PlayerCountChanged;
     public event Action? Reconnected;
 
-    // === Список игроков лобби ===
+    // Список игроков лобби
     public ObservableCollection<LobbyPlayerItem> LobbyPlayers { get; } = new();
 
-    // === Уведомление вверху списка игроков (6 секунд) ===
+    // Уведомление вверху списка игроков (6 секунд)
     private bool _isSyncNoticeVisible;
     public bool IsSyncNoticeVisible
     {
@@ -61,7 +61,7 @@ public class LobbyViewModel : ObservableObject
         set => SetProperty(ref _syncNoticeText, value);
     }
 
-    // === Модальный диалог расхождений модов (ModMismatchDialog) ===
+    // Модальный диалог расхождений модов (ModMismatchDialog)
     private bool _isModMismatchDialogVisible;
     public bool IsModMismatchDialogVisible
     {
@@ -157,13 +157,13 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
-    // === Общее состояние ===
+    // Общее состояние
     private bool _isInLobby;
     private string _statusText = "Создайте лобби или введите код друга";
-    private string _statusIcon = "⚡";
+    private string _statusIcon = string.Empty;
     private bool _isBusy;
 
-    // === Хост ===
+    // Хост
     private string? _lobbyCode;
     private string? _hostName;
     private string _hostStatusText = "Ожидание мира...";
@@ -171,12 +171,12 @@ public class LobbyViewModel : ObservableObject
     private bool _isWorldOpen;
     private bool _codeCopied;
 
-    // === Ошибка туннеля и копирование лога ===
+    // Ошибка туннеля и копирование лога
     private bool _showTunnelFailedLogButton;
     private string? _tunnelFailureReason;
     private bool _tunnelLogCopied;
 
-    // === Гость ===
+    // Гость
     private string _guestCodeInput = string.Empty;
     private bool _isGuestJoined;
     public bool WasInvited { get; set; }
@@ -338,7 +338,7 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
-    // === Свойства ===
+    // Свойства
 
     public bool IsInLobby
     {
@@ -377,7 +377,7 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
-    // --- Хост ---
+    // Хост
 
     public string? LobbyCode
     {
@@ -445,7 +445,7 @@ public class LobbyViewModel : ObservableObject
 
     public bool IsHost => _lobbyService.IsHost;
 
-    // --- Гость ---
+    // Гость
 
     public string GuestCodeInput
     {
@@ -574,7 +574,7 @@ public class LobbyViewModel : ObservableObject
     {
         IsBusy = true;
         StatusText = "Создание лобби...";
-        StatusIcon = "⏳";
+        StatusIcon = string.Empty;
         ShowTunnelFailedLogButton = false;
         TunnelFailureReason = null;
 
@@ -607,7 +607,7 @@ public class LobbyViewModel : ObservableObject
             {
                 PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
                 StatusText = "Ошибка получения конфигурации туннеля";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 ShowTunnelFailedLogButton = true;
                 TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
                 return null;
@@ -627,8 +627,8 @@ public class LobbyViewModel : ObservableObject
                 IsLobbyCreated = true;
                 IsInLobby = true;
                 HostStatusText = "Ожидание мира...";
-                StatusText = "Лобби создано! Отправь код другу и нажми «ОТКРЫТЬ МИР»";
-                StatusIcon = "👑";
+                StatusText = "Лобби создано. Отправь код другу и нажми «Открыть мир»";
+                StatusIcon = string.Empty;
 
                 ImageSource? hostAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
                 _knownPlayerNicks.Clear();
@@ -650,7 +650,7 @@ public class LobbyViewModel : ObservableObject
             else
             {
                 StatusText = "Не удалось создать лобби. Проверь lobby-api сервер";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 ShowTunnelFailedLogButton = true;
                 TunnelFailureReason = "Сервер лобби вернул ошибку при создании лобби.";
                 return null;
@@ -660,7 +660,7 @@ public class LobbyViewModel : ObservableObject
         {
             PlayitTunnelProvider.LogTunnel($"[CREATE-LOBBY: ERROR] {ex.Message}");
             StatusText = $"Ошибка: {ex.Message}";
-            StatusIcon = "❌";
+            StatusIcon = string.Empty;
             ShowTunnelFailedLogButton = true;
             TunnelFailureReason = ex.Message;
             return null;
@@ -693,8 +693,8 @@ public class LobbyViewModel : ObservableObject
                 {
                     IsWorldOpen = true;
                     HostStatusText = "Лобби открыто!";
-                    StatusText = "Мир открыт — друзья могут подключиться!";
-                    StatusIcon = "✅";
+                    StatusText = "Мир открыт, друзья могут подключиться";
+                    StatusIcon = string.Empty;
                 }
                 return;
             }
@@ -710,13 +710,13 @@ public class LobbyViewModel : ObservableObject
 
             HostStatusText = "Ожидание открытия мира...";
             StatusText = "Игра запущена. Открой мир для сети (Esc → Открыть для сети)";
-            StatusIcon = "⏳";
+            StatusIcon = string.Empty;
         }
         catch (Exception ex)
         {
             HostStatusText = "Ошибка";
             StatusText = $"Ошибка: {ex.Message}";
-            StatusIcon = "❌";
+            StatusIcon = string.Empty;
         }
         finally
         {
@@ -738,7 +738,7 @@ public class LobbyViewModel : ObservableObject
                     {
                         HostStatusText = $"Ошибка: порт {port}";
                         StatusText = msg;
-                        StatusIcon = "❌";
+                        StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = true;
                         TunnelFailureReason = msg;
                     });
@@ -762,7 +762,7 @@ public class LobbyViewModel : ObservableObject
                     {
                         HostStatusText = "Порт 25565 недоступен";
                         StatusText = msg;
-                        StatusIcon = "❌";
+                        StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = true;
                         TunnelFailureReason = msg;
                     });
@@ -781,8 +781,8 @@ public class LobbyViewModel : ObservableObject
                     {
                         IsWorldOpen = true;
                         HostStatusText = "Лобби открыто!";
-                        StatusText = "Мир готов — друзья могут подключаться!";
-                        StatusIcon = "✅";
+                        StatusText = "Мир готов, друзья могут подключаться";
+                        StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = false;
                         TunnelFailureReason = null;
                     });
@@ -795,7 +795,7 @@ public class LobbyViewModel : ObservableObject
                     {
                         HostStatusText = "Ошибка туннеля";
                         StatusText = $"Туннель не поднялся: {reason}";
-                        StatusIcon = "❌";
+                        StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = true;
                         TunnelFailureReason = reason;
                     });
@@ -809,7 +809,7 @@ public class LobbyViewModel : ObservableObject
                 {
                     HostStatusText = "Ошибка туннеля";
                     StatusText = $"Ошибка туннеля: {ex.Message}";
-                    StatusIcon = "❌";
+                    StatusIcon = string.Empty;
                     ShowTunnelFailedLogButton = true;
                     TunnelFailureReason = ex.Message;
                 });
@@ -846,7 +846,7 @@ public class LobbyViewModel : ObservableObject
                 {
                     LeaveLobby();
                     StatusText = "Мир был закрыт хостом. Лобби закрыто.";
-                    StatusIcon = "ℹ️";
+                    StatusIcon = string.Empty;
                 });
             }
         });
@@ -874,7 +874,7 @@ public class LobbyViewModel : ObservableObject
                     {
                         LeaveLobby();
                         StatusText = "Игра закрыта. Лобби сброшено.";
-                        StatusIcon = "ℹ️";
+                        StatusIcon = string.Empty;
                     });
                 }
             });
@@ -893,7 +893,7 @@ public class LobbyViewModel : ObservableObject
             {
                 HostStatusText = "Ошибка туннеля";
                 StatusText = $"Ошибка туннеля: {reason}";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 ShowTunnelFailedLogButton = true;
                 TunnelFailureReason = reason;
             });
@@ -920,7 +920,7 @@ public class LobbyViewModel : ObservableObject
         JoinErrorMessage = string.Empty;
         GuestStatusText = "Подключение к лобби...";
         StatusText = "Подключение...";
-        StatusIcon = "⏳";
+        StatusIcon = string.Empty;
 
         var cleanCode = GuestCodeInput.Trim().ToUpperInvariant();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -943,7 +943,7 @@ public class LobbyViewModel : ObservableObject
                     JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
                     GuestStatusText = "Лобби не найдено";
                     StatusText = "Не удалось подключиться к лобби";
-                    StatusIcon = "❌";
+                    StatusIcon = string.Empty;
                 }
                 return;
             }
@@ -958,7 +958,7 @@ public class LobbyViewModel : ObservableObject
                 JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
                 GuestStatusText = "Ошибка соединения";
                 StatusText = "Нет связи с сервером";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 return;
             }
 
@@ -967,7 +967,7 @@ public class LobbyViewModel : ObservableObject
                 JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
                 GuestStatusText = "Лобби не найдено";
                 StatusText = "Лобби не найдено";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 return;
             }
 
@@ -976,7 +976,7 @@ public class LobbyViewModel : ObservableObject
                 JoinErrorMessage = "Это лобби закрыто. Попросите хоста создать новое.";
                 GuestStatusText = "Лобби закрыто";
                 StatusText = "Лобби закрыто";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 return;
             }
 
@@ -985,7 +985,7 @@ public class LobbyViewModel : ObservableObject
                 JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
                 GuestStatusText = "Ошибка сервера";
                 StatusText = "Ошибка сервера";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 return;
             }
 
@@ -1018,7 +1018,7 @@ public class LobbyViewModel : ObservableObject
                 JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
                 GuestStatusText = "Лобби не найдено или код неверный";
                 StatusText = "Не удалось подключиться к лобби";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
             }
         }
         catch (OperationCanceledException)
@@ -1026,7 +1026,7 @@ public class LobbyViewModel : ObservableObject
             JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
             GuestStatusText = "Таймаут подключения";
             StatusText = "Таймаут подключения";
-            StatusIcon = "❌";
+            StatusIcon = string.Empty;
         }
         catch (Exception ex)
         {
@@ -1034,7 +1034,7 @@ public class LobbyViewModel : ObservableObject
             JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
             GuestStatusText = "Ошибка подключения";
             StatusText = $"Ошибка: {ex.Message}";
-            StatusIcon = "❌";
+            StatusIcon = string.Empty;
         }
         finally
         {
@@ -1087,7 +1087,7 @@ public class LobbyViewModel : ObservableObject
         _lastTunnelAddress = address;
         IsBusy = true;
         StatusText = "Запуск игры...";
-        StatusIcon = "🚀";
+        StatusIcon = string.Empty;
 
         try
         {
@@ -1096,12 +1096,12 @@ public class LobbyViewModel : ObservableObject
             GuestConnectRequested?.Invoke(this, address);
 
             StatusText = "Игра запускается с подключением к серверу...";
-            StatusIcon = "🎮";
+            StatusIcon = string.Empty;
         }
         catch (Exception ex)
         {
             StatusText = $"Ошибка запуска: {ex.Message}";
-            StatusIcon = "❌";
+            StatusIcon = string.Empty;
         }
         finally
         {
@@ -1201,7 +1201,7 @@ public class LobbyViewModel : ObservableObject
         HostStatusText = "Ожидание мира...";
         GuestStatusText = "Введите 6-значный код лобби";
         StatusText = "Создайте лобби или введите код друга";
-        StatusIcon = "⚡";
+        StatusIcon = string.Empty;
 
         _discordRpcService?.SetInLauncher();
         _knownPlayerNicks.Clear();
@@ -1219,7 +1219,7 @@ public class LobbyViewModel : ObservableObject
         OnPropertyChanged(nameof(IsHost));
     }
 
-    // === Обработчики событий LobbyService ===
+    // Обработчики событий LobbyService
 
     private void Dispatch(Action action)
     {
@@ -1248,7 +1248,7 @@ public class LobbyViewModel : ObservableObject
                     case "open":
                         HostStatusText = "Лобби открыто!";
                         IsWorldOpen = true;
-                        StatusIcon = "✅";
+                        StatusIcon = string.Empty;
                         break;
                     case "closed":
                         HostStatusText = "Лобби закрыто";
@@ -1270,9 +1270,9 @@ public class LobbyViewModel : ObservableObject
             if (!_lobbyService.IsHost)
             {
                 CanGuestConnect = true;
-                GuestStatusText = "Хост открыл мир — можно подключаться!";
+                GuestStatusText = "Хост открыл мир, можно подключаться";
                 StatusText = "Мир готов! Нажми «Подключиться к игре»";
-                StatusIcon = "✅";
+                StatusIcon = string.Empty;
 
                 if (WasInvited && _configService.CurrentConfig.AutoConnectOnInviteAccept)
                 {
@@ -1292,25 +1292,25 @@ public class LobbyViewModel : ObservableObject
                 CanGuestConnect = false;
                 GuestStatusText = "Ожидание хоста...";
                 StatusText = "Ожидаем, пока хост откроет мир для сети";
-                StatusIcon = "⏳";
+                StatusIcon = string.Empty;
                 break;
             case "open":
                 CanGuestConnect = !string.IsNullOrWhiteSpace(_lobbyService.CurrentTunnelAddress);
-                GuestStatusText = CanGuestConnect ? "Хост открыл мир — можно подключаться!" : "Ожидание адреса сервера...";
+                GuestStatusText = CanGuestConnect ? "Хост открыл мир, можно подключаться" : "Ожидание адреса сервера...";
                 StatusText = CanGuestConnect ? "Мир готов! Нажми «Подключиться к игре»" : "Получение адреса сервера...";
-                StatusIcon = CanGuestConnect ? "✅" : "⏳";
+                StatusIcon = string.Empty;
                 break;
             case "closed":
                 CanGuestConnect = false;
                 GuestStatusText = "Лобби закрыто хостом";
                 StatusText = "Лобби было закрыто";
-                StatusIcon = "❌";
+                StatusIcon = string.Empty;
                 break;
             default:
                 CanGuestConnect = false;
                 GuestStatusText = "Введите 6-значный код лобби";
                 StatusText = "Создайте лобби или введите код друга";
-                StatusIcon = "⚡";
+                StatusIcon = string.Empty;
                 break;
         }
     }
@@ -1494,7 +1494,7 @@ public class LobbyViewModel : ObservableObject
         catch { }
     }
 
-    // === Методы проверки и синхронизации модов ===
+    // Методы проверки и синхронизации модов
 
     public async Task UpdateManifestAsync()
     {

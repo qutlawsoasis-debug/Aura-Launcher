@@ -4,7 +4,7 @@
 - **Лаунчер (`Aura-Launcher`)**: `C:\Users\magne\Documents\GitHub\Aura-Launcher`
   - GitHub: `https://github.com/qutlawsoasis-debug/Aura-Launcher`
   - Стек: C# / .NET 8.0 (`net8.0-windows10.0.19041.0`), WPF, MVVM, CmlLib.Core (запуск Minecraft 1.20.1 + Fabric `0.19.5`), Velopack (`vpk` для автообновлений и инсталлятора).
-  - Текущая версия релиза: **`1.2.45` (`beta 1.0.37`)** — опубликована в GitHub Releases (`v1.2.45`).
+  - Текущая версия релиза: **`1.2.46` (`beta 1.0.38`)** — опубликована в GitHub Releases (`v1.2.46`).
 - **Бэкенд лобби, друзей, скинов и отчётов (`lobby-api`)**: `C:\Users\magne\Documents\GitHub\Aura-Launcher\lobby-api`
   - Хостинг: Vercel (`https://lobby-api.vercel.app`), проект `qutlawsoasis-debugs-projects/lobby-api`.
   - Хранилище: Upstash Redis (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) + `PLAYIT_SECRET` для playit.gg туннеля.
@@ -77,3 +77,8 @@
 5. **Исправления в `Aura-Pack`**:
    - Удалён конфликтующий мод `NE-1.20.1-1.9.0.jar` (*NoExpensive*), вызывавший Mixin-краш с `no_xp_anvils`.
    - В `alexsmobs-2.2.2-fabric+1.20.1.jar` добавлены недостающие теги предметов (`c:nuggets/iron`, `c:ingots/iron`, `c:ingots/netherite`, `c:rods/wooden`, `c:strings`, `c:glass_blocks`), чтобы работали все крафты *Alex's Mobs* (включая «Ракету эндериофага»).
+6. **Среда разработки и правила агента (`AGENTS.md` + `.agents/skills/`)**:
+   - Настроены и актуализированы корневые `AGENTS.md` в `Aura-Launcher` и `Aura-Pack` (исключены из `manifest.json` в `make-manifest.ps1`).
+   - В `.agents/skills/` установлены: `antislop` (`antislop`, `antislop-ui`, `antislop-code`, `antislop-copywriting`), `planning-with-files`, синхронизированный с `DESIGN.md` навык `aura-ui-design` и регламент релизов `aura-release`.
+   - Прогон `.\scripts\check-design.ps1` на текущий момент выявляет 47 старых находок во `Views/` (36 HEX-цветов в `StartupWindow.xaml`, `WorkshopView.xaml`, `SettingsView.xaml`, `LobbyView.xaml`, 1 `TemplateBinding FontFamily` и 10 локальных `<Button.Style>` в `FriendsView.xaml` и `LobbyView.xaml`).
+

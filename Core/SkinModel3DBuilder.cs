@@ -172,9 +172,7 @@ public static class SkinModel3DBuilder
         double leftArmMinX = 4.0;
         double leftArmMaxX = isSlim ? 7.0 : 8.0;
 
-        // ==========================================
-        // БАЗОВЫЕ ЧАСТИ (baseMaterial)
-        // ==========================================
+        // Базовые части (baseMaterial)
         // Голова: 8x8x8, начало (0,0)
         baseGroup.Children.Add(CreateCuboidModel(
             -4, 4, 8, 16, -4, 4,
@@ -233,9 +231,7 @@ public static class SkinModel3DBuilder
                 baseMaterial, texW, texH));
         }
 
-        // ==========================================
-        // НАКЛАДНОЙ СЛОЙ (+0.5 px с каждой стороны, overlayMaterial)
-        // ==========================================
+        // Накладной слой (+0.5 px с каждой стороны, overlayMaterial)
         // Шляпа головы: начало (32,0)
         var hatModel = CreateCuboidModel(
             -4.5, 4.5, 7.5, 16.5, -4.5, 4.5,

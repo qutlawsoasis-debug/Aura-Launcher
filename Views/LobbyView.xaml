@@ -70,13 +70,9 @@
                 <ColumnDefinition Width="*" MinWidth="260" MaxWidth="340" />
             </Grid.ColumnDefinitions>
 
-            <!-- ============================================== -->
-            <!-- LEFT COLUMN: Lobby Creation / Join / In Lobby -->
-            <!-- ============================================== -->
+            <!-- Left column: Lobby creation, join, and active lobby state -->
             <Grid Grid.Column="0">
-                <!-- ============================================== -->
-                <!-- A. NOT IN LOBBY                                -->
-                <!-- ============================================== -->
+                <!-- Not in lobby -->
                 <StackPanel VerticalAlignment="Top">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
@@ -322,9 +318,7 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- ============================================== -->
-                <!-- B. IN LOBBY                                    -->
-                <!-- ============================================== -->
+                <!-- In lobby -->
                 <StackPanel VerticalAlignment="Top">
                     <StackPanel.Style>
                         <Style TargetType="StackPanel">
@@ -434,37 +428,17 @@
 
                         <!-- Guest: "Подключиться к игре" button -->
                         <Button Command="{Binding ConnectToGameCommand}"
+                                Style="{StaticResource LobbyGuestConnectBtn}"
                                 Height="48"
                                 Content="Подключиться к игре"
-                                Margin="0,0,12,8">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsHost}" Value="False">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,12,8" />
 
                         <!-- Guest: "Переподключиться" button (активна при вылете или возможности повторного подключения) -->
                         <Button Command="{Binding ReconnectCommand}"
+                                Style="{StaticResource LobbyGuestReconnectBtn}"
                                 Height="48"
                                 Content="Переподключиться"
-                                Margin="0,0,12,8">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource SecondaryBtn}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CanReconnect}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,12,8" />
 
                         <!-- "Копировать" / "Скопировано" Button -->
                         <Button Command="{Binding CopyCodeCommand}"
@@ -613,14 +587,7 @@
                 </StackPanel>
             </Grid>
 
-            <!-- ============================================== -->
-            <!-- RIGHT COLUMN: Players list (width 200px)       -->
-            <!-- 54px rows with 1px lines top/bottom            -->
-            <!-- ============================================== -->
-            <!-- ============================================== -->
-            <!-- RIGHT COLUMN: Players list                      -->
-            <!-- 54px rows with 1px lines top/bottom            -->
-            <!-- ============================================== -->
+            <!-- Right column: Players list (54px rows with 1px lines top/bottom) -->
             <StackPanel Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Top">
                 <TextBlock Text="Игроки"
                            FontFamily="{StaticResource HeadingFont}"
@@ -811,12 +778,10 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============================================== -->
-        <!-- MOD MISMATCH DIALOG (MODAL OVERLAY)           -->
-        <!-- ============================================== -->
+        <!-- Mod mismatch dialog (modal overlay) -->
         <Grid Grid.RowSpan="2"
               Visibility="{Binding IsModMismatchDialogVisible, Converter={StaticResource BoolToVis}}"
-              Background="#B2071017"
+              Background="{DynamicResource DialogBackdrop}"
               KeyboardNavigation.TabNavigation="Cycle">
             <Grid.InputBindings>
                 <KeyBinding Key="Escape" Command="{Binding CancelMismatchDialogCommand}" />
@@ -927,42 +892,17 @@
                                VerticalAlignment="Center">
                         <!-- Fix & Proceed / Fix button (Accent filled) -->
                         <Button Command="{Binding FixAndProceedCommand}"
+                                Style="{StaticResource LobbyFixAndProceedBtn}"
                                 Content="{Binding FixButtonText}"
                                 Padding="16,8"
-                                Margin="0,0,10,0">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <MultiDataTrigger>
-                                            <MultiDataTrigger.Conditions>
-                                                <Condition Binding="{Binding CanFixAny}" Value="True" />
-                                                <Condition Binding="{Binding IsGameRunningWarning}" Value="False" />
-                                                <Condition Binding="{Binding IsViewOnlyDialogMode}" Value="False" />
-                                            </MultiDataTrigger.Conditions>
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </MultiDataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,10,0" />
 
                         <!-- "Войти как есть" button -->
                         <Button Command="{Binding JoinAsIsCommand}"
+                                Style="{StaticResource LobbyJoinAsIsBtn}"
                                 Content="Войти как есть"
                                 Padding="14,8"
-                                Margin="0,0,10,0">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource StandardBtn}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsJoinDialogMode}" Value="True">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                        </Button>
+                                Margin="0,0,10,0" />
 
                         <!-- Cancel / Later / Close button -->
                         <Button Command="{Binding CancelMismatchDialogCommand}"

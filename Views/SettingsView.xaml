@@ -26,17 +26,17 @@
                     <ControlTemplate TargetType="RadioButton">
                         <TextBlock x:Name="TabTitle"
                                    Text="{TemplateBinding Content}"
-                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontFamily="{StaticResource MainFont}"
                                    FontSize="{TemplateBinding FontSize}"
                                    FontWeight="{TemplateBinding FontWeight}"
-                                   Foreground="#E8F0F8"
+                                   Foreground="{DynamicResource TextPrimary}"
                                    Opacity="0.62"
                                    VerticalAlignment="Center"
                                    HorizontalAlignment="Center" />
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="TabTitle" Property="Opacity" Value="1.0" />
-                                <Setter TargetName="TabTitle" Property="Foreground" Value="#E8F0F8" />
+                                <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource TextPrimary}" />
                             </Trigger>
                             <MultiTrigger>
                                 <MultiTrigger.Conditions>
@@ -109,9 +109,7 @@
         <ScrollViewer Grid.Row="1" Style="{StaticResource AuraScrollViewer}">
             <StackPanel Margin="0,0,8,24" Focusable="False">
 
-                <!-- ============================================== -->
-                <!-- ГРУППА 1: ИГРА                                 -->
-                <!-- ============================================== -->
+                <!-- Группа 1: Игра -->
                 <TextBlock Text="Игра"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="22"
@@ -204,9 +202,7 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- ============================================== -->
-                <!-- ГРУППА 2: ЛАУНЧЕР                              -->
-                <!-- ============================================== -->
+                <!-- Группа 2: Лаунчер -->
                 <TextBlock Text="Лаунчер"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="22"
@@ -417,9 +413,7 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- ============================================== -->
-                <!-- ГРУППА 3: ПОДДЕРЖКА                            -->
-                <!-- ============================================== -->
+                <!-- Группа 3: Поддержка -->
                 <TextBlock Text="Поддержка"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="22"

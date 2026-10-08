@@ -60,7 +60,7 @@ public class OverviewViewModel : ObservableObject
     }
 
     private string _playTimeFormatted = "0 мин.";
-    private string _playtimeSummaryText = "⏱️ Время в игре: 0 мин. • 0 запусков";
+    private string _playtimeSummaryText = "Время в игре: 0 мин. • 0 запусков";
 
     public string PlayTimeFormatted
     {
@@ -184,15 +184,13 @@ public class OverviewViewModel : ObservableObject
         long hours = totalSec / 3600;
         long minutes = (totalSec % 3600) / 60;
         PlayTimeFormatted = hours > 0 ? $"{hours} ч. {minutes} мин." : $"{minutes} мин.";
-        PlaytimeSummaryText = $"⏱️ В игре: {PlayTimeFormatted}  •  Запусков: {config.TotalGameLaunches}";
+        PlaytimeSummaryText = $"В игре: {PlayTimeFormatted}  •  Запусков: {config.TotalGameLaunches}";
 
         // 6. Обновление правой колонки (ленты)
         RefreshRightFeed();
     }
 
-    // ==========================================
-    // ПРАВАЯ КОЛОНКА (ЛЕНТА НА ГЛАВНОМ ЭКРАНЕ)
-    // ==========================================
+    // Правая колонка (лента на главном экране)
     private ScreenshotItem? _latestScreenshot;
     private string _latestScreenshotDateText = string.Empty;
     private bool _hasLatestScreenshot;
@@ -535,9 +533,9 @@ public class OverviewViewModel : ObservableObject
 
             var lines = new ObservableCollection<string>
             {
-                "Frostiful & Snowy Spirit — зимнее выживание и атмосфера",
-                "Alex's Mobs — новые живые существа и анимации",
-                "Spell Engine — переработанная магия и атрибуты заклинаний"
+                "Frostiful и Snowy Spirit: зимнее выживание и сани",
+                "Alex's Mobs: новые животные и существа",
+                "Spell Engine: система заклинаний и атрибутов"
             };
             WhatsNewLines = lines;
             HasWhatsNewBlock = true;

@@ -49,10 +49,7 @@
                 <ColumnDefinition Width="384" />
             </Grid.ColumnDefinitions>
 
-            <!-- ============================================== -->
-            <!-- LEFT: 170x290 3D Viewport figure, soft oval    -->
-            <!-- shadow, caption                                -->
-            <!-- ============================================== -->
+            <!-- Left: 170x290 3D Viewport figure, soft oval shadow, caption -->
             <StackPanel Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Grid x:Name="SkinDragArea"
                       Width="170" Height="290"
@@ -93,9 +90,7 @@
                            Margin="0,8,0,0" />
             </StackPanel>
 
-            <!-- ============================================== -->
-            <!-- RIGHT: Nickname, Profile ID, Skin controls      -->
-            <!-- ============================================== -->
+            <!-- Right: Nickname, Profile ID, Skin controls -->
             <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="20,0,0,0">
 
                 <!-- 1. Ник в игре -->

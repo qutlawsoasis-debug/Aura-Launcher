@@ -520,9 +520,7 @@ public class FabricGameLaunchService : IGameLaunchService
         var javaExtractor = launcher.FileExtractors.OfType<JavaFileExtractor>().FirstOrDefault() ?? new JavaFileExtractor(_httpClient, launcher.JavaPathResolver);
         var logExtractor = launcher.FileExtractors.OfType<LogFileExtractor>().FirstOrDefault() ?? new LogFileExtractor();
 
-        // ==============================================================
-        // ЭТАП 1: Minecraft 1.20.1 (Базовый манифест и client.jar)
-        // ==============================================================
+        // Этап 1: Minecraft 1.20.1 (базовый манифест и client.jar)
         onLogReceived?.Invoke("[AURA-INSTALL] Этап 1/5: Проверка Minecraft 1.20.1...");
         progress?.Report(new InstallProgressReport
         {
@@ -544,9 +542,7 @@ public class FabricGameLaunchService : IGameLaunchService
         await InstallGameFilesStageAsync(
             launcher, stage1Files, "Minecraft 1.20.1", 1, 5, progress, onLogReceived, cancellationToken);
 
-        // ==============================================================
-        // ЭТАП 2: Java 17 (Mojang java-runtime-gamma)
-        // ==============================================================
+        // Этап 2: Java 17 (Mojang java-runtime-gamma)
         onLogReceived?.Invoke("[AURA-INSTALL] Этап 2/5: Проверка Java 17...");
         progress?.Report(new InstallProgressReport
         {
@@ -580,9 +576,7 @@ public class FabricGameLaunchService : IGameLaunchService
             });
         }
 
-        // ==============================================================
-        // ЭТАП 3: Fabric (Профиль загрузчика)
-        // ==============================================================
+        // Этап 3: Fabric (профиль загрузчика)
         var fabricLoader = ResolveFabricLoaderVersion(gameDir);
         onLogReceived?.Invoke($"[AURA-INSTALL] Этап 3/5: Проверка профиля Fabric Loader {fabricLoader}...");
         progress?.Report(new InstallProgressReport
@@ -624,9 +618,7 @@ public class FabricGameLaunchService : IGameLaunchService
             DetailText = "Профиль Fabric загружен"
         });
 
-        // ==============================================================
-        // ЭТАП 4: Библиотеки (Vanilla + Fabric)
-        // ==============================================================
+        // Этап 4: Библиотеки (Vanilla + Fabric)
         onLogReceived?.Invoke("[AURA-INSTALL] Этап 4/5: Проверка библиотек игры и Fabric...");
         progress?.Report(new InstallProgressReport
         {
@@ -647,9 +639,7 @@ public class FabricGameLaunchService : IGameLaunchService
         await InstallGameFilesStageAsync(
             launcher, allLibraries, "Библиотеки", 4, 5, progress, onLogReceived, cancellationToken);
 
-        // ==============================================================
-        // ЭТАП 5: Ресурсы (Ассеты Minecraft 1.20.1)
-        // ==============================================================
+        // Этап 5: Ресурсы (ассеты Minecraft 1.20.1)
         onLogReceived?.Invoke("[AURA-INSTALL] Этап 5/5: Проверка ресурсов (ассетов)...");
         progress?.Report(new InstallProgressReport
         {

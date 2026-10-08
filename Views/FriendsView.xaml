@@ -411,24 +411,10 @@
                                         <Grid VerticalAlignment="Center">
                                             <!-- Normal delete link (visible when not confirming) -->
                                             <Button Command="{Binding StartDeleteCommand}"
+                                                    Style="{StaticResource FriendDeleteLinkBtn}"
                                                     Content="Удалить"
                                                     Foreground="{StaticResource MuteBrush}"
-                                                    FontSize="12">
-                                                <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource GhostBtn}">
-                                                        <Setter Property="Opacity" Value="0.6" />
-                                                        <Style.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter Property="Opacity" Value="1.0" />
-                                                                <Setter Property="Foreground" Value="{DynamicResource Danger}" />
-                                                            </Trigger>
-                                                            <DataTrigger Binding="{Binding IsConfirmingDelete}" Value="True">
-                                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Button.Style>
-                                            </Button>
+                                                    FontSize="12" />
 
                                             <!-- Inline Confirmation: "Удалить?" [Да] [Отмена] -->
                                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
