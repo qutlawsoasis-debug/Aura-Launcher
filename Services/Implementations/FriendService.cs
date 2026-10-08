@@ -23,6 +23,7 @@ public class FriendService : IFriendService
     };
 
     private readonly SemaphoreSlim _regLock = new(1, 1);
+    private readonly SemaphoreSlim _syncLock = new(1, 1);
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
     private readonly HashSet<string> _notifiedInviteIds = new();
@@ -177,17 +178,18 @@ public class FriendService : IFriendService
 
     public async Task<SyncResponse?> SyncNowAsync(CancellationToken cancellationToken = default)
     {
-        if (!IsRegistered)
-        {
-            await EnsureRegisteredAsync(cancellationToken);
-            if (!IsRegistered) return null;
-        }
-
+        await _syncLock.WaitAsync(cancellationToken);
         try
         {
+            if (!IsRegistered)
+            {
+                await EnsureRegisteredAsync(cancellationToken);
+                if (!IsRegistered) return null;
+            }
+
             string status = IsGameRunning ? "playing" : (IsInLobby ? "lobby" : "online");
             string nick = _configService.CurrentConfig?.Nickname ?? "Player";
-            string? lobbyCode = IsInLobby ? CurrentLobbyCode : null;
+            string? lobbyCode = (IsInLobby && !string.IsNullOrWhiteSpace(CurrentLobbyCode)) ? CurrentLobbyCode : null;
 
             var body = new
             {
@@ -201,7 +203,6 @@ public class FriendService : IFriendService
 
             if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                // Токен невалиден или сброшен — перерегистрируем
                 FabricGameLaunchService.LogLauncherEvent("[FRIEND] Sync returned 401. Re-registering user...");
                 _configService.CurrentConfig.UserId = null;
                 _configService.CurrentConfig.UserTokenEncrypted = null;
@@ -218,7 +219,6 @@ public class FriendService : IFriendService
             var syncResult = JsonSerializer.Deserialize<SyncResponse>(json, _jsonOptions);
             if (syncResult != null)
             {
-                // Проверяем новые входящие приглашения
                 if (syncResult.Invites != null)
                 {
                     foreach (var invite in syncResult.Invites)
@@ -231,7 +231,6 @@ public class FriendService : IFriendService
                     }
                 }
 
-                // Проверяем новые входящие заявки в друзья
                 if (syncResult.IncomingRequests != null)
                 {
                     foreach (var incomingReq in syncResult.IncomingRequests)
@@ -254,6 +253,10 @@ public class FriendService : IFriendService
         {
             FabricGameLaunchService.LogLauncherEvent($"[FRIEND: SYNC ERROR] {ex.Message}");
             return null;
+        }
+        finally
+        {
+            _syncLock.Release();
         }
     }
 

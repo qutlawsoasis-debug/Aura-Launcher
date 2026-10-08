@@ -60,6 +60,36 @@ public class FriendItemViewModel : ObservableObject
             if (SetProperty(ref _status, value))
             {
                 OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(CanJoin));
+                OnPropertyChanged(nameof(CanInvite));
+            }
+        }
+    }
+
+    private string? _lobbyCode;
+    public string? LobbyCode
+    {
+        get => _lobbyCode;
+        set
+        {
+            if (SetProperty(ref _lobbyCode, value))
+            {
+                OnPropertyChanged(nameof(CanJoin));
+                OnPropertyChanged(nameof(CanInvite));
+            }
+        }
+    }
+
+    private string? _incomingInviteId;
+    public string? IncomingInviteId
+    {
+        get => _incomingInviteId;
+        set
+        {
+            if (SetProperty(ref _incomingInviteId, value))
+            {
+                OnPropertyChanged(nameof(CanJoin));
+                OnPropertyChanged(nameof(CanInvite));
             }
         }
     }
@@ -111,6 +141,7 @@ public class FriendItemViewModel : ObservableObject
         {
             if (SetProperty(ref _isInMyLobby, value))
             {
+                OnPropertyChanged(nameof(CanJoin));
                 OnPropertyChanged(nameof(CanInvite));
             }
         }
@@ -126,6 +157,7 @@ public class FriendItemViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(InviteStateText));
                 OnPropertyChanged(nameof(CanInvite));
+                OnPropertyChanged(nameof(CanJoin));
                 OnPropertyChanged(nameof(HasInviteState));
             }
         }
@@ -143,7 +175,7 @@ public class FriendItemViewModel : ObservableObject
     };
 
     public bool CanInvite => Online && !IsInMyLobby && !CanJoin && string.IsNullOrEmpty(_inviteState);
-    public bool CanJoin => Online && string.Equals(Status, "lobby", StringComparison.OrdinalIgnoreCase);
+    public bool CanJoin => Online && !IsInMyLobby && !HasInviteState && string.Equals(Status, "lobby", StringComparison.OrdinalIgnoreCase);
 
     private bool _isConfirmingDelete;
     public bool IsConfirmingDelete
@@ -164,6 +196,7 @@ public class FriendItemViewModel : ObservableObject
         Nick = item.Nick;
         Online = item.Online;
         Status = item.Status;
+        LobbyCode = item.LobbyCode;
         LastSeen = item.LastSeen;
         _avatar = SkinService.LoadDefaultSteveBitmap();
         _onInvite = onInvite;
@@ -184,6 +217,7 @@ public class FriendItemViewModel : ObservableObject
     {
         Online = item.Online;
         Status = item.Status;
+        LobbyCode = item.LobbyCode;
         LastSeen = item.LastSeen;
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(CanJoin));
@@ -209,6 +243,13 @@ public class FriendsViewModel : ObservableObject
     private readonly ILobbyService _lobbyService;
     private readonly ISkinService _skinService;
     private readonly LobbyViewModel _lobbyViewModel;
+    private readonly SemaphoreSlim _inviteLock = new(1, 1);
+    private readonly HashSet<string> _inFlightInviteFriendIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _dismissedSentInviteIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _knownSentInviteIds = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string> _latestSentInviteIdByFriend = new(StringComparer.OrdinalIgnoreCase);
+    private string? _trackedLobbyCode;
+    private bool _wasInHostLobby;
 
     public event Action? OpenLobbyRequested;
 
@@ -292,7 +333,6 @@ public class FriendsViewModel : ObservableObject
 
     public string MyFriendCode => _friendService.CurrentFriendCode ?? "--------";
 
-    // 8 символов кода для ячеек
     public char CodeChar0 => GetCodeChar(0);
     public char CodeChar1 => GetCodeChar(1);
     public char CodeChar2 => GetCodeChar(2);
@@ -349,13 +389,116 @@ public class FriendsViewModel : ObservableObject
         OpenLobbyCommand = new RelayCommand(_ => OpenLobbyRequested?.Invoke());
 
         _friendService.SyncUpdated += OnSyncUpdated;
-        _lobbyService.StatusChanged += _ => Dispatch(() => OnPropertyChanged(nameof(IsLobbyActiveBannerVisible)));
+        _lobbyService.StatusChanged += _ => Dispatch(RefreshLobbyStateForFriends);
+        _lobbyViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(LobbyViewModel.IsInLobby) ||
+                e.PropertyName == nameof(LobbyViewModel.LobbyCode) ||
+                e.PropertyName == nameof(LobbyViewModel.IsLobbyCreated) ||
+                e.PropertyName == nameof(LobbyViewModel.IsHost))
+            {
+                Dispatch(RefreshLobbyStateForFriends);
+            }
+        };
+        _lobbyViewModel.LobbyPlayers.CollectionChanged += (_, _) => Dispatch(RefreshLobbyStateForFriends);
+    }
+
+    private bool ComputeIsFriendInMyLobby(string friendNick, string? friendStatus, string? friendLobbyCode)
+    {
+        if (!_lobbyViewModel.IsInLobby) return false;
+
+        if (_lobbyViewModel.LobbyPlayers.Any(p => string.Equals(p.Nickname, friendNick, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var myLobbyCode = _lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode;
+        if (!string.IsNullOrWhiteSpace(myLobbyCode) &&
+            !string.IsNullOrWhiteSpace(friendLobbyCode) &&
+            string.Equals(myLobbyCode, friendLobbyCode, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(friendStatus, "lobby", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void DismissAllKnownSentInvites()
+    {
+        foreach (var id in _knownSentInviteIds)
+        {
+            _dismissedSentInviteIds.Add(id);
+        }
+        foreach (var id in _latestSentInviteIdByFriend.Values)
+        {
+            _dismissedSentInviteIds.Add(id);
+        }
+        _latestSentInviteIdByFriend.Clear();
+    }
+
+    private void RefreshLobbyStateForFriends()
+    {
+        bool isHostLobbyNow = _lobbyViewModel.IsInLobby && _lobbyService.IsHost;
+        string? currentCode = _lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode;
+
+        if (!isHostLobbyNow)
+        {
+            if (_wasInHostLobby || _knownSentInviteIds.Count > 0)
+            {
+                DismissAllKnownSentInvites();
+            }
+            _wasInHostLobby = false;
+            _trackedLobbyCode = null;
+        }
+        else
+        {
+            if (_wasInHostLobby &&
+                !string.IsNullOrWhiteSpace(_trackedLobbyCode) &&
+                !string.IsNullOrWhiteSpace(currentCode) &&
+                !string.Equals(_trackedLobbyCode, currentCode, StringComparison.OrdinalIgnoreCase))
+            {
+                DismissAllKnownSentInvites();
+            }
+            _wasInHostLobby = true;
+            _trackedLobbyCode = currentCode;
+        }
+
+        foreach (var friend in Friends)
+        {
+            bool wasInMyLobby = friend.IsInMyLobby;
+            bool nowInMyLobby = ComputeIsFriendInMyLobby(friend.Nick, friend.Status, friend.LobbyCode);
+            friend.IsInMyLobby = nowInMyLobby;
+
+            if (!isHostLobbyNow)
+            {
+                if (!_inFlightInviteFriendIds.Contains(friend.Id))
+                {
+                    friend.InviteState = null;
+                }
+            }
+            else if (wasInMyLobby && !nowInMyLobby)
+            {
+                if (_latestSentInviteIdByFriend.TryGetValue(friend.Id, out var invId))
+                {
+                    _dismissedSentInviteIds.Add(invId);
+                    _latestSentInviteIdByFriend.Remove(friend.Id);
+                }
+                if (!_inFlightInviteFriendIds.Contains(friend.Id))
+                {
+                    friend.InviteState = null;
+                }
+            }
+        }
+
+        OnPropertyChanged(nameof(IsLobbyActiveBannerVisible));
     }
 
     public void OnTabActivated()
     {
         _friendService.IsFriendsTabActive = true;
         NotifyCodeCharsChanged();
+        RefreshLobbyStateForFriends();
         _ = _friendService.SyncNowAsync();
     }
 
@@ -440,65 +583,173 @@ public class FriendsViewModel : ObservableObject
         Dispatch(() =>
         {
             NotifyCodeCharsChanged();
+            RefreshLobbyStateForFriends();
 
-            // 1. Входящие заявки
-            IncomingRequests.Clear();
-            if (sync.IncomingRequests != null)
+            bool isHostLobbyNow = _lobbyViewModel.IsInLobby && _lobbyService.IsHost;
+            string? myLobbyCode = _lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode;
+
+            var incomingList = sync.IncomingRequests ?? Array.Empty<FriendRequestItem>();
+            bool requestsSame = IncomingRequests.Count == incomingList.Length &&
+                                IncomingRequests.Select(r => r.Id).SequenceEqual(incomingList.Select(r => r.Id), StringComparer.OrdinalIgnoreCase);
+            if (!requestsSame)
             {
-                foreach (var req in sync.IncomingRequests)
+                IncomingRequests.Clear();
+                foreach (var req in incomingList)
                 {
                     IncomingRequests.Add(new FriendRequestItemViewModel(req.Id, req.Nick, OnRespondFriendRequest));
                 }
             }
             OnPropertyChanged(nameof(HasIncomingRequests));
 
-            // 2. Список друзей
-            var currentFriendsDict = Friends.ToDictionary(f => f.Id);
+            var incomingInviteBySender = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (sync.Invites != null)
+            {
+                foreach (var inv in sync.Invites)
+                {
+                    if (!string.IsNullOrWhiteSpace(inv.FromId) && !string.IsNullOrWhiteSpace(inv.InviteId))
+                    {
+                        incomingInviteBySender[inv.FromId] = inv.InviteId;
+                    }
+                }
+            }
+
+            if (sync.SentInvites != null)
+            {
+                foreach (var sent in sync.SentInvites)
+                {
+                    if (!string.IsNullOrWhiteSpace(sent.InviteId))
+                    {
+                        _knownSentInviteIds.Add(sent.InviteId);
+                        if (!isHostLobbyNow)
+                        {
+                            _dismissedSentInviteIds.Add(sent.InviteId);
+                        }
+                        else if (!string.IsNullOrWhiteSpace(sent.LobbyCode) &&
+                                 !string.IsNullOrWhiteSpace(myLobbyCode) &&
+                                 !string.Equals(sent.LobbyCode, myLobbyCode, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _dismissedSentInviteIds.Add(sent.InviteId);
+                        }
+                    }
+                }
+            }
+
+            var currentFriendsDict = Friends.ToDictionary(f => f.Id, StringComparer.OrdinalIgnoreCase);
             var updatedList = new List<FriendItemViewModel>();
 
             if (sync.Friends != null)
             {
                 foreach (var item in sync.Friends)
                 {
+                    FriendItemViewModel vm;
+                    bool wasInMyLobby = false;
                     if (currentFriendsDict.TryGetValue(item.Id, out var existing))
                     {
+                        wasInMyLobby = existing.IsInMyLobby;
                         existing.UpdateFromPresence(item);
-                        existing.IsInMyLobby = _lobbyViewModel.IsInLobby &&
-                            string.Equals(item.Status, "lobby", StringComparison.OrdinalIgnoreCase);
-                        updatedList.Add(existing);
+                        vm = existing;
                     }
                     else
                     {
-                        var vm = new FriendItemViewModel(item, OnInviteFriend, OnRemoveFriend, OnJoinFriend);
-                        updatedList.Add(vm);
+                        vm = new FriendItemViewModel(item, OnInviteFriend, OnRemoveFriend, OnJoinFriend);
                         _ = LoadAvatarAsync(vm);
                     }
+
+                    vm.IncomingInviteId = incomingInviteBySender.TryGetValue(item.Id, out var inInvId) ? inInvId : null;
+                    bool nowInMyLobby = ComputeIsFriendInMyLobby(item.Nick, item.Status, item.LobbyCode);
+                    vm.IsInMyLobby = nowInMyLobby;
+
+                    if (wasInMyLobby && !nowInMyLobby && _latestSentInviteIdByFriend.TryGetValue(item.Id, out var oldInvId))
+                    {
+                        _dismissedSentInviteIds.Add(oldInvId);
+                        _latestSentInviteIdByFriend.Remove(item.Id);
+                    }
+
+                    if (!_inFlightInviteFriendIds.Contains(item.Id))
+                    {
+                        vm.InviteState = null;
+                    }
+
+                    updatedList.Add(vm);
                 }
             }
 
-            // Обработка sentInvites
-            if (sync.SentInvites != null)
+            if (isHostLobbyNow && sync.SentInvites != null)
             {
                 foreach (var sent in sync.SentInvites)
                 {
-                    var friend = updatedList.FirstOrDefault(f => f.Id == sent.FriendId);
-                    if (friend != null)
+                    if (!string.IsNullOrWhiteSpace(sent.InviteId) && _dismissedSentInviteIds.Contains(sent.InviteId))
                     {
-                        friend.InviteState = sent.State;
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(sent.LobbyCode) &&
+                        !string.IsNullOrWhiteSpace(myLobbyCode) &&
+                        !string.Equals(sent.LobbyCode, myLobbyCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var friend = updatedList.FirstOrDefault(f => string.Equals(f.Id, sent.FriendId, StringComparison.OrdinalIgnoreCase));
+                    if (friend == null) continue;
+
+                    if (!string.IsNullOrWhiteSpace(sent.InviteId))
+                    {
+                        _latestSentInviteIdByFriend[friend.Id] = sent.InviteId;
+                    }
+
+                    if (string.Equals(sent.State, "accepted", StringComparison.OrdinalIgnoreCase) &&
+                        !friend.IsInMyLobby &&
+                        !string.Equals(friend.Status, "lobby", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!string.IsNullOrWhiteSpace(sent.InviteId))
+                        {
+                            _dismissedSentInviteIds.Add(sent.InviteId);
+                        }
+                        friend.InviteState = null;
+                        continue;
+                    }
+
+                    friend.InviteState = sent.State;
+
+                    if (string.Equals(sent.State, "declined", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(sent.State, "expired", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var invIdToDismiss = sent.InviteId;
+                        var targetFriend = friend;
+                        _ = Task.Delay(TimeSpan.FromSeconds(4)).ContinueWith(_ =>
+                        {
+                            Dispatch(() =>
+                            {
+                                if (!string.IsNullOrWhiteSpace(invIdToDismiss))
+                                {
+                                    _dismissedSentInviteIds.Add(invIdToDismiss);
+                                }
+                                if (string.Equals(targetFriend.InviteState, "declined", StringComparison.OrdinalIgnoreCase) ||
+                                    string.Equals(targetFriend.InviteState, "expired", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    targetFriend.InviteState = null;
+                                }
+                            });
+                        });
                     }
                 }
             }
 
-            // Сортировка: онлайн первыми, затем офлайн
             var sorted = updatedList
                 .OrderByDescending(f => f.Online)
                 .ThenBy(f => f.Nick)
                 .ToList();
 
-            Friends.Clear();
-            foreach (var f in sorted)
+            bool sameFriendsOrder = Friends.Count == sorted.Count &&
+                                    Friends.Select(f => f.Id).SequenceEqual(sorted.Select(f => f.Id), StringComparer.OrdinalIgnoreCase);
+            if (!sameFriendsOrder)
             {
-                Friends.Add(f);
+                Friends.Clear();
+                foreach (var f in sorted)
+                {
+                    Friends.Add(f);
+                }
             }
 
             OnPropertyChanged(nameof(IsEmptyList));
@@ -545,45 +796,86 @@ public class FriendsViewModel : ObservableObject
 
     private void OnInviteFriend(FriendItemViewModel friend)
     {
+        if (friend == null || !friend.Online || friend.IsInMyLobby) return;
+        if (_inFlightInviteFriendIds.Contains(friend.Id) || !string.IsNullOrEmpty(friend.InviteState)) return;
+
+        _inFlightInviteFriendIds.Add(friend.Id);
+        friend.InviteState = "pending";
+
         _ = Task.Run(async () =>
         {
+            await _inviteLock.WaitAsync();
             try
             {
                 string? lobbyCode = _lobbyService.CurrentLobbyCode;
                 string? hostToken = _lobbyService.CurrentHostToken;
 
-                // Если лобби нет, создается автоматически (я хост)
                 if (!_lobbyViewModel.IsInLobby || !_lobbyService.IsHost || string.IsNullOrWhiteSpace(lobbyCode) || string.IsNullOrWhiteSpace(hostToken))
                 {
                     lobbyCode = await _lobbyViewModel.CreateLobbyAsync();
                     hostToken = _lobbyService.CurrentHostToken;
                 }
 
-                if (string.IsNullOrWhiteSpace(lobbyCode) || string.IsNullOrWhiteSpace(hostToken))
+                if (!_lobbyViewModel.IsInLobby || !_lobbyService.IsHost || string.IsNullOrWhiteSpace(lobbyCode) || string.IsNullOrWhiteSpace(hostToken))
                 {
-                    Dispatch(() => friend.InviteState = null);
+                    Dispatch(() =>
+                    {
+                        _inFlightInviteFriendIds.Remove(friend.Id);
+                        friend.InviteState = null;
+                    });
                     return;
                 }
 
                 Dispatch(() =>
                 {
+                    _wasInHostLobby = true;
+                    _trackedLobbyCode = lobbyCode;
                     friend.InviteState = "pending";
                     OnPropertyChanged(nameof(IsLobbyActiveBannerVisible));
                 });
 
-                var (success, inviteId, error) = await _friendService.SendInviteAsync(friend.Id, lobbyCode, hostToken);
+                var (success, inviteId, _) = await _friendService.SendInviteAsync(friend.Id, lobbyCode, hostToken);
                 if (!success)
                 {
-                    Dispatch(() => friend.InviteState = null);
+                    Dispatch(() =>
+                    {
+                        _inFlightInviteFriendIds.Remove(friend.Id);
+                        friend.InviteState = null;
+                    });
                     return;
                 }
 
-                // Таймер 120 с на случай истечения
+                Dispatch(() =>
+                {
+                    if (!string.IsNullOrWhiteSpace(inviteId))
+                    {
+                        _knownSentInviteIds.Add(inviteId);
+                        _latestSentInviteIdByFriend[friend.Id] = inviteId;
+                    }
+                    _inFlightInviteFriendIds.Remove(friend.Id);
+                    if (_lobbyViewModel.IsInLobby && _lobbyService.IsHost && string.Equals(_lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode, lobbyCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        friend.InviteState = "pending";
+                    }
+                    else
+                    {
+                        if (!string.IsNullOrWhiteSpace(inviteId))
+                        {
+                            _dismissedSentInviteIds.Add(inviteId);
+                        }
+                        friend.InviteState = null;
+                    }
+                });
+
+                var expectedLobbyCode = lobbyCode;
                 _ = Task.Delay(TimeSpan.FromSeconds(120)).ContinueWith(_ =>
                 {
                     Dispatch(() =>
                     {
-                        if (friend.InviteState == "pending")
+                        if (_lobbyViewModel.IsInLobby &&
+                            _lobbyService.IsHost &&
+                            string.Equals(_lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode, expectedLobbyCode, StringComparison.OrdinalIgnoreCase) &&
+                            friend.InviteState == "pending")
                         {
                             friend.InviteState = "expired";
                         }
@@ -592,17 +884,52 @@ public class FriendsViewModel : ObservableObject
             }
             catch
             {
-                Dispatch(() => friend.InviteState = null);
+                Dispatch(() =>
+                {
+                    _inFlightInviteFriendIds.Remove(friend.Id);
+                    friend.InviteState = null;
+                });
+            }
+            finally
+            {
+                _inviteLock.Release();
             }
         });
     }
 
     private void OnJoinFriend(FriendItemViewModel friend)
     {
+        if (friend == null) return;
+
         try
         {
             OpenLobbyRequested?.Invoke();
         }
         catch { }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                string? codeToJoin = friend.LobbyCode;
+                bool fromInvite = false;
+
+                if (string.IsNullOrWhiteSpace(codeToJoin) && !string.IsNullOrWhiteSpace(friend.IncomingInviteId))
+                {
+                    var (ok, inviteLobbyCode, _) = await _friendService.RespondInviteAsync(friend.IncomingInviteId, accept: true);
+                    if (ok && !string.IsNullOrWhiteSpace(inviteLobbyCode))
+                    {
+                        codeToJoin = inviteLobbyCode;
+                        fromInvite = true;
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(codeToJoin))
+                {
+                    await _lobbyViewModel.JoinByCodeAsync(codeToJoin, fromInvite);
+                }
+            }
+            catch { }
+        });
     }
 }

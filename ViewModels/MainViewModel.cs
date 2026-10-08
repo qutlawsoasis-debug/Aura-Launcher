@@ -791,9 +791,14 @@ public class MainViewModel : ObservableObject
             }
             if (_friendService != null && (e.PropertyName == nameof(LobbyViewModel.IsInLobby) || e.PropertyName == nameof(LobbyViewModel.LobbyCode)))
             {
+                bool changed = _friendService.IsInLobby != LobbyVM.IsInLobby ||
+                               !string.Equals(_friendService.CurrentLobbyCode, LobbyVM.LobbyCode, StringComparison.OrdinalIgnoreCase);
                 _friendService.IsInLobby = LobbyVM.IsInLobby;
                 _friendService.CurrentLobbyCode = LobbyVM.LobbyCode;
-                _ = _friendService.SyncNowAsync();
+                if (changed)
+                {
+                    _ = _friendService.SyncNowAsync();
+                }
             }
             if (_discordRpcService != null && (e.PropertyName == nameof(LobbyViewModel.IsInLobby) || e.PropertyName == nameof(LobbyViewModel.LobbyPlayers)))
             {

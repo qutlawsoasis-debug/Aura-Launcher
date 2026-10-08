@@ -21,6 +21,8 @@ public class LobbyService : ILobbyService, IDisposable
     private FileSystemWatcher? _modsWatcher;
     private Timer? _modsDebounceTimer;
 
+    private int _operationVersion;
+
     public string? CurrentLobbyCode { get; private set; }
     public string? CurrentHostToken { get; private set; }
     public string? CurrentTunnelAddress { get; private set; }
@@ -65,6 +67,7 @@ public class LobbyService : ILobbyService, IDisposable
     public async Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default)
     {
         LeaveLobby();
+        int opVersion = Interlocked.Increment(ref _operationVersion);
 
         _currentHostPlayerName = hostName;
         string gameDir = GetGameDir();
@@ -72,6 +75,18 @@ public class LobbyService : ILobbyService, IDisposable
 
         var response = await _apiClient.CreateLobbyAsync(hostName, manifest, cancellationToken);
         if (response == null) return null;
+
+        if (_operationVersion != opVersion)
+        {
+            if (!string.IsNullOrWhiteSpace(response.Code) && !string.IsNullOrWhiteSpace(response.HostToken))
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await _apiClient.CloseLobbyAsync(response.Code, response.HostToken); } catch { }
+                });
+            }
+            return null;
+        }
 
         CurrentLobbyCode = response.Code;
         CurrentHostToken = response.HostToken;
@@ -97,7 +112,6 @@ public class LobbyService : ILobbyService, IDisposable
             bool isFakeTunnel = string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
 
-            // Условие (б): TCP-connect на 127.0.0.1:localPort успешен
             if (!isFakeTunnel)
             {
                 bool tcpOk = await CheckLocalTcpPortAsync("127.0.0.1", localPort, timeoutMs: 3000, cancellationToken);
@@ -122,7 +136,6 @@ public class LobbyService : ILobbyService, IDisposable
                     return false;
                 }
 
-                // Условие (в): агент playit поднят
                 if (!_tunnelProvider.IsProcessRunning && !isFakeTunnel)
                 {
                     PlayitTunnelProvider.LogTunnel("[HOST-OPEN: ERROR] Playit agent process is not running.");
@@ -178,13 +191,19 @@ public class LobbyService : ILobbyService, IDisposable
 
     public async Task CloseLobbyAsHostAsync(CancellationToken cancellationToken = default)
     {
-        if (IsHost && !string.IsNullOrWhiteSpace(CurrentLobbyCode) && !string.IsNullOrWhiteSpace(CurrentHostToken))
+        var codeToClose = CurrentLobbyCode;
+        var hostTokenToClose = CurrentHostToken;
+        bool wasHost = IsHost && !string.IsNullOrWhiteSpace(codeToClose) && !string.IsNullOrWhiteSpace(hostTokenToClose);
+
+        ResetStateInternal();
+
+        if (wasHost && codeToClose != null && hostTokenToClose != null)
         {
             try
             {
-                PlayitTunnelProvider.LogTunnel($"[LOBBY] Closing lobby {CurrentLobbyCode} as host via API...");
-                await _apiClient.CloseLobbyAsync(CurrentLobbyCode, CurrentHostToken, cancellationToken);
-                PlayitTunnelProvider.LogTunnel($"[LOBBY] Lobby {CurrentLobbyCode} closed via API.");
+                PlayitTunnelProvider.LogTunnel($"[LOBBY] Closing lobby {codeToClose} as host via API...");
+                await _apiClient.CloseLobbyAsync(codeToClose, hostTokenToClose, cancellationToken);
+                PlayitTunnelProvider.LogTunnel($"[LOBBY] Lobby {codeToClose} closed via API.");
             }
             catch (Exception ex)
             {
@@ -200,12 +219,12 @@ public class LobbyService : ILobbyService, IDisposable
                 PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsHostAsync StopAsync: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
             }
         }
-        LeaveLobby();
     }
 
     public async Task<bool> JoinLobbyAsGuestAsync(string code, string playerName, CancellationToken cancellationToken = default)
     {
         LeaveLobby();
+        int opVersion = Interlocked.Increment(ref _operationVersion);
 
         var cleanCode = code?.Trim().ToUpperInvariant() ?? string.Empty;
         string gameDir = GetGameDir();
@@ -214,7 +233,16 @@ public class LobbyService : ILobbyService, IDisposable
         var response = await _apiClient.JoinLobbyAsync(cleanCode, playerName, manifest, cancellationToken);
         if (response == null || !response.Success) return false;
 
-        CurrentLobbyCode = response.Code;
+        if (_operationVersion != opVersion)
+        {
+            _ = Task.Run(async () =>
+            {
+                try { await _apiClient.LeaveLobbyAsync(cleanCode, playerName); } catch { }
+            });
+            return false;
+        }
+
+        CurrentLobbyCode = !string.IsNullOrWhiteSpace(response.Code) ? response.Code : cleanCode;
         CurrentStatus = response.Status;
         CurrentTunnelAddress = response.TunnelAddress;
         _currentGuestPlayerName = playerName;
@@ -227,16 +255,42 @@ public class LobbyService : ILobbyService, IDisposable
         }
 
         StartModsWatcher(gameDir);
-        // Start background polling for guest
         StartGuestPolling();
         return true;
     }
 
     public async Task<LobbyStatusResponse?> RefreshGuestStatusAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(CurrentLobbyCode)) return null;
+        var code = CurrentLobbyCode;
+        if (string.IsNullOrWhiteSpace(code)) return null;
+        int opVersion = _operationVersion;
 
-        var status = await _apiClient.GetStatusAsync(CurrentLobbyCode, cancellationToken);
+        var status = await _apiClient.GetStatusAsync(code, cancellationToken);
+        if (_operationVersion != opVersion || !string.Equals(CurrentLobbyCode, code, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (status == null && !IsHost)
+        {
+            var detailed = await _apiClient.GetStatusDetailedAsync(code, cancellationToken);
+            if (_operationVersion != opVersion || !string.Equals(CurrentLobbyCode, code, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            if (detailed.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                bool wasClosed = string.Equals(CurrentStatus, "closed", StringComparison.OrdinalIgnoreCase);
+                CurrentStatus = "closed";
+                if (!wasClosed)
+                {
+                    StatusChanged?.Invoke(CurrentStatus);
+                }
+                return null;
+            }
+        }
+
         if (status != null)
         {
             bool statusChanged = !string.Equals(CurrentStatus, status.Status, StringComparison.OrdinalIgnoreCase);
@@ -392,12 +446,9 @@ public class LobbyService : ILobbyService, IDisposable
         }, ct);
     }
 
-    public void LeaveLobby()
+    private void ResetStateInternal()
     {
-        var codeToLeave = CurrentLobbyCode;
-        var guestName = _currentGuestPlayerName;
-        bool wasGuest = !IsHost && !string.IsNullOrWhiteSpace(codeToLeave) && !string.IsNullOrWhiteSpace(guestName);
-
+        Interlocked.Increment(ref _operationVersion);
         StopModsWatcher();
         _pollCts?.Cancel();
         _pollCts = null;
@@ -410,8 +461,30 @@ public class LobbyService : ILobbyService, IDisposable
         IsHost = false;
         CurrentModSync = null;
         StatusChanged?.Invoke(CurrentStatus);
+    }
 
-        if (wasGuest && codeToLeave != null && guestName != null)
+    public void LeaveLobby()
+    {
+        var codeToLeave = CurrentLobbyCode;
+        var hostTokenToClose = CurrentHostToken;
+        var guestName = _currentGuestPlayerName;
+        bool wasHost = IsHost && !string.IsNullOrWhiteSpace(codeToLeave) && !string.IsNullOrWhiteSpace(hostTokenToClose);
+        bool wasGuest = !IsHost && !string.IsNullOrWhiteSpace(codeToLeave) && !string.IsNullOrWhiteSpace(guestName);
+
+        ResetStateInternal();
+
+        if (wasHost && codeToLeave != null && hostTokenToClose != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _apiClient.CloseLobbyAsync(codeToLeave, hostTokenToClose);
+                }
+                catch { }
+            });
+        }
+        else if (wasGuest && codeToLeave != null && guestName != null)
         {
             _ = Task.Run(async () =>
             {
@@ -426,6 +499,7 @@ public class LobbyService : ILobbyService, IDisposable
 
     public void Dispose()
     {
+        Interlocked.Increment(ref _operationVersion);
         StopModsWatcher();
         _pollCts?.Cancel();
         _pollCts?.Dispose();

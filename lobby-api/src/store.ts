@@ -201,6 +201,7 @@ export interface FriendInfo {
   nick: string;
   online: boolean;
   status: string;
+  lobbyCode?: string;
   lastSeen: number;
 }
 
@@ -223,6 +224,7 @@ export interface SentInviteRecord {
   inviteId: string;
   friendId: string;
   state: 'pending' | 'accepted' | 'declined' | 'expired';
+  lobbyCode?: string;
   createdAt: number;
   expiresAt: number;
 }
@@ -238,6 +240,7 @@ export interface SentInviteInfo {
   inviteId: string;
   friendId: string;
   state: 'pending' | 'accepted' | 'declined' | 'expired';
+  lobbyCode?: string;
 }
 
 export interface SyncResult {
@@ -573,6 +576,7 @@ export class InMemoryStore implements LobbyStore {
         nick: fUser?.nick || 'Unknown',
         online: isOnline,
         status: isOnline ? fPres!.presence.status : 'offline',
+        lobbyCode: isOnline && fPres!.presence.status === 'lobby' ? fPres!.presence.lobbyCode : undefined,
         lastSeen: isOnline ? fPres!.presence.lastSeen : recordedLastSeen
       });
     }
@@ -626,7 +630,8 @@ export class InMemoryStore implements LobbyStore {
           sentInvites.push({
             inviteId: sent.inviteId,
             friendId: sent.friendId,
-            state: sent.state
+            state: sent.state,
+            lobbyCode: sent.lobbyCode
           });
         }
       }
@@ -1052,6 +1057,7 @@ export class UpstashStore implements LobbyStore {
         nick: u?.nick || 'Unknown',
         online: isOnline,
         status: isOnline ? pres!.status : 'offline',
+        lobbyCode: isOnline && pres!.status === 'lobby' ? pres!.lobbyCode : null,
         lastSeen: isOnline ? pres!.lastSeen : recordedLastSeen
       });
     }
@@ -1110,7 +1116,8 @@ export class UpstashStore implements LobbyStore {
           sentInvites.push({
             inviteId: sent.inviteId,
             friendId: sent.friendId,
-            state: sent.state
+            state: sent.state,
+            lobbyCode: sent.lobbyCode || null
           });
         }
       } catch { }

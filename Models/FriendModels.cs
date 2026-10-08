@@ -32,6 +32,9 @@ public class FriendPresenceItem
     [JsonPropertyName("status")]
     public string Status { get; set; } = "online"; // "online" | "lobby" | "playing"
 
+    [JsonPropertyName("lobbyCode")]
+    public string? LobbyCode { get; set; }
+
     [JsonPropertyName("lastSeen")]
     public long LastSeen { get; set; }
 }
@@ -70,6 +73,9 @@ public class SentInviteItem
 
     [JsonPropertyName("state")]
     public string State { get; set; } = "pending"; // "pending" | "accepted" | "declined" | "expired"
+
+    [JsonPropertyName("lobbyCode")]
+    public string? LobbyCode { get; set; }
 }
 
 public class SyncResponse

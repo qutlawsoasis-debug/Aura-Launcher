@@ -33,6 +33,8 @@ public class LobbyViewModel : ObservableObject
     private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _lastPlayerMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _ignoredMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _lobbyOpLock = new(1, 1);
+    private int _lobbyOpGeneration;
     private CancellationTokenSource? _syncNoticeCts;
     private List<ModMismatchItem> _currentMismatchItems = new();
     private Func<Task>? _pendingConnectAction;
@@ -361,6 +363,7 @@ public class LobbyViewModel : ObservableObject
             {
                 RaiseAllCommands();
                 NotifyCellPropertiesChanged();
+                NotifyStatusStateChanged();
             }
         }
     }
@@ -399,6 +402,7 @@ public class LobbyViewModel : ObservableObject
             if (SetProperty(ref _lobbyCode, value))
             {
                 NotifyCellPropertiesChanged();
+                RaiseAllCommands();
             }
         }
     }
@@ -423,6 +427,7 @@ public class LobbyViewModel : ObservableObject
             if (SetProperty(ref _isLobbyCreated, value))
             {
                 RaiseAllCommands();
+                NotifyStatusStateChanged();
             }
         }
     }
@@ -576,11 +581,6 @@ public class LobbyViewModel : ObservableObject
 
     private void NotifyStatusStateChanged()
     {
-        OnPropertyChanged(nameof(IsInLobby));
-        OnPropertyChanged(nameof(IsLobbyCreated));
-        OnPropertyChanged(nameof(IsWorldOpen));
-        OnPropertyChanged(nameof(CanGuestConnect));
-        OnPropertyChanged(nameof(LobbyCode));
         OnPropertyChanged(nameof(IsStatusOpen));
         OnPropertyChanged(nameof(IsStatusWaiting));
         OnPropertyChanged(nameof(CombinedStatusText));
@@ -590,106 +590,135 @@ public class LobbyViewModel : ObservableObject
 
     public async Task<string?> CreateLobbyAsync()
     {
-        IsBusy = true;
-        StatusText = "Создание лобби...";
-        StatusIcon = string.Empty;
-        ShowTunnelFailedLogButton = false;
-        TunnelFailureReason = null;
-
+        await _lobbyOpLock.WaitAsync();
         try
         {
-            PlayitTunnelProvider.PurgeLegacyLocalSecrets();
-
-            var playit = _tunnelProvider as PlayitTunnelProvider;
-            if (playit == null)
+            if (IsInLobby && IsHost && !string.IsNullOrWhiteSpace(LobbyCode))
             {
-                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
-                playit = new PlayitTunnelProvider(null, toolsDir);
+                return LobbyCode;
             }
 
-            StatusText = "Получение конфигурации сервера...";
-            PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api...");
-
-            var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
-            var cfg = await client.GetTunnelConfigAsync();
-
-            if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
+            if (IsInLobby && !IsHost)
             {
-                PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
-                playit.SetSecret(cfg.Secret);
-                if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
-                if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
-            }
-            else
-            {
-                PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
-                StatusText = "Ошибка получения конфигурации туннеля";
-                StatusIcon = string.Empty;
-                ShowTunnelFailedLogButton = true;
-                TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
-                return null;
+                _lobbyService.LeaveLobby();
             }
 
-            var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
-
-            // Автоматически перезаливаем текущий скин под актуальным ником
-            _ = EnsureSkinUploadedAsync();
-
-            var code = await _lobbyService.CreateLobbyAsHostAsync(hostName);
-
-            if (!string.IsNullOrWhiteSpace(code))
-            {
-                LobbyCode = code;
-                HostName = hostName;
-                IsLobbyCreated = true;
-                IsInLobby = true;
-                HostStatusText = "Ожидание мира...";
-                StatusText = "Лобби создано. Отправь код другу и нажми «Открыть мир»";
-                StatusIcon = string.Empty;
-
-                ImageSource? hostAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
-                var hostModel3D = BuildLocalPlayerModel3D();
-                RefreshLocalPlayerModel();
-                _knownPlayerNicks.Clear();
-                _knownPlayerNicks.Add(hostName);
-                _discordRpcService?.SetInLobby(1);
-                Dispatch(() =>
-                {
-                    LobbyPlayers.Clear();
-                    LobbyPlayers.Add(new LobbyPlayerItem
-                    {
-                        Nickname = hostName,
-                        IsHost = true,
-                        Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap(),
-                        PlayerModel3D = hostModel3D
-                    });
-                    UpdateStagePositions();
-                });
-                LobbyCreated?.Invoke();
-                return code;
-            }
-            else
-            {
-                StatusText = "Не удалось создать лобби. Проверь lobby-api сервер";
-                StatusIcon = string.Empty;
-                ShowTunnelFailedLogButton = true;
-                TunnelFailureReason = "Сервер лобби вернул ошибку при создании лобби.";
-                return null;
-            }
-        }
-        catch (Exception ex)
-        {
-            PlayitTunnelProvider.LogTunnel($"[CREATE-LOBBY: ERROR] {ex.Message}");
-            StatusText = $"Ошибка: {ex.Message}";
+            int myGen = Interlocked.Increment(ref _lobbyOpGeneration);
+            IsBusy = true;
+            StatusText = "Создание лобби...";
             StatusIcon = string.Empty;
-            ShowTunnelFailedLogButton = true;
-            TunnelFailureReason = ex.Message;
-            return null;
+            ShowTunnelFailedLogButton = false;
+            TunnelFailureReason = null;
+
+            try
+            {
+                if (_lobbyService is LobbyService || _lobbyApiClient != null || _tunnelProvider is PlayitTunnelProvider)
+                {
+                    PlayitTunnelProvider.PurgeLegacyLocalSecrets();
+
+                    var playit = _tunnelProvider as PlayitTunnelProvider;
+                    if (playit == null)
+                    {
+                        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                        var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
+                        playit = new PlayitTunnelProvider(null, toolsDir);
+                    }
+
+                    StatusText = "Получение конфигурации сервера...";
+                    PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api...");
+
+                    var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+                    var cfg = await client.GetTunnelConfigAsync();
+
+                    if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
+                    {
+                        PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
+                        playit.SetSecret(cfg.Secret);
+                        if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
+                        if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
+                    }
+                    else
+                    {
+                        PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
+                        StatusText = "Ошибка получения конфигурации туннеля";
+                        StatusIcon = string.Empty;
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
+                        return null;
+                    }
+                }
+
+                var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
+
+                _ = EnsureSkinUploadedAsync();
+
+                var code = await _lobbyService.CreateLobbyAsHostAsync(hostName);
+
+                if (_lobbyOpGeneration != myGen)
+                {
+                    return null;
+                }
+
+                if (!string.IsNullOrWhiteSpace(code))
+                {
+                    IsGuestJoined = false;
+                    CanGuestConnect = false;
+                    IsWorldOpen = false;
+                    LobbyCode = code;
+                    HostName = hostName;
+                    IsLobbyCreated = true;
+                    IsInLobby = true;
+                    HostStatusText = "Ожидание мира...";
+                    StatusText = "Лобби создано. Отправь код другу и нажми «Открыть мир»";
+                    StatusIcon = string.Empty;
+
+                    ImageSource? hostAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
+                    var hostModel3D = BuildLocalPlayerModel3D();
+                    RefreshLocalPlayerModel();
+                    _knownPlayerNicks.Clear();
+                    _knownPlayerNicks.Add(hostName);
+                    _discordRpcService?.SetInLobby(1);
+                    Dispatch(() =>
+                    {
+                        LobbyPlayers.Clear();
+                        LobbyPlayers.Add(new LobbyPlayerItem
+                        {
+                            Nickname = hostName,
+                            IsHost = true,
+                            Avatar = hostAvatar ?? SkinService.LoadDefaultSteveBitmap(),
+                            PlayerModel3D = hostModel3D
+                        });
+                        UpdateStagePositions();
+                    });
+                    LobbyCreated?.Invoke();
+                    return code;
+                }
+                else
+                {
+                    StatusText = "Не удалось создать лобби. Проверь lobby-api сервер";
+                    StatusIcon = string.Empty;
+                    ShowTunnelFailedLogButton = true;
+                    TunnelFailureReason = "Сервер лобби вернул ошибку при создании лобби.";
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[CREATE-LOBBY: ERROR] {ex.Message}");
+                StatusText = $"Ошибка: {ex.Message}";
+                StatusIcon = string.Empty;
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = ex.Message;
+                return null;
+            }
+            finally
+            {
+                IsBusy = false;
+            }
         }
         finally
         {
-            IsBusy = false;
+            _lobbyOpLock.Release();
         }
     }
 
@@ -938,130 +967,196 @@ public class LobbyViewModel : ObservableObject
     {
         if (GuestCodeInput.Length < 6) return;
 
-        IsJoiningLobby = true;
-        JoinErrorMessage = string.Empty;
-        GuestStatusText = "Подключение к лобби...";
-        StatusText = "Подключение...";
-        StatusIcon = string.Empty;
-
-        var cleanCode = GuestCodeInput.Trim().ToUpperInvariant();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
+        await _lobbyOpLock.WaitAsync();
         try
         {
-            // Если в тестах используется мок-сервис без реального клиента API:
-            if (_lobbyService is not LobbyService && _lobbyApiClient == null)
+            var cleanCode = GuestCodeInput.Trim().ToUpperInvariant();
+            if (cleanCode.Length < 6) return;
+
+            if (IsInLobby && string.Equals(LobbyCode, cleanCode, StringComparison.OrdinalIgnoreCase))
             {
-                var playerNameMock = _configService.CurrentConfig.Nickname;
-                var joinedMock = await _lobbyService.JoinLobbyAsGuestAsync(cleanCode, playerNameMock, cts.Token);
-                if (joinedMock)
+                return;
+            }
+
+            if (IsInLobby)
+            {
+                LeaveLobby();
+                GuestCodeInput = cleanCode;
+            }
+
+            int myGen = Interlocked.Increment(ref _lobbyOpGeneration);
+            IsJoiningLobby = true;
+            JoinErrorMessage = string.Empty;
+            GuestStatusText = "Подключение к лобби...";
+            StatusText = "Подключение...";
+            StatusIcon = string.Empty;
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            try
+            {
+                if (_lobbyService is not LobbyService && _lobbyApiClient == null)
                 {
+                    var playerNameMock = _configService.CurrentConfig?.Nickname ?? "Player";
+                    var joinedMock = await _lobbyService.JoinLobbyAsGuestAsync(cleanCode, playerNameMock, cts.Token);
+                    if (_lobbyOpGeneration != myGen) return;
+
+                    if (joinedMock)
+                    {
+                        LobbyCode = !string.IsNullOrWhiteSpace(_lobbyService.CurrentLobbyCode) ? _lobbyService.CurrentLobbyCode : cleanCode;
+                        IsLobbyCreated = false;
+                        IsWorldOpen = false;
+                        IsGuestJoined = true;
+                        IsInLobby = true;
+                        SeedGuestLobbyPlayersIfEmpty(playerNameMock, null);
+                        UpdateGuestStatus();
+                    }
+                    else
+                    {
+                        JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
+                        GuestStatusText = "Лобби не найдено";
+                        StatusText = "Не удалось подключиться к лобби";
+                        StatusIcon = string.Empty;
+                    }
+                    return;
+                }
+
+                var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+
+                var (statusCode, statusResp, rawJson) = await client.GetStatusDetailedAsync(cleanCode, cts.Token);
+                if (_lobbyOpGeneration != myGen) return;
+
+                PlayitTunnelProvider.LogTunnel($"[JOIN: CHECK-STATUS] GET /status?code={cleanCode} -> HTTP {(statusCode.HasValue ? (int)statusCode.Value : -1)}, body: {rawJson}");
+
+                if (!statusCode.HasValue)
+                {
+                    JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
+                    GuestStatusText = "Ошибка соединения";
+                    StatusText = "Нет связи с сервером";
+                    StatusIcon = string.Empty;
+                    return;
+                }
+
+                if (statusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
+                    GuestStatusText = "Лобби не найдено";
+                    StatusText = "Лобби не найдено";
+                    StatusIcon = string.Empty;
+                    return;
+                }
+
+                if (statusResp != null && string.Equals(statusResp.Status, "closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    JoinErrorMessage = "Это лобби закрыто. Попросите хоста создать новое.";
+                    GuestStatusText = "Лобби закрыто";
+                    StatusText = "Лобби закрыто";
+                    StatusIcon = string.Empty;
+                    return;
+                }
+
+                if (statusCode != System.Net.HttpStatusCode.OK)
+                {
+                    JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
+                    GuestStatusText = "Ошибка сервера";
+                    StatusText = "Ошибка сервера";
+                    StatusIcon = string.Empty;
+                    return;
+                }
+
+                var playerName = _configService.CurrentConfig?.Nickname ?? "Player";
+
+                _ = EnsureSkinUploadedAsync();
+
+                var joined = await _lobbyService.JoinLobbyAsGuestAsync(cleanCode, playerName, cts.Token);
+                if (_lobbyOpGeneration != myGen) return;
+
+                if (joined)
+                {
+                    LobbyCode = !string.IsNullOrWhiteSpace(_lobbyService.CurrentLobbyCode) ? _lobbyService.CurrentLobbyCode : cleanCode;
+                    HostName = statusResp?.HostName;
+                    IsLobbyCreated = false;
+                    IsWorldOpen = false;
                     IsGuestJoined = true;
                     IsInLobby = true;
+                    SeedGuestLobbyPlayersIfEmpty(playerName, statusResp?.HostName);
+                    _discordRpcService?.SetInLobby(1);
                     UpdateGuestStatus();
+
+                    var status = await _lobbyService.RefreshGuestStatusAsync(cts.Token);
+                    if (_lobbyOpGeneration != myGen || !IsInLobby) return;
+
+                    if (status?.ModSync != null && HasUnresolvedMismatches(status.ModSync, out var myMismatches))
+                    {
+                        var sig = ComputeMismatchSignature(myMismatches);
+                        if (!_ignoredMismatchSignatures.Contains($"{LobbyCode}:{sig}"))
+                        {
+                            ShowMismatchDialog(myMismatches, isJoinMode: true, onProceed: null);
+                        }
+                    }
                 }
                 else
                 {
                     JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
-                    GuestStatusText = "Лобби не найдено";
+                    GuestStatusText = "Лобби не найдено или код неверный";
                     StatusText = "Не удалось подключиться к лобби";
                     StatusIcon = string.Empty;
                 }
-                return;
             }
-
-            var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
-
-            var (statusCode, statusResp, rawJson) = await client.GetStatusDetailedAsync(cleanCode, cts.Token);
-            PlayitTunnelProvider.LogTunnel($"[JOIN: CHECK-STATUS] GET /status?code={cleanCode} -> HTTP {(statusCode.HasValue ? (int)statusCode.Value : -1)}, body: {rawJson}");
-
-            if (!statusCode.HasValue)
+            catch (OperationCanceledException)
             {
                 JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
-                GuestStatusText = "Ошибка соединения";
-                StatusText = "Нет связи с сервером";
+                GuestStatusText = "Таймаут подключения";
+                StatusText = "Таймаут подключения";
                 StatusIcon = string.Empty;
-                return;
             }
-
-            if (statusCode == System.Net.HttpStatusCode.NotFound)
+            catch (Exception ex)
             {
-                JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
-                GuestStatusText = "Лобби не найдено";
-                StatusText = "Лобби не найдено";
-                StatusIcon = string.Empty;
-                return;
-            }
-
-            if (statusResp != null && string.Equals(statusResp.Status, "closed", StringComparison.OrdinalIgnoreCase))
-            {
-                JoinErrorMessage = "Это лобби закрыто. Попросите хоста создать новое.";
-                GuestStatusText = "Лобби закрыто";
-                StatusText = "Лобби закрыто";
-                StatusIcon = string.Empty;
-                return;
-            }
-
-            if (statusCode != System.Net.HttpStatusCode.OK)
-            {
+                PlayitTunnelProvider.LogTunnel($"[JOIN: ERROR] {ex.Message}");
                 JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
-                GuestStatusText = "Ошибка сервера";
-                StatusText = "Ошибка сервера";
-                StatusIcon = string.Empty;
-                return;
-            }
-
-            var playerName = _configService.CurrentConfig?.Nickname ?? "Player";
-
-            // Автоматически перезаливаем текущий скин под актуальным ником
-            _ = EnsureSkinUploadedAsync();
-
-            var joined = await _lobbyService.JoinLobbyAsGuestAsync(cleanCode, playerName, cts.Token);
-
-            if (joined)
-            {
-                IsGuestJoined = true;
-                IsInLobby = true;
-                _discordRpcService?.SetInLobby(1);
-                UpdateGuestStatus();
-
-                var status = await _lobbyService.RefreshGuestStatusAsync(cts.Token);
-                if (status?.ModSync != null && HasUnresolvedMismatches(status.ModSync, out var myMismatches))
-                {
-                    var sig = ComputeMismatchSignature(myMismatches);
-                    if (!_ignoredMismatchSignatures.Contains($"{LobbyCode}:{sig}"))
-                    {
-                        ShowMismatchDialog(myMismatches, isJoinMode: true, onProceed: null);
-                    }
-                }
-            }
-            else
-            {
-                JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
-                GuestStatusText = "Лобби не найдено или код неверный";
-                StatusText = "Не удалось подключиться к лобби";
+                GuestStatusText = "Ошибка подключения";
+                StatusText = $"Ошибка: {ex.Message}";
                 StatusIcon = string.Empty;
             }
-        }
-        catch (OperationCanceledException)
-        {
-            JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
-            GuestStatusText = "Таймаут подключения";
-            StatusText = "Таймаут подключения";
-            StatusIcon = string.Empty;
-        }
-        catch (Exception ex)
-        {
-            PlayitTunnelProvider.LogTunnel($"[JOIN: ERROR] {ex.Message}");
-            JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
-            GuestStatusText = "Ошибка подключения";
-            StatusText = $"Ошибка: {ex.Message}";
-            StatusIcon = string.Empty;
+            finally
+            {
+                IsJoiningLobby = false;
+            }
         }
         finally
         {
-            IsJoiningLobby = false;
+            _lobbyOpLock.Release();
         }
+    }
+
+    private void SeedGuestLobbyPlayersIfEmpty(string guestNick, string? hostNick)
+    {
+        Dispatch(() =>
+        {
+            if (LobbyPlayers.Count > 0) return;
+
+            if (!string.IsNullOrWhiteSpace(hostNick) && !string.Equals(hostNick, guestNick, StringComparison.OrdinalIgnoreCase))
+            {
+                LobbyPlayers.Add(new LobbyPlayerItem
+                {
+                    Nickname = hostNick,
+                    IsHost = true,
+                    Avatar = SkinService.LoadDefaultSteveBitmap(),
+                    PlayerModel3D = LobbyPlayerItem.DefaultSteveModel3D
+                });
+            }
+
+            ImageSource? guestAvatar = _skinService?.ExtractHeadAvatar(_configService.CurrentConfig?.SkinPath);
+            var guestModel3D = BuildLocalPlayerModel3D();
+            LobbyPlayers.Add(new LobbyPlayerItem
+            {
+                Nickname = guestNick,
+                IsHost = false,
+                Avatar = guestAvatar ?? SkinService.LoadDefaultSteveBitmap(),
+                PlayerModel3D = guestModel3D
+            });
+            UpdateStagePositions();
+        });
     }
 
     public async Task<bool> JoinByCodeAsync(string code, bool fromInvite = false)
@@ -1113,8 +1208,6 @@ public class LobbyViewModel : ObservableObject
 
         try
         {
-            // Запускаем событие, которое MainViewModel перехватывает
-            // для запуска игры с --quickPlayMultiplayer <tunnelAddress>
             GuestConnectRequested?.Invoke(this, address);
 
             StatusText = "Игра запускается с подключением к серверу...";
@@ -1158,7 +1251,6 @@ public class LobbyViewModel : ObservableObject
                 Clipboard.SetText(LobbyCode);
                 CodeCopied = true;
 
-                // Сбрасываем через 1.6 секунды по спецификации задачи 27Б
                 _ = Task.Delay(1600).ContinueWith(_ =>
                 {
                     Application.Current?.Dispatcher?.InvokeAsync(() => CodeCopied = false);
@@ -1191,33 +1283,24 @@ public class LobbyViewModel : ObservableObject
 
     private void LeaveLobby()
     {
+        Interlocked.Increment(ref _lobbyOpGeneration);
+
         if (_lobbyService.IsHost)
         {
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _lobbyService.CloseLobbyAsHostAsync();
-                }
-                catch (Exception ex)
-                {
-                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LeaveLobby: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
-                }
-            });
+            _ = _lobbyService.CloseLobbyAsHostAsync();
         }
         else
         {
             _lobbyService.LeaveLobby();
         }
 
-        // Сброс всех состояний
-        IsInLobby = false;
         IsLobbyCreated = false;
         IsWorldOpen = false;
         IsGuestJoined = false;
         CanGuestConnect = false;
         LobbyCode = null;
         HostName = null;
+        IsInLobby = false;
         GuestCodeInput = string.Empty;
         CodeCopied = false;
         HostStatusText = "Ожидание мира...";
