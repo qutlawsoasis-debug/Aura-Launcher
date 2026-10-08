@@ -83,19 +83,31 @@ try {
         [System.IO.Directory]::CreateDirectory($OutDir) | Out-Null
     }
 
-    # If previous releases exist in parent C:\AuraRelease, copy previous package assets for delta creation
+    # Храним в C:\AuraRelease максимум 5 последних версий (4 предыдущие + текущая)
     $parentReleaseDir = "C:\AuraRelease"
+    $maxKeepReleases = 5
     if (Test-Path $parentReleaseDir) {
-        $prevReleases = Get-ChildItem -Path $parentReleaseDir -Directory | Where-Object { $_.FullName -ne $OutDir } | Sort-Object Name
+        $prevReleases = Get-ChildItem -Path $parentReleaseDir -Directory |
+            Where-Object { $_.FullName -ne $OutDir -and ($_.Name -match '^\d+\.\d+\.\d+$') } |
+            Sort-Object { [version]$_.Name } |
+            Select-Object -Last ($maxKeepReleases - 1)
+
+        $allowedPrevVersions = @($prevReleases | ForEach-Object { $_.Name })
         foreach ($prevDir in $prevReleases) {
-            $prevFiles = Get-ChildItem -Path $prevDir.FullName -File | Where-Object { 
-                $_.Name -like "*.nupkg" -or $_.Name -eq "releases.win.json" -or $_.Name -eq "assets.win.json"
+            $prevFiles = Get-ChildItem -Path $prevDir.FullName -File | Where-Object {
+                if ($_.Name -eq "releases.win.json" -or $_.Name -eq "assets.win.json" -or $_.Name -eq "RELEASES") {
+                    return $true
+                }
+                if ($_.Name -like "AuraLauncher-*.nupkg") {
+                    foreach ($av in $allowedPrevVersions) {
+                        if ($_.Name -like "AuraLauncher-$av-*") { return $true }
+                    }
+                }
+                return $false
             }
             foreach ($pf in $prevFiles) {
                 $targetFile = Join-Path $OutDir $pf.Name
-                if (-not (Test-Path $targetFile)) {
-                    Copy-Item -Path $pf.FullName -Destination $targetFile -Force
-                }
+                Copy-Item -Path $pf.FullName -Destination $targetFile -Force
             }
         }
     }
@@ -124,6 +136,32 @@ try {
     & dotnet vpk @vpkArgs
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet vpk pack failed with exit code $LASTEXITCODE"
+    }
+
+    # Автоочистка C:\AuraRelease: оставляем только 5 последних версий
+    if (Test-Path $parentReleaseDir) {
+        $allVerDirs = Get-ChildItem -Path $parentReleaseDir -Directory |
+            Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+            Sort-Object { [version]$_.Name }
+        $keepDirs = @($allVerDirs | Select-Object -Last $maxKeepReleases)
+        $keepNames = @($keepDirs | ForEach-Object { $_.Name })
+
+        Get-ChildItem -Path $parentReleaseDir -Directory | Where-Object { $_.Name -notin $keepNames } | ForEach-Object {
+            Write-Host "Cleaning old release folder: $($_.FullName)" -ForegroundColor DarkGray
+            Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        foreach ($kd in $keepDirs) {
+            Get-ChildItem -Path $kd.FullName -Filter "AuraLauncher-*.nupkg" | ForEach-Object {
+                $keepPkg = $false
+                foreach ($kn in $keepNames) {
+                    if ($_.Name -like "AuraLauncher-$kn-*") { $keepPkg = $true; break }
+                }
+                if (-not $keepPkg) {
+                    Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
     }
 
     Write-Host "`nRelease build complete!" -ForegroundColor Green
