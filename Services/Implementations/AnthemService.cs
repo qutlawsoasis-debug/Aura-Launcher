@@ -28,7 +28,7 @@ public class AnthemService : IAnthemService
 
     private readonly System.Collections.Generic.List<string> _playlist = new();
     private int _currentTrackIndex = 0;
-    private string _currentTrackTitle = "Aura Cyberpunk Anthem";
+    private string _currentTrackTitle = "Aura Theme";
 
     public string CurrentTrackTitle => _currentTrackTitle;
     public event EventHandler<string>? TrackChanged;
@@ -274,7 +274,7 @@ public class AnthemService : IAnthemService
     {
         string fileName = Path.GetFileNameWithoutExtension(path);
         _currentTrackTitle = string.Equals(fileName, "anthem", StringComparison.OrdinalIgnoreCase)
-            ? "Aura Cyberpunk Anthem"
+            ? "Aura Theme"
             : fileName;
         TrackChanged?.Invoke(this, _currentTrackTitle);
     }

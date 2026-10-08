@@ -371,12 +371,11 @@ public class WorkshopService : IWorkshopService
                 catch { }
             }
 
-            // Вариант 1: Без шейдеров
             result.Add(new ShaderPackItem
             {
                 Name = "Без шейдеров",
                 FileName = "",
-                Description = "Стандартный графический рендерер Sodium с максимальным FPS",
+                Description = "Шейдеры отключены",
                 IsActive = !shadersEnabled || string.IsNullOrWhiteSpace(currentShader) || currentShader.Equals("OFF", StringComparison.OrdinalIgnoreCase)
             });
 
@@ -388,14 +387,8 @@ public class WorkshopService : IWorkshopService
                     var fi = new FileInfo(f);
                     string cleanName = Path.GetFileNameWithoutExtension(fi.Name);
                     bool active = shadersEnabled && string.Equals(fi.Name, currentShader, StringComparison.OrdinalIgnoreCase);
-
-                    string desc = cleanName.Contains("Complementary", StringComparison.OrdinalIgnoreCase)
-                        ? "Фотореалистичный свет, динамические облака и отражения на воде"
-                        : cleanName.Contains("BSL", StringComparison.OrdinalIgnoreCase)
-                            ? "Кинематографичная атмосфера, тёплое освещение и глубина резкости"
-                            : cleanName.Contains("MakeUp", StringComparison.OrdinalIgnoreCase)
-                                ? "Ультра-легкий шейдер с мягкими тенями для любых ПК"
-                                : "Пользовательский шейдерпак";
+                    double sizeMb = fi.Length / (1024.0 * 1024.0);
+                    string desc = sizeMb >= 0.1 ? $"{sizeMb:F1} МБ" : $"{Math.Max(1, fi.Length / 1024)} КБ";
 
                     result.Add(new ShaderPackItem
                     {

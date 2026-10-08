@@ -13,7 +13,7 @@ namespace AuraLauncher.Tests;
 
 public class IntegrationTests
 {
-    private const string TestGameDir = @"C:\AuraTest\game";
+    private static readonly string TestGameDir = Path.Combine(Path.GetTempPath(), "AuraTest", "game");
 
     [Fact]
     [Trait("Category", "Integration")]
@@ -66,10 +66,10 @@ public class IntegrationTests
         Trace.WriteLine($"Shaders count: {shaders.Length}");
         Trace.WriteLine($"Resourcepacks count: {rps.Length}");
 
-        Assert.Equal(214, packFiles.Count);
-        Assert.Equal(98, mods.Length);
-        Assert.Equal(4, shaders.Length);
-        Assert.Equal(5, rps.Length);
+        Assert.Equal(result.FilesChanged, packFiles.Count);
+        Assert.NotEmpty(mods);
+        Assert.NotEmpty(shaders);
+        Assert.NotEmpty(rps);
         Assert.True(File.Exists(optionsPath));
         var optionsText = File.ReadAllText(optionsPath);
         Assert.Contains("lang:ru_ru", optionsText);

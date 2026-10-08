@@ -697,7 +697,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- 3.5 CHANGELOG MODAL OVERLAY (СПИСОК ИЗМЕНЕНИЙ СБОРКИ МОДОВ) -->
+            <!-- 3.5 CHANGELOG MODAL OVERLAY -->
             <Grid x:Name="ChangelogModalOverlay"
                   Panel.ZIndex="120"
                   Visibility="Collapsed"
@@ -705,7 +705,7 @@
                   Background="{DynamicResource ModalBackdrop}">
                 <Border x:Name="ChangelogModalCard"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Width="640" MaxHeight="520"
+                        Width="580" MaxHeight="520"
                         Background="{DynamicResource PanelCard}"
                         BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
@@ -723,12 +723,21 @@
 
                         <!-- Header with Title and Close Button -->
                         <Grid Grid.Row="0" Margin="0,0,0,14">
-                            <TextBlock Text="Список изменений сборки"
-                                       FontFamily="{StaticResource HeadingFont}"
-                                       FontSize="22"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource InkBrush}"
-                                       VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Список изменений"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding OverviewVM.WhatsNewVersion}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource EmberBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="12,3,0,0" />
+                            </StackPanel>
 
                             <Button Command="{Binding CloseChangelogCommand}"
                                     Style="{StaticResource WinCloseBtn}"
@@ -741,60 +750,40 @@
                             </Button>
                         </Grid>
 
-                        <!-- Scrollable list of new mods -->
+                        <!-- Dynamic list of changelog items and current environment status -->
                         <ScrollViewer Grid.Row="1" Style="{StaticResource AuraScrollViewer}" MaxHeight="390" Margin="0,0,0,14">
                             <StackPanel Margin="0,0,10,0">
-                                <TextBlock Text="В сборку Aura для Minecraft 1.20.1 (Fabric) добавлены новые моды:"
+                                <TextBlock Text="{Binding OverviewVM.SpecLine}"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="13"
                                            Foreground="{StaticResource DimInkBrush}"
                                            TextWrapping="Wrap"
+                                           Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding OverviewVM.LastUpdateText}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextWrapping="Wrap"
                                            Margin="0,0,0,12" />
 
-                                <!-- Mod entries -->
-                                <Border Background="{DynamicResource PanelInput}" CornerRadius="3" Padding="12,10" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <TextBlock Text="Приключения и контент" FontFamily="{StaticResource MainFont}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource EmberBrush}" Margin="0,0,0,4" />
-                                        <TextBlock Text="• Frostiful (+ Thermoo): зимнее выживание, механика замерзания, тёплая одежда и новые мобы." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Snowy Spirit: сани для поездок по снегу, зимний декор и подарки." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Alex's Mobs (+ Citadel): новые животные и существа с собственной механикой поведения." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Cultural Delights: дополнительные блюда и культуры для Farmer's Delight." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Spell Engine и Spell Power (+ PlayerAnimator): система заклинаний, магических характеристик и анимаций." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Background="{DynamicResource PanelInput}" CornerRadius="3" Padding="12,10" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <TextBlock Text="Исследования и структуры (YUNG's Series)" FontFamily="{StaticResource MainFont}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource EmberBrush}" Margin="0,0,0,4" />
-                                        <TextBlock Text="• YUNG's Better Desert Temples: переработанные пустынные пирамиды с ловушками и головоломками." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• YUNG's Better Dungeons: обновлённые подземные катакомбы и сокровищницы." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• YUNG's Better Mineshafts: разветвлённые заброшенные шахты с рудными жилами." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Background="{DynamicResource PanelInput}" CornerRadius="3" Padding="12,10" Margin="0,0,0,8">
-                                    <StackPanel>
-                                        <TextBlock Text="Декор и строительство" FontFamily="{StaticResource MainFont}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource EmberBrush}" Margin="0,0,0,4" />
-                                        <TextBlock Text="• Supplementaries: указатели, флюгеры, кувшины и функциональные механизмы." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Decorative Blocks: деревянные балки, цепи, костры и мебель." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Macaw's Collection (Fences, Roofs, Bridges, Doors): крыши, мосты, заборы и двери." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                    </StackPanel>
-                                </Border>
-
-                                <Border Background="{DynamicResource PanelInput}" CornerRadius="3" Padding="12,10">
-                                    <StackPanel>
-                                        <TextBlock Text="Атмосфера, физика и визуальные эффекты" FontFamily="{StaticResource MainFont}" FontWeight="SemiBold" FontSize="14" Foreground="{StaticResource EmberBrush}" Margin="0,0,0,4" />
-                                        <TextBlock Text="• AmbientSounds и Presence Footsteps: фоновые звуки биомов и звуки шагов по разным блокам." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• 3D Skin Layers и Wavey Capes: объёмный второй слой скина и плавная физика плаща." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Subtle Effects, Particle Rain и Inventory Particles: обновлённые частицы дождя, окружения и инвентаря." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Teleport Animation (Grand Teleport): плавный переход камеры при телепортации." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Inventory Profiles Next (+ libIPN): быстрая сортировка инвентаря и сундуков." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Player Locator Plus: отображение направления к другим игрокам на компасе." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Enhanced Doors: плавная анимация открывания и закрывания дверей." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Fresh Animations (+ EMF, ETF): обновлённые анимации мобов." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                        <TextBlock Text="• Dungeons UI и Ancient City Panorama: оформление меню и панорама древнего города." FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,2" />
-                                    </StackPanel>
-                                </Border>
+                                <ItemsControl ItemsSource="{Binding OverviewVM.WhatsNewLines}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource PanelInput}"
+                                                    BorderBrush="{DynamicResource BorderSubtle}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="3"
+                                                    Padding="12,10"
+                                                    Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="13"
+                                                           Foreground="{StaticResource InkBrush}"
+                                                           TextWrapping="Wrap" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </ScrollViewer>
 

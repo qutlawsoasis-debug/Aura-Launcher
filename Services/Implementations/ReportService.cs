@@ -171,12 +171,13 @@ public class ReportService : IReportService
 
             string base64Zip = Convert.ToBase64String(zipBytes);
 
+            var (_, userFacingVer) = LauncherUpdateService.ResolveVersions();
             var payload = new
             {
                 zipBase64 = base64Zip,
                 errorText = errorText ?? string.Empty,
                 userComment = userComment ?? string.Empty,
-                launcherVersion = "beta 1.0.22",
+                launcherVersion = userFacingVer,
                 os = $"{Environment.OSVersion.VersionString} ({(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")})"
             };
 
@@ -324,10 +325,26 @@ public class ReportService : IReportService
 
     private string BuildVersionsInfo()
     {
+        var (internalVer, userFacingVer) = LauncherUpdateService.ResolveVersions();
+        string gameDir = _configService.CurrentConfig?.GameDir
+            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+        string fabricLoader = FabricGameLaunchService.ResolveFabricLoaderVersion(gameDir);
+
+        int modsCount = 0;
+        try
+        {
+            string modsDir = Path.Combine(gameDir, "mods");
+            if (Directory.Exists(modsDir))
+            {
+                modsCount = Directory.GetFiles(modsDir, "*.jar", SearchOption.TopDirectoryOnly).Length;
+            }
+        }
+        catch { }
+
         var sb = new StringBuilder();
         sb.AppendLine("=== Aura Versions Report ===");
-        sb.AppendLine("Launcher: 1.2.30 (beta 1.0.22)");
-        sb.AppendLine("Fabric: 0.19.5 (Minecraft 1.20.1, 61 mods)");
+        sb.AppendLine($"Launcher: {internalVer} ({userFacingVer})");
+        sb.AppendLine($"Fabric: {fabricLoader} (Minecraft {FabricGameLaunchService.MinecraftVersion}, {modsCount} mods)");
         sb.AppendLine($"Runtime / Java: .NET {Environment.Version} ({RuntimeInformation.FrameworkDescription})");
         sb.AppendLine($"OS / Windows: {Environment.OSVersion.VersionString} ({(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")})");
         sb.AppendLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss} (Local)");

@@ -107,12 +107,31 @@ public class DiscordRpcService : IDiscordRpcService
             switch (_currentActivity)
             {
                 case "playing":
+                    string gameState = "Сборка Aura Pack";
+                    try
+                    {
+                        string? gameDir = _configService.CurrentConfig?.GameDir;
+                        if (!string.IsNullOrWhiteSpace(gameDir))
+                        {
+                            string modsDir = System.IO.Path.Combine(gameDir, "mods");
+                            if (System.IO.Directory.Exists(modsDir))
+                            {
+                                int modCount = System.IO.Directory.GetFiles(modsDir, "*.jar", System.IO.SearchOption.TopDirectoryOnly).Length;
+                                if (modCount > 0)
+                                {
+                                    gameState = $"Сборка Aura Pack • Модов: {modCount}";
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+
                     presence = new RichPresence
                     {
                         Details = !string.IsNullOrWhiteSpace(_playingWorldName)
                             ? $"В мире: {_playingWorldName}"
                             : "В мире Minecraft (Fabric 1.20.1)",
-                        State = "Сборка Aura Pack • 98 модов",
+                        State = gameState,
                         Timestamps = new Timestamps { Start = _gameStartTime ?? DateTime.UtcNow },
                         Assets = new Assets
                         {

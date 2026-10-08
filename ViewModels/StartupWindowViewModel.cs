@@ -34,7 +34,7 @@ public class StartupWindowViewModel : ObservableObject
     private double _progressValue = 0;
     private bool _isProgressVisible = false;
     private string _progressPercentText = "";
-    private string _versionText = "beta 1.0.38";
+    private string _versionText = "—";
     private bool _isFlowRunning = false;
     private CancellationTokenSource? _flowCts;
 
@@ -140,37 +140,13 @@ public class StartupWindowViewModel : ObservableObject
     {
         try
         {
-            string verFile = Path.Combine(AppContext.BaseDirectory, "version.json");
-            if (File.Exists(verFile))
-            {
-                string json = File.ReadAllText(verFile);
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("userFacingVersion", out var prop))
-                {
-                    string? ver = prop.GetString();
-                    if (!string.IsNullOrWhiteSpace(ver))
-                    {
-                        VersionText = ver;
-                        return;
-                    }
-                }
-            }
+            var (_, userFacingVer) = Services.Implementations.LauncherUpdateService.ResolveVersions(_launcherUpdateService.CurrentVersion);
+            VersionText = userFacingVer;
         }
-        catch { }
-
-        try
+        catch
         {
-            string cur = _launcherUpdateService.CurrentVersion;
-            var parts = cur.Split('.');
-            if (parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8)
-            {
-                VersionText = $"beta 1.0.{patch - 8}";
-                return;
-            }
+            VersionText = "—";
         }
-        catch { }
-
-        VersionText = "beta 1.0.33";
     }
 
     public async Task StartStartupFlowAsync()

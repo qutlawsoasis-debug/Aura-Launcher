@@ -24,7 +24,7 @@ public class OverviewViewModel : ObservableObject
 
     private string _buildName = "Aura";
     private string _versionInfo = $"Minecraft 1.20.1 • Fabric {FabricGameLaunchService.FabricLoaderVersion}";
-    private string _specLine = "Minecraft 1.20.1, Fabric 0.19.5, 93 мода";
+    private string _specLine = $"Minecraft 1.20.1 • Fabric {FabricGameLaunchService.FabricLoaderVersion}";
     private string _modsCountText = "Сборка не установлена";
     private string _lastUpdateText = "Обновлено: —";
     private bool _isEnvironmentInstalled;
@@ -165,8 +165,8 @@ public class OverviewViewModel : ObservableObject
             }
 
             SpecLine = modCount > 0
-                ? $"Minecraft 1.20.1, Fabric {fabricLoader}, {modCount} мод"
-                : "Minecraft 1.20.1, Fabric 0.19.5, 93 мода";
+                ? $"Minecraft 1.20.1, Fabric {fabricLoader}, модов: {modCount}"
+                : $"Minecraft 1.20.1, Fabric {fabricLoader}, модов: —";
         }
 
         // 4. "Обновлено:": показывать LastUpdateUtc из конфига (или "—", если пусто)
@@ -284,13 +284,7 @@ public class OverviewViewModel : ObservableObject
         }
     }
 
-    private static readonly System.Windows.Media.ImageSource?[] s_defaultFeedBackgrounds = new System.Windows.Media.ImageSource?[4];
-    private static bool s_defaultFeedBackgroundsLoaded;
-
     private System.Windows.Media.ImageSource? _feedImage0;
-    private System.Windows.Media.ImageSource? _feedImage1;
-    private System.Windows.Media.ImageSource? _feedImage2;
-    private System.Windows.Media.ImageSource? _feedImage3;
 
     private string _nextAchievementTitle = string.Empty;
     private string _nextAchievementDescription = string.Empty;
@@ -301,24 +295,6 @@ public class OverviewViewModel : ObservableObject
     {
         get => _feedImage0;
         private set => SetProperty(ref _feedImage0, value);
-    }
-
-    public System.Windows.Media.ImageSource? FeedImage1
-    {
-        get => _feedImage1;
-        private set => SetProperty(ref _feedImage1, value);
-    }
-
-    public System.Windows.Media.ImageSource? FeedImage2
-    {
-        get => _feedImage2;
-        private set => SetProperty(ref _feedImage2, value);
-    }
-
-    public System.Windows.Media.ImageSource? FeedImage3
-    {
-        get => _feedImage3;
-        private set => SetProperty(ref _feedImage3, value);
     }
 
     public string NextAchievementTitle
@@ -363,38 +339,11 @@ public class OverviewViewModel : ObservableObject
 
     public void RefreshStoriesData()
     {
-        EnsureDefaultFeedBackgrounds();
         UpdateLauncherBackground();
         RefreshLatestScreenshot();
         RefreshAchievementBlock();
         RefreshWhatsNewBlock();
         UpdateHasRightFeed();
-    }
-
-    private static void EnsureDefaultFeedBackgrounds()
-    {
-        if (s_defaultFeedBackgroundsLoaded) return;
-        s_defaultFeedBackgroundsLoaded = true;
-
-        int[] indices = { 2, 5, 9, 12 };
-        for (int i = 0; i < indices.Length; i++)
-        {
-            try
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri($"pack://application:,,,/Resources/Backgrounds/bg_{indices[i]}.jpg", UriKind.Absolute);
-                bmp.DecodePixelWidth = 640;
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
-                bmp.Freeze();
-                s_defaultFeedBackgrounds[i] = bmp;
-            }
-            catch
-            {
-                s_defaultFeedBackgrounds[i] = null;
-            }
-        }
     }
 
     private static BitmapImage? TryLoadScreenshotBitmap(string fullPath)
@@ -437,14 +386,6 @@ public class OverviewViewModel : ObservableObject
 
     private void RefreshLatestScreenshot()
     {
-        var fallback1 = s_defaultFeedBackgrounds[1] ?? LauncherBackground;
-        var fallback2 = s_defaultFeedBackgrounds[2] ?? LauncherBackground;
-        var fallback3 = s_defaultFeedBackgrounds[3] ?? LauncherBackground;
-
-        FeedImage1 = fallback1;
-        FeedImage2 = fallback2;
-        FeedImage3 = fallback3;
-
         try
         {
             var config = _configService.CurrentConfig;
@@ -532,13 +473,13 @@ public class OverviewViewModel : ObservableObject
             var achService = App.Services?.GetService(typeof(IAchievementService)) as IAchievementService;
             if (achService == null)
             {
-                AchievementTitle = "Искра";
-                AchievementDescription = "Первый запуск игры";
-                AchievementDateOrProgress = "Ожидает открытия";
-                NextAchievementTitle = "Десять шагов";
-                NextAchievementDescription = "Запустить игру 10 раз";
-                NextAchievementProgress = "0 из 10 запусков";
-                HasAchievementBlock = true;
+                AchievementTitle = string.Empty;
+                AchievementDescription = string.Empty;
+                AchievementDateOrProgress = string.Empty;
+                NextAchievementTitle = string.Empty;
+                NextAchievementDescription = string.Empty;
+                NextAchievementProgress = string.Empty;
+                HasAchievementBlock = false;
                 return;
             }
 
@@ -657,7 +598,9 @@ public class OverviewViewModel : ObservableObject
     {
         try
         {
-            string ver = "beta 1.0.40";
+            var (_, ver) = LauncherUpdateService.ResolveVersions();
+            var lines = new ObservableCollection<string>();
+
             try
             {
                 var candidates = new[]
@@ -671,24 +614,33 @@ public class OverviewViewModel : ObservableObject
                     {
                         var json = File.ReadAllText(path);
                         using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        if (doc.RootElement.TryGetProperty("userFacingVersion", out var prop))
+                        if (doc.RootElement.TryGetProperty("changelog", out var clProp) && clProp.ValueKind == System.Text.Json.JsonValueKind.Array)
                         {
-                            var val = prop.GetString();
-                            if (!string.IsNullOrWhiteSpace(val)) { ver = val; break; }
+                            foreach (var item in clProp.EnumerateArray())
+                            {
+                                var line = item.GetString();
+                                if (!string.IsNullOrWhiteSpace(line))
+                                {
+                                    lines.Add(line);
+                                }
+                            }
                         }
+                        if (lines.Count > 0) break;
                     }
                 }
             }
             catch { }
 
-            WhatsNewVersion = ver;
-
-            var lines = new ObservableCollection<string>
+            if (lines.Count == 0)
             {
-                "Frostiful и Snowy Spirit: зимнее выживание и сани",
-                "Alex's Mobs: новые животные и существа",
-                "Spell Engine: система заклинаний и атрибутов"
-            };
+                lines.Add(SpecLine);
+                if (!string.IsNullOrWhiteSpace(LastUpdateText))
+                {
+                    lines.Add(LastUpdateText);
+                }
+            }
+
+            WhatsNewVersion = ver;
             WhatsNewLines = lines;
             WhatsNewPrimaryLine = lines[0];
             HasWhatsNewBlock = true;

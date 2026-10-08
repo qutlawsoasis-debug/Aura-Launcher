@@ -554,42 +554,7 @@ public class MainViewModel : ObservableObject
 
     public bool CanApplyUpdate => !IsGameRunning;
 
-    public string LauncherVersionText
-    {
-        get
-        {
-            try
-            {
-                var candidates = new[]
-                {
-                    System.IO.Path.Combine(AppContext.BaseDirectory, "version.json"),
-                    System.IO.Path.Combine(Environment.CurrentDirectory, "version.json")
-                };
-                foreach (var path in candidates)
-                {
-                    if (System.IO.File.Exists(path))
-                    {
-                        var json = System.IO.File.ReadAllText(path);
-                        using var doc = System.Text.Json.JsonDocument.Parse(json);
-                        if (doc.RootElement.TryGetProperty("userFacingVersion", out var prop))
-                        {
-                            var val = prop.GetString();
-                            if (!string.IsNullOrWhiteSpace(val)) return val;
-                        }
-                    }
-                }
-            }
-            catch { }
-
-            var cur = _launcherUpdateService.CurrentVersion;
-            var parts = cur.Split('.');
-            if (parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8)
-            {
-                return $"beta 1.0.{patch - 8}";
-            }
-            return $"v{cur}";
-        }
-    }
+    public string LauncherVersionText => LauncherUpdateService.ResolveVersions(_launcherUpdateService.CurrentVersion).UserFacingVersion;
 
     // Команды
     public RelayCommand LaunchOrCancelCommand { get; }
@@ -623,7 +588,7 @@ public class MainViewModel : ObservableObject
     public string MaximizeRestoreToolTip => IsWindowMaximized ? "Оконный режим" : "Во весь экран";
 
     public IAnthemService? AnthemService { get; }
-    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "Aura Cyberpunk Anthem";
+    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "Aura Theme";
 
     public WorkshopViewModel WorkshopVM { get; }
 
@@ -693,13 +658,24 @@ public class MainViewModel : ObservableObject
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));
         var manifestService = new ModManifestService();
-        LobbyVM = lobbyViewModel ?? new LobbyViewModel(new LobbyService(new LobbyApiClient(), configService: configService, manifestService: manifestService, launchService: launchService), launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService, modManifestService: manifestService);
+        ILobbyService? sharedLobbyService = App.Services?.GetService(typeof(ILobbyService)) as ILobbyService;
+        if (sharedLobbyService == null && (lobbyViewModel == null || friendsViewModel == null))
+        {
+            var apiClient = new LobbyApiClient(configService: configService);
+            sharedLobbyService = new LobbyService(
+                apiClient,
+                new PlayitTunnelProvider(),
+                configService: configService,
+                manifestService: manifestService,
+                launchService: launchService);
+        }
+        LobbyVM = lobbyViewModel ?? new LobbyViewModel(sharedLobbyService!, launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService, modManifestService: manifestService);
         WorkshopVM = workshopViewModel ?? new WorkshopViewModel(workshopService ?? new WorkshopService(), _configService, _launchService);
         WorkshopVM.ModToggled += () => _ = LobbyVM.UpdateManifestAsync();
         WorkshopVM.ScreenshotsCountChanged += _ => OverviewVM.RefreshRightFeed();
         
         _friendService = friendService;
-        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), new LobbyService(new LobbyApiClient(), configService: configService, manifestService: manifestService, launchService: launchService), _skinService, LobbyVM);
+        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), sharedLobbyService!, _skinService, LobbyVM);
         FriendsVM.OpenLobbyRequested += () => SwitchTab("Lobby");
 
         if (_notificationService != null)

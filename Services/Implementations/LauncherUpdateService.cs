@@ -37,6 +37,59 @@ public class LauncherUpdateService : ILauncherUpdateService
         }
     }
 
+    public static (string InternalVersion, string UserFacingVersion) ResolveVersions(string? fallbackInternalVersion = null)
+    {
+        var asmVersion = typeof(LauncherUpdateService).Assembly.GetName().Version;
+        string internalVer = !string.IsNullOrWhiteSpace(fallbackInternalVersion)
+            ? fallbackInternalVersion
+            : (asmVersion != null ? $"{asmVersion.Major}.{asmVersion.Minor}.{asmVersion.Build}" : "—");
+        string userFacingVer = "—";
+
+        try
+        {
+            var candidates = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "version.json"),
+                Path.Combine(Environment.CurrentDirectory, "version.json")
+            };
+            foreach (var path in candidates)
+            {
+                if (File.Exists(path))
+                {
+                    var json = File.ReadAllText(path);
+                    using var doc = System.Text.Json.JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("internalVersion", out var intProp))
+                    {
+                        var val = intProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(val)) internalVer = val;
+                    }
+                    if (doc.RootElement.TryGetProperty("userFacingVersion", out var ufProp))
+                    {
+                        var val = ufProp.GetString();
+                        if (!string.IsNullOrWhiteSpace(val)) userFacingVer = val;
+                    }
+                    if (userFacingVer != "—") break;
+                }
+            }
+        }
+        catch { }
+
+        if (userFacingVer == "—" && internalVer != "—")
+        {
+            var parts = internalVer.Split('.');
+            if (parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8)
+            {
+                userFacingVer = $"beta 1.0.{patch - 8}";
+            }
+            else
+            {
+                userFacingVer = $"v{internalVer}";
+            }
+        }
+
+        return (internalVer, userFacingVer);
+    }
+
     public LauncherUpdateService(
         IConfigService configService,
         IGameLaunchService launchService,

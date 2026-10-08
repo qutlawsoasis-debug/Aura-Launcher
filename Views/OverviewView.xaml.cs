@@ -143,32 +143,24 @@ public partial class OverviewView : UserControl
         }
 
         double availableHeight = ActualHeight > 0 ? ActualHeight : Math.Max(0, _parentWindow.ActualHeight - 108);
-        bool showFourthCard = availableHeight >= 740;
+        bool showFourthCard = availableHeight >= 560;
 
-        if (CardNextGoalImageRow != null &&
-            CardNextGoalTextRow != null &&
+        if (CardNextGoalTextRow != null &&
             CardNextGoalDividerRow != null &&
-            CardNextGoalImage != null &&
             CardNextGoalText != null &&
             CardNextGoalDivider != null)
         {
             if (showFourthCard)
             {
-                CardNextGoalImageRow.MinHeight = 64;
-                CardNextGoalImageRow.Height = new GridLength(1, GridUnitType.Star);
                 CardNextGoalTextRow.Height = GridLength.Auto;
                 CardNextGoalDividerRow.Height = GridLength.Auto;
-                CardNextGoalImage.Visibility = Visibility.Visible;
                 CardNextGoalText.Visibility = Visibility.Visible;
                 CardNextGoalDivider.Visibility = Visibility.Visible;
             }
             else
             {
-                CardNextGoalImageRow.MinHeight = 0;
-                CardNextGoalImageRow.Height = new GridLength(0);
                 CardNextGoalTextRow.Height = new GridLength(0);
                 CardNextGoalDividerRow.Height = new GridLength(0);
-                CardNextGoalImage.Visibility = Visibility.Collapsed;
                 CardNextGoalText.Visibility = Visibility.Collapsed;
                 CardNextGoalDivider.Visibility = Visibility.Collapsed;
             }

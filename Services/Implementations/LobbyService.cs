@@ -42,7 +42,7 @@ public class LobbyService : ILobbyService, IDisposable
         IGameLaunchService? launchService = null)
     {
         _apiClient = apiClient ?? throw new ArgumentNullException(nameof(apiClient));
-        _tunnelProvider = tunnelProvider ?? new FakeTunnelProvider();
+        _tunnelProvider = tunnelProvider ?? (configService != null ? new PlayitTunnelProvider() : new FakeTunnelProvider());
         _configService = configService;
         _manifestService = manifestService ?? new ModManifestService();
         _launchService = launchService;

@@ -21,10 +21,14 @@ $versionJsonPath = Join-Path $repoRoot "version.json"
 $internalVersion = "1.2.9"
 $userFacingVersion = "beta 1.0.1"
 
+$changelog = @()
 if (Test-Path $versionJsonPath) {
     $vData = Get-Content $versionJsonPath -Raw | ConvertFrom-Json
     $internalVersion = $vData.internalVersion
     $userFacingVersion = $vData.userFacingVersion
+    if ($null -ne $vData.changelog) {
+        $changelog = @($vData.changelog)
+    }
 }
 
 if ($Increment) {
@@ -50,8 +54,9 @@ $Version = $internalVersion
 $vObj = [ordered]@{
     internalVersion = $internalVersion
     userFacingVersion = $userFacingVersion
+    changelog = $changelog
 }
-$vObj | ConvertTo-Json -Depth 2 | Set-Content $versionJsonPath -Encoding UTF8
+$vObj | ConvertTo-Json -Depth 3 | Set-Content $versionJsonPath -Encoding UTF8
 
 # Sync AuraLauncher.csproj
 $csprojPath = Join-Path $repoRoot "AuraLauncher.csproj"
