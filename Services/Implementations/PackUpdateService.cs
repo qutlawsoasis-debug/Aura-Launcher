@@ -864,11 +864,12 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             throw new FormatException($"Путь содержит управляющие символы: {path}");
         }
 
-        // Разрешены только: mods/, shaderpacks/, resourcepacks/, config/ и options.txt в корне
+        // Разрешены только: mods/, shaderpacks/, resourcepacks/, config/, CustomSkinLoader/ и options.txt в корне
         bool isAllowedRoot = path.StartsWith("mods/", StringComparison.Ordinal) ||
                              path.StartsWith("shaderpacks/", StringComparison.Ordinal) ||
                              path.StartsWith("resourcepacks/", StringComparison.Ordinal) ||
                              path.StartsWith("config/", StringComparison.Ordinal) ||
+                             path.StartsWith("CustomSkinLoader/", StringComparison.Ordinal) ||
                              string.Equals(path, "options.txt", StringComparison.Ordinal);
 
         if (!isAllowedRoot)

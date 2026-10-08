@@ -1352,6 +1352,7 @@ public class MainViewModel : ObservableObject
                 FabricGameLaunchService.LogLauncherEvent($"[UPDATE: FAILED] {updateResult.Message}");
                 SetLauncherState(LauncherState.Idle, "Сборка не обновилась, повтори");
                 IsProgressVisible = false;
+                LobbyVM.NotifyLaunchFailed($"Сборка не обновилась: {updateResult.Message}");
                 return;
             }
 
@@ -1515,6 +1516,7 @@ public class MainViewModel : ObservableObject
                     _ = _friendService.SyncNowAsync();
                 }
                 _discordRpcService?.SetPlayingGame(startTime: DateTime.UtcNow);
+                LobbyVM.OnHostGameStarted();
                 GameStarted?.Invoke(this, process);
             }
             catch { }
@@ -1523,12 +1525,14 @@ public class MainViewModel : ObservableObject
         {
             SetLauncherState(LauncherState.Idle, "Операция отменена");
             LatestLogLine = "[INFO] Операция отменена пользователем.";
+            LobbyVM.NotifyLaunchFailed("Запуск отменен");
             UpdateIdleState();
         }
         catch (Exception ex)
         {
             SetLauncherState(LauncherState.Error, ex.Message);
             LatestLogLine = $"[ERROR] {ex.Message}";
+            LobbyVM.NotifyLaunchFailed($"Ошибка запуска: {ex.Message}");
         }
         finally
         {

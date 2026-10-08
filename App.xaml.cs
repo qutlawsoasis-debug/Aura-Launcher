@@ -817,7 +817,20 @@ public partial class App : Application
         try
         {
             var lobbyService = Services?.GetService<ILobbyService>();
-            lobbyService?.LeaveLobby();
+            if (lobbyService != null)
+            {
+                if (lobbyService.IsHost && !string.IsNullOrWhiteSpace(lobbyService.CurrentLobbyCode) && !string.IsNullOrWhiteSpace(lobbyService.CurrentHostToken))
+                {
+                    var code = lobbyService.CurrentLobbyCode;
+                    var token = lobbyService.CurrentHostToken;
+                    var apiClient = Services?.GetService<ILobbyApiClient>();
+                    if (apiClient != null)
+                    {
+                        Task.Run(async () => await apiClient.CloseLobbyAsync(code, token)).Wait(TimeSpan.FromMilliseconds(1500));
+                    }
+                }
+                lobbyService.LeaveLobby();
+            }
         }
         catch { }
 

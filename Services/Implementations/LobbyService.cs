@@ -293,6 +293,23 @@ public class LobbyService : ILobbyService, IDisposable
 
         if (status != null)
         {
+            if (!IsHost && status.LastHeartbeat > 0)
+            {
+                long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                long diffMs = nowMs - status.LastHeartbeat;
+                if (diffMs > 25000)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[GUEST-POLL] Хост не присылал heartbeat {diffMs}ms (> 25s). Лобби считается закрытым.");
+                    bool wasClosed = string.Equals(CurrentStatus, "closed", StringComparison.OrdinalIgnoreCase);
+                    CurrentStatus = "closed";
+                    if (!wasClosed)
+                    {
+                        StatusChanged?.Invoke(CurrentStatus);
+                    }
+                    return null;
+                }
+            }
+
             bool statusChanged = !string.Equals(CurrentStatus, status.Status, StringComparison.OrdinalIgnoreCase);
             bool tunnelChanged = !string.Equals(CurrentTunnelAddress, status.TunnelAddress, StringComparison.OrdinalIgnoreCase);
 
@@ -475,6 +492,12 @@ public class LobbyService : ILobbyService, IDisposable
 
         if (wasHost && codeToLeave != null && hostTokenToClose != null)
         {
+            try
+            {
+                _tunnelProvider.StopAsync(CancellationToken.None).GetAwaiter().GetResult();
+            }
+            catch { }
+
             _ = Task.Run(async () =>
             {
                 try

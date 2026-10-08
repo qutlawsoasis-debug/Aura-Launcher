@@ -756,12 +756,12 @@ public class LobbyViewModel : ObservableObject
             
             _worldWatcher.Start(logPath);
 
+            HostStatusText = "Запуск игры...";
+            StatusText = "Подготовка и запуск Minecraft...";
+            StatusIcon = string.Empty;
+
             // Запускаем игру хоста через MainViewModel
             HostLaunchRequested?.Invoke(this, EventArgs.Empty);
-
-            HostStatusText = "Ожидание открытия мира...";
-            StatusText = "Игра запущена. Открой мир для сети (Esc → Открыть для сети)";
-            StatusIcon = string.Empty;
         }
         catch (Exception ex)
         {
@@ -1239,8 +1239,33 @@ public class LobbyViewModel : ObservableObject
 
     /// <summary>
     /// Событие, которое MainViewModel слушает для запуска игры хоста.
-    /// </summary>
     public event EventHandler? HostLaunchRequested;
+
+    public void OnHostGameStarted()
+    {
+        Dispatch(() =>
+        {
+            if (IsHost && !IsWorldOpen)
+            {
+                HostStatusText = "Ожидание открытия мира...";
+                StatusText = "Игра запущена. Открой мир для сети (Esc → Открыть для сети)";
+                StatusIcon = string.Empty;
+            }
+        });
+    }
+
+    public void NotifyLaunchFailed(string errorMessage)
+    {
+        Dispatch(() =>
+        {
+            _worldWatcher.Stop();
+            HostStatusText = "Ошибка запуска";
+            StatusText = string.IsNullOrWhiteSpace(errorMessage) ? "Не удалось запустить игру" : errorMessage;
+            StatusIcon = string.Empty;
+            ShowTunnelFailedLogButton = true;
+            TunnelFailureReason = StatusText;
+        });
+    }
 
     private void CopyCode()
     {
@@ -1364,6 +1389,10 @@ public class LobbyViewModel : ObservableObject
             else
             {
                 UpdateGuestStatus();
+                if (string.Equals(newStatus, "closed", StringComparison.OrdinalIgnoreCase))
+                {
+                    _ = Task.Delay(2000).ContinueWith(_ => Dispatch(LeaveLobby));
+                }
             }
         });
     }
@@ -1539,9 +1568,12 @@ public class LobbyViewModel : ObservableObject
                     {
                         existingItem.Avatar = incoming.Avatar;
                     }
-                    if (incoming.Model3D != null && !existingItem.HasCustomModel3D)
+                    if (incoming.Model3D != null && !ReferenceEquals(incoming.Model3D, LobbyPlayerItem.DefaultSteveModel3D))
                     {
-                        existingItem.PlayerModel3D = incoming.Model3D;
+                        if (!ReferenceEquals(existingItem.PlayerModel3D, incoming.Model3D))
+                        {
+                            existingItem.PlayerModel3D = incoming.Model3D;
+                        }
                     }
                     existingItem.IsNewlyAdded = false;
 

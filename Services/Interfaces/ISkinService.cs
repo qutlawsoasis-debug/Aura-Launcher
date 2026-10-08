@@ -71,4 +71,9 @@ public interface ISkinService
     /// Очистка папки кэша CustomSkinLoader (<gameDir>/CustomSkinLoader/caches).
     /// </summary>
     void ClearCustomSkinLoaderCache(string gameDir);
+
+    /// <summary>
+    /// Сброс оперативного кэша скинов/аватарок в памяти лаунчера.
+    /// </summary>
+    void InvalidateMemoryCache(string? nickname = null) { }
 }

@@ -344,6 +344,8 @@ public class SkinService : ISkinService
                 await Task.Run(() => File.Copy(steveLocal, targetFile, overwrite: true), cancellationToken);
             }
         }
+
+        InvalidateMemoryCache(nickname);
     }
 
     private static BitmapSource? _cachedSteveBitmap;
@@ -677,7 +679,7 @@ public class SkinService : ISkinService
                 }
             }
             catch { }
-
+            InvalidateMemoryCache(nickname);
             return new SkinUploadResult(true, newOwnerToken, null);
         }
         catch (OperationCanceledException)
@@ -896,5 +898,19 @@ public class SkinService : ISkinService
         // В случае ошибки или отсутствия скина возвращаем дефолтного Стива,
         // но НЕ кэшируем намертво, чтобы повторный опрос мог подтянуть загруженный скин.
         return (LoadDefaultSteveBitmap(), false);
+    }
+
+    public void InvalidateMemoryCache(string? nickname = null)
+    {
+        if (string.IsNullOrWhiteSpace(nickname))
+        {
+            _skinTextureCache.Clear();
+            _avatarCache.Clear();
+        }
+        else
+        {
+            _skinTextureCache.TryRemove(nickname, out _);
+            _avatarCache.TryRemove(nickname, out _);
+        }
     }
 }

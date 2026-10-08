@@ -131,7 +131,7 @@ public class LobbyPlayerItem : System.ComponentModel.INotifyPropertyChanged
         set { if (_playerModel3D != value) { _playerModel3D = value; OnPropertyChanged(nameof(PlayerModel3D)); } }
     }
 
-    public bool HasCustomModel3D => _playerModel3D != null;
+    public bool HasCustomModel3D => _playerModel3D != null && !ReferenceEquals(_playerModel3D, DefaultSteveModel3D);
 
     private int _stageSlotIndex;
     public int StageSlotIndex
