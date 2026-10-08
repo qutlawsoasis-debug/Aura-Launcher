@@ -2,6 +2,7 @@ package net.auramc.defaults.client.mixin;
 
 import net.auramc.defaults.config.AuraDefaultsConfig;
 import net.minecraft.client.gui.screen.world.CreateWorldScreen;
+import net.minecraft.client.gui.screen.world.WorldCreator;
 import net.minecraft.client.gui.tab.TabManager;
 import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.CyclingButtonWidget;
@@ -9,6 +10,7 @@ import net.minecraft.text.Text;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -19,8 +21,28 @@ public abstract class CreateWorldScreenMixin {
     @Final
     private TabManager tabManager;
 
+    @Shadow
+    @Final
+    WorldCreator worldCreator;
+
+    @Inject(method = "init", at = @At("TAIL"))
+    private void aura_onInitRegisterLockListener(CallbackInfo ci) {
+        if (!AuraDefaultsConfig.get().lockCheats) {
+            return;
+        }
+        if (this.worldCreator != null) {
+            this.worldCreator.addListener(creator -> aura_lockAllowCommandsWidget());
+        }
+        aura_lockAllowCommandsWidget();
+    }
+
     @Inject(method = "initTabNavigation", at = @At("TAIL"))
     private void aura_lockCreateWorldCheats(CallbackInfo ci) {
+        aura_lockAllowCommandsWidget();
+    }
+
+    @Unique
+    private void aura_lockAllowCommandsWidget() {
         if (!AuraDefaultsConfig.get().lockCheats) {
             return;
         }
