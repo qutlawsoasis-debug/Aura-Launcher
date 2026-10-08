@@ -22,6 +22,8 @@ public class LobbyService : ILobbyService, IDisposable
     private Timer? _modsDebounceTimer;
 
     private int _operationVersion;
+    private long _lastSeenServerHeartbeat;
+    private long _lastHeartbeatChangeTick;
 
     public string? CurrentLobbyCode { get; private set; }
     public string? CurrentHostToken { get; private set; }
@@ -295,18 +297,26 @@ public class LobbyService : ILobbyService, IDisposable
         {
             if (!IsHost && status.LastHeartbeat > 0)
             {
-                long nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                long diffMs = nowMs - status.LastHeartbeat;
-                if (diffMs > 25000)
+                long nowTick = Environment.TickCount64;
+                if (_lastSeenServerHeartbeat != status.LastHeartbeat)
                 {
-                    PlayitTunnelProvider.LogTunnel($"[GUEST-POLL] Хост не присылал heartbeat {diffMs}ms (> 25s). Лобби считается закрытым.");
-                    bool wasClosed = string.Equals(CurrentStatus, "closed", StringComparison.OrdinalIgnoreCase);
-                    CurrentStatus = "closed";
-                    if (!wasClosed)
+                    _lastSeenServerHeartbeat = status.LastHeartbeat;
+                    _lastHeartbeatChangeTick = nowTick;
+                }
+                else if (_lastHeartbeatChangeTick > 0)
+                {
+                    long unchangedMs = nowTick - _lastHeartbeatChangeTick;
+                    if (unchangedMs > 45000)
                     {
-                        StatusChanged?.Invoke(CurrentStatus);
+                        PlayitTunnelProvider.LogTunnel($"[GUEST-POLL] Хост не обновлял heartbeat {unchangedMs}ms (> 45s). Лобби считается закрытым.");
+                        bool wasClosed = string.Equals(CurrentStatus, "closed", StringComparison.OrdinalIgnoreCase);
+                        CurrentStatus = "closed";
+                        if (!wasClosed)
+                        {
+                            StatusChanged?.Invoke(CurrentStatus);
+                        }
+                        return null;
                     }
-                    return null;
                 }
             }
 
@@ -426,7 +436,7 @@ public class LobbyService : ILobbyService, IDisposable
                         if (ct.IsCancellationRequested) break;
 
                         heartbeatTick++;
-                        if (IsHost && !string.IsNullOrWhiteSpace(CurrentLobbyCode) && !string.IsNullOrWhiteSpace(CurrentHostToken) && heartbeatTick % 10 == 0)
+                        if (IsHost && !string.IsNullOrWhiteSpace(CurrentLobbyCode) && !string.IsNullOrWhiteSpace(CurrentHostToken) && heartbeatTick % 3 == 0)
                         {
                             try
                             {
@@ -466,6 +476,8 @@ public class LobbyService : ILobbyService, IDisposable
     private void ResetStateInternal()
     {
         Interlocked.Increment(ref _operationVersion);
+        _lastSeenServerHeartbeat = 0;
+        _lastHeartbeatChangeTick = 0;
         StopModsWatcher();
         _pollCts?.Cancel();
         _pollCts = null;

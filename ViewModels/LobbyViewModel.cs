@@ -850,7 +850,6 @@ public class LobbyViewModel : ObservableObject
                         ShowTunnelFailedLogButton = true;
                         TunnelFailureReason = reason;
                     });
-                    await _lobbyService.CloseLobbyAsHostAsync();
                 }
             }
             catch (Exception ex)
@@ -864,14 +863,6 @@ public class LobbyViewModel : ObservableObject
                     ShowTunnelFailedLogButton = true;
                     TunnelFailureReason = ex.Message;
                 });
-                try
-                {
-                    await _lobbyService.CloseLobbyAsHostAsync();
-                }
-                catch (Exception closeEx)
-                {
-                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsHostAsync on error failed: {closeEx.GetType().FullName}: {closeEx.Message}\n{closeEx.StackTrace}");
-                }
             }
         });
     }
@@ -936,10 +927,76 @@ public class LobbyViewModel : ObservableObject
     {
         if (!_lobbyService.IsHost || !IsInLobby) return;
 
+        if (info.Status == TunnelStatus.Active && IsWorldOpen)
+        {
+            Dispatch(() =>
+            {
+                HostStatusText = "Лобби открыто!";
+                StatusText = "Мир готов, друзья могут подключаться";
+                StatusIcon = string.Empty;
+                ShowTunnelFailedLogButton = false;
+                TunnelFailureReason = null;
+            });
+            return;
+        }
+
         if (info.Status == TunnelStatus.Failed)
         {
             var reason = info.ErrorMessage ?? "Процесс туннеля playit завершился с ошибкой.";
-            PlayitTunnelProvider.LogTunnel($"[LOBBY: STATUS_CHANGED] Tunnel failed: {reason}. Closing lobby via API.");
+            PlayitTunnelProvider.LogTunnel($"[LOBBY: STATUS_CHANGED] Tunnel failed: {reason}. Keeping lobby open.");
+
+            if (IsWorldOpen && _tunnelProvider != null)
+            {
+                Dispatch(() =>
+                {
+                    HostStatusText = "Переподключение туннеля...";
+                    StatusText = "Связь с туннелем прервалась, переподключаем...";
+                    StatusIcon = string.Empty;
+                });
+
+                _ = Task.Run(async () =>
+                {
+                    for (int retry = 1; retry <= 10; retry++)
+                    {
+                        await Task.Delay(4000);
+                        if (!_lobbyService.IsHost || !IsInLobby || !IsWorldOpen || _tunnelProvider == null) return;
+                        if (_tunnelProvider.CurrentInfo.Status == TunnelStatus.Active) return;
+
+                        try
+                        {
+                            PlayitTunnelProvider.LogTunnel($"[LOBBY] Background tunnel reconnect attempt {retry}/10...");
+                            var res = await _tunnelProvider.StartAsync(25565, CancellationToken.None);
+                            if (res.Status == TunnelStatus.Active)
+                            {
+                                Dispatch(() =>
+                                {
+                                    HostStatusText = "Лобби открыто!";
+                                    StatusText = "Мир готов, друзья могут подключаться";
+                                    StatusIcon = string.Empty;
+                                    ShowTunnelFailedLogButton = false;
+                                    TunnelFailureReason = null;
+                                });
+                                return;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            PlayitTunnelProvider.LogTunnel($"[EXCEPTION] Background tunnel reconnect failed: {ex.Message}");
+                        }
+                    }
+
+                    Dispatch(() =>
+                    {
+                        HostStatusText = "Ошибка туннеля";
+                        StatusText = $"Ошибка туннеля: {reason}";
+                        StatusIcon = string.Empty;
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = reason;
+                    });
+                });
+                return;
+            }
+
             Dispatch(() =>
             {
                 HostStatusText = "Ошибка туннеля";
@@ -947,18 +1004,6 @@ public class LobbyViewModel : ObservableObject
                 StatusIcon = string.Empty;
                 ShowTunnelFailedLogButton = true;
                 TunnelFailureReason = reason;
-            });
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await _lobbyService.CloseLobbyAsHostAsync();
-                }
-                catch (Exception ex)
-                {
-                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CloseLobbyAsHostAsync on tunnel failure failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
-                }
             });
         }
     }

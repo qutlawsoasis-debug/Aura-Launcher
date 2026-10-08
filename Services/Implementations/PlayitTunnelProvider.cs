@@ -690,13 +690,16 @@ public class PlayitTunnelProvider : ITunnelProvider
 
         LogTunnel($"[PLAYIT: WARN] Active agent process died with code {exitCode}.");
 
-        if (Interlocked.Increment(ref _runtimeRestartCount) <= 1)
+        int restartAttempt = Interlocked.Increment(ref _runtimeRestartCount);
+        if (restartAttempt <= 5)
         {
-            LogTunnel("[PLAYIT] Performing 1 automatic restart of active tunnel...");
+            LogTunnel($"[PLAYIT] Performing automatic restart ({restartAttempt}/5) of active tunnel...");
             _ = Task.Run(async () =>
             {
                 try
                 {
+                    await Task.Delay(2000).ConfigureAwait(false);
+                    if (_isStopping) return;
                     var result = await StartAsync(25565, CancellationToken.None).ConfigureAwait(false);
                     if (result.Status != TunnelStatus.Active)
                     {

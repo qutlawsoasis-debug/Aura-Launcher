@@ -965,7 +965,15 @@ public class MainViewModel : ObservableObject
         }, _ => !IsGameRunning && (IsBusy || NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid));
 
         CheckUpdatesCommand = new AsyncRelayCommand(() => CheckUpdatesAsync(isStartup: false), () => !IsBusy && !IsGameRunning);
-        CloseWindowCommand = new RelayCommand(_ => System.Windows.Application.Current.Shutdown());
+        CloseWindowCommand = new RelayCommand(_ =>
+        {
+            if (IsGameRunning && LobbyVM.IsInLobby && System.Windows.Application.Current.MainWindow is MainWindow mw)
+            {
+                mw.HideToTray();
+                return;
+            }
+            System.Windows.Application.Current.Shutdown();
+        });
         MinimizeWindowCommand = new RelayCommand(_ =>
         {
             if (System.Windows.Application.Current.MainWindow != null)
