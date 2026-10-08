@@ -102,15 +102,15 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Stories Rail (компактный блок справа) -->
+        <!-- Правая колонка: растянута сверху вниз, отображает 3-4 карточки с картинками в зависимости от разрешения -->
         <Border x:Name="StoriesRail"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Bottom"
+                VerticalAlignment="Stretch"
                 Width="320"
                 MinWidth="280"
                 MaxWidth="360"
-                Margin="0,24,0,0"
-                Padding="16"
+                Margin="0,0,0,0"
+                Padding="14"
                 CornerRadius="3"
                 Background="{DynamicResource StoriesDim55}"
                 BorderBrush="{DynamicResource Border}"
@@ -122,319 +122,281 @@
                 <TranslateTransform x:Name="StoriesRailTranslate" X="0" />
             </Border.RenderTransform>
 
-            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Top">
+            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
+                    <!-- Карточка 1: Последний скриншот -->
+                    <RowDefinition Height="*" MinHeight="64" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+
+                    <!-- Карточка 2: Достижение -->
+                    <RowDefinition Height="*" MinHeight="64" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+
+                    <!-- Карточка 3: Следующая цель (включается на экранах с достаточной высотой — 4 карточки) -->
+                    <RowDefinition x:Name="CardNextGoalImageRow" Height="*" MinHeight="64" />
+                    <RowDefinition x:Name="CardNextGoalTextRow" Height="Auto" />
+                    <RowDefinition x:Name="CardNextGoalDividerRow" Height="Auto" />
+
+                    <!-- Карточка 4: Что нового -->
+                    <RowDefinition Height="*" MinHeight="64" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- ПОЛОСЫ ПРОГРЕССА (3 СЕГМЕНТА СВЕРХУ БЛОКА) -->
-                <Grid Grid.Row="0" Margin="0,0,0,12" Panel.ZIndex="20" IsHitTestVisible="False">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="4" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="4" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <!-- 1. ПОСЛЕДНИЙ СКРИНШОТ: Картинка -->
+                <Border Grid.Row="0"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Background="{DynamicResource Panel}"
+                        BorderBrush="{DynamicResource BorderSubtle}"
+                        BorderThickness="1"
+                        Margin="0,0,0,8">
+                    <Grid>
+                        <Image Source="{Binding FeedImage0}"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.14" IsHitTestVisible="False" />
+                    </Grid>
+                </Border>
 
-                    <Border Grid.Column="0" Height="3" CornerRadius="3" Background="{DynamicResource StoriesTrack}" ClipToBounds="True">
-                        <Border x:Name="ProgressFill0" Height="3" CornerRadius="3" Background="{DynamicResource StoriesFill}"
-                                RenderTransformOrigin="0,0.5">
-                            <Border.RenderTransform>
-                                <ScaleTransform x:Name="ProgressScale0" ScaleX="0" />
-                            </Border.RenderTransform>
-                        </Border>
-                    </Border>
+                <!-- 1. ПОСЛЕДНИЙ СКРИНШОТ: Текст -->
+                <StackPanel Grid.Row="1">
+                    <Grid Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="2" Height="3" CornerRadius="3" Background="{DynamicResource StoriesTrack}" ClipToBounds="True">
-                        <Border x:Name="ProgressFill1" Height="3" CornerRadius="3" Background="{DynamicResource StoriesFill}"
-                                RenderTransformOrigin="0,0.5">
-                            <Border.RenderTransform>
-                                <ScaleTransform x:Name="ProgressScale1" ScaleX="0" />
-                            </Border.RenderTransform>
-                        </Border>
-                    </Border>
+                        <TextBlock Grid.Column="0"
+                                   Text="ПОСЛЕДНИЙ СКРИНШОТ"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource StoriesTextSecondary}"
+                                   VerticalAlignment="Center" />
 
-                    <Border Grid.Column="4" Height="3" CornerRadius="3" Background="{DynamicResource StoriesTrack}" ClipToBounds="True">
-                        <Border x:Name="ProgressFill2" Height="3" CornerRadius="3" Background="{DynamicResource StoriesFill}"
-                                RenderTransformOrigin="0,0.5">
-                            <Border.RenderTransform>
-                                <ScaleTransform x:Name="ProgressScale2" ScaleX="0" />
-                            </Border.RenderTransform>
-                        </Border>
-                    </Border>
-                </Grid>
-
-                <!-- СЛАЙДЫ (Картинка 16:9 внутри слайда + текст снизу) -->
-                <Grid Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                    <!-- СЛАЙД 0: «Скриншоты» -->
-                    <Grid x:Name="SlideScreenshots" Opacity="1.0" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                        <!-- СЛОЙ ЗОН КЛИКА (Panel.ZIndex 5, под кнопкой со ссылкой ZIndex 10) -->
-                        <Grid Panel.ZIndex="5"
-                              Background="Transparent"
-                              PreviewMouseLeftButtonDown="StoriesRail_MouseLeftButtonDown"
-                              PreviewMouseLeftButtonUp="StoriesRail_MouseLeftButtonUp"
-                              LostMouseCapture="StoriesRail_LostMouseCapture">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="30*" />
-                                <ColumnDefinition Width="70*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="Transparent" />
-                            <Border Grid.Column="1" Background="Transparent" />
-                        </Grid>
-
-                        <StackPanel>
-                            <!-- Горизонтальная картинка 16:9 -->
-                            <Border Height="162"
-                                    CornerRadius="3"
-                                    ClipToBounds="True"
-                                    Background="{DynamicResource Panel}"
-                                    BorderBrush="{DynamicResource BorderSubtle}"
-                                    BorderThickness="1"
-                                    Margin="0,0,0,12">
-                                <Grid>
-                                    <Image Source="{Binding LatestScreenshot.Thumbnail}"
-                                           Stretch="UniformToFill"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           RenderOptions.BitmapScalingMode="HighQuality"
-                                           Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}" />
-                                    <Image Source="{Binding LauncherBackground}"
-                                           Stretch="UniformToFill"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           RenderOptions.BitmapScalingMode="HighQuality"
-                                           Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}" />
-                                </Grid>
-                            </Border>
-
-                            <!-- Если скриншот есть -->
-                            <StackPanel Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}" Panel.ZIndex="10">
-                                <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           FontWeight="Medium"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
-                                           Margin="0,0,0,4" />
-
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Column="0"
-                                               Text="{Binding LatestScreenshotDateText}"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="14"
-                                               Foreground="{DynamicResource TextPrimary}"
-                                               VerticalAlignment="Center"
-                                               TextWrapping="Wrap" />
-
-                                    <Button Grid.Column="1"
-                                            Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding LatestScreenshot}"
-                                            Style="{StaticResource GhostBtn}"
-                                            Padding="0"
-                                            VerticalAlignment="Center"
-                                            Margin="12,0,0,0"
-                                            Cursor="Hand">
-                                        <TextBlock Text="Открыть"
-                                                   FontFamily="{StaticResource MainFont}"
-                                                   FontSize="14"
-                                                   Foreground="{DynamicResource Accent}"
-                                                   TextDecorations="Underline" />
-                                    </Button>
-                                </Grid>
-                            </StackPanel>
-
-                            <!-- Если скриншотов нет -->
-                            <StackPanel Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}" Panel.ZIndex="10">
-                                <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           FontWeight="Medium"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
-                                           Margin="0,0,0,4" />
-                                <TextBlock Text="Нажмите F2 в игре, чтобы сделать скриншот"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="14"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding LatestScreenshot}"
+                                Style="{StaticResource GhostBtn}"
+                                Padding="0"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"
+                                Cursor="Hand"
+                                Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Открыть"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Accent}"
+                                       TextDecorations="Underline" />
+                        </Button>
                     </Grid>
 
-                    <!-- СЛАЙД 1: «Достижения» -->
-                    <Grid x:Name="SlideAchievements" Opacity="0.0" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                        <!-- СЛОЙ ЗОН КЛИКА -->
-                        <Grid Panel.ZIndex="5"
-                              Background="Transparent"
-                              PreviewMouseLeftButtonDown="StoriesRail_MouseLeftButtonDown"
-                              PreviewMouseLeftButtonUp="StoriesRail_MouseLeftButtonUp"
-                              LostMouseCapture="StoriesRail_LostMouseCapture">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="30*" />
-                                <ColumnDefinition Width="70*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="Transparent" />
-                            <Border Grid.Column="1" Background="Transparent" />
-                        </Grid>
+                    <TextBlock Text="{Binding LatestScreenshotDateText}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}" />
 
-                        <StackPanel>
-                            <!-- Горизонтальная картинка 16:9 -->
-                            <Border Height="162"
-                                    CornerRadius="3"
-                                    ClipToBounds="True"
-                                    Background="{DynamicResource Panel}"
-                                    BorderBrush="{DynamicResource BorderSubtle}"
-                                    BorderThickness="1"
-                                    Margin="0,0,0,12">
-                                <Grid>
-                                    <Image Source="{Binding LauncherBackground}"
-                                           Stretch="UniformToFill"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Center"
-                                           RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.25" IsHitTestVisible="False" />
-                                </Grid>
-                            </Border>
+                    <TextBlock Text="Нажмите F2 в игре, чтобы сделать скриншот"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource StoriesTextSecondary}"
+                               TextWrapping="Wrap"
+                               Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}" />
+                </StackPanel>
 
-                            <StackPanel Panel.ZIndex="10">
-                                <TextBlock Text="ДОСТИЖЕНИЕ"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           FontWeight="Medium"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
-                                           Margin="0,0,0,4" />
+                <Border Grid.Row="2" Height="1" Background="{DynamicResource BorderSubtle}" Margin="0,10,0,10" />
 
-                                <TextBlock Text="{Binding AchievementTitle}"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"
-                                           TextWrapping="Wrap"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxHeight="58"
-                                           ToolTip="{Binding AchievementTitle}"
-                                           Margin="0,0,0,4" />
+                <!-- 2. ДОСТИЖЕНИЕ: Картинка -->
+                <Border Grid.Row="3"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Background="{DynamicResource Panel}"
+                        BorderBrush="{DynamicResource BorderSubtle}"
+                        BorderThickness="1"
+                        Margin="0,0,0,8">
+                    <Grid>
+                        <Image Source="{Binding FeedImage1}"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.18" IsHitTestVisible="False" />
+                    </Grid>
+                </Border>
 
-                                <TextBlock Text="{Binding AchievementDescription}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
-                                           TextWrapping="Wrap"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxHeight="42"
-                                           ToolTip="{Binding AchievementDescription}"
-                                           Margin="0,0,0,6" />
+                <!-- 2. ДОСТИЖЕНИЕ: Текст -->
+                <StackPanel Grid.Row="4">
+                    <Grid Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                                <TextBlock Text="{Binding AchievementDateOrProgress}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           Foreground="{DynamicResource TextPrimary}"
-                                           TextWrapping="Wrap"
-                                           ToolTip="{Binding AchievementDateOrProgress}" />
+                        <TextBlock Grid.Column="0"
+                                   Text="ДОСТИЖЕНИЕ"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource StoriesTextSecondary}"
+                                   VerticalAlignment="Center" />
 
-                                <Button Command="{Binding OpenAchievementsCommand}"
-                                        Style="{StaticResource GhostBtn}"
-                                        Padding="0"
-                                        Margin="0,6,0,0"
-                                        HorizontalAlignment="Left"
-                                        Cursor="Hand"
-                                        Visibility="{Binding HasAchievementsPage, Converter={StaticResource BoolToVis}}">
-                                    <TextBlock Text="Открыть"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="14"
-                                               Foreground="{DynamicResource Accent}"
-                                               TextDecorations="Underline" />
-                                </Button>
-                            </StackPanel>
-                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding AchievementDateOrProgress}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource TextPrimary}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0" />
                     </Grid>
 
-                    <!-- СЛАЙД 2: «Обновления» -->
-                    <Grid x:Name="SlideUpdates" Opacity="0.0" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                        <!-- СЛОЙ ЗОН КЛИКА -->
-                        <Grid Panel.ZIndex="5"
-                              Background="Transparent"
-                              PreviewMouseLeftButtonDown="StoriesRail_MouseLeftButtonDown"
-                              PreviewMouseLeftButtonUp="StoriesRail_MouseLeftButtonUp"
-                              LostMouseCapture="StoriesRail_LostMouseCapture">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="30*" />
-                                <ColumnDefinition Width="70*" />
-                            </Grid.ColumnDefinitions>
-                            <Border Grid.Column="0" Background="Transparent" />
-                            <Border Grid.Column="1" Background="Transparent" />
-                        </Grid>
+                    <TextBlock Text="{Binding AchievementTitle}"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,2" />
 
-                        <StackPanel>
-                            <!-- Горизонтальная картинка 16:9 -->
-                            <Border Height="162"
-                                    CornerRadius="3"
-                                    ClipToBounds="True"
-                                    Background="{DynamicResource Panel}"
-                                    BorderBrush="{DynamicResource BorderSubtle}"
-                                    BorderThickness="1"
-                                    Margin="0,0,0,12">
-                                <Grid>
-                                    <Image Source="{Binding LauncherBackground}"
-                                           Stretch="UniformToFill"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Center"
-                                           RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.25" IsHitTestVisible="False" />
-                                </Grid>
-                            </Border>
+                    <TextBlock Text="{Binding AchievementDescription}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource StoriesTextSecondary}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
 
-                            <StackPanel Panel.ZIndex="10">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                    <TextBlock Text="ЧТО НОВОГО · "
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="12"
-                                               FontWeight="Medium"
-                                               Foreground="{DynamicResource StoriesTextSecondary}"
-                                               VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding WhatsNewVersion}"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="12"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource Accent}"
-                                               VerticalAlignment="Center" />
-                                </StackPanel>
+                <Border Grid.Row="5" Height="1" Background="{DynamicResource BorderSubtle}" Margin="0,10,0,10" />
 
-                                <ItemsControl ItemsSource="{Binding WhatsNewLines}" MaxHeight="96" ClipToBounds="True" Margin="0,0,0,6">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding}"
-                                                       FontFamily="{StaticResource MainFont}"
-                                                       FontSize="13"
-                                                       Foreground="{DynamicResource TextPrimary}"
-                                                       TextWrapping="Wrap"
-                                                       TextTrimming="CharacterEllipsis"
-                                                       ToolTip="{Binding}"
-                                                       Margin="0,0,0,4" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                                <Button Command="{Binding DataContext.OpenChangelogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        Style="{StaticResource GhostBtn}"
-                                        Padding="0"
-                                        HorizontalAlignment="Left"
-                                        Cursor="Hand">
-                                    <TextBlock Text="Все изменения"
-                                               FontFamily="{StaticResource MainFont}"
-                                               FontSize="14"
-                                               Foreground="{DynamicResource Accent}"
-                                               TextDecorations="Underline" />
-                                </Button>
-                            </StackPanel>
-                        </StackPanel>
+                <!-- 3. СЛЕДУЮЩАЯ ЦЕЛЬ (адаптивный 4-й блок для высоких разрешений): Картинка -->
+                <Border x:Name="CardNextGoalImage"
+                        Grid.Row="6"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Background="{DynamicResource Panel}"
+                        BorderBrush="{DynamicResource BorderSubtle}"
+                        BorderThickness="1"
+                        Margin="0,0,0,8">
+                    <Grid>
+                        <Image Source="{Binding FeedImage2}"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.18" IsHitTestVisible="False" />
                     </Grid>
-                </Grid>
+                </Border>
+
+                <!-- 3. СЛЕДУЮЩАЯ ЦЕЛЬ: Текст -->
+                <StackPanel x:Name="CardNextGoalText" Grid.Row="7">
+                    <Grid Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0"
+                                   Text="СЛЕДУЮЩАЯ ЦЕЛЬ"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   FontWeight="Medium"
+                                   Foreground="{DynamicResource StoriesTextSecondary}"
+                                   VerticalAlignment="Center" />
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{Binding NextAchievementProgress}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Accent}"
+                                   VerticalAlignment="Center"
+                                   Margin="8,0,0,0" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding NextAchievementTitle}"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,2" />
+
+                    <TextBlock Text="{Binding NextAchievementDescription}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource StoriesTextSecondary}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+
+                <Border x:Name="CardNextGoalDivider" Grid.Row="8" Height="1" Background="{DynamicResource BorderSubtle}" Margin="0,10,0,10" />
+
+                <!-- 4. ЧТО НОВОГО: Картинка -->
+                <Border Grid.Row="9"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Background="{DynamicResource Panel}"
+                        BorderBrush="{DynamicResource BorderSubtle}"
+                        BorderThickness="1"
+                        Margin="0,0,0,8">
+                    <Grid>
+                        <Image Source="{Binding FeedImage3}"
+                               Stretch="UniformToFill"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <Rectangle Fill="{DynamicResource BgBase}" Opacity="0.18" IsHitTestVisible="False" />
+                    </Grid>
+                </Border>
+
+                <!-- 4. ЧТО НОВОГО: Текст -->
+                <StackPanel Grid.Row="10">
+                    <Grid Margin="0,0,0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="ЧТО НОВОГО · "
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="11"
+                                       FontWeight="Medium"
+                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding WhatsNewVersion}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource Accent}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1"
+                                Command="{Binding DataContext.OpenChangelogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                Style="{StaticResource GhostBtn}"
+                                Padding="0"
+                                VerticalAlignment="Center"
+                                Margin="8,0,0,0"
+                                Cursor="Hand">
+                            <TextBlock Text="Все изменения"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Accent}"
+                                       TextDecorations="Underline" />
+                        </Button>
+                    </Grid>
+
+                    <TextBlock Text="{Binding WhatsNewPrimaryLine}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource TextPrimary}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

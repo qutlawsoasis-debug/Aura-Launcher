@@ -284,6 +284,67 @@ public class OverviewViewModel : ObservableObject
         }
     }
 
+    private static readonly System.Windows.Media.ImageSource?[] s_defaultFeedBackgrounds = new System.Windows.Media.ImageSource?[4];
+    private static bool s_defaultFeedBackgroundsLoaded;
+
+    private System.Windows.Media.ImageSource? _feedImage0;
+    private System.Windows.Media.ImageSource? _feedImage1;
+    private System.Windows.Media.ImageSource? _feedImage2;
+    private System.Windows.Media.ImageSource? _feedImage3;
+
+    private string _nextAchievementTitle = string.Empty;
+    private string _nextAchievementDescription = string.Empty;
+    private string _nextAchievementProgress = string.Empty;
+    private string _whatsNewPrimaryLine = string.Empty;
+
+    public System.Windows.Media.ImageSource? FeedImage0
+    {
+        get => _feedImage0;
+        private set => SetProperty(ref _feedImage0, value);
+    }
+
+    public System.Windows.Media.ImageSource? FeedImage1
+    {
+        get => _feedImage1;
+        private set => SetProperty(ref _feedImage1, value);
+    }
+
+    public System.Windows.Media.ImageSource? FeedImage2
+    {
+        get => _feedImage2;
+        private set => SetProperty(ref _feedImage2, value);
+    }
+
+    public System.Windows.Media.ImageSource? FeedImage3
+    {
+        get => _feedImage3;
+        private set => SetProperty(ref _feedImage3, value);
+    }
+
+    public string NextAchievementTitle
+    {
+        get => _nextAchievementTitle;
+        private set => SetProperty(ref _nextAchievementTitle, value);
+    }
+
+    public string NextAchievementDescription
+    {
+        get => _nextAchievementDescription;
+        private set => SetProperty(ref _nextAchievementDescription, value);
+    }
+
+    public string NextAchievementProgress
+    {
+        get => _nextAchievementProgress;
+        private set => SetProperty(ref _nextAchievementProgress, value);
+    }
+
+    public string WhatsNewPrimaryLine
+    {
+        get => _whatsNewPrimaryLine;
+        private set => SetProperty(ref _whatsNewPrimaryLine, value);
+    }
+
     public bool HasRightFeed
     {
         get => _hasRightFeed;
@@ -302,11 +363,57 @@ public class OverviewViewModel : ObservableObject
 
     public void RefreshStoriesData()
     {
+        EnsureDefaultFeedBackgrounds();
+        UpdateLauncherBackground();
         RefreshLatestScreenshot();
         RefreshAchievementBlock();
         RefreshWhatsNewBlock();
-        UpdateLauncherBackground();
         UpdateHasRightFeed();
+    }
+
+    private static void EnsureDefaultFeedBackgrounds()
+    {
+        if (s_defaultFeedBackgroundsLoaded) return;
+        s_defaultFeedBackgroundsLoaded = true;
+
+        int[] indices = { 2, 5, 9, 12 };
+        for (int i = 0; i < indices.Length; i++)
+        {
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri($"pack://application:,,,/Resources/Backgrounds/bg_{indices[i]}.jpg", UriKind.Absolute);
+                bmp.DecodePixelWidth = 640;
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+                s_defaultFeedBackgrounds[i] = bmp;
+            }
+            catch
+            {
+                s_defaultFeedBackgrounds[i] = null;
+            }
+        }
+    }
+
+    private static BitmapImage? TryLoadScreenshotBitmap(string fullPath)
+    {
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(fullPath, UriKind.Absolute);
+            bmp.DecodePixelWidth = 640;
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void UpdateLauncherBackground()
@@ -330,6 +437,11 @@ public class OverviewViewModel : ObservableObject
 
     private void RefreshLatestScreenshot()
     {
+        var fallback0 = s_defaultFeedBackgrounds[0] ?? LauncherBackground;
+        var fallback1 = s_defaultFeedBackgrounds[1] ?? LauncherBackground;
+        var fallback2 = s_defaultFeedBackgrounds[2] ?? LauncherBackground;
+        var fallback3 = s_defaultFeedBackgrounds[3] ?? LauncherBackground;
+
         try
         {
             var config = _configService.CurrentConfig;
@@ -340,65 +452,87 @@ public class OverviewViewModel : ObservableObject
             {
                 LatestScreenshot = null;
                 HasLatestScreenshot = false;
+                FeedImage0 = fallback0;
+                FeedImage1 = fallback1;
+                FeedImage2 = fallback2;
+                FeedImage3 = fallback3;
                 return;
             }
 
             var di = new DirectoryInfo(screensDir);
-            var latestFile = di.GetFiles("*.png")
+            var recentFiles = di.GetFiles("*.png")
                 .OrderByDescending(f => f.LastWriteTimeUtc)
-                .FirstOrDefault();
+                .Take(4)
+                .ToArray();
 
-            if (latestFile == null)
+            if (recentFiles.Length == 0)
             {
                 LatestScreenshot = null;
                 HasLatestScreenshot = false;
+                FeedImage0 = fallback0;
+                FeedImage1 = fallback1;
+                FeedImage2 = fallback2;
+                FeedImage3 = fallback3;
                 return;
             }
 
-            // Проверяем, изменился ли файл или дата
-            if (LatestScreenshot != null && 
-                string.Equals(LatestScreenshot.FullPath, latestFile.FullName, StringComparison.OrdinalIgnoreCase) &&
-                LatestScreenshot.CreatedDate == latestFile.LastWriteTime)
+            var latestFile = recentFiles[0];
+
+            if (LatestScreenshot == null ||
+                !string.Equals(LatestScreenshot.FullPath, latestFile.FullName, StringComparison.OrdinalIgnoreCase) ||
+                LatestScreenshot.CreatedDate != latestFile.LastWriteTime)
             {
-                // Уже актуален
-                HasLatestScreenshot = true;
-                return;
+                var bmp0 = TryLoadScreenshotBitmap(latestFile.FullName);
+                if (bmp0 == null)
+                {
+                    LatestScreenshot = null;
+                    HasLatestScreenshot = false;
+                    FeedImage0 = fallback0;
+                    FeedImage1 = fallback1;
+                    FeedImage2 = fallback2;
+                    FeedImage3 = fallback3;
+                    return;
+                }
+
+                LatestScreenshot = new ScreenshotItem
+                {
+                    FileName = latestFile.Name,
+                    FullPath = latestFile.FullName,
+                    CreatedDate = latestFile.LastWriteTime,
+                    Thumbnail = bmp0
+                };
             }
 
-            BitmapImage? bmp = null;
-            try
-            {
-                bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = new Uri(latestFile.FullName, UriKind.Absolute);
-                bmp.DecodePixelWidth = 720;
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
-                bmp.Freeze();
-            }
-            catch
-            {
-                LatestScreenshot = null;
-                HasLatestScreenshot = false;
-                return;
-            }
-
-            LatestScreenshot = new ScreenshotItem
-            {
-                FileName = latestFile.Name,
-                FullPath = latestFile.FullName,
-                CreatedDate = latestFile.LastWriteTime,
-                Thumbnail = bmp
-            };
             LatestScreenshotDateText = latestFile.LastWriteTime.ToString("dd.MM.yyyy HH:mm");
             HasLatestScreenshot = true;
+
+            FeedImage0 = LatestScreenshot.Thumbnail ?? fallback0;
+            FeedImage1 = (recentFiles.Length > 1 ? TryLoadScreenshotBitmap(recentFiles[1].FullName) : null) ?? fallback1;
+            FeedImage2 = (recentFiles.Length > 2 ? TryLoadScreenshotBitmap(recentFiles[2].FullName) : null) ?? fallback2;
+            FeedImage3 = (recentFiles.Length > 3 ? TryLoadScreenshotBitmap(recentFiles[3].FullName) : null) ?? fallback3;
         }
         catch
         {
             LatestScreenshot = null;
             HasLatestScreenshot = false;
+            FeedImage0 = fallback0;
+            FeedImage1 = fallback1;
+            FeedImage2 = fallback2;
+            FeedImage3 = fallback3;
         }
     }
+
+    private static string GetAchievementUnit(string id) => id switch
+    {
+        "ten_launches" => "запусков",
+        "hundred_hours" => "часов",
+        "marathon" => "часов",
+        "full_table" => "игроков",
+        "five_friends" => "друзей",
+        "ten_backups" => "бэкапов",
+        "photographer" => "скриншотов",
+        _ => ""
+    };
 
     private void RefreshAchievementBlock()
     {
@@ -407,7 +541,13 @@ public class OverviewViewModel : ObservableObject
             var achService = App.Services?.GetService(typeof(IAchievementService)) as IAchievementService;
             if (achService == null)
             {
-                HasAchievementBlock = false;
+                AchievementTitle = "Искра";
+                AchievementDescription = "Первый запуск игры";
+                AchievementDateOrProgress = "Ожидает открытия";
+                NextAchievementTitle = "Десять шагов";
+                NextAchievementDescription = "Запустить игру 10 раз";
+                NextAchievementProgress = "0 из 10 запусков";
+                HasAchievementBlock = true;
                 return;
             }
 
@@ -420,79 +560,101 @@ public class OverviewViewModel : ObservableObject
                 return;
             }
 
+            string? primaryId = null;
+
             // 1. Проверяем последнее полученное достижение
             var latest = achService.LatestUnlocked;
             if (latest.HasValue)
             {
+                primaryId = latest.Value.Id;
                 var def = defs.FirstOrDefault(d => string.Equals(d.Id, latest.Value.Id, StringComparison.OrdinalIgnoreCase));
                 AchievementTitle = latest.Value.Title;
                 AchievementDescription = def?.Description ?? string.Empty;
                 AchievementDateOrProgress = latest.Value.UnlockedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
                 HasAchievementBlock = true;
-                return;
             }
-
-            // 2. Если ни одного не получено, ищем ближайшее к получению с прогрессом
-            AchievementDefinition? closestDef = null;
-            double closestPercent = -1.0;
-            double closestCurrent = 0;
-            int closestTarget = 1;
-
-            foreach (var d in defs)
+            else
             {
-                if (progress.TryGetValue(d.Id, out var p) && !p.Unlocked && p.CurrentValue > 0)
+                // 2. Если ни одного не получено, ищем ближайшее к получению с прогрессом
+                AchievementDefinition? closestDef = null;
+                double closestPercent = -1.0;
+                double closestCurrent = 0;
+                int closestTarget = 1;
+
+                foreach (var d in defs)
                 {
-                    double ratio = p.CurrentValue / Math.Max(1, d.Target);
-                    if (ratio > closestPercent)
+                    if (progress.TryGetValue(d.Id, out var p) && !p.Unlocked && p.CurrentValue > 0)
                     {
-                        closestPercent = ratio;
-                        closestDef = d;
-                        closestCurrent = p.CurrentValue;
-                        closestTarget = d.Target;
+                        double ratio = p.CurrentValue / Math.Max(1, d.Target);
+                        if (ratio > closestPercent)
+                        {
+                            closestPercent = ratio;
+                            closestDef = d;
+                            closestCurrent = p.CurrentValue;
+                            closestTarget = d.Target;
+                        }
                     }
                 }
-            }
 
-            if (closestDef != null)
-            {
-                AchievementTitle = closestDef.Title;
-                AchievementDescription = closestDef.Description;
-                string unit = closestDef.Id switch
+                if (closestDef != null)
                 {
-                    "ten_launches" => "запусков",
-                    "hundred_hours" => "часов",
-                    "marathon" => "часов",
-                    "full_table" => "игроков",
-                    "five_friends" => "друзей",
-                    "ten_backups" => "бэкапов",
-                    "photographer" => "скриншотов",
-                    _ => ""
-                };
-
-                if (!string.IsNullOrEmpty(unit))
-                {
-                    AchievementDateOrProgress = $"{closestDef.Title}: {(int)closestCurrent} из {closestTarget} {unit}";
+                    primaryId = closestDef.Id;
+                    AchievementTitle = closestDef.Title;
+                    AchievementDescription = closestDef.Description;
+                    string unit = GetAchievementUnit(closestDef.Id);
+                    AchievementDateOrProgress = !string.IsNullOrEmpty(unit)
+                        ? $"{(int)closestCurrent} из {closestTarget} {unit}"
+                        : $"{(int)closestCurrent} из {closestTarget}";
+                    HasAchievementBlock = true;
                 }
                 else
                 {
-                    AchievementDateOrProgress = $"Прогресс: {(int)closestCurrent} из {closestTarget}";
+                    var d = defs.FirstOrDefault(x => x.Id == "first_launch") ?? defs[0];
+                    primaryId = d.Id;
+                    AchievementTitle = d.Title;
+                    AchievementDescription = d.Description;
+                    AchievementDateOrProgress = "Не открыто";
+                    HasAchievementBlock = true;
                 }
-                HasAchievementBlock = true;
-                return;
             }
 
-            // 3. Если вообще нет данных о прогрессе
-            if (defs.Count > 0)
+            // 3. Следующая цель (вторая карточка достижений)
+            AchievementDefinition? nextDef = null;
+            double nextBestRatio = -1.0;
+            double nextCurrent = 0;
+
+            foreach (var d in defs)
             {
-                var d = defs.FirstOrDefault(x => x.Id == "ten_launches") ?? defs[0];
-                AchievementTitle = d.Title;
-                AchievementDescription = d.Description;
-                AchievementDateOrProgress = $"{d.Title}: 0 из {d.Target} запусков";
-                HasAchievementBlock = true;
-                return;
+                if (string.Equals(d.Id, primaryId, StringComparison.OrdinalIgnoreCase)) continue;
+                bool isUnlocked = progress.TryGetValue(d.Id, out var p) && p.Unlocked;
+                if (isUnlocked) continue;
+
+                double cur = p != null ? p.CurrentValue : 0;
+                double ratio = cur / Math.Max(1, d.Target);
+                if (ratio > nextBestRatio)
+                {
+                    nextBestRatio = ratio;
+                    nextDef = d;
+                    nextCurrent = cur;
+                }
             }
 
-            HasAchievementBlock = false;
+            if (nextDef != null)
+            {
+                NextAchievementTitle = nextDef.Title;
+                NextAchievementDescription = nextDef.Description;
+                string unit = GetAchievementUnit(nextDef.Id);
+                NextAchievementProgress = !string.IsNullOrEmpty(unit)
+                    ? $"{(int)nextCurrent} из {nextDef.Target} {unit}"
+                    : $"{(int)nextCurrent} из {nextDef.Target}";
+            }
+            else
+            {
+                var fallbackDef = defs.FirstOrDefault(d => !string.Equals(d.Id, primaryId, StringComparison.OrdinalIgnoreCase)) ?? defs[0];
+                NextAchievementTitle = fallbackDef.Title;
+                NextAchievementDescription = fallbackDef.Description;
+                NextAchievementProgress = "Выполнено";
+            }
         }
         catch
         {
@@ -504,8 +666,7 @@ public class OverviewViewModel : ObservableObject
     {
         try
         {
-            // Берем версию из version.json или текущей версии
-            string ver = "beta 1.0.3";
+            string ver = "beta 1.0.40";
             try
             {
                 var candidates = new[]
@@ -538,6 +699,7 @@ public class OverviewViewModel : ObservableObject
                 "Spell Engine: система заклинаний и атрибутов"
             };
             WhatsNewLines = lines;
+            WhatsNewPrimaryLine = lines[0];
             HasWhatsNewBlock = true;
         }
         catch
