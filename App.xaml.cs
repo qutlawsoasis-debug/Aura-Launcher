@@ -187,12 +187,14 @@ public partial class App : Application
 
         if (!skipSplash)
         {
+            bool shouldContinueToMain = true;
             try
             {
                 var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
                 var startupCompletedTcs = new TaskCompletionSource<bool>();
                 StartupWindowViewModel? startupVm = null;
 
+                shouldContinueToMain = false;
                 startupVm = new StartupWindowViewModel(
                     launcherUpdateService,
                     onLaunchMainRequested: () =>
@@ -200,6 +202,7 @@ public partial class App : Application
                         Dispatcher.Invoke(() =>
                         {
                             if (Dispatcher.HasShutdownStarted) return;
+                            shouldContinueToMain = true;
                             startupCompletedTcs.TrySetResult(true);
                         });
                     },
@@ -207,6 +210,8 @@ public partial class App : Application
                     {
                         Dispatcher.Invoke(() =>
                         {
+                            shouldContinueToMain = false;
+                            startupCompletedTcs.TrySetResult(false);
                             if (Dispatcher.HasShutdownStarted) return;
                             splashWin?.Close();
                             Shutdown(0);
@@ -228,6 +233,12 @@ public partial class App : Application
             catch (Exception ex)
             {
                 FabricGameLaunchService.LogLauncherEvent($"[STARTUP-WINDOW: ERROR] {ex.Message}");
+                shouldContinueToMain = true;
+            }
+
+            if (!shouldContinueToMain || Dispatcher.HasShutdownStarted)
+            {
+                return;
             }
         }
 
