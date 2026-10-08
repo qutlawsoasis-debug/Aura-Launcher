@@ -1,5 +1,8 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    mc:Ignorable="po">
 
     <!-- Color definitions -->
     <Color x:Key="ColorBgBase">#091015</Color>
@@ -37,35 +40,35 @@
     <Color x:Key="ColorStoriesTrack">#47FFFFFF</Color>
     <Color x:Key="ColorStoriesTextSecondary">#80E8F0F8</Color>
 
-    <!-- Named SolidColorBrush resources for UI controls -->
-    <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" />
-    <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" />
-    <SolidColorBrush x:Key="PanelRaised" Color="{StaticResource ColorPanelRaised}" />
-    <SolidColorBrush x:Key="PanelCard" Color="{StaticResource ColorPanelCard}" />
-    <SolidColorBrush x:Key="PanelInput" Color="{StaticResource ColorPanelInput}" />
-    <SolidColorBrush x:Key="Night" Color="{StaticResource ColorNight}" />
-    <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource ColorTextPrimary}" />
-    <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource ColorTextSecondary}" />
-    <SolidColorBrush x:Key="TextWhite" Color="{StaticResource ColorTextWhite}" />
-    <SolidColorBrush x:Key="Accent" Color="{StaticResource ColorAccent}" />
-    <SolidColorBrush x:Key="AccentDim" Color="{StaticResource ColorAccentDim}" />
-    <SolidColorBrush x:Key="AccentFaint" Color="{StaticResource ColorAccentFaint}" />
-    <SolidColorBrush x:Key="Danger" Color="{StaticResource ColorDanger}" />
-    <SolidColorBrush x:Key="Success" Color="{StaticResource ColorSuccess}" />
-    <SolidColorBrush x:Key="Border" Color="{StaticResource ColorBorder}" />
-    <SolidColorBrush x:Key="BorderStrong" Color="{StaticResource ColorBorderStrong}" />
-    <SolidColorBrush x:Key="BorderSubtle" Color="{StaticResource ColorBorderSubtle}" />
-    <SolidColorBrush x:Key="TrackSubtle" Color="{StaticResource ColorTrackSubtle}" />
-    <SolidColorBrush x:Key="BarSubtle" Color="{StaticResource ColorBarSubtle}" />
-    <SolidColorBrush x:Key="Shade" Color="{StaticResource ColorShade}" />
-    <SolidColorBrush x:Key="Shade40" Color="{StaticResource ColorShade40}" />
-    <SolidColorBrush x:Key="ShadeOverlay" Color="{StaticResource ColorShadeOverlay}" />
-    <SolidColorBrush x:Key="ModalBackdrop" Color="{StaticResource ColorModalBackdrop}" />
-    <SolidColorBrush x:Key="DialogBackdrop" Color="{StaticResource ColorDialogBackdrop}" />
-    <SolidColorBrush x:Key="MediaPlaceholder" Color="{StaticResource ColorMediaPlaceholder}" />
-    <SolidColorBrush x:Key="StoriesDim55" Color="{StaticResource ColorStoriesDim55}" />
-    <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" />
-    <SolidColorBrush x:Key="StoriesFill" Color="{StaticResource ColorTextPrimary}" />
-    <SolidColorBrush x:Key="StoriesTextSecondary" Color="{StaticResource ColorStoriesTextSecondary}" />
+    <!-- Named SolidColorBrush resources for UI controls (Frozen for GPU performance) -->
+    <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" po:Freeze="True" />
+    <SolidColorBrush x:Key="PanelRaised" Color="{StaticResource ColorPanelRaised}" po:Freeze="True" />
+    <SolidColorBrush x:Key="PanelCard" Color="{StaticResource ColorPanelCard}" po:Freeze="True" />
+    <SolidColorBrush x:Key="PanelInput" Color="{StaticResource ColorPanelInput}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Night" Color="{StaticResource ColorNight}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource ColorTextSecondary}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TextWhite" Color="{StaticResource ColorTextWhite}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Accent" Color="{StaticResource ColorAccent}" po:Freeze="True" />
+    <SolidColorBrush x:Key="AccentDim" Color="{StaticResource ColorAccentDim}" po:Freeze="True" />
+    <SolidColorBrush x:Key="AccentFaint" Color="{StaticResource ColorAccentFaint}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Danger" Color="{StaticResource ColorDanger}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Success" Color="{StaticResource ColorSuccess}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Border" Color="{StaticResource ColorBorder}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BorderStrong" Color="{StaticResource ColorBorderStrong}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BorderSubtle" Color="{StaticResource ColorBorderSubtle}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TrackSubtle" Color="{StaticResource ColorTrackSubtle}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BarSubtle" Color="{StaticResource ColorBarSubtle}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Shade" Color="{StaticResource ColorShade}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Shade40" Color="{StaticResource ColorShade40}" po:Freeze="True" />
+    <SolidColorBrush x:Key="ShadeOverlay" Color="{StaticResource ColorShadeOverlay}" po:Freeze="True" />
+    <SolidColorBrush x:Key="ModalBackdrop" Color="{StaticResource ColorModalBackdrop}" po:Freeze="True" />
+    <SolidColorBrush x:Key="DialogBackdrop" Color="{StaticResource ColorDialogBackdrop}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MediaPlaceholder" Color="{StaticResource ColorMediaPlaceholder}" po:Freeze="True" />
+    <SolidColorBrush x:Key="StoriesDim55" Color="{StaticResource ColorStoriesDim55}" po:Freeze="True" />
+    <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" po:Freeze="True" />
+    <SolidColorBrush x:Key="StoriesFill" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
+    <SolidColorBrush x:Key="StoriesTextSecondary" Color="{StaticResource ColorStoriesTextSecondary}" po:Freeze="True" />
 
 </ResourceDictionary>

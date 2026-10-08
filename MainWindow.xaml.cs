@@ -614,6 +614,7 @@ public partial class MainWindow : Window
         var handle = new WindowInteropHelper(this).Handle;
         var hwndSource = HwndSource.FromHwnd(handle);
         hwndSource?.AddHook(HwndHook);
+        UpdateWindowChromeAndBorders();
     }
 
     private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -835,7 +836,18 @@ public partial class MainWindow : Window
         if (AuraWindowChrome != null)
         {
             AuraWindowChrome.CaptionHeight = _isFullscreen ? 0 : 40;
+            AuraWindowChrome.CornerRadius = isBorderFull ? new CornerRadius(0) : new CornerRadius(3);
         }
+        try
+        {
+            var handle = new WindowInteropHelper(this).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                int cornerPreference = isBorderFull ? DWMWCP_DONOTROUND : DWMWCP_ROUNDSMALL;
+                DwmSetWindowAttribute(handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPreference, sizeof(int));
+            }
+        }
+        catch { }
         if (DataContext is MainViewModel vm)
         {
             vm.IsWindowMaximized = (WindowState == WindowState.Maximized) || _isFullscreen;
@@ -911,7 +923,13 @@ public partial class MainWindow : Window
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
     private const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    private const int DWMWCP_DONOTROUND = 1;
+    private const int DWMWCP_ROUNDSMALL = 3;
 
     #endregion
 

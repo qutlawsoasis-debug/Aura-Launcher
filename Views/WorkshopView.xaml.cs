@@ -50,8 +50,18 @@ public partial class WorkshopView : UserControl
     private void OnSubTabChanged()
     {
         WorldsScrollViewer?.ScrollToTop();
-        ModsScrollViewer?.ScrollToTop();
+        ScrollItemsControlToTop(ModsItemsControl);
         ScreenshotsScrollViewer?.ScrollToTop();
+    }
+
+    private static void ScrollItemsControlToTop(DependencyObject? control)
+    {
+        if (control == null) return;
+        if (System.Windows.Media.VisualTreeHelper.GetChildrenCount(control) > 0 &&
+            System.Windows.Media.VisualTreeHelper.GetChild(control, 0) is ScrollViewer sv)
+        {
+            sv.ScrollToTop();
+        }
     }
 
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)

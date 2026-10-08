@@ -38,7 +38,7 @@
             </Setter>
         </Style>
 
-        <!-- Smooth Toggle Switch for Mods (180ms EaseInOut, sliding thumb and color change) -->
+        <!-- Toggle Switch for Mods (lightweight trigger without per-row Storyboard clocks) -->
         <Style x:Key="WorkshopToggleSwitch" TargetType="{x:Type CheckBox}">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -48,10 +48,10 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type CheckBox}">
                         <Border x:Name="Track" Width="38" Height="20" CornerRadius="3"
-                                Background="{DynamicResource TrackSubtle}">
+                                Background="{StaticResource TrackSubtle}">
                             <Grid>
                                 <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="2"
-                                        Background="{DynamicResource TextPrimary}" HorizontalAlignment="Left" Margin="3,0,0,0">
+                                        Background="{StaticResource TextPrimary}" HorizontalAlignment="Left" Margin="3,0,0,0">
                                     <Border.RenderTransform>
                                         <TranslateTransform x:Name="ThumbTransform" X="0" />
                                     </Border.RenderTransform>
@@ -60,34 +60,13 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource Accent}" />
-                                <Setter TargetName="Thumb" Property="Background" Value="{DynamicResource Night}" />
-                                <Trigger.EnterActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Thumb"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             To="18" Duration="0:0:0.180">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseInOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.EnterActions>
-                                <Trigger.ExitActions>
-                                    <BeginStoryboard>
-                                        <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Thumb"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             To="0" Duration="0:0:0.180">
-                                                <DoubleAnimation.EasingFunction>
-                                                    <CubicEase EasingMode="EaseInOut" />
-                                                </DoubleAnimation.EasingFunction>
-                                            </DoubleAnimation>
-                                        </Storyboard>
-                                    </BeginStoryboard>
-                                </Trigger.ExitActions>
+                                <Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}" />
+                                <Setter TargetName="Thumb" Property="Background" Value="{StaticResource Night}" />
+                                <Setter TargetName="Thumb" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="18" />
+                                    </Setter.Value>
+                                </Setter>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -287,6 +266,7 @@
 
                     <!-- Worlds Scrollable Area -->
                     <ScrollViewer x:Name="WorldsScrollViewer" Grid.Row="1"
+                                  Style="{StaticResource AuraScrollViewer}"
                                   behaviors:SmoothScroll.IsEnabled="True"
                                   VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,12,0">
@@ -618,60 +598,59 @@
                         </Button>
                     </Grid>
 
-                    <!-- Mods List (Thin dividers, no cards, smooth toggle on right) -->
-                    <ScrollViewer x:Name="ModsScrollViewer" Grid.Row="2"
-                                  behaviors:SmoothScroll.IsEnabled="True"
-                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Margin="0,0,12,0">
-                            <!-- Empty state: single line of muted text -->
-                            <TextBlock Text="Моды не найдены"
-                                       FontFamily="{StaticResource MainFont}" FontSize="14" Foreground="{StaticResource MuteBrush}"
-                                       Visibility="{Binding HasNoMods, Converter={StaticResource BoolToVis}}"
-                                       Margin="0,20,0,0" />
+                    <!-- Mods List (Virtualized with Recycling & Pixel Smooth Scroll) -->
+                    <Grid Grid.Row="2">
+                        <!-- Empty state: single line of muted text -->
+                        <TextBlock Text="Моды не найдены"
+                                   FontFamily="{StaticResource MainFont}" FontSize="14" Foreground="{StaticResource MuteBrush}"
+                                   Visibility="{Binding HasNoMods, Converter={StaticResource BoolToVis}}"
+                                   Margin="0,20,0,0"
+                                   VerticalAlignment="Top" />
 
-                            <ItemsControl ItemsSource="{Binding FilteredMods}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource Border}" Padding="0,10,0,10">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="Auto" />
-                                                </Grid.ColumnDefinitions>
+                        <ItemsControl x:Name="ModsItemsControl"
+                                      Style="{StaticResource VirtualizedAuraItemsControl}"
+                                      ItemsSource="{Binding FilteredMods}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderThickness="0,0,0,1" BorderBrush="{StaticResource Border}" Padding="0,10,0,10">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
 
-                                                <!-- Mod Name -->
-                                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                                                    <TextBlock Text="{Binding DisplayName}"
-                                                               FontFamily="{StaticResource MainFont}" FontSize="14" FontWeight="Medium"
-                                                               Foreground="{Binding IsEnabled, Converter={StaticResource BoolToInkOrDimBrushConverter}}"
-                                                               TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
-                                                    <TextBlock Text="{Binding FileName}"
-                                                               FontFamily="{StaticResource MainFont}" FontSize="11"
-                                                               Foreground="{StaticResource MuteBrush}"
-                                                               TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding FileName}" />
-                                                </StackPanel>
-
-                                                <!-- Version or Size -->
-                                                <TextBlock Grid.Column="1" Text="{Binding VersionOrSize}"
-                                                           FontFamily="{StaticResource MainFont}" FontSize="12"
+                                            <!-- Mod Name -->
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontFamily="{StaticResource MainFont}" FontSize="14" FontWeight="Medium"
+                                                           Foreground="{Binding IsEnabled, Converter={StaticResource BoolToInkOrDimBrushConverter}}"
+                                                           TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}" />
+                                                <TextBlock Text="{Binding FileName}"
+                                                           FontFamily="{StaticResource MainFont}" FontSize="11"
                                                            Foreground="{StaticResource MuteBrush}"
-                                                           VerticalAlignment="Center" Margin="16,0" />
+                                                           TextTrimming="CharacterEllipsis" Margin="0,2,0,0" ToolTip="{Binding FileName}" />
+                                            </StackPanel>
 
-                                                <!-- Smooth Toggle Switch -->
-                                                <CheckBox Grid.Column="2"
-                                                          IsChecked="{Binding IsEnabled, Mode=TwoWay}"
-                                                          Command="{Binding DataContext.ToggleModCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                          CommandParameter="{Binding}"
-                                                          Style="{StaticResource WorkshopToggleSwitch}"
-                                                          VerticalAlignment="Center" />
-                                            </Grid>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
+                                            <!-- Version or Size -->
+                                            <TextBlock Grid.Column="1" Text="{Binding VersionOrSize}"
+                                                       FontFamily="{StaticResource MainFont}" FontSize="12"
+                                                       Foreground="{StaticResource MuteBrush}"
+                                                       VerticalAlignment="Center" Margin="16,0" />
+
+                                            <!-- Toggle Switch -->
+                                            <CheckBox Grid.Column="2"
+                                                      IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                      Command="{Binding DataContext.ToggleModCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}"
+                                                      Style="{StaticResource WorkshopToggleSwitch}"
+                                                      VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
                 </Grid>
 
                 <!-- Page 3: Screenshots -->
@@ -710,6 +689,7 @@
 
                     <!-- Screenshots Grid (Full width, tiles filling row across columns) -->
                     <ScrollViewer x:Name="ScreenshotsScrollViewer" Grid.Row="1"
+                                  Style="{StaticResource AuraScrollViewer}"
                                   behaviors:SmoothScroll.IsEnabled="True"
                                   VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,12,0">
@@ -890,7 +870,7 @@
                         </Grid>
 
                         <!-- Backups List -->
-                        <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ScrollViewer Style="{StaticResource AuraScrollViewer}" MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel>
                                 <!-- Empty state -->
                                 <TextBlock Text="Для этого мира пока нет созданных копий."

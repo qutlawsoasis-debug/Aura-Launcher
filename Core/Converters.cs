@@ -57,8 +57,8 @@ public class InverseIntToVisibilityConverter : IValueConverter
 
 public class BoolToEmberOrDarkBgConverter : IValueConverter
 {
-    private static readonly SolidColorBrush EmberBrush = new((Color)ColorConverter.ConvertFromString("#33F2A63C"));
-    private static readonly SolidColorBrush DarkBrush = new((Color)ColorConverter.ConvertFromString("#141E26"));
+    private static readonly SolidColorBrush EmberBrush = CreateFrozenBrush("#33F2A63C");
+    private static readonly SolidColorBrush DarkBrush = CreateFrozenBrush("#141E26");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -66,12 +66,19 @@ public class BoolToEmberOrDarkBgConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+    private static SolidColorBrush CreateFrozenBrush(string hex)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
+    }
 }
 
 public class BoolToEmberOrLineBorderConverter : IValueConverter
 {
-    private static readonly SolidColorBrush EmberBrush = new((Color)ColorConverter.ConvertFromString("#F2A63C"));
-    private static readonly SolidColorBrush LineBrush = new((Color)ColorConverter.ConvertFromString("#24EAF1EF"));
+    private static readonly SolidColorBrush EmberBrush = CreateFrozenBrush("#F2A63C");
+    private static readonly SolidColorBrush LineBrush = CreateFrozenBrush("#24EAF1EF");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -79,12 +86,19 @@ public class BoolToEmberOrLineBorderConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+    private static SolidColorBrush CreateFrozenBrush(string hex)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
+    }
 }
 
 public class BoolToInkOrDimBrushConverter : IValueConverter
 {
-    private static readonly SolidColorBrush InkBrush = new((Color)ColorConverter.ConvertFromString("#EAF1EF"));
-    private static readonly SolidColorBrush DimBrush = new((Color)ColorConverter.ConvertFromString("#9EEAF1EF"));
+    private static readonly SolidColorBrush InkBrush = CreateFrozenBrush("#EAF1EF");
+    private static readonly SolidColorBrush DimBrush = CreateFrozenBrush("#9EEAF1EF");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -92,12 +106,19 @@ public class BoolToInkOrDimBrushConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+    private static SolidColorBrush CreateFrozenBrush(string hex)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
+    }
 }
 
 public class BoolToInkOrMuteBrushConverter : IValueConverter
 {
-    private static readonly SolidColorBrush InkBrush = new((Color)ColorConverter.ConvertFromString("#EAF1EF"));
-    private static readonly SolidColorBrush MuteBrush = new((Color)ColorConverter.ConvertFromString("#8FA7A4"));
+    private static readonly SolidColorBrush InkBrush = CreateFrozenBrush("#EAF1EF");
+    private static readonly SolidColorBrush MuteBrush = CreateFrozenBrush("#8FA7A4");
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
@@ -105,6 +126,13 @@ public class BoolToInkOrMuteBrushConverter : IValueConverter
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+
+    private static SolidColorBrush CreateFrozenBrush(string hex)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
+    }
 }
 
 public class BoolToEnabledTextConverter : IValueConverter

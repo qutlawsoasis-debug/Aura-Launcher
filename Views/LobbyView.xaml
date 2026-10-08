@@ -836,6 +836,7 @@
 
                     <!-- Discrepancies List in ScrollViewer (MaxHeight ~280) -->
                     <ScrollViewer Grid.Row="2"
+                                  Style="{StaticResource AuraScrollViewer}"
                                   MaxHeight="280"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
