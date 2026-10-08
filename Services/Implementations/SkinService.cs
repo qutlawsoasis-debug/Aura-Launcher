@@ -121,27 +121,14 @@ public class SkinService : ISkinService
             var skinBmp = LoadSkinImage(skinPath) as BitmapSource;
             if (skinBmp == null || skinBmp.PixelWidth < 16 || skinBmp.PixelHeight < 16)
             {
-                return LoadDefaultSteveBitmap();
+                return LoadDefaultSteveHead();
             }
 
-            var dv = new DrawingVisual();
-            using (var dc = dv.RenderOpen())
-            {
-                // Отрисовка базовой головы (8,8,8,8)
-                DrawSubRect(dc, skinBmp, new Int32Rect(8, 8, 8, 8), new Rect(0, 0, 8, 8));
-
-                // Наложение слоя шляпы поверх базовой головы (40,8,8,8)
-                DrawSubRect(dc, skinBmp, new Int32Rect(40, 8, 8, 8), new Rect(0, 0, 8, 8));
-            }
-
-            var rtb = new RenderTargetBitmap(8, 8, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(dv);
-            if (rtb.CanFreeze) rtb.Freeze();
-            return rtb;
+            return ExtractHeadAvatarDirect(skinBmp);
         }
         catch
         {
-            return LoadDefaultSteveBitmap();
+            return LoadDefaultSteveHead();
         }
     }
 
@@ -359,8 +346,13 @@ public class SkinService : ISkinService
         }
     }
 
+    private static BitmapSource? _cachedSteveBitmap;
+    private static ImageSource? _cachedDefaultSteveHead;
+
     public static BitmapSource LoadDefaultSteveBitmap()
     {
+        if (_cachedSteveBitmap != null) return _cachedSteveBitmap;
+
         try
         {
             var uri = new Uri("pack://application:,,,/AuraLauncher;component/steve.png", UriKind.Absolute);
@@ -373,6 +365,7 @@ public class SkinService : ISkinService
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
                 if (bmp.CanFreeze) bmp.Freeze();
+                _cachedSteveBitmap = bmp;
                 return bmp;
             }
         }
@@ -389,6 +382,7 @@ public class SkinService : ISkinService
                 bmp.CacheOption = BitmapCacheOption.OnLoad;
                 bmp.EndInit();
                 if (bmp.CanFreeze) bmp.Freeze();
+                _cachedSteveBitmap = bmp;
                 return bmp;
             }
         }
@@ -397,7 +391,103 @@ public class SkinService : ISkinService
         // Fallback: 64x64 пустой битмап
         var fallback = new WriteableBitmap(64, 64, 96, 96, PixelFormats.Bgra32, null);
         if (fallback.CanFreeze) fallback.Freeze();
+        _cachedSteveBitmap = fallback;
         return fallback;
+    }
+
+    public static ImageSource LoadDefaultSteveHead()
+    {
+        if (_cachedDefaultSteveHead != null) return _cachedDefaultSteveHead;
+        var bmp = LoadDefaultSteveBitmap();
+        var head = ExtractHeadAvatarDirect(bmp);
+        _cachedDefaultSteveHead = head;
+        return head;
+    }
+
+    public static bool IsDefaultSteveHead(ImageSource? img) =>
+        img == null || ReferenceEquals(img, _cachedDefaultSteveHead) || ReferenceEquals(img, _cachedSteveBitmap);
+
+    public static BitmapSource ExtractHeadAvatarDirect(BitmapSource skinBmp)
+    {
+        try
+        {
+            BitmapSource converted = skinBmp;
+            if (converted.Format != PixelFormats.Bgra32)
+            {
+                converted = new FormatConvertedBitmap(skinBmp, PixelFormats.Bgra32, null, 0);
+            }
+            if (converted.PixelWidth == 64 && converted.PixelHeight == 32)
+            {
+                converted = Convert64x32To64x64(converted);
+            }
+            if (converted.PixelWidth != 64 || converted.PixelHeight != 64)
+            {
+                return LoadDefaultSteveBitmap();
+            }
+
+            int stride = 64 * 4;
+            byte[] skinPixels = new byte[64 * stride];
+            converted.CopyPixels(skinPixels, stride, 0);
+
+            byte[] headPixels = new byte[8 * 8 * 4];
+
+            for (int y = 0; y < 8; y++)
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    int baseIdx = ((8 + y) * 64 + (8 + x)) * 4;
+                    int hatIdx = ((8 + y) * 64 + (40 + x)) * 4;
+                    int outIdx = (y * 8 + x) * 4;
+
+                    byte baseB = skinPixels[baseIdx + 0];
+                    byte baseG = skinPixels[baseIdx + 1];
+                    byte baseR = skinPixels[baseIdx + 2];
+                    byte baseA = skinPixels[baseIdx + 3];
+
+                    byte hatB = skinPixels[hatIdx + 0];
+                    byte hatG = skinPixels[hatIdx + 1];
+                    byte hatR = skinPixels[hatIdx + 2];
+                    byte hatA = skinPixels[hatIdx + 3];
+
+                    if (hatA == 0)
+                    {
+                        headPixels[outIdx + 0] = baseB;
+                        headPixels[outIdx + 1] = baseG;
+                        headPixels[outIdx + 2] = baseR;
+                        headPixels[outIdx + 3] = baseA;
+                    }
+                    else if (hatA == 255)
+                    {
+                        headPixels[outIdx + 0] = hatB;
+                        headPixels[outIdx + 1] = hatG;
+                        headPixels[outIdx + 2] = hatR;
+                        headPixels[outIdx + 3] = 255;
+                    }
+                    else
+                    {
+                        float hatAlpha = hatA / 255f;
+                        float baseAlpha = (baseA / 255f) * (1f - hatAlpha);
+                        float totalAlpha = hatAlpha + baseAlpha;
+
+                        if (totalAlpha > 0.001f)
+                        {
+                            headPixels[outIdx + 0] = (byte)((hatB * hatAlpha + baseB * baseAlpha) / totalAlpha);
+                            headPixels[outIdx + 1] = (byte)((hatG * hatAlpha + baseG * baseAlpha) / totalAlpha);
+                            headPixels[outIdx + 2] = (byte)((hatR * hatAlpha + baseR * baseAlpha) / totalAlpha);
+                            headPixels[outIdx + 3] = (byte)(totalAlpha * 255);
+                        }
+                    }
+                }
+            }
+
+            var result = BitmapSource.Create(8, 8, 96, 96, PixelFormats.Bgra32, null, headPixels, 8 * 4);
+            if (result.CanFreeze) result.Freeze();
+            return result;
+        }
+        catch
+        {
+            return LoadDefaultSteveBitmap();
+        }
     }
 
     private static BitmapSource Convert64x32To64x64(BitmapSource source32)
@@ -639,12 +729,19 @@ public class SkinService : ISkinService
                     ["enableCape"] = true,
                     ["threadPoolSize"] = 8,
                     ["enableLogStdOut"] = false,
-                    ["cacheExpiry"] = 30,
+                    ["cacheExpiry"] = 0,
                     ["forceUpdateSkull"] = false,
                     ["enableLocalProfileCache"] = false,
-                    ["enableCacheAutoClean"] = false,
-                    ["forceDisableCache"] = false
+                    ["enableCacheAutoClean"] = true,
+                    ["forceDisableCache"] = true
                 };
+            }
+            else
+            {
+                rootObj["forceDisableCache"] = true;
+                rootObj["cacheExpiry"] = 0;
+                rootObj["enableCacheAutoClean"] = true;
+                rootObj["enableLocalProfileCache"] = false;
             }
 
             var loadlistNode = rootObj["loadlist"] as System.Text.Json.Nodes.JsonArray;
@@ -707,7 +804,7 @@ public class SkinService : ISkinService
     {
         if (string.IsNullOrWhiteSpace(nickname))
         {
-            return LoadDefaultSteveBitmap();
+            return LoadDefaultSteveHead();
         }
 
         if (_avatarCache.TryGetValue(nickname, out var cached))
@@ -716,16 +813,14 @@ public class SkinService : ISkinService
         }
 
         var (skinTexture, _) = await GetSkinTextureForPlayerAsync(nickname, cancellationToken);
-        if (skinTexture is BitmapSource bmp)
+        if (skinTexture is BitmapSource bmp && !ReferenceEquals(bmp, LoadDefaultSteveBitmap()))
         {
-            var avatar = ExtractHeadAvatarFromBitmap(bmp);
+            var avatar = ExtractHeadAvatarDirect(bmp);
             _avatarCache[nickname] = avatar;
             return avatar;
         }
 
-        var fallback = LoadDefaultSteveBitmap();
-        _avatarCache[nickname] = fallback;
-        return fallback;
+        return LoadDefaultSteveHead();
     }
 
     public async Task<(ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default)
@@ -765,7 +860,16 @@ public class SkinService : ISkinService
 
                     if (!string.IsNullOrWhiteSpace(textureUrl))
                     {
-                        byte[] pngBytes = await _httpClient.GetByteArrayAsync(textureUrl, cancellationToken);
+                        string resolvedUrl = textureUrl;
+                        if (!resolvedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                            !resolvedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        {
+                            resolvedUrl = resolvedUrl.StartsWith('/')
+                                ? $"https://lobby-api.vercel.app{resolvedUrl}"
+                                : $"https://lobby-api.vercel.app/textures/{resolvedUrl}.png";
+                        }
+
+                        byte[] pngBytes = await _httpClient.GetByteArrayAsync(resolvedUrl, cancellationToken);
                         using var ms = new MemoryStream(pngBytes);
                         var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
                         var frame = decoder.Frames[0];
@@ -779,7 +883,7 @@ public class SkinService : ISkinService
                         bool isSlim = isSlimFromApi || DetectIsSlim(converted);
                         var entry = ((ImageSource)converted, isSlim);
                         _skinTextureCache[nickname] = entry;
-                        _avatarCache[nickname] = ExtractHeadAvatarFromBitmap(converted);
+                        _avatarCache[nickname] = ExtractHeadAvatarDirect(converted);
                         return entry;
                     }
                 }
@@ -789,31 +893,8 @@ public class SkinService : ISkinService
         {
         }
 
-        var fallbackBmp = LoadDefaultSteveBitmap();
-        var fallbackEntry = ((ImageSource)fallbackBmp, false);
-        _skinTextureCache[nickname] = fallbackEntry;
-        return fallbackEntry;
-    }
-
-    private ImageSource ExtractHeadAvatarFromBitmap(BitmapSource skinBmp)
-    {
-        try
-        {
-            var dv = new DrawingVisual();
-            using (var dc = dv.RenderOpen())
-            {
-                DrawSubRect(dc, skinBmp, new Int32Rect(8, 8, 8, 8), new Rect(0, 0, 8, 8));
-                DrawSubRect(dc, skinBmp, new Int32Rect(40, 8, 8, 8), new Rect(0, 0, 8, 8));
-            }
-
-            var rtb = new RenderTargetBitmap(8, 8, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(dv);
-            if (rtb.CanFreeze) rtb.Freeze();
-            return rtb;
-        }
-        catch
-        {
-            return LoadDefaultSteveBitmap();
-        }
+        // В случае ошибки или отсутствия скина возвращаем дефолтного Стива,
+        // но НЕ кэшируем намертво, чтобы повторный опрос мог подтянуть загруженный скин.
+        return (LoadDefaultSteveBitmap(), false);
     }
 }

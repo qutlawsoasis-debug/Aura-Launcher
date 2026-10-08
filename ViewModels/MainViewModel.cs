@@ -1184,6 +1184,7 @@ public class MainViewModel : ObservableObject
         var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
         FabricGameLaunchService.EnsureDefaultOptions(gameDir);
         FabricGameLaunchService.EnsureDefaultLspConfig(gameDir);
+        _skinService.EnsureCustomSkinLoaderConfig(gameDir);
         var running = _launchService.FindRunningGameProcess(gameDir);
         if (running != null)
         {
@@ -1375,13 +1376,22 @@ public class MainViewModel : ObservableObject
             {
                 var targetGameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
                 _skinService.EnsureCustomSkinLoaderConfig(targetGameDir);
-                _ = _skinService.UploadSkinToLobbyApiAsync(
+                var uploadResult = await _skinService.UploadSkinToLobbyApiAsync(
                     config.SkinPath,
                     config.Nickname,
                     config.SkinModel,
                     config.SkinOwnerToken,
                     config.LobbyApiBaseUrl,
                     ct);
+
+                if (uploadResult.Success && !string.IsNullOrWhiteSpace(uploadResult.OwnerToken) &&
+                    uploadResult.OwnerToken != config.SkinOwnerToken)
+                {
+                    config.SkinOwnerToken = uploadResult.OwnerToken;
+                    await _configService.SaveConfigAsync(config, ct);
+                }
+
+                await _skinService.SyncSkinToGameAsync(config.SkinPath, config.Nickname, targetGameDir, ct);
             }
             catch (Exception ex)
             {

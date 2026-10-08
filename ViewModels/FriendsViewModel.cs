@@ -126,11 +126,18 @@ public class FriendItemViewModel : ObservableObject
 
     public double RowOpacity => Online ? 1.0 : 0.45;
 
-    private ImageSource _avatar;
+    private ImageSource _avatar = SkinService.LoadDefaultSteveHead();
     public ImageSource Avatar
     {
         get => _avatar;
         set => SetProperty(ref _avatar, value);
+    }
+
+    private bool _isCustomAvatarLoaded;
+    public bool IsCustomAvatarLoaded
+    {
+        get => _isCustomAvatarLoaded;
+        set => SetProperty(ref _isCustomAvatarLoaded, value);
     }
 
     private bool _isInMyLobby;
@@ -648,6 +655,10 @@ public class FriendsViewModel : ObservableObject
                         wasInMyLobby = existing.IsInMyLobby;
                         existing.UpdateFromPresence(item);
                         vm = existing;
+                        if (!existing.IsCustomAvatarLoaded)
+                        {
+                            _ = LoadAvatarAsync(existing);
+                        }
                     }
                     else
                     {
@@ -764,7 +775,14 @@ public class FriendsViewModel : ObservableObject
             var avatar = await _skinService.GetAvatarForPlayerAsync(vm.Nick);
             if (avatar != null)
             {
-                Dispatch(() => vm.Avatar = avatar);
+                Dispatch(() =>
+                {
+                    vm.Avatar = avatar;
+                    if (!SkinService.IsDefaultSteveHead(avatar))
+                    {
+                        vm.IsCustomAvatarLoaded = true;
+                    }
+                });
             }
         }
         catch { }

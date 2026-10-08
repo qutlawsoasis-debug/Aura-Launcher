@@ -384,6 +384,7 @@ public class WardrobeViewModel : ObservableObject
                     cfg.SkinOwnerToken = res.OwnerToken;
                     await _configService.SaveConfigAsync(cfg);
                 }
+                _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
                 _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
                 IsStatusError = false;
                 StatusMessage = "Скин успешно загружен и применён!";
