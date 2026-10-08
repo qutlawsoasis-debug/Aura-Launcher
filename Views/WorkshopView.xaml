@@ -38,7 +38,7 @@
             </Setter>
         </Style>
 
-        <!-- Toggle Switch for Mods (lightweight trigger without per-row Storyboard clocks) -->
+        <!-- Toggle Switch for Mods -->
         <Style x:Key="WorkshopToggleSwitch" TargetType="{x:Type CheckBox}">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -51,22 +51,16 @@
                                 Background="{StaticResource TrackSubtle}">
                             <Grid>
                                 <Border x:Name="Thumb" Width="14" Height="14" CornerRadius="2"
-                                        Background="{StaticResource TextPrimary}" HorizontalAlignment="Left" Margin="3,0,0,0">
-                                    <Border.RenderTransform>
-                                        <TranslateTransform x:Name="ThumbTransform" X="0" />
-                                    </Border.RenderTransform>
-                                </Border>
+                                        Background="{StaticResource TextPrimary}"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                                        Margin="3,0,0,0" />
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}" />
                                 <Setter TargetName="Thumb" Property="Background" Value="{StaticResource Night}" />
-                                <Setter TargetName="Thumb" Property="RenderTransform">
-                                    <Setter.Value>
-                                        <TranslateTransform X="18" />
-                                    </Setter.Value>
-                                </Setter>
+                                <Setter TargetName="Thumb" Property="Margin" Value="21,0,0,0" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

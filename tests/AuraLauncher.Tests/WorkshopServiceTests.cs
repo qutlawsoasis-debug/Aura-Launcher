@@ -160,4 +160,43 @@ public class WorkshopServiceTests : IDisposable
         Assert.True(deleted);
         Assert.False(File.Exists(scFile));
     }
+
+    [Fact]
+    public async Task ToggleModCommand_UpdatesModInPlace_WithoutResettingFilteredMods()
+    {
+        var service = new WorkshopService();
+        string modsDir = Path.Combine(_tempDir, "mods");
+        Directory.CreateDirectory(modsDir);
+        File.WriteAllText(Path.Combine(modsDir, "Alpha-1.0.jar"), "a");
+        File.WriteAllText(Path.Combine(modsDir, "Beta-2.0.jar"), "b");
+
+        var configService = new TestConfigService(_tempDir, PackUpdateService.DefaultPackRepo);
+        var launchService = new FabricGameLaunchService();
+        var vm = new WorkshopViewModel(service, configService, launchService);
+
+        await vm.RefreshAllAsync();
+        Assert.Equal(2, vm.FilteredMods.Count);
+
+        int collectionChanges = 0;
+        vm.FilteredMods.CollectionChanged += (_, _) => collectionChanges++;
+
+        var firstMod = vm.FilteredMods[0];
+        bool fileNameNotified = false;
+        firstMod.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ModItem.FileName))
+            {
+                fileNameNotified = true;
+            }
+        };
+
+        // Simulate CheckBox two-way binding + Command execution
+        firstMod.IsEnabled = false;
+        vm.ToggleModCommand.Execute(firstMod);
+
+        Assert.Equal(0, collectionChanges);
+        Assert.True(fileNameNotified);
+        Assert.EndsWith(".disabled", firstMod.FileName);
+        Assert.True(vm.FilteredMods[1].IsEnabled);
+    }
 }

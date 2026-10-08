@@ -284,17 +284,12 @@ public class WorkshopViewModel : ObservableObject
         {
             if (p is not ModItem mod) return;
             bool targetState = mod.IsEnabled;
-            _ = Task.Run(async () =>
+            bool ok = _workshopService.ToggleMod(mod, targetState);
+            if (!ok)
             {
-                // Give 190ms for smooth 180ms toggle animation before renaming file
-                await Task.Delay(190);
-                _workshopService.ToggleMod(mod, targetState);
-                await Application.Current.Dispatcher.InvokeAsync(() =>
-                {
-                    ApplyModFilter();
-                    ModToggled?.Invoke();
-                });
-            });
+                mod.IsEnabled = mod.FullPath.EndsWith(".jar", StringComparison.OrdinalIgnoreCase);
+            }
+            ModToggled?.Invoke();
         });
 
         SelectShaderCommand = new RelayCommand(p =>
@@ -568,8 +563,32 @@ public class WorkshopViewModel : ObservableObject
 
             // 2. Mods
             var mods = await _workshopService.GetModsAsync(gameDir);
+            var existingByDisplay = new Dictionary<string, ModItem>(StringComparer.OrdinalIgnoreCase);
+            foreach (var existingMod in Mods)
+            {
+                existingByDisplay.TryAdd(existingMod.DisplayName, existingMod);
+            }
+
+            var updatedMods = new List<ModItem>(mods.Count);
+            foreach (var fresh in mods)
+            {
+                if (existingByDisplay.TryGetValue(fresh.DisplayName, out var existing))
+                {
+                    existing.FileName = fresh.FileName;
+                    existing.FullPath = fresh.FullPath;
+                    existing.Version = fresh.Version;
+                    existing.SizeFormatted = fresh.SizeFormatted;
+                    existing.IsEnabled = fresh.IsEnabled;
+                    updatedMods.Add(existing);
+                }
+                else
+                {
+                    updatedMods.Add(fresh);
+                }
+            }
+
             Mods.Clear();
-            foreach (var m in mods) Mods.Add(m);
+            foreach (var m in updatedMods) Mods.Add(m);
             ApplyModFilter();
 
             OnPropertyChanged(nameof(ModsCount));
@@ -607,16 +626,38 @@ public class WorkshopViewModel : ObservableObject
 
     private void ApplyModFilter()
     {
-        FilteredMods.Clear();
         string filter = SearchModText?.Trim() ?? string.Empty;
-        var query = string.IsNullOrWhiteSpace(filter)
+        var desired = (string.IsNullOrWhiteSpace(filter)
             ? Mods
             : Mods.Where(m => m.DisplayName.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                              m.FileName.Contains(filter, StringComparison.OrdinalIgnoreCase));
+                              m.FileName.Contains(filter, StringComparison.OrdinalIgnoreCase))).ToList();
 
-        foreach (var m in query)
+        var desiredSet = new HashSet<ModItem>(desired);
+        for (int i = FilteredMods.Count - 1; i >= 0; i--)
         {
-            FilteredMods.Add(m);
+            if (!desiredSet.Contains(FilteredMods[i]))
+            {
+                FilteredMods.RemoveAt(i);
+            }
+        }
+
+        for (int i = 0; i < desired.Count; i++)
+        {
+            var item = desired[i];
+            if (i < FilteredMods.Count && ReferenceEquals(FilteredMods[i], item))
+            {
+                continue;
+            }
+
+            int existingIdx = FilteredMods.IndexOf(item);
+            if (existingIdx >= 0)
+            {
+                FilteredMods.Move(existingIdx, i);
+            }
+            else
+            {
+                FilteredMods.Insert(i, item);
+            }
         }
 
         OnPropertyChanged(nameof(HasMods));

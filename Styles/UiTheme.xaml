@@ -731,11 +731,7 @@
                                 Background="#1AFFFFFF" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                             <Border x:Name="Knob" Width="20" Height="20" CornerRadius="2"
                                     Background="{StaticResource MuteBrush}"
-                                    HorizontalAlignment="Left" Margin="2,0,0,0">
-                                <Border.RenderTransform>
-                                    <TranslateTransform x:Name="KnobTrans" X="0" />
-                                </Border.RenderTransform>
-                            </Border>
+                                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0" />
                         </Border>
                         <ContentPresenter Margin="12,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
@@ -744,11 +740,7 @@
                             <Setter TargetName="SwitchTrack" Property="Background" Value="#33F2A63C" />
                             <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
                             <Setter TargetName="Knob" Property="Background" Value="{StaticResource EmberBrush}" />
-                            <Setter TargetName="Knob" Property="RenderTransform">
-                                <Setter.Value>
-                                    <TranslateTransform X="20" />
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="Knob" Property="Margin" Value="22,0,0,0" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
