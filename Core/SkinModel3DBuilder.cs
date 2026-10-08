@@ -6,6 +6,17 @@ using System.Windows.Media.Media3D;
 
 namespace AuraLauncher.Core;
 
+public enum PlayerLimbPart
+{
+    None = 0,
+    Head,
+    Body,
+    RightArm,
+    LeftArm,
+    RightLeg,
+    LeftLeg
+}
+
 /// <summary>
 /// Построитель настоящей 3D-модели игрока Minecraft на базе кубоидов и Viewport3D.
 /// Размеры кубоидов и сцены: 1 px = 1 единица.
@@ -14,6 +25,26 @@ namespace AuraLauncher.Core;
 /// </summary>
 public static class SkinModel3DBuilder
 {
+    public static readonly DependencyProperty LimbPartProperty =
+        DependencyProperty.RegisterAttached(
+            "LimbPart",
+            typeof(PlayerLimbPart),
+            typeof(SkinModel3DBuilder),
+            new PropertyMetadata(PlayerLimbPart.None));
+
+    public static readonly DependencyProperty IsSlimModelProperty =
+        DependencyProperty.RegisterAttached(
+            "IsSlimModel",
+            typeof(bool),
+            typeof(SkinModel3DBuilder),
+            new PropertyMetadata(false));
+
+    public static PlayerLimbPart GetLimbPart(DependencyObject obj) => (PlayerLimbPart)obj.GetValue(LimbPartProperty);
+    public static void SetLimbPart(DependencyObject obj, PlayerLimbPart value) => obj.SetValue(LimbPartProperty, value);
+
+    public static bool GetIsSlimModel(DependencyObject obj) => (bool)obj.GetValue(IsSlimModelProperty);
+    public static void SetIsSlimModel(DependencyObject obj, bool value) => obj.SetValue(IsSlimModelProperty, value);
+
     public static BitmapSource UpscaleNearestNeighbor(BitmapSource source, int factor = 8)
     {
         var formatted = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
@@ -181,19 +212,19 @@ public static class SkinModel3DBuilder
         baseGroup.Children.Add(CreateCuboidModel(
             -4, 4, 8, 16, -4, 4,
             0, 0, 8, 8, 8,
-            baseMaterial, texW, texH));
+            baseMaterial, texW, texH, limbPart: PlayerLimbPart.Head));
 
         // Тело: 8x12x4, начало (16,16)
         baseGroup.Children.Add(CreateCuboidModel(
             -4, 4, -4, 8, -2, 2,
             16, 16, 8, 12, 4,
-            baseMaterial, texW, texH));
+            baseMaterial, texW, texH, limbPart: PlayerLimbPart.Body));
 
         // Правая рука: w=3 или 4, h=12, d=4, начало (40,16)
         baseGroup.Children.Add(CreateCuboidModel(
             rightArmMinX, rightArmMaxX, -4, 8, -2, 2,
             40, 16, armW, 12, 4,
-            baseMaterial, texW, texH));
+            baseMaterial, texW, texH, limbPart: PlayerLimbPart.RightArm));
 
         // Левая рука: w=3 или 4, h=12, d=4.
         // Если 64x64: начало (32,48). Если 64x32: зеркалит правую руку (40,16).
@@ -202,21 +233,21 @@ public static class SkinModel3DBuilder
             baseGroup.Children.Add(CreateCuboidModel(
                 leftArmMinX, leftArmMaxX, -4, 8, -2, 2,
                 40, 16, armW, 12, 4,
-                baseMaterial, texW, texH, mirrorU: true));
+                baseMaterial, texW, texH, mirrorU: true, limbPart: PlayerLimbPart.LeftArm));
         }
         else
         {
             baseGroup.Children.Add(CreateCuboidModel(
                 leftArmMinX, leftArmMaxX, -4, 8, -2, 2,
                 32, 48, armW, 12, 4,
-                baseMaterial, texW, texH));
+                baseMaterial, texW, texH, limbPart: PlayerLimbPart.LeftArm));
         }
 
         // Правая нога: 4x12x4, начало (0,16)
         baseGroup.Children.Add(CreateCuboidModel(
             -4, 0, -16, -4, -2, 2,
             0, 16, 4, 12, 4,
-            baseMaterial, texW, texH));
+            baseMaterial, texW, texH, limbPart: PlayerLimbPart.RightLeg));
 
         // Левая нога: 4x12x4.
         // Если 64x64: начало (16,48). Если 64x32: зеркалит правую ногу (0,16).
@@ -225,14 +256,14 @@ public static class SkinModel3DBuilder
             baseGroup.Children.Add(CreateCuboidModel(
                 0, 4, -16, -4, -2, 2,
                 0, 16, 4, 12, 4,
-                baseMaterial, texW, texH, mirrorU: true));
+                baseMaterial, texW, texH, mirrorU: true, limbPart: PlayerLimbPart.LeftLeg));
         }
         else
         {
             baseGroup.Children.Add(CreateCuboidModel(
                 0, 4, -16, -4, -2, 2,
                 16, 48, 4, 12, 4,
-                baseMaterial, texW, texH));
+                baseMaterial, texW, texH, limbPart: PlayerLimbPart.LeftLeg));
         }
 
         // Накладной слой (+0.5 px с каждой стороны, overlayMaterial)
@@ -241,7 +272,7 @@ public static class SkinModel3DBuilder
             -4.5, 4.5, 7.5, 16.5, -4.5, 4.5,
             32, 0, 8, 8, 8,
             overlayMaterial, texW, texH,
-            isOverlay: true, rawPixels: rawPixels, stride: stride);
+            isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.Head);
         if (hatModel != null) overlayGroup.Children.Add(hatModel);
 
         if (!is64x32)
@@ -251,7 +282,7 @@ public static class SkinModel3DBuilder
                 -4.5, 4.5, -4.5, 8.5, -2.5, 2.5,
                 16, 32, 8, 12, 4,
                 overlayMaterial, texW, texH,
-                isOverlay: true, rawPixels: rawPixels, stride: stride);
+                isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.Body);
             if (jacketModel != null) overlayGroup.Children.Add(jacketModel);
 
             // Рукав правой руки: начало (40,32)
@@ -259,7 +290,7 @@ public static class SkinModel3DBuilder
                 rightArmMinX - 0.5, rightArmMaxX + 0.5, -4.5, 8.5, -2.5, 2.5,
                 40, 32, armW, 12, 4,
                 overlayMaterial, texW, texH,
-                isOverlay: true, rawPixels: rawPixels, stride: stride);
+                isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.RightArm);
             if (rightSleeve != null) overlayGroup.Children.Add(rightSleeve);
 
             // Рукав левой руки: начало (48,48)
@@ -267,7 +298,7 @@ public static class SkinModel3DBuilder
                 leftArmMinX - 0.5, leftArmMaxX + 0.5, -4.5, 8.5, -2.5, 2.5,
                 48, 48, armW, 12, 4,
                 overlayMaterial, texW, texH,
-                isOverlay: true, rawPixels: rawPixels, stride: stride);
+                isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.LeftArm);
             if (leftSleeve != null) overlayGroup.Children.Add(leftSleeve);
 
             // Штанина правой ноги: начало (0,32)
@@ -275,7 +306,7 @@ public static class SkinModel3DBuilder
                 -4.5, 0.5, -16.5, -3.5, -2.5, 2.5,
                 0, 32, 4, 12, 4,
                 overlayMaterial, texW, texH,
-                isOverlay: true, rawPixels: rawPixels, stride: stride);
+                isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.RightLeg);
             if (rightPant != null) overlayGroup.Children.Add(rightPant);
 
             // Штанина левой ноги: начало (0,48)
@@ -283,7 +314,7 @@ public static class SkinModel3DBuilder
                 -0.5, 4.5, -16.5, -3.5, -2.5, 2.5,
                 0, 48, 4, 12, 4,
                 overlayMaterial, texW, texH,
-                isOverlay: true, rawPixels: rawPixels, stride: stride);
+                isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.LeftLeg);
             if (leftPant != null) overlayGroup.Children.Add(leftPant);
         }
 
@@ -291,6 +322,7 @@ public static class SkinModel3DBuilder
         if (overlayGroup.CanFreeze) overlayGroup.Freeze();
         rootGroup.Children.Add(baseGroup);
         rootGroup.Children.Add(overlayGroup);
+        SetIsSlimModel(rootGroup, isSlim);
         if (rootGroup.CanFreeze) rootGroup.Freeze();
 
         return rootGroup;
@@ -306,7 +338,8 @@ public static class SkinModel3DBuilder
         bool mirrorU = false,
         bool isOverlay = false,
         byte[]? rawPixels = null,
-        int stride = 0)
+        int stride = 0,
+        PlayerLimbPart limbPart = PlayerLimbPart.None)
     {
         var mesh = new MeshGeometry3D();
 
@@ -466,6 +499,10 @@ public static class SkinModel3DBuilder
         {
             BackMaterial = material
         };
+        if (limbPart != PlayerLimbPart.None)
+        {
+            SetLimbPart(geomModel, limbPart);
+        }
         if (geomModel.CanFreeze) geomModel.Freeze();
         return geomModel;
     }

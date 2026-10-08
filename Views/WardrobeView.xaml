@@ -49,27 +49,18 @@
                 <ColumnDefinition Width="384" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: 170x290 3D Viewport figure, soft oval shadow, caption -->
+            <!-- Left: 170x290 3D Viewport figure (живой и вращаемый мышью, без круглой тени) -->
             <StackPanel Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Top">
                 <Grid x:Name="SkinDragArea"
                       Width="170" Height="290"
                       Background="Transparent"
-                      Cursor="Hand"
-                      MouseDown="Skin_MouseDown"
-                      MouseMove="Skin_MouseMove"
-                      MouseUp="Skin_MouseUp">
-
-                    <!-- Soft oval shadow under feet -->
-                    <Ellipse Width="96" Height="8"
-                             Fill="{DynamicResource Shade40}"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Bottom"
-                             Margin="0,0,0,14" />
+                      Cursor="Hand">
 
                     <!-- 3D Viewport for Player Model -->
                     <Viewport3D x:Name="SkinViewport"
                                 Width="170" Height="290"
-                                ClipToBounds="False">
+                                ClipToBounds="False"
+                                IsHitTestVisible="False">
                         <Viewport3D.Camera>
                             <PerspectiveCamera Position="0,0,27"
                                                LookDirection="0,0,-1"

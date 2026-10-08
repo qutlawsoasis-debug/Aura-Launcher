@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:behaviors="clr-namespace:AuraLauncher.Behaviors"
              mc:Ignorable="d"
              Focusable="False"
              FocusVisualStyle="{x:Null}"
@@ -313,14 +314,16 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Правая колонка: Подиум 3D-персонажа игрока до входа в лобби -->
+                <!-- Правая колонка: 3D-персонаж игрока до входа в лобби (живой и вращаемый мышью) -->
                 <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0">
-                    <Grid Width="156" Height="244">
-                        <Ellipse Width="88" Height="8"
-                                 Fill="{DynamicResource Shade40}"
-                                 HorizontalAlignment="Center"
-                                 VerticalAlignment="Bottom"
-                                 Margin="0,0,0,12" />
+                    <Grid Width="156" Height="244"
+                          Background="Transparent"
+                          Cursor="Hand"
+                          ToolTip="Потяните мышью, чтобы повернуть персонажа"
+                          behaviors:AlivePlayer3D.SourceModel="{Binding LocalPlayerModel3D}"
+                          behaviors:AlivePlayer3D.BaseYaw="-14"
+                          behaviors:AlivePlayer3D.BasePitch="4"
+                          behaviors:AlivePlayer3D.PhaseSeed="{Binding LocalPlayerNickname}">
                         <Viewport3D Width="156" Height="244" ClipToBounds="False" IsHitTestVisible="False">
                             <Viewport3D.Camera>
                                 <PerspectiveCamera Position="0,0,27.5"
@@ -328,22 +331,7 @@
                                                    UpDirection="0,1,0"
                                                    FieldOfView="45" />
                             </Viewport3D.Camera>
-                            <ModelVisual3D Content="{Binding LocalPlayerModel3D}">
-                                <ModelVisual3D.Transform>
-                                    <Transform3DGroup>
-                                        <RotateTransform3D>
-                                            <RotateTransform3D.Rotation>
-                                                <AxisAngleRotation3D Axis="0,1,0" Angle="-14" />
-                                            </RotateTransform3D.Rotation>
-                                        </RotateTransform3D>
-                                        <RotateTransform3D>
-                                            <RotateTransform3D.Rotation>
-                                                <AxisAngleRotation3D Axis="1,0,0" Angle="4" />
-                                            </RotateTransform3D.Rotation>
-                                        </RotateTransform3D>
-                                    </Transform3DGroup>
-                                </ModelVisual3D.Transform>
-                            </ModelVisual3D>
+                            <ModelVisual3D />
                         </Viewport3D>
                     </Grid>
 
@@ -562,12 +550,6 @@
 
             <!-- Центральная сцена с персонажами (CS2 / Brawl Stars раскладка) -->
             <Grid Grid.Row="1" ClipToBounds="True" Margin="0,2,0,2">
-                <!-- Линия подиума на фоне -->
-                <Border Height="1"
-                        Background="{StaticResource LineInkBrush}"
-                        VerticalAlignment="Bottom"
-                        Margin="16,0,16,52" />
-
                 <ItemsControl ItemsSource="{Binding LobbyPlayers}"
                               HorizontalAlignment="Stretch"
                               VerticalAlignment="Stretch">
@@ -597,24 +579,15 @@
                                 </Border.RenderTransform>
 
                                 <StackPanel HorizontalAlignment="Center">
-                                    <!-- 3D Персонаж + тень под ногами -->
-                                    <Grid Width="128" Height="210">
-                                        <!-- Овальная тень под ногами -->
-                                        <Ellipse Width="78" Height="8"
-                                                 Fill="{DynamicResource Shade40}"
-                                                 HorizontalAlignment="Center"
-                                                 VerticalAlignment="Bottom"
-                                                 Margin="0,0,0,10" />
-
-                                        <!-- Тонкий акцентный ободок подиума у хоста -->
-                                        <Ellipse Width="86" Height="10"
-                                                 Stroke="{DynamicResource AccentDim}"
-                                                 StrokeThickness="1"
-                                                 HorizontalAlignment="Center"
-                                                 VerticalAlignment="Bottom"
-                                                 Margin="0,0,0,9"
-                                                 Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
-
+                                    <!-- 3D Персонаж (живой и вращаемый мышью, без круглой тени под ногами) -->
+                                    <Grid Width="128" Height="210"
+                                          Background="Transparent"
+                                          Cursor="Hand"
+                                          ToolTip="Потяните мышью, чтобы повернуть персонажа"
+                                          behaviors:AlivePlayer3D.SourceModel="{Binding PlayerModel3D}"
+                                          behaviors:AlivePlayer3D.BaseYaw="{Binding StageYawAngle}"
+                                          behaviors:AlivePlayer3D.BasePitch="4"
+                                          behaviors:AlivePlayer3D.PhaseSeed="{Binding Nickname}">
                                         <Viewport3D Width="128" Height="210"
                                                     ClipToBounds="False"
                                                     IsHitTestVisible="False">
@@ -624,22 +597,7 @@
                                                                    UpDirection="0,1,0"
                                                                    FieldOfView="45" />
                                             </Viewport3D.Camera>
-                                            <ModelVisual3D Content="{Binding PlayerModel3D}">
-                                                <ModelVisual3D.Transform>
-                                                    <Transform3DGroup>
-                                                        <RotateTransform3D>
-                                                            <RotateTransform3D.Rotation>
-                                                                <AxisAngleRotation3D Axis="0,1,0" Angle="{Binding StageYawAngle}" />
-                                                            </RotateTransform3D.Rotation>
-                                                        </RotateTransform3D>
-                                                        <RotateTransform3D>
-                                                            <RotateTransform3D.Rotation>
-                                                                <AxisAngleRotation3D Axis="1,0,0" Angle="4" />
-                                                            </RotateTransform3D.Rotation>
-                                                        </RotateTransform3D>
-                                                    </Transform3DGroup>
-                                                </ModelVisual3D.Transform>
-                                            </ModelVisual3D>
+                                            <ModelVisual3D />
                                         </Viewport3D>
                                     </Grid>
 

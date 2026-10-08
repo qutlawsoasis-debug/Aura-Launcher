@@ -213,7 +213,8 @@
                        Margin="0,0,0,8" />
 
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                <TextBox Text="{Binding AddCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                <TextBox Style="{StaticResource AuraTextBox}"
+                         Text="{Binding AddCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          MaxLength="8"
                          Width="180" Height="40"
                          FontFamily="{StaticResource HeadingFont}"

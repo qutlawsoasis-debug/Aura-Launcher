@@ -849,20 +849,6 @@
                                                 Content="{TemplateBinding Content}"
                                                 Margin="{TemplateBinding Padding}" />
 
-                        <!-- Bottom fade gradient (24px) -->
-                        <Border Grid.Column="0"
-                                Height="24"
-                                VerticalAlignment="Bottom"
-                                HorizontalAlignment="Stretch"
-                                IsHitTestVisible="False">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
-                                    <GradientStop Color="#00071017" Offset="0" />
-                                    <GradientStop Color="#E6071017" Offset="1" />
-                                </LinearGradientBrush>
-                            </Border.Background>
-                        </Border>
-
                         <ScrollBar x:Name="PART_VerticalScrollBar"
                                    Grid.Column="1"
                                    Orientation="Vertical"
@@ -878,8 +864,6 @@
             </Setter.Value>
         </Setter>
     </Style>
-
-    <Style TargetType="{x:Type ScrollViewer}" BasedOn="{StaticResource AuraScrollViewer}" />
 
     <!-- Virtualized ItemsControl with built-in AuraScrollViewer for large lists (e.g. 100+ mods) -->
     <Style x:Key="VirtualizedAuraItemsControl" TargetType="{x:Type ItemsControl}">
