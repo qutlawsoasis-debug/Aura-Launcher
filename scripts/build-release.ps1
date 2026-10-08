@@ -21,9 +21,10 @@ $versionJsonPath = Join-Path $repoRoot "version.json"
 $internalVersion = "1.2.9"
 $userFacingVersion = "beta 1.0.1"
 
+$utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $changelog = @()
 if (Test-Path $versionJsonPath) {
-    $vData = Get-Content $versionJsonPath -Raw | ConvertFrom-Json
+    $vData = [System.IO.File]::ReadAllText($versionJsonPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
     $internalVersion = $vData.internalVersion
     $userFacingVersion = $vData.userFacingVersion
     if ($null -ne $vData.changelog) {
@@ -56,12 +57,15 @@ $vObj = [ordered]@{
     userFacingVersion = $userFacingVersion
     changelog = $changelog
 }
-$vObj | ConvertTo-Json -Depth 3 | Set-Content $versionJsonPath -Encoding UTF8
+$jsonText = ($vObj | ConvertTo-Json -Depth 3) + "`n"
+[System.IO.File]::WriteAllText($versionJsonPath, $jsonText, $utf8NoBom)
 
 # Sync AuraLauncher.csproj
 $csprojPath = Join-Path $repoRoot "AuraLauncher.csproj"
 if (Test-Path $csprojPath) {
-    (Get-Content $csprojPath) -replace '<Version>.*?</Version>', "<Version>$internalVersion</Version>" | Set-Content $csprojPath -Encoding UTF8
+    $csprojText = [System.IO.File]::ReadAllText($csprojPath, [System.Text.Encoding]::UTF8)
+    $csprojText = $csprojText -replace '<Version>.*?</Version>', "<Version>$internalVersion</Version>"
+    [System.IO.File]::WriteAllText($csprojPath, $csprojText, $utf8NoBom)
 }
 
 if ([string]::IsNullOrWhiteSpace($OutDir)) {
