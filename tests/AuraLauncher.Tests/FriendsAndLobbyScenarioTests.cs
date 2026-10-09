@@ -130,6 +130,12 @@ public class FriendsAndLobbyScenarioTests
         public string? CurrentHostToken { get; set; }
         public bool IsGameRunning { get; set; }
 
+        public void UpdateLobbyState(bool isInLobby, string? lobbyCode)
+        {
+            IsInLobby = isInLobby;
+            CurrentLobbyCode = isInLobby ? lobbyCode : null;
+        }
+
         public int SendInviteCallCount;
         public List<(string FriendId, string LobbyCode, string HostToken)> SentInvitesLog { get; } = new();
         public Dictionary<string, string> InviteAcceptLobbyCodeByInviteId { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -144,7 +150,10 @@ public class FriendsAndLobbyScenarioTests
         public void Dispose() { }
 
         public Task EnsureRegisteredAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task<SyncResponse?> SyncNowAsync(CancellationToken cancellationToken = default) => Task.FromResult<SyncResponse?>(null);
+
+        public Func<Task<SyncResponse?>>? OnSyncNowAsync { get; set; }
+        public Task<SyncResponse?> SyncNowAsync(CancellationToken cancellationToken = default)
+            => OnSyncNowAsync != null ? OnSyncNowAsync() : Task.FromResult<SyncResponse?>(null);
 
         public void EmitSync(SyncResponse response)
         {
@@ -181,8 +190,15 @@ public class FriendsAndLobbyScenarioTests
             return Task.FromResult((true, (string?)$"inv-{num}", (string?)null));
         }
 
+        public List<string> ChangedNicknamesLog { get; } = new();
         public Task<(bool Success, string? ErrorMessage)> ChangeNicknameAsync(string newNick, CancellationToken cancellationToken = default)
-            => Task.FromResult((true, (string?)null));
+        {
+            lock (ChangedNicknamesLog)
+            {
+                ChangedNicknamesLog.Add(newNick);
+            }
+            return Task.FromResult((true, (string?)null));
+        }
 
         public Task<(bool Success, string? LobbyCode, string? ErrorMessage)> RespondInviteAsync(string inviteId, bool accept, CancellationToken cancellationToken = default)
         {
@@ -198,6 +214,7 @@ public class FriendsAndLobbyScenarioTests
 
     private sealed class ScenarioSkinService : ISkinService
     {
+        public List<string> RequestedAvatarNicks { get; } = new();
         public SkinValidationResult ValidateSkinFile(string? filePath) => new(true);
         public ImageSource LoadSkinImage(string? skinPath) => SkinService.LoadDefaultSteveBitmap();
         public ImageSource ExtractHeadAvatar(string? skinPath) => SkinService.LoadDefaultSteveBitmap();
@@ -206,7 +223,14 @@ public class FriendsAndLobbyScenarioTests
         public Task SyncSkinToGameAsync(string? skinPath, string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<SkinUploadResult> UploadSkinToLobbyApiAsync(string? skinPath, string nickname, string model, string? ownerToken, string? baseUrl = null, CancellationToken cancellationToken = default) => Task.FromResult(new SkinUploadResult(true, "token"));
-        public Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default) => Task.FromResult<ImageSource>(SkinService.LoadDefaultSteveBitmap());
+        public Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default)
+        {
+            lock (RequestedAvatarNicks)
+            {
+                RequestedAvatarNicks.Add(nickname);
+            }
+            return Task.FromResult<ImageSource>(SkinService.LoadDefaultSteveBitmap());
+        }
         public Task<(ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default) => Task.FromResult< (ImageSource SkinTexture, bool IsSlim) >((SkinService.LoadDefaultSteveBitmap(), false));
         public void EnsureCustomSkinLoaderConfig(string gameDir) { }
         public void ClearCustomSkinLoaderCache(string gameDir) { }
@@ -558,6 +582,112 @@ public class FriendsAndLobbyScenarioTests
         Assert.Equal("INV777", lobbyVm.LobbyCode);
     }
 
+    [Fact]
+    public async Task JoinFriend_WithStatusLobby_FetchesFreshLobbyCodeOnJoinIfMissing()
+    {
+        var (lobbyVm, friendsVm, _, friendService) = CreateTestHarness();
+
+        friendService.EmitSync(new SyncResponse
+        {
+            Friends = new FriendPresenceItem[]
+            {
+                new() { Id = "f1", Nick = "HostFriend", Online = true, Status = "lobby", LobbyCode = null }
+            }
+        });
+
+        var friend = friendsVm.Friends[0];
+        Assert.True(friend.CanJoin);
+        Assert.Null(friend.LobbyCode);
+
+        friendService.OnSyncNowAsync = () => Task.FromResult<SyncResponse?>(new SyncResponse
+        {
+            Friends = new FriendPresenceItem[]
+            {
+                new() { Id = "f1", Nick = "HostFriend", Online = true, Status = "lobby", LobbyCode = "SYNC88" }
+            }
+        });
+
+        bool openLobbyFired = false;
+        friendsVm.OpenLobbyRequested += () => openLobbyFired = true;
+
+        friend.JoinCommand.Execute(null);
+
+        for (int i = 0; i < 40 && lobbyVm.LobbyCode != "SYNC88"; i++)
+        {
+            await Task.Delay(20);
+        }
+
+        Assert.True(openLobbyFired);
+        Assert.True(lobbyVm.IsInLobby);
+        Assert.True(lobbyVm.IsGuestJoined);
+        Assert.Equal("SYNC88", lobbyVm.LobbyCode);
+        Assert.Equal("SYNC88", friend.LobbyCode);
+    }
+
+    [Fact]
+    public async Task JoinFriend_WithoutLobbyCodeAndInvite_ShowsNotificationAndDoesNotSwitchTab()
+    {
+        var lobbyService = new ScenarioLobbyService();
+        var friendService = new ScenarioFriendService();
+        var skinService = new ScenarioSkinService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        var launchService = new TestLaunchService();
+        var notificationService = new ScenarioNotificationService();
+
+        var lobbyVm = new LobbyViewModel(lobbyService, launchService, configService, skinService: skinService);
+        var friendsVm = new FriendsViewModel(friendService, lobbyService, skinService, lobbyVm, notificationService);
+
+        friendService.EmitSync(new SyncResponse
+        {
+            Friends = new FriendPresenceItem[]
+            {
+                new() { Id = "f2", Nick = "NoCodeFriend", Online = true, Status = "lobby", LobbyCode = null }
+            }
+        });
+
+        var friend = friendsVm.Friends[0];
+        Assert.True(friend.CanJoin);
+
+        friendService.OnSyncNowAsync = () => Task.FromResult<SyncResponse?>(new SyncResponse
+        {
+            Friends = new FriendPresenceItem[]
+            {
+                new() { Id = "f2", Nick = "NoCodeFriend", Online = true, Status = "lobby", LobbyCode = null }
+            }
+        });
+
+        bool openLobbyFired = false;
+        friendsVm.OpenLobbyRequested += () => openLobbyFired = true;
+
+        friend.JoinCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.False(openLobbyFired);
+        Assert.False(lobbyVm.IsInLobby);
+        Assert.NotEmpty(notificationService.Notifications);
+        Assert.Contains(notificationService.Notifications, n => n.Message.Contains("NoCodeFriend"));
+    }
+
+    private sealed class ScenarioNotificationService : INotificationService
+    {
+        public List<(string Title, string Message, string TargetTab, string Type)> Notifications { get; } = new();
+
+        public void Notify(string title, string message, string targetTab = "Overview", string type = "info")
+            => Notifications.Add((title, message, targetTab, type));
+        public void NotifyLobbyInvite(string fromNick, string inviteId = "", string lobbyCode = "") { }
+        public void NotifyFriendRequest(string fromNick, string fromId = "", string friendCode = "") { }
+        public void NotifyPlayerJoinedLobby(string playerNick) { }
+        public void NotifyHostOpenedWorld() { }
+        public void NotifyScreenshotTaken(string filePath, string fileName) { }
+        public void NotifyGameCrash(int exitCode, string? reason = null) { }
+        public void NotifyKickedFromLobby() { }
+        public void NotifyUpdateAvailable(string updateTitle, string updateMessage) { }
+        public void NotifyIntegrityChecked(string statusText) { }
+        public bool IsWindowVisibleAndFocused() => true;
+        public void RegisterInAppToastHandler(Action<string, string, string, string?> showToast) { }
+        public void RegisterInAppToastHandler(Action<string, string> showToast) { }
+    }
+
     private sealed class DelayedMockLobbyApiClient : ILobbyApiClient
     {
         public TimeSpan CloseDelay { get; set; } = TimeSpan.FromMilliseconds(80);
@@ -750,5 +880,51 @@ public class FriendsAndLobbyScenarioTests
         Assert.Null(lobbyVm.LobbyCode);
         Assert.Null(friend.InviteState);
         Assert.True(friend.CanInvite);
+    }
+
+    [Fact]
+    public void FriendItem_NickUpdate_UpdatesNickAndReloadsAvatar()
+    {
+        var (lobbyVm, friendsVm, _, friendService) = CreateTestHarness();
+
+        friendService.EmitSync(new SyncResponse
+        {
+            Friends = new FriendPresenceItem[]
+            {
+                new() { Id = "f1", Nick = "Player", Online = true, Status = "online" }
+            }
+        });
+
+        var friend = Assert.Single(friendsVm.Friends);
+        Assert.Equal("Player", friend.Nick);
+
+        // Server sends updated nickname (e.g. Coock0ld)
+        friendService.EmitSync(new SyncResponse
+        {
+            Friends = new FriendPresenceItem[]
+            {
+                new() { Id = "f1", Nick = "Coock0ld", Online = true, Status = "online" }
+            }
+        });
+
+        Assert.Equal("Coock0ld", friend.Nick);
+    }
+
+    [Fact]
+    public void SettingsViewModel_NicknameChange_InvokesFriendServiceChangeNick()
+    {
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        configService.CurrentConfig.Nickname = "InitialNick";
+        var skinService = new ScenarioSkinService();
+        var friendService = new ScenarioFriendService();
+
+        var settingsVm = new SettingsViewModel(
+            configService,
+            skinService,
+            friendService: friendService);
+
+        settingsVm.Nickname = "Coock0ld";
+
+        Assert.Contains("Coock0ld", friendService.ChangedNicknamesLog);
     }
 }

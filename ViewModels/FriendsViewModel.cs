@@ -35,7 +35,13 @@ public class FriendItemViewModel : ObservableObject
     private readonly Action<FriendItemViewModel> _onRemove;
 
     public string Id { get; }
-    public string Nick { get; }
+
+    private string _nick = string.Empty;
+    public string Nick
+    {
+        get => _nick;
+        set => SetProperty(ref _nick, value);
+    }
 
     private bool _online;
     public bool Online
@@ -222,8 +228,14 @@ public class FriendItemViewModel : ObservableObject
         CancelDeleteCommand = new RelayCommand(_ => IsConfirmingDelete = false);
     }
 
-    public void UpdateFromPresence(FriendPresenceItem item)
+    public bool UpdateFromPresence(FriendPresenceItem item)
     {
+        bool nickChanged = false;
+        if (!string.IsNullOrWhiteSpace(item.Nick) && !string.Equals(Nick, item.Nick, StringComparison.OrdinalIgnoreCase))
+        {
+            Nick = item.Nick;
+            nickChanged = true;
+        }
         Online = item.Online;
         Status = item.Status;
         LobbyCode = item.LobbyCode;
@@ -231,6 +243,7 @@ public class FriendItemViewModel : ObservableObject
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(CanJoin));
         OnPropertyChanged(nameof(CanInvite));
+        return nickChanged;
     }
 
     public static string FormatLastSeen(long lastSeenMs)
@@ -252,6 +265,7 @@ public class FriendsViewModel : ObservableObject
     private readonly ILobbyService _lobbyService;
     private readonly ISkinService _skinService;
     private readonly LobbyViewModel _lobbyViewModel;
+    private readonly INotificationService? _notificationService;
     private readonly SemaphoreSlim _inviteLock = new(1, 1);
     private readonly HashSet<string> _inFlightInviteFriendIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _dismissedSentInviteIds = new(StringComparer.OrdinalIgnoreCase);
@@ -385,12 +399,14 @@ public class FriendsViewModel : ObservableObject
         IFriendService friendService,
         ILobbyService lobbyService,
         ISkinService skinService,
-        LobbyViewModel lobbyViewModel)
+        LobbyViewModel lobbyViewModel,
+        INotificationService? notificationService = null)
     {
         _friendService = friendService ?? throw new ArgumentNullException(nameof(friendService));
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _lobbyViewModel = lobbyViewModel ?? throw new ArgumentNullException(nameof(lobbyViewModel));
+        _notificationService = notificationService;
 
         CopyCodeCommand = new RelayCommand(_ => CopyCode());
         CopyLinkCommand = new RelayCommand(_ => CopyFriendLink());
@@ -655,9 +671,14 @@ public class FriendsViewModel : ObservableObject
                     if (currentFriendsDict.TryGetValue(item.Id, out var existing))
                     {
                         wasInMyLobby = existing.IsInMyLobby;
-                        existing.UpdateFromPresence(item);
+                        bool nickChanged = existing.UpdateFromPresence(item);
                         vm = existing;
-                        if (!existing.IsCustomAvatarLoaded)
+                        if (nickChanged)
+                        {
+                            existing.IsCustomAvatarLoaded = false;
+                            _ = LoadAvatarAsync(existing);
+                        }
+                        else if (!existing.IsCustomAvatarLoaded)
                         {
                             _ = LoadAvatarAsync(existing);
                         }
@@ -921,12 +942,6 @@ public class FriendsViewModel : ObservableObject
     {
         if (friend == null) return;
 
-        try
-        {
-            OpenLobbyRequested?.Invoke();
-        }
-        catch { }
-
         _ = Task.Run(async () =>
         {
             try
@@ -934,6 +949,7 @@ public class FriendsViewModel : ObservableObject
                 string? codeToJoin = friend.LobbyCode;
                 bool fromInvite = false;
 
+                // 1. Если кода нет, но есть инвайт — отвечаем на него
                 if (string.IsNullOrWhiteSpace(codeToJoin) && !string.IsNullOrWhiteSpace(friend.IncomingInviteId))
                 {
                     var (ok, inviteLobbyCode, _) = await _friendService.RespondInviteAsync(friend.IncomingInviteId, accept: true);
@@ -944,12 +960,44 @@ public class FriendsViewModel : ObservableObject
                     }
                 }
 
-                if (!string.IsNullOrWhiteSpace(codeToJoin))
+                // 2. Если кода всё ещё нет, а статус "lobby" или "playing" — пробуем свежий sync
+                if (string.IsNullOrWhiteSpace(codeToJoin) && (string.Equals(friend.Status, "lobby", StringComparison.OrdinalIgnoreCase) || string.Equals(friend.Status, "playing", StringComparison.OrdinalIgnoreCase)))
                 {
-                    await _lobbyViewModel.JoinByCodeAsync(codeToJoin, fromInvite);
+                    var syncResult = await _friendService.SyncNowAsync();
+                    var updatedFriend = syncResult?.Friends?.FirstOrDefault(f => string.Equals(f.Id, friend.Id, StringComparison.OrdinalIgnoreCase));
+                    if (!string.IsNullOrWhiteSpace(updatedFriend?.LobbyCode))
+                    {
+                        codeToJoin = updatedFriend.LobbyCode;
+                        Dispatch(() =>
+                        {
+                            friend.LobbyCode = updatedFriend.LobbyCode;
+                        });
+                    }
                 }
+
+                // 3. Если код так и не удалось определить — не открываем пустую вкладку
+                if (string.IsNullOrWhiteSpace(codeToJoin))
+                {
+                    Dispatch(() =>
+                    {
+                        _notificationService?.Notify("Лобби друга", $"Не удалось получить код лобби игрока {friend.Nick}. Попросите друга прислать код или приглашение.", "Friends", "warning");
+                    });
+                    return;
+                }
+
+                // 4. Переключаем на вкладку Лобби
+                Dispatch(() =>
+                {
+                    OpenLobbyRequested?.Invoke();
+                });
+
+                // 5. Запускаем вход по коду
+                await _lobbyViewModel.JoinByCodeAsync(codeToJoin, fromInvite);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[FRIEND: JOIN ERROR] {ex.Message}");
+            }
         });
     }
 }

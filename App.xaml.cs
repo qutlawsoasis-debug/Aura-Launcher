@@ -633,7 +633,8 @@ public partial class App : Application
             sp.GetService<IReportService>(),
             sp.GetService<IBackgroundService>(),
             sp.GetRequiredService<IPackUpdateService>(),
-            sp.GetService<INotificationService>()));
+            sp.GetService<INotificationService>(),
+            sp.GetService<IFriendService>()));
         services.AddSingleton<WorkshopViewModel>();
         services.AddSingleton<WardrobeViewModel>(sp => new WardrobeViewModel(
             sp.GetRequiredService<ISkinService>(),

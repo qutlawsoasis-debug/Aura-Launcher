@@ -661,7 +661,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
 
     private static void CleanupPartFiles(string gameDir, Dictionary<string, long> plannedParts)
     {
-        var targetSubDirs = new[] { "mods", "shaderpacks", "resourcepacks", "config" };
+        var targetSubDirs = new[] { "mods", "shaderpacks", "resourcepacks", "config", "tlm_custom_pack" };
         foreach (var sub in targetSubDirs)
         {
             var dir = Path.Combine(gameDir, sub);
@@ -864,12 +864,13 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             throw new FormatException($"Путь содержит управляющие символы: {path}");
         }
 
-        // Разрешены только: mods/, shaderpacks/, resourcepacks/, config/, CustomSkinLoader/ и options.txt в корне
+        // Разрешены только: mods/, shaderpacks/, resourcepacks/, config/, CustomSkinLoader/, tlm_custom_pack/ и options.txt в корне
         bool isAllowedRoot = path.StartsWith("mods/", StringComparison.Ordinal) ||
                              path.StartsWith("shaderpacks/", StringComparison.Ordinal) ||
                              path.StartsWith("resourcepacks/", StringComparison.Ordinal) ||
                              path.StartsWith("config/", StringComparison.Ordinal) ||
                              path.StartsWith("CustomSkinLoader/", StringComparison.Ordinal) ||
+                             path.StartsWith("tlm_custom_pack/", StringComparison.Ordinal) ||
                              string.Equals(path, "options.txt", StringComparison.Ordinal);
 
         if (!isAllowedRoot)

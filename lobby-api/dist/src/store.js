@@ -372,9 +372,10 @@ export class InMemoryStore {
             const fPres = this.presences.get(fId);
             const isOnline = Boolean(fPres && now <= fPres.expiresAt && fPres.presence.status !== 'offline');
             const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.createdAt || 0;
+            const effectiveNick = (fPres?.presence?.nick && fPres.presence.nick !== 'Unknown') ? fPres.presence.nick : (fUser?.nick || 'Unknown');
             friends.push({
                 id: fId,
-                nick: fUser?.nick || 'Unknown',
+                nick: effectiveNick,
                 online: isOnline,
                 status: isOnline ? fPres.presence.status : 'offline',
                 lobbyCode: isOnline && (fPres.presence.status === 'lobby' || fPres.presence.status === 'playing') && fPres.presence.lobbyCode ? fPres.presence.lobbyCode : undefined,
@@ -824,9 +825,10 @@ export class UpstashStore {
             const pres = presencesMap.get(fId);
             const isOnline = Boolean(pres && pres.status !== 'offline');
             const recordedLastSeen = lastSeenMap.get(fId) || u?.createdAt || 0;
+            const effectiveNick = (pres?.nick && pres.nick !== 'Unknown') ? pres.nick : (u?.nick || 'Unknown');
             friends.push({
                 id: fId,
-                nick: u?.nick || 'Unknown',
+                nick: effectiveNick,
                 online: isOnline,
                 status: isOnline ? pres.status : 'offline',
                 lobbyCode: isOnline && (pres.status === 'lobby' || pres.status === 'playing') && pres.lobbyCode ? pres.lobbyCode : null,

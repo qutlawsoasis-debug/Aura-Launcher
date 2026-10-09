@@ -138,6 +138,12 @@ export async function handleSync(req: any, res: any) {
 
   const body = await parseJson(req);
   const nick = (typeof body.nick === 'string' && body.nick.trim()) ? body.nick.trim() : user.nick;
+  if (nick && nick !== user.nick && /^[A-Za-z0-9_]{2,24}$/.test(nick)) {
+    try {
+      await store.updateUserNick(user.id, nick);
+      user.nick = nick;
+    } catch { }
+  }
   const statusRaw = body.status;
   const status: 'online' | 'lobby' | 'playing' | 'offline' =
     (statusRaw === 'lobby' || statusRaw === 'playing' || statusRaw === 'offline') ? statusRaw : 'online';

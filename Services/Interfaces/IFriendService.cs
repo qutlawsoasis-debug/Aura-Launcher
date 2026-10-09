@@ -17,6 +17,8 @@ public interface IFriendService : IDisposable
     string? CurrentHostToken { get; set; }
     bool IsGameRunning { get; set; }
 
+    void UpdateLobbyState(bool isInLobby, string? lobbyCode);
+
     event Action<SyncResponse>? SyncUpdated;
     event Action<IReadOnlyList<FriendPresenceItem>>? FriendsListUpdated;
     event Action<IncomingInviteItem>? InviteReceived;

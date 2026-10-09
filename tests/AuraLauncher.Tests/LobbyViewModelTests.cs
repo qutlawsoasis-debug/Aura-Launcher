@@ -290,4 +290,40 @@ public class LobbyViewModelTests
         Assert.True(friend3.StageOffsetX > friend1.StageOffsetX);
         Assert.Equal(-friend3.StageOffsetX, friend4.StageOffsetX);
     }
+
+    [Fact]
+    public async Task KickPlayerAsync_WhenHost_RemovesPlayerImmediately()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        var launchService = new TestLaunchService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService);
+
+        await vm.CreateLobbyAsync();
+        var guest = new LobbyPlayerItem { Nickname = "Vetements", IsHost = false };
+        vm.LobbyPlayers.Add(guest);
+        Assert.Equal(2, vm.LobbyPlayers.Count);
+
+        bool kicked = await vm.KickPlayerAsync("Vetements");
+
+        Assert.True(kicked);
+        Assert.DoesNotContain(vm.LobbyPlayers, p => p.Nickname == "Vetements");
+    }
+
+    [Fact]
+    public async Task KickPlayerAsync_WhenNotHost_ReturnsFalse()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        var launchService = new TestLaunchService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService);
+
+        var guest = new LobbyPlayerItem { Nickname = "Vetements", IsHost = false };
+        vm.LobbyPlayers.Add(guest);
+
+        bool kicked = await vm.KickPlayerAsync("Vetements");
+
+        Assert.False(kicked);
+        Assert.Contains(vm.LobbyPlayers, p => p.Nickname == "Vetements");
+    }
 }

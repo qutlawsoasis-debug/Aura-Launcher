@@ -255,17 +255,32 @@ public class LobbyViewModel : ObservableObject
     public string ServerPingText
     {
         get => _serverPingText;
-        set => SetProperty(ref _serverPingText, value);
+        set
+        {
+            if (SetProperty(ref _serverPingText, value))
+            {
+                OnPropertyChanged(nameof(HasServerPing));
+                OnPropertyChanged(nameof(IsServerMetricsVisible));
+            }
+        }
     }
 
     public string ServerPlayersText
     {
         get => _serverPlayersText;
-        set => SetProperty(ref _serverPlayersText, value);
+        set
+        {
+            if (SetProperty(ref _serverPlayersText, value))
+            {
+                OnPropertyChanged(nameof(HasServerPlayers));
+                OnPropertyChanged(nameof(IsServerMetricsVisible));
+            }
+        }
     }
 
     public bool HasServerPing => ServerPingText != "—";
     public bool HasServerPlayers => ServerPlayersText != "—";
+    public bool IsServerMetricsVisible => IsInLobby && IsStatusOpen && (HasServerPing || HasServerPlayers);
 
     public bool CanReconnect => !IsBusy && !_lobbyService.IsHost && (CanGuestConnect || !string.IsNullOrWhiteSpace(_lastTunnelAddress));
 
@@ -644,6 +659,7 @@ public class LobbyViewModel : ObservableObject
         OnPropertyChanged(nameof(IsStatusWaiting));
         OnPropertyChanged(nameof(CombinedStatusText));
         OnPropertyChanged(nameof(IsHost));
+        OnPropertyChanged(nameof(IsServerMetricsVisible));
         RaiseAllCommands();
     }
 
@@ -1091,15 +1107,21 @@ public class LobbyViewModel : ObservableObject
             if (IsInLobby)
             {
                 LeaveLobby();
-                GuestCodeInput = cleanCode;
+                Dispatch(() =>
+                {
+                    GuestCodeInput = cleanCode;
+                });
             }
 
             int myGen = Interlocked.Increment(ref _lobbyOpGeneration);
-            IsJoiningLobby = true;
-            JoinErrorMessage = string.Empty;
-            GuestStatusText = "Подключение к лобби...";
-            StatusText = "Подключение...";
-            StatusIcon = string.Empty;
+            Dispatch(() =>
+            {
+                IsJoiningLobby = true;
+                JoinErrorMessage = string.Empty;
+                GuestStatusText = "Подключение к лобби...";
+                StatusText = "Подключение...";
+                StatusIcon = string.Empty;
+            });
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
@@ -1183,15 +1205,18 @@ public class LobbyViewModel : ObservableObject
 
                 if (joined)
                 {
-                    LobbyCode = !string.IsNullOrWhiteSpace(_lobbyService.CurrentLobbyCode) ? _lobbyService.CurrentLobbyCode : cleanCode;
-                    HostName = statusResp?.HostName;
-                    IsLobbyCreated = false;
-                    IsWorldOpen = false;
-                    IsGuestJoined = true;
-                    IsInLobby = true;
-                    SeedGuestLobbyPlayersIfEmpty(playerName, statusResp?.HostName);
-                    _discordRpcService?.SetInLobby(1);
-                    UpdateGuestStatus();
+                    Dispatch(() =>
+                    {
+                        LobbyCode = !string.IsNullOrWhiteSpace(_lobbyService.CurrentLobbyCode) ? _lobbyService.CurrentLobbyCode : cleanCode;
+                        HostName = statusResp?.HostName;
+                        IsLobbyCreated = false;
+                        IsWorldOpen = false;
+                        IsGuestJoined = true;
+                        IsInLobby = true;
+                        SeedGuestLobbyPlayersIfEmpty(playerName, statusResp?.HostName);
+                        _discordRpcService?.SetInLobby(1);
+                        UpdateGuestStatus();
+                    });
 
                     var status = await _lobbyService.RefreshGuestStatusAsync(cts.Token);
                     if (_lobbyOpGeneration != myGen || !IsInLobby) return;
@@ -1207,30 +1232,42 @@ public class LobbyViewModel : ObservableObject
                 }
                 else
                 {
-                    JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
-                    GuestStatusText = "Лобби не найдено или код неверный";
-                    StatusText = "Не удалось подключиться к лобби";
-                    StatusIcon = string.Empty;
+                    Dispatch(() =>
+                    {
+                        JoinErrorMessage = $"Лобби с кодом {cleanCode} не найдено. Проверьте код или попросите хоста создать новое.";
+                        GuestStatusText = "Лобби не найдено или код неверный";
+                        StatusText = "Не удалось подключиться к лобби";
+                        StatusIcon = string.Empty;
+                    });
                 }
             }
             catch (OperationCanceledException)
             {
-                JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
-                GuestStatusText = "Таймаут подключения";
-                StatusText = "Таймаут подключения";
-                StatusIcon = string.Empty;
+                Dispatch(() =>
+                {
+                    JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
+                    GuestStatusText = "Таймаут подключения";
+                    StatusText = "Таймаут подключения";
+                    StatusIcon = string.Empty;
+                });
             }
             catch (Exception ex)
             {
                 PlayitTunnelProvider.LogTunnel($"[JOIN: ERROR] {ex.Message}");
-                JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
-                GuestStatusText = "Ошибка подключения";
-                StatusText = $"Ошибка: {ex.Message}";
-                StatusIcon = string.Empty;
+                Dispatch(() =>
+                {
+                    JoinErrorMessage = "Нет связи с сервером лобби. Проверьте интернет и попробуйте снова.";
+                    GuestStatusText = "Ошибка подключения";
+                    StatusText = $"Ошибка: {ex.Message}";
+                    StatusIcon = string.Empty;
+                });
             }
             finally
             {
-                IsJoiningLobby = false;
+                Dispatch(() =>
+                {
+                    IsJoiningLobby = false;
+                });
             }
         }
         finally
@@ -1272,8 +1309,12 @@ public class LobbyViewModel : ObservableObject
     public async Task<bool> JoinByCodeAsync(string code, bool fromInvite = false)
     {
         if (string.IsNullOrWhiteSpace(code)) return false;
+        var clean = code.Trim().ToUpperInvariant();
         WasInvited = fromInvite;
-        GuestCodeInput = code.Trim().ToUpperInvariant();
+        Dispatch(() =>
+        {
+            GuestCodeInput = clean;
+        });
         await JoinLobbyAsync();
         if (IsInLobby && IsStatusOpen && WasInvited && _configService.CurrentConfig.AutoConnectOnInviteAccept)
         {
@@ -1486,6 +1527,16 @@ public class LobbyViewModel : ObservableObject
             bool success = await _lobbyService.KickPlayerAsync(playerNick);
             if (success)
             {
+                Dispatch(() =>
+                {
+                    var item = LobbyPlayers.FirstOrDefault(p => string.Equals(p.Nickname, playerNick, StringComparison.OrdinalIgnoreCase));
+                    if (item != null)
+                    {
+                        LobbyPlayers.Remove(item);
+                        UpdateStagePositions();
+                        PlayerCountChanged?.Invoke(LobbyPlayers.Count);
+                    }
+                });
                 _notificationService?.Notify("Лобби", $"Игрок {playerNick} исключен из лобби");
             }
             return success;

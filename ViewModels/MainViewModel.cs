@@ -753,7 +753,7 @@ public class MainViewModel : ObservableObject
         WorkshopVM.LaunchWorldRequested += folder => _ = LaunchGameAsync(quickPlaySingleplayer: folder);
         
         _friendService = friendService;
-        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), sharedLobbyService!, _skinService, LobbyVM);
+        FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), sharedLobbyService!, _skinService, LobbyVM, _notificationService);
         FriendsVM.OpenLobbyRequested += () => SwitchTab("Lobby");
 
         DismissInfoToastCommand = new RelayCommand(_ => DismissInfoToast());
@@ -872,14 +872,7 @@ public class MainViewModel : ObservableObject
             }
             if (_friendService != null && (e.PropertyName == nameof(LobbyViewModel.IsInLobby) || e.PropertyName == nameof(LobbyViewModel.LobbyCode)))
             {
-                bool changed = _friendService.IsInLobby != LobbyVM.IsInLobby ||
-                               !string.Equals(_friendService.CurrentLobbyCode, LobbyVM.LobbyCode, StringComparison.OrdinalIgnoreCase);
-                _friendService.IsInLobby = LobbyVM.IsInLobby;
-                _friendService.CurrentLobbyCode = LobbyVM.LobbyCode;
-                if (changed)
-                {
-                    _ = _friendService.SyncNowAsync();
-                }
+                _friendService.UpdateLobbyState(LobbyVM.IsInLobby, LobbyVM.LobbyCode);
             }
             if (_discordRpcService != null && (e.PropertyName == nameof(LobbyViewModel.IsInLobby) || e.PropertyName == nameof(LobbyViewModel.LobbyPlayers)))
             {

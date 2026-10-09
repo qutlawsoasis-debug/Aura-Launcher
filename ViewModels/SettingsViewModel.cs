@@ -23,6 +23,7 @@ public class SettingsViewModel : ObservableObject
     private readonly IBackgroundService? _backgroundService;
     private readonly IPackUpdateService? _packUpdateService;
     private readonly INotificationService? _notificationService;
+    private readonly IFriendService? _friendService;
     private bool _isCheckingIntegrity;
     private string _integrityStatusText = string.Empty;
     private CancellationTokenSource? _debounceCts;
@@ -94,6 +95,7 @@ public class SettingsViewModel : ObservableObject
                 _configService.CurrentConfig.Nickname = nick;
                 _ = SaveImmediatelyAsync();
                 _ = ReuploadSkinUnderNewNickAsync(nick);
+                _ = _friendService?.ChangeNicknameAsync(nick);
             }
         }
         else
@@ -442,7 +444,8 @@ public class SettingsViewModel : ObservableObject
         IReportService? reportService = null,
         IBackgroundService? backgroundService = null,
         IPackUpdateService? packUpdateService = null,
-        INotificationService? notificationService = null)
+        INotificationService? notificationService = null,
+        IFriendService? friendService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
@@ -451,6 +454,7 @@ public class SettingsViewModel : ObservableObject
         _backgroundService = backgroundService;
         _packUpdateService = packUpdateService;
         _notificationService = notificationService;
+        _friendService = friendService;
 
         CheckIntegrityCommand = new AsyncRelayCommand(CheckIntegrityAsync, () => !IsCheckingIntegrity);
 

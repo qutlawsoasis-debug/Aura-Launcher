@@ -21,7 +21,7 @@ public class IntegrationTests
     {
         // 1. Prepare clean test folder for pack files
         Directory.CreateDirectory(TestGameDir);
-        foreach (var sub in new[] { "mods", "config", "shaderpacks", "resourcepacks" })
+        foreach (var sub in new[] { "mods", "config", "shaderpacks", "resourcepacks", "tlm_custom_pack", "CustomSkinLoader" })
         {
             var p = Path.Combine(TestGameDir, sub);
             if (Directory.Exists(p)) Directory.Delete(p, true);
@@ -53,7 +53,7 @@ public class IntegrationTests
         var rps = Directory.GetFiles(Path.Combine(TestGameDir, "resourcepacks"), "*.zip");
         var optionsPath = Path.Combine(TestGameDir, "options.txt");
 
-        var packFolders = new[] { "mods", "config", "shaderpacks", "resourcepacks" };
+        var packFolders = new[] { "mods", "config", "shaderpacks", "resourcepacks", "tlm_custom_pack", "CustomSkinLoader" };
         var packFiles = packFolders.SelectMany(f => Directory.Exists(Path.Combine(TestGameDir, f))
             ? Directory.GetFiles(Path.Combine(TestGameDir, f), "*", SearchOption.AllDirectories)
             : Array.Empty<string>()).ToList();

@@ -41,27 +41,31 @@ public class FriendService : IFriendService
     public bool IsInLobby
     {
         get => _isInLobby;
-        set
-        {
-            if (_isInLobby != value)
-            {
-                _isInLobby = value;
-                _ = SyncNowAsync();
-            }
-        }
+        set => UpdateLobbyState(value, _currentLobbyCode);
     }
 
     private string? _currentLobbyCode;
     public string? CurrentLobbyCode
     {
         get => _currentLobbyCode;
-        set
+        set => UpdateLobbyState(_isInLobby, value);
+    }
+
+    public void UpdateLobbyState(bool isInLobby, string? lobbyCode)
+    {
+        var cleanCode = isInLobby && !string.IsNullOrWhiteSpace(lobbyCode)
+            ? lobbyCode.Trim().ToUpperInvariant()
+            : null;
+
+        bool changed = _isInLobby != isInLobby ||
+                       !string.Equals(_currentLobbyCode, cleanCode, StringComparison.OrdinalIgnoreCase);
+
+        _isInLobby = isInLobby;
+        _currentLobbyCode = cleanCode;
+
+        if (changed)
         {
-            if (!string.Equals(_currentLobbyCode, value, StringComparison.OrdinalIgnoreCase))
-            {
-                _currentLobbyCode = value;
-                _ = SyncNowAsync();
-            }
+            _ = SyncNowAsync();
         }
     }
 
@@ -477,6 +481,7 @@ public class FriendService : IFriendService
                 return (false, err);
             }
 
+            _ = SyncNowAsync(cancellationToken);
             return (true, null);
         }
         catch (OperationCanceledException)
@@ -500,6 +505,17 @@ public class FriendService : IFriendService
         {
             // Первый запуск: тихая регистрация и первичный синк
             await EnsureRegisteredAsync(token);
+
+            var currentNick = _configService.CurrentConfig?.Nickname;
+            if (!string.IsNullOrWhiteSpace(currentNick) && !string.Equals(currentNick, "Player", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    _ = await ChangeNicknameAsync(currentNick, token);
+                }
+                catch { }
+            }
+
             await SyncNowAsync(token);
 
             while (!token.IsCancellationRequested)
