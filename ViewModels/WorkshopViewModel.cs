@@ -182,6 +182,8 @@ public class WorkshopViewModel : ObservableObject
     public RelayCommand SwitchSubTabCommand { get; }
     public AsyncRelayCommand RefreshAllCommand { get; }
     public AsyncRelayCommand CreateBackupCommand { get; }
+    public AsyncRelayCommand ExportWorldCommand { get; }
+    public AsyncRelayCommand ImportWorldCommand { get; }
     public RelayCommand OpenWorldFolderCommand { get; }
     public RelayCommand OpenBackupsFolderCommand { get; }
 
@@ -252,6 +254,87 @@ public class WorkshopViewModel : ObservableObject
             finally
             {
                 world.IsBackingUp = false;
+            }
+        });
+
+        ExportWorldCommand = new AsyncRelayCommand(async p =>
+        {
+            var world = p as WorldSaveItem ?? FeaturedWorld;
+            if (world == null || world.IsBackingUp) return;
+
+            string safeName = string.Join("_", world.DisplayName.Split(Path.GetInvalidFileNameChars()));
+            if (string.IsNullOrWhiteSpace(safeName)) safeName = world.FolderName;
+
+            var sfd = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Экспорт мира в архив (.zip)",
+                Filter = "Архив мира Minecraft (*.zip)|*.zip",
+                FileName = $"{safeName}.zip",
+                DefaultExt = ".zip"
+            };
+
+            if (sfd.ShowDialog() != true || string.IsNullOrWhiteSpace(sfd.FileName))
+            {
+                return;
+            }
+
+            try
+            {
+                world.IsBackingUp = true;
+                world.BackupStatusText = "Экспорт мира...";
+                await _workshopService.ExportWorldToZipAsync(world, sfd.FileName);
+                world.BackupStatusText = "Мир экспортирован!";
+                StatusMessage = $"Мир сохранён: {Path.GetFileName(sfd.FileName)}";
+                _ = Task.Delay(3000).ContinueWith(_ =>
+                {
+                    Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    {
+                        world.BackupStatusText = string.Empty;
+                        StatusMessage = string.Empty;
+                    });
+                });
+            }
+            catch (Exception ex)
+            {
+                world.BackupStatusText = "Ошибка экспорта";
+                StatusMessage = $"Ошибка экспорта: {ex.Message}";
+                FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: ERROR Export] {ex.Message}");
+            }
+            finally
+            {
+                world.IsBackingUp = false;
+            }
+        });
+
+        ImportWorldCommand = new AsyncRelayCommand(async _ =>
+        {
+            var ofd = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Выберите архив мира Minecraft (.zip)",
+                Filter = "Архив мира Minecraft (*.zip)|*.zip",
+                Multiselect = false
+            };
+
+            if (ofd.ShowDialog() != true || string.IsNullOrWhiteSpace(ofd.FileName))
+            {
+                return;
+            }
+
+            try
+            {
+                StatusMessage = "Импорт мира из архива...";
+                string importedName = await _workshopService.ImportWorldFromZipAsync(GetGameDir(), ofd.FileName);
+                await RefreshAllAsync();
+                StatusMessage = $"Мир «{importedName}» импортирован!";
+                _ = Task.Delay(3500).ContinueWith(_ =>
+                {
+                    Application.Current?.Dispatcher?.InvokeAsync(() => StatusMessage = string.Empty);
+                });
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Ошибка импорта: {ex.Message}";
+                FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: ERROR Import] {ex.Message}");
             }
         });
 

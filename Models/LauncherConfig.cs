@@ -39,4 +39,5 @@ public class LauncherConfig
     public string CurrentMusicTrack { get; set; } = "Aura Theme";
     public string StartMode { get; set; } = "Maximized";
     public bool AutoRotateBackgrounds { get; set; } = true;
+    public string GraphicsPreset { get; set; } = "Balanced";
 }

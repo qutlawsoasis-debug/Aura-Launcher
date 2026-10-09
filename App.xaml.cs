@@ -640,7 +640,9 @@ public partial class App : Application
             sp.GetRequiredService<ILobbyApiClient>(),
             sp.GetRequiredService<INotificationService>(),
             sp.GetRequiredService<IDiscordRpcService>(),
-            sp.GetRequiredService<IModManifestService>()));
+            sp.GetRequiredService<IModManifestService>(),
+            sp.GetRequiredService<IServerListSyncService>(),
+            sp.GetRequiredService<IWorkshopService>()));
         services.AddSingleton<FriendsViewModel>();
         services.AddSingleton<MainViewModel>();
     }

@@ -315,4 +315,210 @@ public class ServerListSyncService : IServerListSyncService
         FabricGameLaunchService.LogLauncherEvent(
             $"[SERVER-SYNC] added: {addedCount}, updated: {updatedCount}, removed: {removedCount}, unchanged: {unchangedCount}");
     }
+
+    public const string ActiveLobbyServerId = "aura-active-lobby";
+
+    public Task UpsertActiveLobbyServerAsync(
+        string gameDir,
+        string tunnelAddress,
+        string? hostName = null,
+        string? lobbyCode = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(gameDir) || !IsValidServerAddress(tunnelAddress))
+            {
+                return Task.CompletedTask;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var normalizedGameDir = Path.GetFullPath(gameDir);
+            Directory.CreateDirectory(normalizedGameDir);
+            var serversDatPath = Path.Combine(normalizedGameDir, "servers.dat");
+
+            var nbtFile = new NbtFile();
+            if (File.Exists(serversDatPath))
+            {
+                try
+                {
+                    nbtFile.LoadFromFile(serversDatPath, NbtCompression.None, null);
+                }
+                catch (Exception ex)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] active lobby upsert skipped: servers.dat unreadable ({ex.Message})");
+                    return Task.CompletedTask;
+                }
+            }
+
+            if (nbtFile.RootTag == null)
+            {
+                nbtFile.RootTag = new NbtCompound("");
+            }
+
+            var serversList = nbtFile.RootTag["servers"] as NbtList;
+            if (serversList == null)
+            {
+                serversList = new NbtList("servers", NbtTagType.Compound);
+                nbtFile.RootTag["servers"] = serversList;
+            }
+
+            string cleanAddress = tunnelAddress.Trim();
+            string displayName;
+            if (!string.IsNullOrWhiteSpace(hostName) && !string.IsNullOrWhiteSpace(lobbyCode))
+            {
+                displayName = $"Лобби Aura: {hostName.Trim()} [{lobbyCode.Trim()}]";
+            }
+            else if (!string.IsNullOrWhiteSpace(hostName))
+            {
+                displayName = $"Лобби Aura: {hostName.Trim()}";
+            }
+            else if (!string.IsNullOrWhiteSpace(lobbyCode))
+            {
+                displayName = $"Лобби Aura [{lobbyCode.Trim()}]";
+            }
+            else
+            {
+                displayName = "Лобби Aura";
+            }
+
+            // Проверяем, не стоит ли уже на 0-м месте точно такая же запись
+            if (serversList.Count > 0 && serversList[0] is NbtCompound firstComp)
+            {
+                bool sameId = string.Equals(firstComp["id"]?.StringValue, ActiveLobbyServerId, StringComparison.OrdinalIgnoreCase);
+                bool sameName = string.Equals(firstComp["name"]?.StringValue, displayName, StringComparison.Ordinal);
+                bool sameIp = string.Equals(firstComp["ip"]?.StringValue, cleanAddress, StringComparison.OrdinalIgnoreCase);
+                if (sameId && sameName && sameIp && File.Exists(serversDatPath))
+                {
+                    return Task.CompletedTask;
+                }
+            }
+
+            // Удаляем старые записи активного лобби
+            for (int i = serversList.Count - 1; i >= 0; i--)
+            {
+                if (serversList[i] is NbtCompound comp)
+                {
+                    string? idVal = comp["id"]?.StringValue;
+                    string? nameVal = comp["name"]?.StringValue;
+                    if (string.Equals(idVal, ActiveLobbyServerId, StringComparison.OrdinalIgnoreCase) ||
+                        (nameVal != null && nameVal.StartsWith("Лобби Aura", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        serversList.RemoveAt(i);
+                    }
+                }
+            }
+
+            var lobbyCompound = new NbtCompound
+            {
+                new NbtString("name", displayName),
+                new NbtString("ip", cleanAddress),
+                new NbtString("id", ActiveLobbyServerId),
+                new NbtByte("acceptTextures", 1),
+                new NbtByte("hidden", 0)
+            };
+
+            serversList.Insert(0, lobbyCompound);
+            SaveServersDatAtomically(serversDatPath, nbtFile);
+            FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] Active lobby server updated at index 0: '{displayName}'");
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] UpsertActiveLobbyServer error: {ex.Message}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveActiveLobbyServerAsync(
+        string gameDir,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(gameDir))
+            {
+                return Task.CompletedTask;
+            }
+
+            var normalizedGameDir = Path.GetFullPath(gameDir);
+            var serversDatPath = Path.Combine(normalizedGameDir, "servers.dat");
+            if (!File.Exists(serversDatPath))
+            {
+                return Task.CompletedTask;
+            }
+
+            var nbtFile = new NbtFile();
+            try
+            {
+                nbtFile.LoadFromFile(serversDatPath, NbtCompression.None, null);
+            }
+            catch
+            {
+                return Task.CompletedTask;
+            }
+
+            var serversList = nbtFile.RootTag?["servers"] as NbtList;
+            if (serversList == null || serversList.Count == 0)
+            {
+                return Task.CompletedTask;
+            }
+
+            int removed = 0;
+            for (int i = serversList.Count - 1; i >= 0; i--)
+            {
+                if (serversList[i] is NbtCompound comp)
+                {
+                    string? idVal = comp["id"]?.StringValue;
+                    string? nameVal = comp["name"]?.StringValue;
+                    if (string.Equals(idVal, ActiveLobbyServerId, StringComparison.OrdinalIgnoreCase) ||
+                        (nameVal != null && nameVal.StartsWith("Лобби Aura", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        serversList.RemoveAt(i);
+                        removed++;
+                    }
+                }
+            }
+
+            if (removed > 0)
+            {
+                SaveServersDatAtomically(serversDatPath, nbtFile);
+                FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] Removed {removed} active lobby server entry(s) from servers.dat");
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] RemoveActiveLobbyServer error: {ex.Message}");
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static void SaveServersDatAtomically(string serversDatPath, NbtFile nbtFile)
+    {
+        if (File.Exists(serversDatPath) && !_sessionBackupDone)
+        {
+            try
+            {
+                File.Copy(serversDatPath, serversDatPath + ".aura.bak", overwrite: true);
+                _sessionBackupDone = true;
+            }
+            catch { }
+        }
+
+        var tmpPath = serversDatPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            nbtFile.SaveToFile(tmpPath, NbtCompression.None);
+            File.Move(tmpPath, serversDatPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tmpPath))
+            {
+                try { File.Delete(tmpPath); } catch { }
+            }
+        }
+    }
 }

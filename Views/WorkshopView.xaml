@@ -245,26 +245,43 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- Subheader: Muted description + Text link «Папка бэкапов» (No banner box) -->
+                    <!-- Subheader: Muted description + Text links «Импорт мира (.zip)» & «Папка бэкапов» (No banner box) -->
                     <Grid Grid.Row="0" Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <TextBlock Grid.Column="0"
-                                   Text="Резервные копии создаются в формате .zip в 1 клик перед установкой новых модов"
-                                   FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                            <TextBlock Text="Резервные копии создаются автоматически перед открытием лобби и в 1 клик вручную"
+                                       FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding StatusMessage}"
+                                       FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="Medium"
+                                       Foreground="{DynamicResource Accent}"
+                                       VerticalAlignment="Center" Margin="14,0,0,0"
+                                       Visibility="{Binding StatusMessage.Length, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
 
-                        <Button Grid.Column="1" Command="{Binding OpenBackupsFolderCommand}"
-                                Style="{StaticResource GhostBtn}"
-                                Padding="0" VerticalAlignment="Center" FocusVisualStyle="{x:Null}">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Width="14" Height="14" Margin="0,0,6,0" Stroke="{DynamicResource TextPrimary}" />
-                                <TextBlock Text="Папка бэкапов" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource TextPrimary}" />
-                            </StackPanel>
-                        </Button>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding ImportWorldCommand}"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="0" Margin="0,0,20,0" VerticalAlignment="Center" FocusVisualStyle="{x:Null}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSave}" Width="14" Height="14" Margin="0,0,6,0" Stroke="{DynamicResource Accent}" />
+                                    <TextBlock Text="Импорт мира (.zip)" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource Accent}" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Command="{Binding OpenBackupsFolderCommand}"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="0" VerticalAlignment="Center" FocusVisualStyle="{x:Null}">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Width="14" Height="14" Margin="0,0,6,0" Stroke="{DynamicResource TextPrimary}" />
+                                    <TextBlock Text="Папка бэкапов" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource TextPrimary}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
                     <!-- Worlds Scrollable Area -->
@@ -372,7 +389,7 @@
                                         </Grid>
                                     </StackPanel>
 
-                                    <!-- Action Buttons: Filled «Создать бэкап», Text «Восстановить…» & «Папка» -->
+                                    <!-- Action Buttons: Filled «Создать бэкап», Text «Восстановить…», «Экспорт (.zip)» & «Папка» -->
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                         <!-- Filled Accent Button with dark text, radius 3 -->
                                         <Button Command="{Binding DataContext.CreateBackupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -397,6 +414,14 @@
                                                 Style="{StaticResource GhostBtn}"
                                                 Margin="0,0,16,0" Padding="8,8" FocusVisualStyle="{x:Null}">
                                             <TextBlock Text="Восстановить…" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource TextPrimary}" />
+                                        </Button>
+
+                                        <!-- Text Link «Экспорт (.zip)» -->
+                                        <Button Command="{Binding DataContext.ExportWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource GhostBtn}"
+                                                Margin="0,0,16,0" Padding="8,8" FocusVisualStyle="{x:Null}">
+                                            <TextBlock Text="Экспорт (.zip)" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource TextPrimary}" />
                                         </Button>
 
                                         <!-- Text Link «Папка» -->
@@ -488,6 +513,12 @@
                                                                 Style="{StaticResource GhostBtn}"
                                                                 Padding="8,6" Margin="0,0,8,0" FocusVisualStyle="{x:Null}">
                                                             <TextBlock Text="Восстановить…" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
+                                                        </Button>
+                                                        <Button Command="{Binding DataContext.ExportWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                Padding="8,6" Margin="0,0,8,0" FocusVisualStyle="{x:Null}">
+                                                            <TextBlock Text="Экспорт (.zip)" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
                                                         </Button>
                                                         <Button Command="{Binding DataContext.OpenWorldFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"

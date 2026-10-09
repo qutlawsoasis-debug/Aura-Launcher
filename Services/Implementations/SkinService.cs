@@ -649,6 +649,33 @@ public class SkinService : ISkinService
             using var response = await _httpClient.SendAsync(req, cancellationToken);
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
 
+            // Если сессия UserId в Redis истекла (401), повторяем запрос без X-User-Id/X-User-Token (по ownerToken)
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && req.Headers.Contains("X-User-Id"))
+            {
+                using var retryContent = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                using var retryReq = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, endpoint)
+                {
+                    Content = retryContent
+                };
+                using var retryResp = await _httpClient.SendAsync(retryReq, cancellationToken);
+                responseText = await retryResp.Content.ReadAsStringAsync(cancellationToken);
+                if (retryResp.IsSuccessStatusCode)
+                {
+                    string? retryOwnerToken = ownerToken;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(responseText);
+                        if (doc.RootElement.TryGetProperty("ownerToken", out var tokenElem))
+                        {
+                            retryOwnerToken = tokenElem.GetString();
+                        }
+                    }
+                    catch { }
+                    InvalidateMemoryCache(nickname);
+                    return new SkinUploadResult(true, retryOwnerToken, null);
+                }
+            }
+
             if (response.StatusCode == System.Net.HttpStatusCode.Conflict || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
             {
                 return new SkinUploadResult(false, null, "Этот ник уже занят другим игроком, выбери другой");
@@ -708,63 +735,34 @@ public class SkinService : ISkinService
                 ["root"] = "https://lobby-api.vercel.app/csl/"
             };
 
-            System.Text.Json.Nodes.JsonNode? rootNode = null;
-            if (File.Exists(cslJsonPath))
+            var localSkinSource = new System.Text.Json.Nodes.JsonObject
             {
-                try
-                {
-                    var text = File.ReadAllText(cslJsonPath);
-                    rootNode = System.Text.Json.Nodes.JsonNode.Parse(text);
-                }
-                catch { }
-            }
+                ["name"] = "LocalSkin",
+                ["type"] = "Legacy",
+                ["checkPNG"] = false,
+                ["skin"] = "LocalSkin/skins/{USERNAME}.png",
+                ["model"] = "auto",
+                ["cape"] = "LocalSkin/capes/{USERNAME}.png",
+                ["elytra"] = "LocalSkin/elytras/{USERNAME}.png"
+            };
 
-            if (rootNode is not System.Text.Json.Nodes.JsonObject rootObj)
+            var rootObj = new System.Text.Json.Nodes.JsonObject
             {
-                rootObj = new System.Text.Json.Nodes.JsonObject
-                {
-                    ["version"] = "15.0.1",
-                    ["buildNumber"] = 40,
-                    ["loadlist"] = new System.Text.Json.Nodes.JsonArray(),
-                    ["enableTransparentSkin"] = true,
-                    ["forceLoadAllTextures"] = true,
-                    ["enableCape"] = true,
-                    ["threadPoolSize"] = 8,
-                    ["enableLogStdOut"] = false,
-                    ["cacheExpiry"] = 0,
-                    ["forceUpdateSkull"] = false,
-                    ["enableLocalProfileCache"] = false,
-                    ["enableCacheAutoClean"] = true,
-                    ["forceDisableCache"] = true
-                };
-            }
-            else
-            {
-                rootObj["forceDisableCache"] = true;
-                rootObj["cacheExpiry"] = 0;
-                rootObj["enableCacheAutoClean"] = true;
-                rootObj["enableLocalProfileCache"] = false;
-            }
-
-            var loadlistNode = rootObj["loadlist"] as System.Text.Json.Nodes.JsonArray;
-            if (loadlistNode == null)
-            {
-                loadlistNode = new System.Text.Json.Nodes.JsonArray();
-                rootObj["loadlist"] = loadlistNode;
-            }
-
-            // Проверяем, есть ли уже AuraLobby в списке
-            for (int i = loadlistNode.Count - 1; i >= 0; i--)
-            {
-                var item = loadlistNode[i] as System.Text.Json.Nodes.JsonObject;
-                if (item != null && item["name"]?.GetValue<string>() == "AuraLobby")
-                {
-                    loadlistNode.RemoveAt(i);
-                }
-            }
-
-            // Вставляем первым элементом
-            loadlistNode.Insert(0, auraSource);
+                ["version"] = "14.27",
+                ["buildNumber"] = 94,
+                ["loadlist"] = new System.Text.Json.Nodes.JsonArray(auraSource, localSkinSource),
+                ["enableDynamicSkull"] = true,
+                ["enableTransparentSkin"] = true,
+                ["forceLoadAllTextures"] = false,
+                ["enableCape"] = true,
+                ["threadPoolSize"] = 4,
+                ["enableLogStdOut"] = false,
+                ["cacheExpiry"] = 0,
+                ["forceUpdateSkull"] = true,
+                ["enableLocalProfileCache"] = false,
+                ["enableCacheAutoClean"] = true,
+                ["forceDisableCache"] = true
+            };
 
             var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
             File.WriteAllText(cslJsonPath, rootObj.ToJsonString(options));
@@ -799,8 +797,10 @@ public class SkinService : ISkinService
         }
     }
 
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImageSource> _avatarCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (ImageSource SkinTexture, bool IsSlim)> _skinTextureCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan SkinCheckTtl = TimeSpan.FromSeconds(15);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (ImageSource Avatar, DateTime FetchedAt)> _avatarCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (ImageSource SkinTexture, bool IsSlim, string Hash, DateTime FetchedAt)> _skinTextureCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, BitmapSource> _textureByHashCache = new(StringComparer.OrdinalIgnoreCase);
 
     public async Task<ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default)
     {
@@ -809,16 +809,20 @@ public class SkinService : ISkinService
             return LoadDefaultSteveHead();
         }
 
-        if (_avatarCache.TryGetValue(nickname, out var cached))
+        if (_avatarCache.TryGetValue(nickname, out var cached) && (DateTime.UtcNow - cached.FetchedAt) < SkinCheckTtl)
         {
-            return cached;
+            return cached.Avatar;
         }
 
         var (skinTexture, _) = await GetSkinTextureForPlayerAsync(nickname, cancellationToken);
         if (skinTexture is BitmapSource bmp && !ReferenceEquals(bmp, LoadDefaultSteveBitmap()))
         {
+            if (_avatarCache.TryGetValue(nickname, out var updated))
+            {
+                return updated.Avatar;
+            }
             var avatar = ExtractHeadAvatarDirect(bmp);
-            _avatarCache[nickname] = avatar;
+            _avatarCache[nickname] = (avatar, DateTime.UtcNow);
             return avatar;
         }
 
@@ -832,9 +836,9 @@ public class SkinService : ISkinService
             return (LoadDefaultSteveBitmap(), false);
         }
 
-        if (_skinTextureCache.TryGetValue(nickname, out var cachedSkin))
+        if (_skinTextureCache.TryGetValue(nickname, out var cachedSkin) && (DateTime.UtcNow - cachedSkin.FetchedAt) < SkinCheckTtl)
         {
-            return cachedSkin;
+            return (cachedSkin.SkinTexture, cachedSkin.IsSlim);
         }
 
         try
@@ -848,45 +852,61 @@ public class SkinService : ISkinService
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("skins", out var skinsProp))
                 {
-                    string? textureUrl = null;
+                    string? textureHashOrUrl = null;
                     bool isSlimFromApi = false;
                     if (skinsProp.TryGetProperty("slim", out var slimProp) && slimProp.ValueKind == System.Text.Json.JsonValueKind.String)
                     {
-                        textureUrl = slimProp.GetString();
+                        textureHashOrUrl = slimProp.GetString();
                         isSlimFromApi = true;
                     }
                     else if (skinsProp.TryGetProperty("default", out var defProp) && defProp.ValueKind == System.Text.Json.JsonValueKind.String)
                     {
-                        textureUrl = defProp.GetString();
+                        textureHashOrUrl = defProp.GetString();
                     }
 
-                    if (!string.IsNullOrWhiteSpace(textureUrl))
+                    if (!string.IsNullOrWhiteSpace(textureHashOrUrl))
                     {
-                        string resolvedUrl = textureUrl;
-                        if (!resolvedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
-                            !resolvedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                        if (cachedSkin.SkinTexture != null &&
+                            string.Equals(cachedSkin.Hash, textureHashOrUrl, StringComparison.OrdinalIgnoreCase) &&
+                            cachedSkin.IsSlim == isSlimFromApi)
                         {
-                            resolvedUrl = resolvedUrl.StartsWith('/')
-                                ? $"https://lobby-api.vercel.app{resolvedUrl}"
-                                : $"https://lobby-api.vercel.app/textures/{resolvedUrl}.png";
+                            _skinTextureCache[nickname] = (cachedSkin.SkinTexture, cachedSkin.IsSlim, cachedSkin.Hash, DateTime.UtcNow);
+                            if (_avatarCache.TryGetValue(nickname, out var prevAv))
+                            {
+                                _avatarCache[nickname] = (prevAv.Avatar, DateTime.UtcNow);
+                            }
+                            return (cachedSkin.SkinTexture, cachedSkin.IsSlim);
                         }
 
-                        byte[] pngBytes = await _httpClient.GetByteArrayAsync(resolvedUrl, cancellationToken);
-                        using var ms = new MemoryStream(pngBytes);
-                        var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
-                        var frame = decoder.Frames[0];
-                        BitmapSource converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
-                        if (converted.PixelWidth == 64 && converted.PixelHeight == 32)
+                        if (!_textureByHashCache.TryGetValue(textureHashOrUrl, out var converted))
                         {
-                            converted = Convert64x32To64x64(converted);
+                            string resolvedUrl = textureHashOrUrl;
+                            if (!resolvedUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                                !resolvedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                            {
+                                resolvedUrl = resolvedUrl.StartsWith('/')
+                                    ? $"https://lobby-api.vercel.app{resolvedUrl}"
+                                    : $"https://lobby-api.vercel.app/csl/textures/{resolvedUrl}";
+                            }
+
+                            byte[] pngBytes = await _httpClient.GetByteArrayAsync(resolvedUrl, cancellationToken);
+                            using var ms = new MemoryStream(pngBytes);
+                            var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                            var frame = decoder.Frames[0];
+                            converted = new FormatConvertedBitmap(frame, PixelFormats.Bgra32, null, 0);
+                            if (converted.PixelWidth == 64 && converted.PixelHeight == 32)
+                            {
+                                converted = Convert64x32To64x64(converted);
+                            }
+                            if (converted.CanFreeze && !converted.IsFrozen) converted.Freeze();
+                            _textureByHashCache[textureHashOrUrl] = converted;
                         }
-                        if (converted.CanFreeze && !converted.IsFrozen) converted.Freeze();
 
                         bool isSlim = isSlimFromApi || DetectIsSlim(converted);
-                        var entry = ((ImageSource)converted, isSlim);
-                        _skinTextureCache[nickname] = entry;
-                        _avatarCache[nickname] = ExtractHeadAvatarDirect(converted);
-                        return entry;
+                        var avatar = ExtractHeadAvatarDirect(converted);
+                        _skinTextureCache[nickname] = (converted, isSlim, textureHashOrUrl, DateTime.UtcNow);
+                        _avatarCache[nickname] = (avatar, DateTime.UtcNow);
+                        return (converted, isSlim);
                     }
                 }
             }
@@ -895,8 +915,11 @@ public class SkinService : ISkinService
         {
         }
 
-        // В случае ошибки или отсутствия скина возвращаем дефолтного Стива,
-        // но НЕ кэшируем намертво, чтобы повторный опрос мог подтянуть загруженный скин.
+        if (cachedSkin.SkinTexture != null)
+        {
+            return (cachedSkin.SkinTexture, cachedSkin.IsSlim);
+        }
+
         return (LoadDefaultSteveBitmap(), false);
     }
 

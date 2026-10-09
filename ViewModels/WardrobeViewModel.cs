@@ -221,10 +221,7 @@ public class WardrobeViewModel : ObservableObject
                 _configService.CurrentConfig.SkinModel = newModel;
                 OnPropertyChanged();
                 _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
-                if (!string.IsNullOrWhiteSpace(_configService.CurrentConfig.SkinPath) && File.Exists(_configService.CurrentConfig.SkinPath))
-                {
-                    _ = UploadCurrentSkinAsync();
-                }
+                _ = UploadCurrentSkinAsync();
             }
         }
     }

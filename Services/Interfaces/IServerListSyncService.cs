@@ -15,4 +15,15 @@ public interface IServerListSyncService
         IReadOnlyList<ManifestServerEntry>? manifestServers,
         string? customStateFilePath = null,
         CancellationToken cancellationToken = default);
+
+    Task UpsertActiveLobbyServerAsync(
+        string gameDir,
+        string tunnelAddress,
+        string? hostName = null,
+        string? lobbyCode = null,
+        CancellationToken cancellationToken = default);
+
+    Task RemoveActiveLobbyServerAsync(
+        string gameDir,
+        CancellationToken cancellationToken = default);
 }

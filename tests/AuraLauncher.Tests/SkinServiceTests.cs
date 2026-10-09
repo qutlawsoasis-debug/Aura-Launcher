@@ -96,13 +96,18 @@ public class SkinServiceTests
 
             var loadlist = node["loadlist"] as JsonArray;
             Assert.NotNull(loadlist);
-            Assert.True(loadlist.Count > 0);
+            Assert.Equal(2, loadlist.Count);
 
             var first = loadlist[0] as JsonObject;
             Assert.NotNull(first);
             Assert.Equal("AuraLobby", first["name"]?.GetValue<string>());
             Assert.Equal("CustomSkinAPI", first["type"]?.GetValue<string>());
             Assert.Equal("https://lobby-api.vercel.app/csl/", first["root"]?.GetValue<string>());
+
+            var second = loadlist[1] as JsonObject;
+            Assert.NotNull(second);
+            Assert.Equal("LocalSkin", second["name"]?.GetValue<string>());
+            Assert.Equal("Legacy", second["type"]?.GetValue<string>());
         }
         finally
         {

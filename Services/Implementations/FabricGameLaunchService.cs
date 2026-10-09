@@ -161,7 +161,7 @@ public class FabricGameLaunchService : IGameLaunchService
     /// Если перед первым запуском в GameDir нет options.txt, создает его с дефолтными настройками.
     /// Не перезаписывает, если файл уже существует.
     /// </summary>
-    public static void EnsureDefaultOptions(string gameDir)
+    public static void EnsureDefaultOptions(string gameDir, string? graphicsPreset = null)
     {
         try
         {
@@ -172,11 +172,137 @@ public class FabricGameLaunchService : IGameLaunchService
                 var content = "version:3465\nlang:ru_ru\nguiScale:2\nfullscreen:true\n";
                 File.WriteAllText(optionsPath, content, new UTF8Encoding(false));
                 LogLauncherEvent($"[OPTIONS] Создан файл настроек по умолчанию (options.txt): {optionsPath}");
+                ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Balanced");
             }
         }
         catch (Exception ex)
         {
             LogLauncherEvent($"[OPTIONS: ERROR] Ошибка создания options.txt: {ex.Message}");
+        }
+    }
+
+    public static void ApplyGraphicsPreset(string gameDir, string? preset)
+    {
+        if (string.IsNullOrWhiteSpace(gameDir))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(gameDir);
+            var optionsPath = Path.Combine(gameDir, "options.txt");
+            var lines = File.Exists(optionsPath)
+                ? File.ReadAllLines(optionsPath, Encoding.UTF8).ToList()
+                : new List<string> { "version:3465", "lang:ru_ru", "guiScale:2", "fullscreen:true" };
+
+            string normalized = (preset ?? "Balanced").Trim();
+            Dictionary<string, string> targetValues = normalized.ToLowerInvariant() switch
+            {
+                "low" => new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["renderDistance"] = "8",
+                    ["simulationDistance"] = "6",
+                    ["graphicsMode"] = "0",
+                    ["clouds"] = "\"false\"",
+                    ["particles"] = "2",
+                    ["entityShadows"] = "false",
+                    ["entityDistanceScaling"] = "0.75",
+                    ["biomeBlendRadius"] = "1",
+                    ["ao"] = "1",
+                    ["mipmapLevels"] = "2",
+                    ["enableVsync"] = "false",
+                    ["maxFps"] = "120"
+                },
+                "ultra" => new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["renderDistance"] = "16",
+                    ["simulationDistance"] = "12",
+                    ["graphicsMode"] = "1",
+                    ["clouds"] = "\"true\"",
+                    ["particles"] = "0",
+                    ["entityShadows"] = "true",
+                    ["entityDistanceScaling"] = "1.25",
+                    ["biomeBlendRadius"] = "4",
+                    ["ao"] = "2",
+                    ["mipmapLevels"] = "4",
+                    ["enableVsync"] = "true",
+                    ["maxFps"] = "260"
+                },
+                _ => new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["renderDistance"] = "12",
+                    ["simulationDistance"] = "8",
+                    ["graphicsMode"] = "1",
+                    ["clouds"] = "\"fast\"",
+                    ["particles"] = "1",
+                    ["entityShadows"] = "true",
+                    ["entityDistanceScaling"] = "1.0",
+                    ["biomeBlendRadius"] = "2",
+                    ["ao"] = "2",
+                    ["mipmapLevels"] = "4",
+                    ["enableVsync"] = "true",
+                    ["maxFps"] = "120"
+                }
+            };
+
+            var appliedKeys = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < lines.Count; i++)
+            {
+                int colonIdx = lines[i].IndexOf(':');
+                if (colonIdx <= 0)
+                {
+                    continue;
+                }
+
+                string key = lines[i][..colonIdx].Trim();
+                if (targetValues.TryGetValue(key, out var newVal))
+                {
+                    lines[i] = $"{key}:{newVal}";
+                    appliedKeys.Add(key);
+                }
+            }
+
+            foreach (var kvp in targetValues)
+            {
+                if (!appliedKeys.Contains(kvp.Key))
+                {
+                    lines.Add($"{kvp.Key}:{kvp.Value}");
+                }
+            }
+
+            var tmpOptionsPath = optionsPath + ".tmp";
+            File.WriteAllLines(tmpOptionsPath, lines, new UTF8Encoding(false));
+            File.Move(tmpOptionsPath, optionsPath, overwrite: true);
+
+            if (string.Equals(normalized, "Low", StringComparison.OrdinalIgnoreCase))
+            {
+                var irisPath = Path.Combine(gameDir, "config", "iris.properties");
+                if (File.Exists(irisPath))
+                {
+                    var irisLines = File.ReadAllLines(irisPath, Encoding.UTF8);
+                    bool irisChanged = false;
+                    for (int i = 0; i < irisLines.Length; i++)
+                    {
+                        if (irisLines[i].StartsWith("enableShaders=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            irisLines[i] = "enableShaders=false";
+                            irisChanged = true;
+                        }
+                    }
+
+                    if (irisChanged)
+                    {
+                        File.WriteAllLines(irisPath, irisLines, new UTF8Encoding(false));
+                    }
+                }
+            }
+
+            LogLauncherEvent($"[OPTIONS] Применён профиль графики '{normalized}' в {optionsPath}");
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[OPTIONS: ERROR] Не удалось применить профиль графики '{preset}': {ex.Message}");
         }
     }
 
@@ -815,7 +941,7 @@ public class FabricGameLaunchService : IGameLaunchService
         LogLauncherEvent($"[LAUNCH] Запуск игры для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {gameDir}");
 
         // 0. Настройки игры по умолчанию (options.txt, lsp.json) перед первым запуском
-        EnsureDefaultOptions(gameDir);
+        EnsureDefaultOptions(gameDir, config.GraphicsPreset);
         EnsureDefaultLspConfig(gameDir);
 
         // 1. Автоматическая проверка и докачка недостающих компонентов окружения

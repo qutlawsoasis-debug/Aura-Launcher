@@ -299,4 +299,36 @@ public class ServerListSyncServiceTests : IDisposable
         bool result = ServerListSyncService.IsValidServerAddress(address);
         Assert.Equal(expected, result);
     }
+
+    [Fact]
+    public async Task UpsertAndRemoveActiveLobbyServer_UpdatesTopEntryAndRemovesOnLeave()
+    {
+        var service = new ServerListSyncService();
+        await service.UpsertActiveLobbyServerAsync(_testDir, "147.185.221.20:49123", "Alex", "AB12CD");
+
+        var serversDat = Path.Combine(_testDir, "servers.dat");
+        Assert.True(File.Exists(serversDat));
+
+        var nbt = new NbtFile();
+        nbt.LoadFromFile(serversDat, NbtCompression.None, null);
+        var list = nbt.RootTag["servers"] as NbtList;
+        Assert.NotNull(list);
+        Assert.Single(list);
+
+        var first = (NbtCompound)list[0];
+        Assert.Equal("aura-active-lobby", first["id"]?.StringValue);
+        Assert.Equal("147.185.221.20:49123", first["ip"]?.StringValue);
+        Assert.Contains("Alex", first["name"]?.StringValue);
+
+        await service.UpsertActiveLobbyServerAsync(_testDir, "147.185.221.20:55555", "Alex", "AB12CD");
+        nbt.LoadFromFile(serversDat, NbtCompression.None, null);
+        list = nbt.RootTag["servers"] as NbtList;
+        Assert.Single(list!);
+        Assert.Equal("147.185.221.20:55555", ((NbtCompound)list![0])["ip"]?.StringValue);
+
+        await service.RemoveActiveLobbyServerAsync(_testDir);
+        nbt.LoadFromFile(serversDat, NbtCompression.None, null);
+        list = nbt.RootTag["servers"] as NbtList;
+        Assert.Empty(list!);
+    }
 }

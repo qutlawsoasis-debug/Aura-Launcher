@@ -9,6 +9,9 @@ public interface IWorkshopService
 {
     Task<List<WorldSaveItem>> GetWorldSavesAsync(string gameDir);
     Task<string> CreateWorldBackupAsync(WorldSaveItem world);
+    Task ExportWorldToZipAsync(WorldSaveItem world, string destinationZipPath);
+    Task<string> ImportWorldFromZipAsync(string gameDir, string sourceZipPath);
+    Task CreateAutoBackupLatestWorldAsync(string gameDir, int maxAutoBackupsPerWorld = 3);
     Task RestoreWorldBackupAsync(WorldSaveItem world, WorldBackupItem backup);
     Task DeleteWorldBackupAsync(WorldBackupItem backup);
     Task<List<ModItem>> GetModsAsync(string gameDir);

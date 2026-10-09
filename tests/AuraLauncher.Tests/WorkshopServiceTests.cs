@@ -199,4 +199,56 @@ public class WorkshopServiceTests : IDisposable
         Assert.EndsWith(".disabled", firstMod.FileName);
         Assert.True(vm.FilteredMods[1].IsEnabled);
     }
+
+    [Fact]
+    public async Task ExportAndImportWorldZip_RoundTripsWorldAndCreatesAutoBackup()
+    {
+        var service = new WorkshopService();
+        string worldDir = Path.Combine(_tempDir, "saves", "CoopWorld");
+        Directory.CreateDirectory(Path.Combine(worldDir, "region"));
+        File.WriteAllText(Path.Combine(worldDir, "level.dat"), "level-content");
+        File.WriteAllText(Path.Combine(worldDir, "region", "r.0.0.mca"), "chunk-data");
+
+        var worldItem = new WorldSaveItem
+        {
+            FolderName = "CoopWorld",
+            DisplayName = "Coop World",
+            FolderPath = worldDir
+        };
+
+        string exportZip = Path.Combine(_tempDir, "ExportedCoop.zip");
+        await service.ExportWorldToZipAsync(worldItem, exportZip);
+        Assert.True(File.Exists(exportZip));
+
+        string importedFolderName = await service.ImportWorldFromZipAsync(_tempDir, exportZip);
+        string importedPath = Path.Combine(_tempDir, "saves", importedFolderName);
+        Assert.True(Directory.Exists(importedPath));
+        Assert.True(File.Exists(Path.Combine(importedPath, "level.dat")));
+        Assert.True(File.Exists(Path.Combine(importedPath, "region", "r.0.0.mca")));
+
+        await service.CreateAutoBackupLatestWorldAsync(_tempDir, maxAutoBackupsPerWorld: 2);
+        var autoBackups = Directory.GetFiles(Path.Combine(_tempDir, "backups", "AuraBackups"), "*_auto_*.zip");
+        Assert.NotEmpty(autoBackups);
+    }
+
+    [Fact]
+    public void GameCrashAnalyzer_DetectsOutOfMemoryAndGraphicsPresetsWriteOptions()
+    {
+        string logsDir = Path.Combine(_tempDir, "logs");
+        Directory.CreateDirectory(logsDir);
+        File.WriteAllText(Path.Combine(logsDir, "latest.log"), "[main/ERROR]: java.lang.OutOfMemoryError: Java heap space");
+
+        var crash = GameCrashAnalyzer.AnalyzeCrash(_tempDir, 1);
+        Assert.Contains("памяти", crash.Title, StringComparison.OrdinalIgnoreCase);
+
+        FabricGameLaunchService.ApplyGraphicsPreset(_tempDir, "Low");
+        string optionsText = File.ReadAllText(Path.Combine(_tempDir, "options.txt"));
+        Assert.Contains("renderDistance:8", optionsText);
+        Assert.Contains("simulationDistance:6", optionsText);
+
+        FabricGameLaunchService.ApplyGraphicsPreset(_tempDir, "Ultra");
+        optionsText = File.ReadAllText(Path.Combine(_tempDir, "options.txt"));
+        Assert.Contains("renderDistance:16", optionsText);
+        Assert.Contains("simulationDistance:12", optionsText);
+    }
 }

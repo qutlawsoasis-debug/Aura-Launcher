@@ -168,6 +168,44 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- 1.2b "Профиль графики" -->
+                <Grid MinHeight="56" Margin="0,4,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Профиль графики"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="{Binding GraphicsPresetDescription}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <RadioButton Content="Слабый ПК"
+                                     GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetLow, Mode=TwoWay}"
+                                     Style="{StaticResource RamPillRadio}" />
+                        <RadioButton Content="Баланс"
+                                     GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetBalanced, Mode=TwoWay}"
+                                     Style="{StaticResource RamPillRadio}" />
+                        <RadioButton Content="Ультра"
+                                     GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetUltra, Mode=TwoWay}"
+                                     Style="{StaticResource RamPillRadio}"
+                                     Margin="0" />
+                    </StackPanel>
+                </Grid>
+
                 <!-- 1.3 "Папка игры" -->
                 <Grid MinHeight="56" Margin="0,4,0,8">
                     <Grid.ColumnDefinitions>

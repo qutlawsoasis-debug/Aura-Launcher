@@ -30,6 +30,8 @@ public class LobbyViewModel : ObservableObject
     private readonly ILobbyApiClient? _lobbyApiClient;
     private readonly INotificationService? _notificationService;
     private readonly IDiscordRpcService? _discordRpcService;
+    private readonly IServerListSyncService? _serverListSyncService;
+    private readonly IWorkshopService? _workshopService;
     private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _lastPlayerMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _ignoredMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
@@ -40,6 +42,7 @@ public class LobbyViewModel : ObservableObject
     private Func<Task>? _pendingConnectAction;
     private string _lastSelfMismatchSignature = string.Empty;
     private bool _previousWorldIsOpen;
+    private string _lastLocalSkinSignature = string.Empty;
 
     public event Action? LobbyCreated;
     public event Action<int>? PlayerCountChanged;
@@ -271,7 +274,9 @@ public class LobbyViewModel : ObservableObject
         ILobbyApiClient? lobbyApiClient = null,
         INotificationService? notificationService = null,
         IDiscordRpcService? discordRpcService = null,
-        IModManifestService? modManifestService = null)
+        IModManifestService? modManifestService = null,
+        IServerListSyncService? serverListSyncService = null,
+        IWorkshopService? workshopService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
@@ -283,6 +288,8 @@ public class LobbyViewModel : ObservableObject
         _lobbyApiClient = lobbyApiClient;
         _notificationService = notificationService;
         _discordRpcService = discordRpcService;
+        _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
+        _workshopService = workshopService;
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6 && !IsJoiningLobby);
@@ -350,6 +357,27 @@ public class LobbyViewModel : ObservableObject
 
         LobbyPlayers.CollectionChanged += OnLobbyPlayersCollectionChanged;
         RefreshLocalPlayerModel();
+
+        _configService.ConfigChanged += (s, cfg) =>
+        {
+            var sig = $"{cfg.Nickname}|{cfg.SkinPath}|{cfg.SkinModel}";
+            if (!string.Equals(_lastLocalSkinSignature, sig, StringComparison.Ordinal))
+            {
+                _lastLocalSkinSignature = sig;
+                Dispatch(() =>
+                {
+                    RefreshLocalPlayerModel();
+                    var myNick = cfg.Nickname ?? string.Empty;
+                    var selfItem = LobbyPlayers.FirstOrDefault(p => string.Equals(p.Nickname, myNick, StringComparison.OrdinalIgnoreCase) || (IsHost && p.IsHost));
+                    if (selfItem != null)
+                    {
+                        selfItem.Nickname = myNick;
+                        selfItem.Avatar = _skinService?.ExtractHeadAvatar(cfg.SkinPath) ?? SkinService.LoadDefaultSteveBitmap();
+                        selfItem.PlayerModel3D = LocalPlayerModel3D;
+                    }
+                });
+            }
+        };
     }
 
     // Свойства
@@ -750,8 +778,14 @@ public class LobbyViewModel : ObservableObject
                 return;
             }
 
-            // Реальный режим: запускаем watcher на latest.log
+            // Реальный режим: создаём быстрый авто-бэкап свежего мира перед хостингом и запускаем watcher на latest.log
             var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+            if (_workshopService != null && !_launchService.IsGameRunning)
+            {
+                HostStatusText = "Резервная копия мира...";
+                await _workshopService.CreateAutoBackupLatestWorldAsync(gameDir);
+            }
+
             var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
             
             _worldWatcher.Start(logPath);
@@ -1244,7 +1278,7 @@ public class LobbyViewModel : ObservableObject
         await ExecuteConnectToGameAsync(address);
     }
 
-    private Task ExecuteConnectToGameAsync(string address)
+    private async Task ExecuteConnectToGameAsync(string address)
     {
         _lastTunnelAddress = address;
         IsBusy = true;
@@ -1253,6 +1287,11 @@ public class LobbyViewModel : ObservableObject
 
         try
         {
+            if (_serverListSyncService != null)
+            {
+                await _serverListSyncService.UpsertActiveLobbyServerAsync(GetGameDir(), address, HostName, LobbyCode);
+            }
+
             GuestConnectRequested?.Invoke(this, address);
 
             StatusText = "Игра запускается с подключением к серверу...";
@@ -1267,8 +1306,6 @@ public class LobbyViewModel : ObservableObject
         {
             IsBusy = false;
         }
-
-        return Task.CompletedTask;
     }
 
     private Task ReconnectAsync()
@@ -1364,6 +1401,11 @@ public class LobbyViewModel : ObservableObject
             _lobbyService.LeaveLobby();
         }
 
+        if (_serverListSyncService != null)
+        {
+            _ = _serverListSyncService.RemoveActiveLobbyServerAsync(GetGameDir());
+        }
+
         IsLobbyCreated = false;
         IsWorldOpen = false;
         IsGuestJoined = false;
@@ -1444,6 +1486,15 @@ public class LobbyViewModel : ObservableObject
 
     private void OnTunnelAddressReady(string tunnelAddress)
     {
+        if (!string.IsNullOrWhiteSpace(tunnelAddress))
+        {
+            _lastTunnelAddress = tunnelAddress;
+            if (_serverListSyncService != null)
+            {
+                _ = _serverListSyncService.UpsertActiveLobbyServerAsync(GetGameDir(), tunnelAddress, HostName, LobbyCode);
+            }
+        }
+
         Dispatch(() =>
         {
             if (!_lobbyService.IsHost)
@@ -1499,6 +1550,15 @@ public class LobbyViewModel : ObservableObject
         if (IsInLobby && status.Players != null && status.Players.Length > 0)
         {
             _discordRpcService?.SetInLobby(status.Players.Length);
+        }
+
+        if (!string.IsNullOrWhiteSpace(status.TunnelAddress) && string.Equals(status.Status, "open", StringComparison.OrdinalIgnoreCase))
+        {
+            _lastTunnelAddress = status.TunnelAddress;
+            if (_serverListSyncService != null)
+            {
+                _ = _serverListSyncService.UpsertActiveLobbyServerAsync(GetGameDir(), status.TunnelAddress, status.HostName ?? HostName, LobbyCode);
+            }
         }
 
         if (_lobbyService.IsHost && status.Players != null)

@@ -669,8 +669,9 @@ public class MainViewModel : ObservableObject
                 manifestService: manifestService,
                 launchService: launchService);
         }
-        LobbyVM = lobbyViewModel ?? new LobbyViewModel(sharedLobbyService!, launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService, modManifestService: manifestService);
-        WorkshopVM = workshopViewModel ?? new WorkshopViewModel(workshopService ?? new WorkshopService(), _configService, _launchService);
+        var resolvedWorkshopService = workshopService ?? new WorkshopService();
+        LobbyVM = lobbyViewModel ?? new LobbyViewModel(sharedLobbyService!, launchService, configService, notificationService: notificationService, discordRpcService: discordRpcService, modManifestService: manifestService, skinService: _skinService, serverListSyncService: _serverListSyncService, workshopService: resolvedWorkshopService);
+        WorkshopVM = workshopViewModel ?? new WorkshopViewModel(resolvedWorkshopService, _configService, _launchService);
         WorkshopVM.ModToggled += () => _ = LobbyVM.UpdateManifestAsync();
         WorkshopVM.ScreenshotsCountChanged += _ => OverviewVM.RefreshRightFeed();
         
@@ -1030,10 +1031,10 @@ public class MainViewModel : ObservableObject
                 OverviewVM.RefreshStats();
                 if (exitCode != 0)
                 {
-                    var logsDir = Path.Combine(_launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir), "logs");
-                    var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
-                    SetLauncherState(LauncherState.Error, $"Игра завершилась с ошибкой (код {exitCode}). Лог: {gameLogPath}");
-                    PromptGameCrashToast(exitCode);
+                    var resolvedGameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+                    var crashReport = GameCrashAnalyzer.AnalyzeCrash(resolvedGameDir, exitCode);
+                    SetLauncherState(LauncherState.Error, $"{crashReport.Title}. {crashReport.UserAdvice}");
+                    PromptGameCrashToast(exitCode, crashReport);
                 }
                 else
                 {
@@ -1464,7 +1465,10 @@ public class MainViewModel : ObservableObject
                         LobbyVM.OnGameExited();
                         if (exitCode != 0)
                         {
-                            SetLauncherState(LauncherState.Error, $"Игра завершилась с ошибкой (код {exitCode}). Лог: {logPath}");
+                            var resolvedGameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+                            var crashReport = GameCrashAnalyzer.AnalyzeCrash(resolvedGameDir, exitCode);
+                            SetLauncherState(LauncherState.Error, $"{crashReport.Title}. {crashReport.UserAdvice}");
+                            PromptGameCrashToast(exitCode, crashReport);
                         }
                         else
                         {
@@ -1817,14 +1821,19 @@ public class MainViewModel : ObservableObject
         IsSendReportModalVisible = true;
     }
 
-    private void PromptGameCrashToast(int exitCode)
+    private void PromptGameCrashToast(int exitCode, GameCrashAnalysisResult? analysis = null)
     {
-        ProtocolPromptTitle = $"Игра завершилась с ошибкой (код {exitCode})";
-        ProtocolPromptSubtitle = "Отправить отчёт об ошибке разработчикам?";
+        var report = analysis ?? new GameCrashAnalysisResult(
+            $"Игра завершилась с ошибкой (код {exitCode})",
+            "Отправить отчёт об ошибке разработчикам?",
+            $"Game exited with error code {exitCode}");
+
+        ProtocolPromptTitle = report.Title;
+        ProtocolPromptSubtitle = report.UserAdvice;
         ProtocolPromptConfirmText = "Отчёт";
         _pendingProtocolAction = () =>
         {
-            PromptSendReport($"Game exited with error code {exitCode}");
+            PromptSendReport(report.TechnicalSummary);
             return Task.CompletedTask;
         };
         IsProtocolPromptVisible = true;

@@ -187,6 +187,53 @@ public class SettingsViewModel : ObservableObject
         set { if (value) RamMb = 12288; }
     }
 
+    public string GraphicsPreset
+    {
+        get => string.IsNullOrWhiteSpace(_configService.CurrentConfig.GraphicsPreset)
+            ? "Balanced"
+            : _configService.CurrentConfig.GraphicsPreset;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? "Balanced" : value.Trim();
+            if (!string.Equals(_configService.CurrentConfig.GraphicsPreset, normalized, StringComparison.OrdinalIgnoreCase))
+            {
+                _configService.CurrentConfig.GraphicsPreset = normalized;
+                AuraLauncher.Services.Implementations.FabricGameLaunchService.ApplyGraphicsPreset(GameDir, normalized);
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsPresetLow));
+                OnPropertyChanged(nameof(IsPresetBalanced));
+                OnPropertyChanged(nameof(IsPresetUltra));
+                OnPropertyChanged(nameof(GraphicsPresetDescription));
+                _ = SaveImmediatelyAsync();
+            }
+        }
+    }
+
+    public bool IsPresetLow
+    {
+        get => string.Equals(GraphicsPreset, "Low", StringComparison.OrdinalIgnoreCase);
+        set { if (value) GraphicsPreset = "Low"; }
+    }
+
+    public bool IsPresetBalanced
+    {
+        get => !IsPresetLow && !IsPresetUltra;
+        set { if (value) GraphicsPreset = "Balanced"; }
+    }
+
+    public bool IsPresetUltra
+    {
+        get => string.Equals(GraphicsPreset, "Ultra", StringComparison.OrdinalIgnoreCase);
+        set { if (value) GraphicsPreset = "Ultra"; }
+    }
+
+    public string GraphicsPresetDescription => GraphicsPreset.ToLowerInvariant() switch
+    {
+        "low" => "Прорисовка 8 чанков, быстрая графика, без шейдеров",
+        "ultra" => "Прорисовка 16 чанков, максимум деталей и теней",
+        _ => "Прорисовка 12 чанков, оптимальный баланс FPS и качества"
+    };
+
     public string GameDir
     {
         get => _configService.CurrentConfig.GameDir;

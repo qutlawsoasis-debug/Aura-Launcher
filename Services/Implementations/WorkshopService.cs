@@ -206,6 +206,194 @@ public class WorkshopService : IWorkshopService
         });
     }
 
+    public Task ExportWorldToZipAsync(WorldSaveItem world, string destinationZipPath)
+    {
+        return Task.Run(() =>
+        {
+            if (string.IsNullOrWhiteSpace(world.FolderPath) || !Directory.Exists(world.FolderPath))
+            {
+                throw new DirectoryNotFoundException("Папка мира не найдена.");
+            }
+            if (string.IsNullOrWhiteSpace(destinationZipPath))
+            {
+                throw new ArgumentException("Не указан путь для сохранения архива.");
+            }
+
+            string? destDir = Path.GetDirectoryName(destinationZipPath);
+            if (!string.IsNullOrWhiteSpace(destDir))
+            {
+                Directory.CreateDirectory(destDir);
+            }
+
+            string tmpZip = destinationZipPath + $".{Guid.NewGuid():N}.tmp";
+            try
+            {
+                ZipFile.CreateFromDirectory(world.FolderPath, tmpZip, CompressionLevel.Optimal, false);
+                File.Move(tmpZip, destinationZipPath, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(tmpZip))
+                {
+                    try { File.Delete(tmpZip); } catch { }
+                }
+            }
+        });
+    }
+
+    public Task<string> ImportWorldFromZipAsync(string gameDir, string sourceZipPath)
+    {
+        return Task.Run(() =>
+        {
+            if (string.IsNullOrWhiteSpace(sourceZipPath) || !File.Exists(sourceZipPath))
+            {
+                throw new FileNotFoundException("Архив мира не найден.");
+            }
+
+            using var archive = ZipFile.OpenRead(sourceZipPath);
+            var levelDatEntry = archive.Entries.FirstOrDefault(e =>
+                string.Equals(e.FullName.Replace('\\', '/'), "level.dat", StringComparison.OrdinalIgnoreCase) ||
+                e.FullName.Replace('\\', '/').EndsWith("/level.dat", StringComparison.OrdinalIgnoreCase));
+
+            if (levelDatEntry == null)
+            {
+                throw new InvalidDataException("В архиве не найден файл level.dat. Выберите корректный архив мира Minecraft.");
+            }
+
+            string normalizedLevelPath = levelDatEntry.FullName.Replace('\\', '/');
+            string prefix = string.Empty;
+            int slashIdx = normalizedLevelPath.LastIndexOf('/');
+            if (slashIdx > 0)
+            {
+                prefix = normalizedLevelPath.Substring(0, slashIdx + 1);
+            }
+
+            string baseFolderName = Path.GetFileNameWithoutExtension(sourceZipPath);
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                string innerFolder = prefix.Trim('/').Split('/').LastOrDefault() ?? baseFolderName;
+                if (!string.IsNullOrWhiteSpace(innerFolder))
+                {
+                    baseFolderName = innerFolder;
+                }
+            }
+
+            baseFolderName = string.Join("_", baseFolderName.Split(Path.GetInvalidFileNameChars())).Trim();
+            if (string.IsNullOrWhiteSpace(baseFolderName))
+            {
+                baseFolderName = $"ImportedWorld_{DateTime.Now:yyyyMMdd_HHmmss}";
+            }
+
+            string savesDir = Path.Combine(gameDir, "saves");
+            Directory.CreateDirectory(savesDir);
+
+            string targetFolder = Path.Combine(savesDir, baseFolderName);
+            int counter = 1;
+            while (Directory.Exists(targetFolder))
+            {
+                targetFolder = Path.Combine(savesDir, $"{baseFolderName}_{counter}");
+                counter++;
+            }
+
+            Directory.CreateDirectory(targetFolder);
+            string fullTargetRoot = Path.GetFullPath(targetFolder) + Path.DirectorySeparatorChar;
+
+            foreach (var entry in archive.Entries)
+            {
+                string entryPath = entry.FullName.Replace('\\', '/');
+                if (!string.IsNullOrEmpty(prefix))
+                {
+                    if (!entryPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    entryPath = entryPath.Substring(prefix.Length);
+                }
+
+                if (string.IsNullOrEmpty(entryPath))
+                {
+                    continue;
+                }
+
+                string destinationPath = Path.GetFullPath(Path.Combine(targetFolder, entryPath));
+                if (!destinationPath.StartsWith(fullTargetRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (entryPath.EndsWith('/'))
+                {
+                    Directory.CreateDirectory(destinationPath);
+                }
+                else
+                {
+                    string? parentDir = Path.GetDirectoryName(destinationPath);
+                    if (!string.IsNullOrEmpty(parentDir))
+                    {
+                        Directory.CreateDirectory(parentDir);
+                    }
+                    entry.ExtractToFile(destinationPath, overwrite: true);
+                }
+            }
+
+            return Path.GetFileName(targetFolder);
+        });
+    }
+
+    public async Task CreateAutoBackupLatestWorldAsync(string gameDir, int maxAutoBackupsPerWorld = 3)
+    {
+        try
+        {
+            var worlds = await GetWorldSavesAsync(gameDir);
+            var latestWorld = worlds.FirstOrDefault();
+            if (latestWorld == null || string.IsNullOrWhiteSpace(latestWorld.FolderPath) || !Directory.Exists(latestWorld.FolderPath))
+            {
+                return;
+            }
+
+            await Task.Run(() =>
+            {
+                string backupDir = Path.Combine(gameDir, "backups", "AuraBackups");
+                Directory.CreateDirectory(backupDir);
+
+                string safeName = string.Join("_", latestWorld.DisplayName.Split(Path.GetInvalidFileNameChars()));
+                string autoPrefix = $"{safeName}_auto_";
+
+                // Если последний бэкап этого мира был создан менее 5 минут назад, не дублируем
+                var existingForWorld = Directory.EnumerateFiles(backupDir, "*.zip")
+                    .Select(p => new FileInfo(p))
+                    .Where(fi => fi.Name.StartsWith(safeName, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(fi => fi.LastWriteTimeUtc)
+                    .ToList();
+
+                if (existingForWorld.Count > 0 && (DateTime.UtcNow - existingForWorld[0].LastWriteTimeUtc).TotalMinutes < 5)
+                {
+                    return;
+                }
+
+                string zipFileName = $"{autoPrefix}{DateTime.Now:yyyyMMdd_HHmmss}.zip";
+                string zipPath = Path.Combine(backupDir, zipFileName);
+                ZipFile.CreateFromDirectory(latestWorld.FolderPath, zipPath, CompressionLevel.Fastest, false);
+                FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP] Auto-backup created before hosting: {zipFileName}");
+
+                var autoBackups = Directory.EnumerateFiles(backupDir, "*.zip")
+                    .Select(p => new FileInfo(p))
+                    .Where(fi => fi.Name.StartsWith(autoPrefix, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(fi => fi.LastWriteTimeUtc)
+                    .ToList();
+
+                for (int i = maxAutoBackupsPerWorld; i < autoBackups.Count; i++)
+                {
+                    try { autoBackups[i].Delete(); } catch { }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN AutoBackup] {ex.Message}");
+        }
+    }
+
     public Task RestoreWorldBackupAsync(WorldSaveItem world, WorldBackupItem backup)
     {
         return Task.Run(() =>
