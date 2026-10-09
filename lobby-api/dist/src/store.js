@@ -1,4 +1,129 @@
 import crypto from 'crypto';
+export function computeModManifestHash(manifest) {
+    const normalized = [...manifest]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map(m => `${m.id.toLowerCase()}:${m.version}:${m.enabled ? 1 : 0}`)
+        .join('\n');
+    return crypto.createHash('sha256').update(normalized).digest('hex').substring(0, 16);
+}
+export function computeLobbyModSync(lobby) {
+    const result = {};
+    const hostName = lobby.hostName;
+    const hostManifest = lobby.manifests ? lobby.manifests[hostName] : undefined;
+    const hostHash = lobby.manifestHashes ? lobby.manifestHashes[hostName] : undefined;
+    const hostModsMap = new Map();
+    if (hostManifest) {
+        for (const m of hostManifest) {
+            hostModsMap.set(m.id.toLowerCase(), m);
+        }
+    }
+    for (const player of lobby.players) {
+        const playerManifest = lobby.manifests ? lobby.manifests[player] : undefined;
+        const playerHash = lobby.manifestHashes ? lobby.manifestHashes[player] : undefined;
+        // If host has no manifest or player has no manifest -> unverified
+        if (!hostManifest || !playerManifest) {
+            result[player] = {
+                hash: playerHash || null,
+                status: 'unverified',
+                mismatches: []
+            };
+            continue;
+        }
+        // Host is always synced with self
+        if (player.toLowerCase() === hostName.toLowerCase()) {
+            result[player] = {
+                hash: hostHash || computeModManifestHash(hostManifest),
+                status: 'synced',
+                mismatches: []
+            };
+            continue;
+        }
+        // If hashes match exactly, 0 mismatches
+        if (playerHash && hostHash && playerHash === hostHash) {
+            result[player] = {
+                hash: playerHash,
+                status: 'synced',
+                mismatches: []
+            };
+            continue;
+        }
+        const playerModsMap = new Map();
+        for (const m of playerManifest) {
+            playerModsMap.set(m.id.toLowerCase(), m);
+        }
+        const mismatches = [];
+        // 1. Check all mods that host has enabled
+        for (const hostMod of hostManifest) {
+            if (!hostMod.enabled)
+                continue;
+            const guestMod = playerModsMap.get(hostMod.id.toLowerCase());
+            if (!guestMod) {
+                mismatches.push({
+                    modId: hostMod.id,
+                    modName: hostMod.name || hostMod.id,
+                    type: 'missing',
+                    typeRu: 'нет',
+                    hostVersion: hostMod.version
+                });
+            }
+            else if (!guestMod.enabled) {
+                if (guestMod.version && hostMod.version && guestMod.version !== hostMod.version) {
+                    mismatches.push({
+                        modId: hostMod.id,
+                        modName: guestMod.name || hostMod.name || hostMod.id,
+                        type: 'version',
+                        typeRu: 'версия',
+                        playerVersion: guestMod.version,
+                        hostVersion: hostMod.version
+                    });
+                }
+                else {
+                    mismatches.push({
+                        modId: hostMod.id,
+                        modName: guestMod.name || hostMod.name || hostMod.id,
+                        type: 'disabled',
+                        typeRu: 'выключен',
+                        playerVersion: guestMod.version,
+                        hostVersion: hostMod.version
+                    });
+                }
+            }
+            else {
+                if (guestMod.version && hostMod.version && guestMod.version !== hostMod.version) {
+                    mismatches.push({
+                        modId: hostMod.id,
+                        modName: guestMod.name || hostMod.name || hostMod.id,
+                        type: 'version',
+                        typeRu: 'версия',
+                        playerVersion: guestMod.version,
+                        hostVersion: hostMod.version
+                    });
+                }
+            }
+        }
+        // 2. Check mods that guest has enabled: extra
+        for (const guestMod of playerManifest) {
+            if (!guestMod.enabled)
+                continue;
+            const hostMod = hostModsMap.get(guestMod.id.toLowerCase());
+            if (!hostMod || !hostMod.enabled) {
+                mismatches.push({
+                    modId: guestMod.id,
+                    modName: guestMod.name || guestMod.id,
+                    type: 'extra',
+                    typeRu: 'лишний',
+                    playerVersion: guestMod.version
+                });
+            }
+        }
+        result[player] = {
+            hash: playerHash || computeModManifestHash(playerManifest),
+            status: mismatches.length === 0 ? 'synced' : 'mismatch',
+            mismatches
+        };
+    }
+    return result;
+}
 export class InMemoryStore {
     lobbies = new Map();
     skins = new Map();
@@ -252,6 +377,7 @@ export class InMemoryStore {
                 nick: fUser?.nick || 'Unknown',
                 online: isOnline,
                 status: isOnline ? fPres.presence.status : 'offline',
+                lobbyCode: isOnline && (fPres.presence.status === 'lobby' || fPres.presence.status === 'playing') && fPres.presence.lobbyCode ? fPres.presence.lobbyCode : undefined,
                 lastSeen: isOnline ? fPres.presence.lastSeen : recordedLastSeen
             });
         }
@@ -303,7 +429,8 @@ export class InMemoryStore {
                     sentInvites.push({
                         inviteId: sent.inviteId,
                         friendId: sent.friendId,
-                        state: sent.state
+                        state: sent.state,
+                        lobbyCode: sent.lobbyCode
                     });
                 }
             }
@@ -702,6 +829,7 @@ export class UpstashStore {
                 nick: u?.nick || 'Unknown',
                 online: isOnline,
                 status: isOnline ? pres.status : 'offline',
+                lobbyCode: isOnline && (pres.status === 'lobby' || pres.status === 'playing') && pres.lobbyCode ? pres.lobbyCode : null,
                 lastSeen: isOnline ? pres.lastSeen : recordedLastSeen
             });
         }
@@ -759,7 +887,8 @@ export class UpstashStore {
                     sentInvites.push({
                         inviteId: sent.inviteId,
                         friendId: sent.friendId,
-                        state: sent.state
+                        state: sent.state,
+                        lobbyCode: sent.lobbyCode || null
                     });
                 }
             }

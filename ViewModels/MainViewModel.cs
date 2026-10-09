@@ -60,6 +60,7 @@ public class MainViewModel : ObservableObject
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IReportService? _reportService;
     private readonly IAchievementService? _achievementService;
+    private readonly IScreenshotWatcherService _screenshotWatcher;
 
     // Свойства диалога «Отправить отчёт»
     private bool _isSendReportModalVisible;
@@ -140,7 +141,44 @@ public class MainViewModel : ObservableObject
 
     public bool HasInfoToastSubtitle => !string.IsNullOrWhiteSpace(_infoToastSubtitle);
 
-    public void ShowInfoToast(string title, string? subtitle = null, int autoDismissMs = 4000)
+    private string _infoToastType = "info";
+    public string InfoToastType
+    {
+        get => _infoToastType;
+        set
+        {
+            if (SetProperty(ref _infoToastType, value))
+            {
+                OnPropertyChanged(nameof(IsInfoToastWarning));
+                OnPropertyChanged(nameof(IsInfoToastSuccess));
+                OnPropertyChanged(nameof(IsInfoToastScreenshot));
+                OnPropertyChanged(nameof(IsInfoToastLobby));
+                OnPropertyChanged(nameof(IsInfoToastFriends));
+            }
+        }
+    }
+
+    private string? _infoToastTargetTab;
+    public string? InfoToastTargetTab
+    {
+        get => _infoToastTargetTab;
+        set
+        {
+            if (SetProperty(ref _infoToastTargetTab, value))
+            {
+                OnPropertyChanged(nameof(HasInfoToastAction));
+            }
+        }
+    }
+
+    public bool HasInfoToastAction => !string.IsNullOrWhiteSpace(_infoToastTargetTab);
+    public bool IsInfoToastWarning => string.Equals(_infoToastType, "warning", StringComparison.OrdinalIgnoreCase);
+    public bool IsInfoToastSuccess => string.Equals(_infoToastType, "success", StringComparison.OrdinalIgnoreCase);
+    public bool IsInfoToastScreenshot => string.Equals(_infoToastType, "screenshot", StringComparison.OrdinalIgnoreCase);
+    public bool IsInfoToastLobby => string.Equals(_infoToastType, "lobby", StringComparison.OrdinalIgnoreCase);
+    public bool IsInfoToastFriends => string.Equals(_infoToastType, "friends", StringComparison.OrdinalIgnoreCase);
+
+    public void ShowInfoToast(string title, string? subtitle = null, int autoDismissMs = 4000, string type = "info", string? targetTab = null)
     {
         _infoToastCts?.Cancel();
         _infoToastCts = new CancellationTokenSource();
@@ -148,6 +186,8 @@ public class MainViewModel : ObservableObject
 
         InfoToastTitle = title;
         InfoToastSubtitle = subtitle ?? string.Empty;
+        InfoToastType = type;
+        InfoToastTargetTab = targetTab;
         IsInfoToastVisible = true;
 
         if (autoDismissMs > 0)
@@ -163,6 +203,25 @@ public class MainViewModel : ObservableObject
                 }
             }, ct);
         }
+    }
+
+    public void DismissInfoToast()
+    {
+        _infoToastCts?.Cancel();
+        IsInfoToastVisible = false;
+    }
+
+    public void OnClickInfoToast()
+    {
+        if (!string.IsNullOrWhiteSpace(InfoToastTargetTab))
+        {
+            SwitchTab(InfoToastTargetTab);
+            if (string.Equals(InfoToastTargetTab, "Workshop", StringComparison.OrdinalIgnoreCase) && string.Equals(InfoToastType, "screenshot", StringComparison.OrdinalIgnoreCase))
+            {
+                WorkshopVM.ActiveSubTab = "Screenshots";
+            }
+        }
+        DismissInfoToast();
     }
 
     private bool _isProtocolPromptVisible;
@@ -571,6 +630,8 @@ public class MainViewModel : ObservableObject
     public RelayCommand TogglePlayPauseCommand { get; }
     public RelayCommand NextTrackCommand { get; }
     public RelayCommand PreviousTrackCommand { get; }
+    public RelayCommand DismissInfoToastCommand { get; }
+    public RelayCommand ClickInfoToastCommand { get; }
 
     private bool _isWindowMaximized = true;
     public bool IsWindowMaximized
@@ -638,10 +699,11 @@ public class MainViewModel : ObservableObject
         IAnthemService? anthemService = null,
         INotificationService? notificationService = null,
         IDiscordRpcService? discordRpcService = null,
-        IReportService? reportService = null,
         WorkshopViewModel? workshopViewModel = null,
         IWorkshopService? workshopService = null,
-        IAchievementService? achievementService = null)
+        IAchievementService? achievementService = null,
+        IScreenshotWatcherService? screenshotWatcher = null,
+        IReportService? reportService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -653,6 +715,20 @@ public class MainViewModel : ObservableObject
         _discordRpcService = discordRpcService;
         _reportService = reportService ?? new ReportService(configService, notificationService ?? new NotificationService(configService));
         _achievementService = achievementService;
+        _screenshotWatcher = screenshotWatcher ?? new ScreenshotWatcherService();
+        _screenshotWatcher.ScreenshotCaptured += path =>
+        {
+            var fileName = Path.GetFileName(path);
+            if (_notificationService != null)
+            {
+                _notificationService.NotifyScreenshotTaken(path, fileName);
+            }
+            else
+            {
+                ShowInfoToast("Скриншот скопирован в буфер", fileName, type: "screenshot", targetTab: "Workshop");
+            }
+            _ = WorkshopVM.RefreshAllAsync();
+        };
         AnthemService = anthemService;
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
@@ -674,18 +750,22 @@ public class MainViewModel : ObservableObject
         WorkshopVM = workshopViewModel ?? new WorkshopViewModel(resolvedWorkshopService, _configService, _launchService);
         WorkshopVM.ModToggled += () => _ = LobbyVM.UpdateManifestAsync();
         WorkshopVM.ScreenshotsCountChanged += _ => OverviewVM.RefreshRightFeed();
+        WorkshopVM.LaunchWorldRequested += folder => _ = LaunchGameAsync(quickPlaySingleplayer: folder);
         
         _friendService = friendService;
         FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), sharedLobbyService!, _skinService, LobbyVM);
         FriendsVM.OpenLobbyRequested += () => SwitchTab("Lobby");
 
+        DismissInfoToastCommand = new RelayCommand(_ => DismissInfoToast());
+        ClickInfoToastCommand = new RelayCommand(_ => OnClickInfoToast());
+
         if (_notificationService != null)
         {
-            _notificationService.RegisterInAppToastHandler((title, subtitle) =>
+            _notificationService.RegisterInAppToastHandler((title, subtitle, type, tab) =>
             {
                 System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
                 {
-                    ShowInfoToast(title, subtitle);
+                    ShowInfoToast(title, subtitle, type: type, targetTab: tab);
                 });
             });
         }
@@ -1194,6 +1274,7 @@ public class MainViewModel : ObservableObject
         FabricGameLaunchService.EnsureDefaultOptions(gameDir);
         FabricGameLaunchService.EnsureDefaultLspConfig(gameDir);
         _skinService.EnsureCustomSkinLoaderConfig(gameDir);
+        _screenshotWatcher.StartWatching(gameDir);
         var running = _launchService.FindRunningGameProcess(gameDir);
         if (running != null)
         {
@@ -1208,6 +1289,60 @@ public class MainViewModel : ObservableObject
         }
 
         StartBackgroundUpdatePolling();
+        _ = CheckAutoReconnectLobbyAsync();
+    }
+
+    private async Task CheckAutoReconnectLobbyAsync()
+    {
+        try
+        {
+            var config = _configService.CurrentConfig;
+            if (config == null || string.IsNullOrWhiteSpace(config.LastActiveLobbyCode))
+            {
+                return;
+            }
+
+            var savedCode = config.LastActiveLobbyCode.Trim().ToUpperInvariant();
+            var savedRole = config.LastActiveLobbyRole;
+
+            // Если роль хост, восстановить локальный сервер и туннель вслепую нельзя, очищаем
+            if (string.Equals(savedRole, "host", StringComparison.OrdinalIgnoreCase))
+            {
+                config.LastActiveLobbyCode = null;
+                config.LastActiveLobbyRole = null;
+                config.LastActiveHostToken = null;
+                await _configService.SaveConfigAsync(config);
+                return;
+            }
+
+            // Небольшая задержка, чтобы UI и сопутствующие сервисы успели стартовать
+            await Task.Delay(1000);
+
+            var client = new LobbyApiClient(configService: _configService);
+            var status = await client.GetStatusAsync(savedCode);
+
+            // Если лобби найдено и активно
+            if (status != null && !string.IsNullOrWhiteSpace(status.Code))
+            {
+                bool success = await LobbyVM.JoinByCodeAsync(savedCode);
+                if (success)
+                {
+                    SwitchTab("Lobby");
+                    ShowInfoToast("Лобби", $"Восстановлено подключение к лобби {savedCode}");
+                    return;
+                }
+            }
+
+            // Если подключиться не удалось или лобби закрыто — очищаем сохраненный код
+            config.LastActiveLobbyCode = null;
+            config.LastActiveLobbyRole = null;
+            config.LastActiveHostToken = null;
+            await _configService.SaveConfigAsync(config);
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[AUTO-RECONNECT] Ошибка авто-возврата в лобби: {ex.Message}");
+        }
     }
 
     public void UpdateIdleState()
@@ -1298,7 +1433,7 @@ public class MainViewModel : ObservableObject
         }
     }
 
-    private async Task LaunchGameAsync(string? quickPlayMultiplayer = null)
+    private async Task LaunchGameAsync(string? quickPlayMultiplayer = null, string? quickPlaySingleplayer = null)
     {
         // Защита от двойного клика (флаг до любого await)
         if (_isLaunching || _isBusy || IsGameRunning)
@@ -1326,6 +1461,7 @@ public class MainViewModel : ObservableObject
 
             var config = _configService.CurrentConfig;
             config.QuickPlayMultiplayer = quickPlayMultiplayer;
+            config.QuickPlaySingleplayer = quickPlaySingleplayer;
 
             // 1. Проверяем наличие и применяем обновления сборки модов через IPackUpdateService
             SetLauncherState(LauncherState.Checking, "Проверка обновлений сборки...");
@@ -1553,6 +1689,11 @@ public class MainViewModel : ObservableObject
             if (!IsGameRunning)
             {
                 IsBusy = false;
+            }
+            if (_configService?.CurrentConfig != null)
+            {
+                _configService.CurrentConfig.QuickPlayMultiplayer = null;
+                _configService.CurrentConfig.QuickPlaySingleplayer = null;
             }
             OnPropertyChanged(nameof(LaunchButtonText));
             LaunchOrCancelCommand.RaiseCanExecuteChanged();
@@ -1837,5 +1978,6 @@ public class MainViewModel : ObservableObject
             return Task.CompletedTask;
         };
         IsProtocolPromptVisible = true;
+        _notificationService?.NotifyGameCrash(exitCode, report.Title);
     }
 }

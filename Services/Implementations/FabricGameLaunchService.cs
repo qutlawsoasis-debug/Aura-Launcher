@@ -1010,6 +1010,11 @@ public class FabricGameLaunchService : IGameLaunchService
             tokens.Add("--quickPlayMultiplayer");
             tokens.Add(config.QuickPlayMultiplayer.Trim());
         }
+        else if (!string.IsNullOrWhiteSpace(config.QuickPlaySingleplayer))
+        {
+            tokens.Add("--quickPlaySingleplayer");
+            tokens.Add(config.QuickPlaySingleplayer.Trim());
+        }
 
         var formattedLines = new List<string>();
         var maskedLinesForLog = new List<string>();

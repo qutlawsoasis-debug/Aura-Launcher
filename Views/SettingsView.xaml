@@ -278,6 +278,50 @@
                     </StackPanel>
                 </Grid>
 
+                <!-- 1.4 "Целостность сборки" -->
+                <Grid MinHeight="56" Margin="0,4,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="180" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="Целостность сборки"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Проверка SHA-256 файлов"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding IntegrityStatusText}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource Accent}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"
+                                   Visibility="{Binding HasIntegrityStatus, Converter={StaticResource BoolToVis}}" />
+
+                        <Button Command="{Binding CheckIntegrityCommand}"
+                                Style="{StaticResource SettingsActionBtn}"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconRefresh}"
+                                      Style="{StaticResource IconPath}"
+                                      Width="13" Height="13"
+                                      Margin="0,0,7,0"
+                                      VerticalAlignment="Center" />
+                                <TextBlock Text="Проверить сборку" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
                 <!-- Группа 2: Лаунчер -->
                 <TextBlock Text="Лаунчер"
                            FontFamily="{StaticResource HeadingFont}"

@@ -23,9 +23,13 @@
     <StreamGeometry x:Key="IconRestore">M7,3 H21 V17 H17 M3,7 H17 V21 H3 Z</StreamGeometry>
     <StreamGeometry x:Key="IconWarning">M12,9 V13 M12,17 A0.5,0.5 0 1,0 12,17.01 M10.29,3.86 L1.82,18 A2,2 0 0,0 3.55,21 H20.45 A2,2 0 0,0 22.18,18 L13.71,3.86 A2,2 0 0,0 10.29,3.86 Z</StreamGeometry>
     <StreamGeometry x:Key="IconSkipBack">M19,20 L9,12 L19,4 V20 Z M5,19 V5</StreamGeometry>
-    <StreamGeometry x:Key="IconPlayPause">M5,4 L13,12 L5,20 V4 Z M16,5 V19 M20,5 V19</StreamGeometry>
-    <StreamGeometry x:Key="IconSkipForward">M5,4 L15,12 L5,20 V4 Z M19,5 V19</StreamGeometry>
+    <StreamGeometry x:Key="IconPlay">M5,3 L19,12 L5,21 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconKick">M18,6 L6,18 M6,6 L18,18</StreamGeometry>
+    <StreamGeometry x:Key="IconWifi">M5,12.55 A11,11 0 0,1 19,12.55 M1.42,9 A16,16 0 0,1 22.58,9 M8.53,16.11 A6,6 0 0,1 15.47,16.11 M12,20 H12.01</StreamGeometry>
+    <StreamGeometry x:Key="IconCompass">M12,22 A10,10 0 1,0 12,2 A10,10 0 0,0 12,22 Z M16.24,7.76 L14.12,14.12 L7.76,16.24 L9.88,9.88 Z</StreamGeometry>
     <StreamGeometry x:Key="IconCrown">M2,4 L5,16 H19 L22,4 L17,9 L12,3 L7,9 L2,4 Z M5,19 H19 V21 H5 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconInfo">M12,2 A10,10 0 1,0 12,22 A10,10 0 0,0 12,2 Z M12,16 V12 M12,8 H12.01</StreamGeometry>
+    <StreamGeometry x:Key="IconUser">M20,21 V19 A4,4 0 0,0 16,15 H8 A4,4 0 0,0 4,19 V21 M12,11 A4,4 0 1,0 12,3 A4,4 0 0,0 12,11 Z</StreamGeometry>
 
     <!-- Base Lucide Icon Style: uniform outline, inherits parent Foreground, default 14x14 -->
     <Style x:Key="IconPath" TargetType="Path">

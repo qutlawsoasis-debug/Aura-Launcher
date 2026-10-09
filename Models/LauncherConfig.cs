@@ -18,6 +18,10 @@ public class LauncherConfig
     public string PackRepo { get; set; } = DefaultPackRepo;
     public DateTime? LastUpdateUtc { get; set; }
     public string? QuickPlayMultiplayer { get; set; }
+    public string? QuickPlaySingleplayer { get; set; }
+    public string? LastActiveLobbyCode { get; set; }
+    public string? LastActiveLobbyRole { get; set; }
+    public string? LastActiveHostToken { get; set; }
     public string LobbyApiBaseUrl { get; set; } = "https://lobby-api.vercel.app";
     public string SkinOwnerToken { get; set; } = "";
     public string SkinModel { get; set; } = "default";

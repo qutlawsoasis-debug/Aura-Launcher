@@ -35,5 +35,5 @@ public class PackUpdateResult
 
 public interface IPackUpdateService
 {
-    Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default);
+    Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default, bool forceFullCheck = false);
 }

@@ -91,6 +91,13 @@ public partial class MainWindow : Window
                         AnimateInviteToastEntrance();
                     }
                 }
+                else if (args.PropertyName == nameof(MainViewModel.IsInfoToastVisible))
+                {
+                    if (vm.IsInfoToastVisible)
+                    {
+                        AnimateInfoToastEntrance();
+                    }
+                }
                 else if (args.PropertyName == nameof(MainViewModel.IsChangelogModalVisible))
                 {
                     AnimateChangelogModal(vm.IsChangelogModalVisible);
@@ -105,6 +112,10 @@ public partial class MainWindow : Window
             if (vm.IsInviteToastVisible)
             {
                 AnimateInviteToastEntrance();
+            }
+            if (vm.IsInfoToastVisible)
+            {
+                AnimateInfoToastEntrance();
             }
             if (vm.IsChangelogModalVisible)
             {
@@ -175,6 +186,33 @@ public partial class MainWindow : Window
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         Storyboard.SetTarget(slideIn, ToastTransform);
+        Storyboard.SetTargetProperty(slideIn, new PropertyPath(TranslateTransform.XProperty));
+        sb.Children.Add(slideIn);
+
+        sb.Begin();
+    }
+
+    public void AnimateInfoToastEntrance()
+    {
+        if (InfoToastBorder == null || InfoToastTransform == null) return;
+
+        InfoToastBorder.Opacity = 0.0;
+        InfoToastTransform.X = 20.0;
+
+        var sb = new Storyboard();
+        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(fadeIn, InfoToastBorder);
+        Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(fadeIn);
+
+        var slideIn = new DoubleAnimation(20.0, 0.0, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(slideIn, InfoToastTransform);
         Storyboard.SetTargetProperty(slideIn, new PropertyPath(TranslateTransform.XProperty));
         sb.Children.Add(slideIn);
 

@@ -1,4 +1,4 @@
-import { getStore } from '../src/store.js';
+import { getStore, computeModManifestHash } from '../src/store.js';
 import { parseJson, sendJson } from './_utils.js';
 export default async function handler(req, res) {
     if (req.method === 'OPTIONS') {
@@ -19,10 +19,25 @@ export default async function handler(req, res) {
         if (!lobby || lobby.status === 'closed') {
             return sendJson(res, 404, { error: 'Lobby not found or closed' });
         }
+        if (lobby.kickedPlayers && lobby.kickedPlayers.some((p) => p.toLowerCase() === playerName.toLowerCase())) {
+            return sendJson(res, 403, { error: 'Вы были исключены из этого лобби' });
+        }
         if (!lobby.players.includes(playerName)) {
             lobby.players.push(playerName);
-            await store.set(lobby, 1800);
         }
+        if (Array.isArray(body.manifest)) {
+            lobby.manifests = lobby.manifests || {};
+            lobby.manifestHashes = lobby.manifestHashes || {};
+            const cleanManifest = body.manifest.slice(0, 400).map((m) => ({
+                id: String(m.id || '').slice(0, 100),
+                name: String(m.name || m.id || '').slice(0, 100),
+                version: String(m.version || '').slice(0, 50),
+                enabled: Boolean(m.enabled)
+            }));
+            lobby.manifests[playerName] = cleanManifest;
+            lobby.manifestHashes[playerName] = computeModManifestHash(cleanManifest);
+        }
+        await store.set(lobby, 1800);
         return sendJson(res, 200, {
             success: true,
             code: lobby.code,

@@ -428,6 +428,57 @@
                                    VerticalAlignment="Center" />
                     </StackPanel>
 
+                    <!-- Показатели сети и сервера Minecraft -->
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <!-- Пинг -->
+                        <Border Background="{DynamicResource PanelRaised}"
+                                BorderBrush="{DynamicResource BorderSubtle}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="8,3"
+                                Margin="0,0,8,0"
+                                ToolTip="Реальный сетевой пинг до сервера">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconWifi}"
+                                      Style="{StaticResource IconPath}"
+                                      Width="11" Height="11"
+                                      Margin="0,0,6,0"
+                                      Stroke="{DynamicResource TextMuted}" />
+                                <TextBlock Text="{Binding ServerPingText}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           FontWeight="Medium"
+                                           Foreground="{DynamicResource TextPrimary}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Онлайн в мире -->
+                        <Border Background="{DynamicResource PanelRaised}"
+                                BorderBrush="{DynamicResource BorderSubtle}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="8,3"
+                                ToolTip="Количество игроков внутри мира Minecraft">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconWorld}"
+                                      Style="{StaticResource IconPath}"
+                                      Width="11" Height="11"
+                                      Margin="0,0,6,0"
+                                      Stroke="{DynamicResource TextMuted}" />
+                                <TextBlock Text="{Binding ServerPlayersText}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           FontWeight="Medium"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Margin="0,0,4,0" />
+                                <TextBlock Text="в мире"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource TextMuted}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
                     <Border Margin="0,4,0,0"
                             Visibility="{Binding IsSyncNoticeVisible, Converter={StaticResource BoolToVis}}">
                         <TextBlock Text="{Binding SyncNoticeText}"
@@ -681,6 +732,38 @@
                                                                VerticalAlignment="Center" />
                                                 </StackPanel>
                                             </StackPanel>
+                                        </Button>
+
+                                        <!-- Кнопка исключения игрока хостом -->
+                                        <Button Command="{Binding KickPlayerCommand}"
+                                                Cursor="Hand"
+                                                HorizontalAlignment="Center"
+                                                Margin="0,4,0,0"
+                                                ToolTip="Исключить из лобби"
+                                                FocusVisualStyle="{x:Null}"
+                                                Visibility="{Binding CanKick, Converter={StaticResource BoolToVis}}">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{DynamicResource PanelRaised}"
+                                                            BorderBrush="{DynamicResource BorderSubtle}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="3"
+                                                            Padding="6,2">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Data="{StaticResource IconKick}"
+                                                                  Style="{StaticResource IconPath}"
+                                                                  Width="8" Height="8"
+                                                                  Margin="0,0,4,0"
+                                                                  Stroke="{DynamicResource Danger}" />
+                                                            <TextBlock Text="Кикнуть"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="10"
+                                                                       FontWeight="Medium"
+                                                                       Foreground="{DynamicResource Danger}" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
                                         </Button>
                                     </StackPanel>
                                 </StackPanel>

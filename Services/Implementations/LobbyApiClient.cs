@@ -97,11 +97,17 @@ public class LobbyApiClient : ILobbyApiClient
         }
     }
 
-    public async Task<LobbyStatusResponse?> GetStatusAsync(string code, CancellationToken cancellationToken = default)
+    public async Task<LobbyStatusResponse?> GetStatusAsync(string code, string? playerName = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await _httpClient.GetAsync(GetRequestUri($"api/lobby/status?code={Uri.EscapeDataString(code)}"), cancellationToken);
+            string url = $"api/lobby/status?code={Uri.EscapeDataString(code)}";
+            if (!string.IsNullOrWhiteSpace(playerName))
+            {
+                url += $"&player={Uri.EscapeDataString(playerName.Trim())}";
+            }
+
+            var response = await _httpClient.GetAsync(GetRequestUri(url), cancellationToken);
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -113,11 +119,17 @@ public class LobbyApiClient : ILobbyApiClient
         }
     }
 
-    public async Task<(System.Net.HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, CancellationToken cancellationToken = default)
+    public async Task<(System.Net.HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, string? playerName = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = await _httpClient.GetAsync(GetRequestUri($"api/lobby/status?code={Uri.EscapeDataString(code)}"), cancellationToken);
+            string url = $"api/lobby/status?code={Uri.EscapeDataString(code)}";
+            if (!string.IsNullOrWhiteSpace(playerName))
+            {
+                url += $"&player={Uri.EscapeDataString(playerName.Trim())}";
+            }
+
+            var response = await _httpClient.GetAsync(GetRequestUri(url), cancellationToken);
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             if (response.IsSuccessStatusCode)
             {
@@ -203,6 +215,24 @@ public class LobbyApiClient : ILobbyApiClient
                 "application/json");
 
             var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/leave"), content, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> KickPlayerAsync(string code, string hostToken, string playerName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var content = new StringContent(
+                JsonSerializer.Serialize(new { code, hostToken, player = playerName }),
+                Encoding.UTF8,
+                "application/json");
+
+            var response = await _httpClient.PostAsync(GetRequestUri("api/lobby/kick"), content, cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch

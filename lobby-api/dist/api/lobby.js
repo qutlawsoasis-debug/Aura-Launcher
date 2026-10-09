@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { getStore } from '../src/store.js';
+import { getStore, computeModManifestHash } from '../src/store.js';
 import { parseJson, sendJson } from './_utils.js';
 export default async function handler(req, res) {
     if (req.method === 'OPTIONS') {
@@ -27,6 +27,16 @@ export default async function handler(req, res) {
             lastHeartbeat: Date.now(),
             players: [hostName]
         };
+        if (Array.isArray(body.manifest)) {
+            const cleanManifest = body.manifest.slice(0, 400).map((m) => ({
+                id: String(m.id || '').slice(0, 100),
+                name: String(m.name || m.id || '').slice(0, 100),
+                version: String(m.version || '').slice(0, 50),
+                enabled: Boolean(m.enabled)
+            }));
+            lobby.manifests = { [hostName]: cleanManifest };
+            lobby.manifestHashes = { [hostName]: computeModManifestHash(cleanManifest) };
+        }
         // 30 minutes TTL while waiting
         await store.set(lobby, 1800);
         return sendJson(res, 201, {

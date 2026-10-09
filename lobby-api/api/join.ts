@@ -25,6 +25,10 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 404, { error: 'Lobby not found or closed' });
     }
 
+    if (lobby.kickedPlayers && lobby.kickedPlayers.some((p: string) => p.toLowerCase() === playerName.toLowerCase())) {
+      return sendJson(res, 403, { error: 'Вы были исключены из этого лобби' });
+    }
+
     if (!lobby.players.includes(playerName)) {
       lobby.players.push(playerName);
     }

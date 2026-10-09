@@ -47,6 +47,7 @@ public class WorkshopViewModel : ObservableObject
     public event Action<int>? ScreenshotsCountChanged;
     public event Action? ModToggled;
     public event Action? SubTabChanged;
+    public event Action<string>? LaunchWorldRequested;
 
     public string ActiveSubTab
     {
@@ -180,6 +181,7 @@ public class WorkshopViewModel : ObservableObject
 
     // Commands
     public RelayCommand SwitchSubTabCommand { get; }
+    public RelayCommand LaunchWorldCommand { get; }
     public AsyncRelayCommand RefreshAllCommand { get; }
     public AsyncRelayCommand CreateBackupCommand { get; }
     public AsyncRelayCommand ExportWorldCommand { get; }
@@ -225,6 +227,7 @@ public class WorkshopViewModel : ObservableObject
         });
 
         RefreshAllCommand = new AsyncRelayCommand(RefreshAllAsync);
+        LaunchWorldCommand = new RelayCommand(p => LaunchWorld(p as WorldSaveItem ?? FeaturedWorld));
 
         CreateBackupCommand = new AsyncRelayCommand(async p =>
         {
@@ -604,6 +607,12 @@ public class WorkshopViewModel : ObservableObject
                 catch { }
             }
         });
+    }
+
+    private void LaunchWorld(WorldSaveItem? world)
+    {
+        if (world == null || string.IsNullOrWhiteSpace(world.FolderName)) return;
+        LaunchWorldRequested?.Invoke(world.FolderName);
     }
 
     public void OpenScreenshotPreview(ScreenshotItem item)

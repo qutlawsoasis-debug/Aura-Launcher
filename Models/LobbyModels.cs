@@ -83,7 +83,8 @@ public record LobbyStatusResponse(
     long LastHeartbeat,
     string[]? Players = null,
     string? HostName = null,
-    [property: JsonPropertyName("modSync")] Dictionary<string, PlayerModSyncInfo>? ModSync = null);
+    [property: JsonPropertyName("modSync")] Dictionary<string, PlayerModSyncInfo>? ModSync = null,
+    bool Kicked = false);
 public record TunnelConfigResponse(string? Secret, string? PublicAddress, int? PublicPort);
 
 public class LobbyPlayerItem : System.ComponentModel.INotifyPropertyChanged
@@ -253,6 +254,15 @@ public class LobbyPlayerItem : System.ComponentModel.INotifyPropertyChanged
     public bool IsModSyncSynced => ModSyncStatus == "synced";
     public bool IsModSyncMismatch => ModSyncStatus == "mismatch";
     public bool IsModSyncUnverified => ModSyncStatus == "unverified";
+
+    private bool _canKick;
+    public bool CanKick
+    {
+        get => _canKick;
+        set { if (_canKick != value) { _canKick = value; OnPropertyChanged(nameof(CanKick)); } }
+    }
+
+    public ICommand? KickPlayerCommand { get; set; }
 
     public ICommand? OpenMismatchDialogCommand { get; set; }
 

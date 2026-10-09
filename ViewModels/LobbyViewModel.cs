@@ -32,6 +32,11 @@ public class LobbyViewModel : ObservableObject
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IServerListSyncService? _serverListSyncService;
     private readonly IWorkshopService? _workshopService;
+    private readonly IMinecraftPingService _pingService;
+    private string _serverPingText = "—";
+    private string _serverPlayersText = "—";
+    private string? _currentPingAddress;
+    private CancellationTokenSource? _pingLoopCts;
     private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _lastPlayerMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _ignoredMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
@@ -247,6 +252,21 @@ public class LobbyViewModel : ObservableObject
         private set => SetProperty(ref _tunnelLogCopied, value);
     }
 
+    public string ServerPingText
+    {
+        get => _serverPingText;
+        set => SetProperty(ref _serverPingText, value);
+    }
+
+    public string ServerPlayersText
+    {
+        get => _serverPlayersText;
+        set => SetProperty(ref _serverPlayersText, value);
+    }
+
+    public bool HasServerPing => ServerPingText != "—";
+    public bool HasServerPlayers => ServerPlayersText != "—";
+
     public bool CanReconnect => !IsBusy && !_lobbyService.IsHost && (CanGuestConnect || !string.IsNullOrWhiteSpace(_lastTunnelAddress));
 
     public AsyncRelayCommand CreateLobbyCommand { get; }
@@ -276,7 +296,8 @@ public class LobbyViewModel : ObservableObject
         IDiscordRpcService? discordRpcService = null,
         IModManifestService? modManifestService = null,
         IServerListSyncService? serverListSyncService = null,
-        IWorkshopService? workshopService = null)
+        IWorkshopService? workshopService = null,
+        IMinecraftPingService? pingService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
@@ -290,6 +311,7 @@ public class LobbyViewModel : ObservableObject
         _discordRpcService = discordRpcService;
         _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
         _workshopService = workshopService;
+        _pingService = pingService ?? new MinecraftPingService();
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6 && !IsJoiningLobby);
@@ -344,6 +366,15 @@ public class LobbyViewModel : ObservableObject
         _lobbyService.TunnelAddressReady += OnTunnelAddressReady;
         _lobbyService.LobbyStatusUpdated += OnLobbyStatusUpdated;
         _lobbyService.ModSyncUpdated += OnModSyncUpdated;
+        _lobbyService.KickedFromLobby += () =>
+        {
+            Dispatch(() =>
+            {
+                LeaveLobby();
+                JoinErrorMessage = "Вы были исключены из лобби хостом";
+                _notificationService?.NotifyKickedFromLobby();
+            });
+        };
 
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
@@ -1102,7 +1133,7 @@ public class LobbyViewModel : ObservableObject
 
                 var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
 
-                var (statusCode, statusResp, rawJson) = await client.GetStatusDetailedAsync(cleanCode, cts.Token);
+                var (statusCode, statusResp, rawJson) = await client.GetStatusDetailedAsync(cleanCode, cancellationToken: cts.Token);
                 if (_lobbyOpGeneration != myGen) return;
 
                 PlayitTunnelProvider.LogTunnel($"[JOIN: CHECK-STATUS] GET /status?code={cleanCode} -> HTTP {(statusCode.HasValue ? (int)statusCode.Value : -1)}, body: {rawJson}");
@@ -1429,6 +1460,13 @@ public class LobbyViewModel : ObservableObject
         _ignoredMismatchSignatures.Clear();
         _lastSelfMismatchSignature = string.Empty;
         _syncNoticeCts?.Cancel();
+        _pingLoopCts?.Cancel();
+        _pingLoopCts = null;
+        _currentPingAddress = null;
+        ServerPingText = "—";
+        ServerPlayersText = "—";
+        OnPropertyChanged(nameof(HasServerPing));
+        OnPropertyChanged(nameof(HasServerPlayers));
         IsSyncNoticeVisible = false;
         IsModMismatchDialogVisible = false;
         JoinErrorMessage = string.Empty;
@@ -1436,7 +1474,76 @@ public class LobbyViewModel : ObservableObject
         OnPropertyChanged(nameof(IsHost));
     }
 
-    // Обработчики событий LobbyService
+    public async Task<bool> KickPlayerAsync(string playerNick)
+    {
+        if (!IsHost || string.IsNullOrWhiteSpace(playerNick))
+        {
+            return false;
+        }
+
+        try
+        {
+            bool success = await _lobbyService.KickPlayerAsync(playerNick);
+            if (success)
+            {
+                _notificationService?.Notify("Лобби", $"Игрок {playerNick} исключен из лобби");
+            }
+            return success;
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[KICK ERROR] Failed to kick player {playerNick}: {ex.Message}");
+            return false;
+        }
+    }
+
+    private void StartPingPolling(string address)
+    {
+        if (string.IsNullOrWhiteSpace(address) || !IsInLobby) return;
+
+        if (_currentPingAddress == address && _pingLoopCts != null && !_pingLoopCts.IsCancellationRequested)
+        {
+            return;
+        }
+
+        _currentPingAddress = address;
+        _pingLoopCts?.Cancel();
+        _pingLoopCts = new CancellationTokenSource();
+        var ct = _pingLoopCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            while (!ct.IsCancellationRequested && IsInLobby)
+            {
+                try
+                {
+                    var res = await _pingService.PingServerAsync(address, ct);
+                    if (ct.IsCancellationRequested || !IsInLobby) break;
+
+                    Dispatch(() =>
+                    {
+                        ServerPingText = res.FormattedPing;
+                        ServerPlayersText = res.FormattedPlayers;
+                        OnPropertyChanged(nameof(HasServerPing));
+                        OnPropertyChanged(nameof(HasServerPlayers));
+                    });
+                }
+                catch
+                {
+                    // transient ping failure
+                }
+
+                try
+                {
+                    await Task.Delay(4000, ct);
+                }
+                catch
+                {
+                    break;
+                }
+            }
+        }, ct);
+    }
 
     private void Dispatch(Action action)
     {
@@ -1489,6 +1596,7 @@ public class LobbyViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(tunnelAddress))
         {
             _lastTunnelAddress = tunnelAddress;
+            StartPingPolling(tunnelAddress);
             if (_serverListSyncService != null)
             {
                 _ = _serverListSyncService.UpsertActiveLobbyServerAsync(GetGameDir(), tunnelAddress, HostName, LobbyCode);
@@ -1555,6 +1663,7 @@ public class LobbyViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(status.TunnelAddress) && string.Equals(status.Status, "open", StringComparison.OrdinalIgnoreCase))
         {
             _lastTunnelAddress = status.TunnelAddress;
+            StartPingPolling(status.TunnelAddress);
             if (_serverListSyncService != null)
             {
                 _ = _serverListSyncService.UpsertActiveLobbyServerAsync(GetGameDir(), status.TunnelAddress, status.HostName ?? HostName, LobbyCode);
@@ -1681,6 +1790,8 @@ public class LobbyViewModel : ObservableObject
                         }
                     }
                     existingItem.IsNewlyAdded = false;
+                    existingItem.CanKick = IsHost && !incoming.IsHost && !string.Equals(incoming.Nick, myNick, StringComparison.OrdinalIgnoreCase);
+                    existingItem.KickPlayerCommand = new AsyncRelayCommand(async () => await KickPlayerAsync(incoming.Nick));
 
                     // Ensure matching order if needed
                     if (existingIndex != i && i < LobbyPlayers.Count)
@@ -1697,7 +1808,9 @@ public class LobbyViewModel : ObservableObject
                         IsHost = incoming.IsHost,
                         Avatar = incoming.Avatar,
                         PlayerModel3D = incoming.Model3D,
-                        IsNewlyAdded = true
+                        IsNewlyAdded = true,
+                        CanKick = IsHost && !incoming.IsHost && !string.Equals(incoming.Nick, myNick, StringComparison.OrdinalIgnoreCase),
+                        KickPlayerCommand = new AsyncRelayCommand(async () => await KickPlayerAsync(incoming.Nick))
                     };
 
                     if (i < LobbyPlayers.Count)

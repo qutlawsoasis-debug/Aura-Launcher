@@ -1,4 +1,4 @@
-import { getStore } from '../src/store.js';
+import { getStore, computeLobbyModSync } from '../src/store.js';
 import { sendJson } from './_utils.js';
 export default async function handler(req, res) {
     if (req.method === 'OPTIONS') {
@@ -20,6 +20,51 @@ export default async function handler(req, res) {
         if (!lobby) {
             return sendJson(res, 404, { error: 'Lobby not found' });
         }
+        const playerName = (req.query?.player || '').trim();
+        // 1. Проверка, не исключён ли запрашивающий игрок
+        if (playerName && lobby.kickedPlayers && lobby.kickedPlayers.some(p => p.toLowerCase() === playerName.toLowerCase())) {
+            return sendJson(res, 200, {
+                code: lobby.code,
+                status: 'closed',
+                kicked: true,
+                playerCount: lobby.players.length,
+                players: lobby.players,
+                hostName: lobby.hostName
+            });
+        }
+        // 2. Обновление пульса гостя
+        const now = Date.now();
+        lobby.playerHeartbeats = lobby.playerHeartbeats || {};
+        if (playerName) {
+            lobby.playerHeartbeats[playerName.toLowerCase()] = now;
+        }
+        // 3. Авто-очистка гостей, от которых нет пульса более 25 секунд
+        const hostLower = lobby.hostName.toLowerCase();
+        let playersChanged = false;
+        const activePlayers = lobby.players.filter(p => {
+            const pLower = p.toLowerCase();
+            if (pLower === hostLower)
+                return true;
+            const lastBeat = lobby.playerHeartbeats[pLower] || lobby.createdAt;
+            if (now - lastBeat > 25000) {
+                playersChanged = true;
+                delete lobby.playerHeartbeats[pLower];
+                if (lobby.manifests)
+                    delete lobby.manifests[p];
+                if (lobby.manifestHashes)
+                    delete lobby.manifestHashes[p];
+                return false;
+            }
+            return true;
+        });
+        if (playersChanged) {
+            lobby.players = activePlayers;
+            await store.set(lobby, 1800);
+        }
+        else if (playerName) {
+            await store.set(lobby, 1800);
+        }
+        const modSync = computeLobbyModSync(lobby);
         return sendJson(res, 200, {
             code: lobby.code,
             status: lobby.status,
@@ -27,7 +72,9 @@ export default async function handler(req, res) {
             playerCount: lobby.players.length,
             players: lobby.players,
             hostName: lobby.hostName,
-            lastHeartbeat: lobby.lastHeartbeat
+            lastHeartbeat: lobby.lastHeartbeat,
+            modSync,
+            kicked: false
         });
     }
     catch (err) {

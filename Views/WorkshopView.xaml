@@ -327,7 +327,23 @@
                                                FontFamily="{StaticResource HeadingFont}" FontSize="54" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}"
                                                TextTrimming="CharacterEllipsis" ToolTip="{Binding DisplayName}"
-                                               Margin="0,0,0,16" />
+                                               Margin="0,0,0,8" />
+
+                                    <!-- World Details Chips: Day, Dimension, Coordinates, Seed -->
+                                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,14" Visibility="{Binding HasDetails, Converter={StaticResource BoolToVis}}">
+                                        <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="8,3" Margin="0,0,8,4" Visibility="{Binding HasDay, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding DayFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                        </Border>
+                                        <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="8,3" Margin="0,0,8,4" Visibility="{Binding HasDimension, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding DimensionFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
+                                        </Border>
+                                        <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="8,3" Margin="0,0,8,4" Visibility="{Binding HasCoordinates, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding CoordinatesFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                                        </Border>
+                                        <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="8,3" Margin="0,0,8,4" Visibility="{Binding HasSeed, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding SeedFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                                        </Border>
+                                    </WrapPanel>
 
                                     <!-- 3 Large Stats (Oswald 38): Size, Playtime (if available), Backups count -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
@@ -389,19 +405,36 @@
                                         </Grid>
                                     </StackPanel>
 
-                                    <!-- Action Buttons: Filled «Создать бэкап», Text «Восстановить…», «Экспорт (.zip)» & «Папка» -->
+                                    <!-- Action Buttons: Filled «В мир», «Создать бэкап», Text «Восстановить…», «Экспорт (.zip)» & «Папка» -->
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <!-- Filled Accent Button with dark text, radius 3 -->
-                                        <Button Command="{Binding DataContext.CreateBackupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        <!-- Primary Accent Button «В мир» -->
+                                        <Button Command="{Binding DataContext.LaunchWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 FocusVisualStyle="{x:Null}"
-                                                Margin="0,0,16,0" Padding="18,9" Cursor="Hand">
+                                                Margin="0,0,12,0" Padding="20,9" Cursor="Hand">
                                             <Button.Template>
                                                 <ControlTemplate TargetType="Button">
                                                     <Border Background="{DynamicResource Accent}" CornerRadius="3" Padding="{TemplateBinding Padding}">
                                                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconBackup}" Width="14" Height="14" Margin="0,0,8,0" Stroke="{DynamicResource Night}" />
-                                                            <TextBlock Text="Создать бэкап" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Night}" />
+                                                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPlay}" Width="12" Height="12" Margin="0,0,8,0" Fill="{DynamicResource Night}" Stroke="{DynamicResource Night}" />
+                                                            <TextBlock Text="В мир" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Night}" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+
+                                        <!-- Secondary Button «Создать бэкап» -->
+                                        <Button Command="{Binding DataContext.CreateBackupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                FocusVisualStyle="{x:Null}"
+                                                Margin="0,0,12,0" Padding="14,9" Cursor="Hand">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="{TemplateBinding Padding}">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconBackup}" Width="13" Height="13" Margin="0,0,8,0" Stroke="{DynamicResource TextPrimary}" />
+                                                            <TextBlock Text="Создать бэкап" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}" />
                                                         </StackPanel>
                                                     </Border>
                                                 </ControlTemplate>
@@ -475,13 +508,25 @@
                                                         <WrapPanel Orientation="Horizontal" Margin="0,4,0,0">
                                                             <TextBlock Text="{Binding GameMode}"
                                                                        FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                                       Foreground="{DynamicResource Accent}" Margin="0,0,12,0" />
+                                                                       Foreground="{DynamicResource Accent}" Margin="0,0,10,0" />
+                                                            <TextBlock Text="{Binding DayFormatted}"
+                                                                       FontFamily="{StaticResource MainFont}" FontSize="12"
+                                                                       Foreground="{DynamicResource Accent}" Margin="0,0,10,0"
+                                                                       Visibility="{Binding HasDay, Converter={StaticResource BoolToVis}}" />
+                                                            <TextBlock Text="{Binding DimensionFormatted}"
+                                                                       FontFamily="{StaticResource MainFont}" FontSize="12"
+                                                                       Foreground="{DynamicResource TextPrimary}" Margin="0,0,10,0"
+                                                                       Visibility="{Binding HasDimension, Converter={StaticResource BoolToVis}}" />
+                                                            <TextBlock Text="{Binding CoordinatesFormatted}"
+                                                                       FontFamily="{StaticResource MainFont}" FontSize="12"
+                                                                       Foreground="{DynamicResource TextMuted}" Margin="0,0,10,0"
+                                                                       Visibility="{Binding HasCoordinates, Converter={StaticResource BoolToVis}}" />
                                                             <TextBlock Text="{Binding SizeFormatted}"
                                                                        FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                                       Foreground="{StaticResource MuteBrush}" Margin="0,0,12,0" />
+                                                                       Foreground="{StaticResource MuteBrush}" Margin="0,0,10,0" />
                                                             <TextBlock Text="{Binding PlaytimeFormatted}"
                                                                        FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                                       Foreground="{StaticResource MuteBrush}" Margin="0,0,12,0"
+                                                                       Foreground="{StaticResource MuteBrush}" Margin="0,0,10,0"
                                                                        Visibility="{Binding HasPlaytime, Converter={StaticResource BoolToVis}}" />
                                                             <TextBlock Text="{Binding LastPlayedFormatted}"
                                                                        FontFamily="{StaticResource MainFont}" FontSize="12"
@@ -502,11 +547,20 @@
 
                                                     <!-- Actions -->
                                                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Command="{Binding DataContext.LaunchWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                Padding="8,6" Margin="0,0,8,0" FocusVisualStyle="{x:Null}">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPlay}" Width="10" Height="10" Margin="0,0,6,0" Fill="{DynamicResource Accent}" Stroke="{DynamicResource Accent}" />
+                                                                <TextBlock Text="В мир" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Accent}" />
+                                                            </StackPanel>
+                                                        </Button>
                                                         <Button Command="{Binding DataContext.CreateBackupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
                                                                 Style="{StaticResource GhostBtn}"
                                                                 Padding="8,6" Margin="0,0,8,0" FocusVisualStyle="{x:Null}">
-                                                            <TextBlock Text="Создать бэкап" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource Accent}" />
+                                                            <TextBlock Text="Создать бэкап" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
                                                         </Button>
                                                         <Button Command="{Binding DataContext.OpenRestoreDialogCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"

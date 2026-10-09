@@ -39,6 +39,10 @@ public class WorkshopService : IWorkshopService
                     string displayName = dirInfo.Name;
                     string gameMode = "Выживание";
                     DateTime lastPlayed = dirInfo.LastWriteTime;
+                    string? dayFormatted = null;
+                    string? dimFormatted = null;
+                    string? coordFormatted = null;
+                    string? seedFormatted = null;
 
                     try
                     {
@@ -61,6 +65,66 @@ public class WorkshopService : IWorkshopService
                                 3 => "Наблюдатель",
                                 _ => "Выживание"
                             };
+
+                            // Игровой день (24 000 тиков = 1 день)
+                            long dayTime = data["DayTime"]?.LongValue ?? data["Time"]?.LongValue ?? -1;
+                            if (dayTime >= 0)
+                            {
+                                long dayNumber = (dayTime / 24000L) + 1;
+                                dayFormatted = $"День {dayNumber}";
+                            }
+
+                            // Сид мира
+                            if (data["WorldGenSettings"] is NbtCompound genSettings && genSettings["seed"] != null)
+                            {
+                                seedFormatted = $"Сид: {genSettings["seed"]!.LongValue}";
+                            }
+
+                            // Координаты и измерение игрока
+                            NbtCompound? playerCompound = data["Player"] as NbtCompound;
+                            if (playerCompound == null)
+                            {
+                                string playerDataDir = Path.Combine(d, "playerdata");
+                                if (Directory.Exists(playerDataDir))
+                                {
+                                    var latestFile = Directory.EnumerateFiles(playerDataDir, "*.dat")
+                                        .Select(f => new FileInfo(f))
+                                        .OrderByDescending(f => f.LastWriteTimeUtc)
+                                        .FirstOrDefault();
+                                    if (latestFile != null)
+                                    {
+                                        try
+                                        {
+                                            var playerNbt = new NbtFile();
+                                            playerNbt.LoadFromFile(latestFile.FullName);
+                                            playerCompound = playerNbt.RootTag;
+                                        }
+                                        catch { }
+                                    }
+                                }
+                            }
+
+                            if (playerCompound != null)
+                            {
+                                if (playerCompound["Dimension"] is NbtString dimTag)
+                                {
+                                    dimFormatted = dimTag.Value switch
+                                    {
+                                        "minecraft:overworld" => "Верхний мир",
+                                        "minecraft:the_nether" => "Незер",
+                                        "minecraft:the_end" => "Энд",
+                                        _ => dimTag.Value.Replace("minecraft:", "")
+                                    };
+                                }
+
+                                if (playerCompound["Pos"] is NbtList posList && posList.Count >= 3)
+                                {
+                                    int x = (int)Math.Round(((NbtDouble)posList[0]).Value);
+                                    int y = (int)Math.Round(((NbtDouble)posList[1]).Value);
+                                    int z = (int)Math.Round(((NbtDouble)posList[2]).Value);
+                                    coordFormatted = $"X: {x}, Y: {y}, Z: {z}";
+                                }
+                            }
                         }
                     }
                     catch { }
@@ -171,6 +235,10 @@ public class WorkshopService : IWorkshopService
                         SizeFormatted = FormatFileSize(totalBytes),
                         IconSource = icon,
                         PlaytimeFormatted = playtimeFormatted,
+                        DayFormatted = dayFormatted,
+                        DimensionFormatted = dimFormatted,
+                        CoordinatesFormatted = coordFormatted,
+                        SeedFormatted = seedFormatted,
                         BackupsCount = backupsList.Count,
                         LastBackupText = lastBackupText,
                         BackupTicks = ticks,

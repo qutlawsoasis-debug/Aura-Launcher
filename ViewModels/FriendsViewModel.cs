@@ -46,6 +46,8 @@ public class FriendItemViewModel : ObservableObject
             if (SetProperty(ref _online, value))
             {
                 OnPropertyChanged(nameof(RowOpacity));
+                OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(CanJoin));
                 OnPropertyChanged(nameof(CanInvite));
             }
         }
@@ -182,7 +184,7 @@ public class FriendItemViewModel : ObservableObject
     };
 
     public bool CanInvite => Online && !IsInMyLobby && !CanJoin && string.IsNullOrEmpty(_inviteState);
-    public bool CanJoin => Online && !IsInMyLobby && !HasInviteState && string.Equals(Status, "lobby", StringComparison.OrdinalIgnoreCase);
+    public bool CanJoin => Online && !IsInMyLobby && !HasInviteState && (!string.IsNullOrWhiteSpace(LobbyCode) || string.Equals(Status, "lobby", StringComparison.OrdinalIgnoreCase));
 
     private bool _isConfirmingDelete;
     public bool IsConfirmingDelete

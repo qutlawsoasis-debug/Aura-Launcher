@@ -66,7 +66,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         }
     }
 
-    public async Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default)
+    public async Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default, bool forceFullCheck = false)
     {
         Task<PackUpdateResult> taskToAwait;
         lock (_concurrencyLock)
@@ -77,7 +77,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             }
             else
             {
-                taskToAwait = ExecuteCheckAndApplyAsync(progress, ct);
+                taskToAwait = ExecuteCheckAndApplyAsync(progress, ct, forceFullCheck);
                 _activeUpdateTask = taskToAwait;
             }
         }
@@ -98,7 +98,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         }
     }
 
-    private async Task<PackUpdateResult> ExecuteCheckAndApplyAsync(IProgress<DownloadProgressReport>? progress, CancellationToken ct)
+    private async Task<PackUpdateResult> ExecuteCheckAndApplyAsync(IProgress<DownloadProgressReport>? progress, CancellationToken ct, bool forceFullCheck = false)
     {
         var sw = Stopwatch.StartNew();
         var config = _configService.CurrentConfig;
@@ -284,9 +284,9 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         }
 
         bool sameVersion = isInstalled && string.Equals(currentState?.PackVersion, manifest.PackVersion, StringComparison.Ordinal);
-        bool needsFullCheck = !sameVersion;
+        bool needsFullCheck = !sameVersion || forceFullCheck;
 
-        if (sameVersion)
+        if (sameVersion && !forceFullCheck)
         {
             // Быстрая проверка
             foreach (var file in manifest.Files)
@@ -334,11 +334,11 @@ public class PackUpdateService : IPackUpdateService, IDisposable
 
         if (needsFullCheck)
         {
-            // Полная проверка
+            // Полная проверка (при forceFullCheck сверяем хеши всех файлов)
             foreach (var file in manifest.Files)
             {
                 var localPath = fullPathByEntry[file];
-                if (file.Mode == "sync")
+                if (file.Mode == "sync" || forceFullCheck)
                 {
                     if (!File.Exists(localPath))
                     {
@@ -393,7 +393,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             return new PackUpdateResult
             {
                 Status = PackUpdateStatus.UpToDate,
-                Message = "Установлена последняя версия сборки",
+                Message = forceFullCheck ? "Все файлы сборки проверены и в порядке" : "Установлена последняя версия сборки",
                 FilesChanged = 0,
                 Duration = sw.Elapsed,
                 Servers = manifest.Servers

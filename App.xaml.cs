@@ -621,10 +621,19 @@ public partial class App : Application
         services.AddSingleton<IBackgroundService, BackgroundService>();
         services.AddSingleton<IWorkshopService, WorkshopService>();
         services.AddSingleton<IAchievementService, AchievementService>();
+        services.AddSingleton<IMinecraftPingService, MinecraftPingService>();
+        services.AddSingleton<IScreenshotWatcherService, ScreenshotWatcherService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
-        services.AddSingleton<SettingsViewModel>();
+        services.AddSingleton<SettingsViewModel>(sp => new SettingsViewModel(
+            sp.GetRequiredService<IConfigService>(),
+            sp.GetRequiredService<ISkinService>(),
+            sp.GetService<IDiscordRpcService>(),
+            sp.GetService<IReportService>(),
+            sp.GetService<IBackgroundService>(),
+            sp.GetRequiredService<IPackUpdateService>(),
+            sp.GetService<INotificationService>()));
         services.AddSingleton<WorkshopViewModel>();
         services.AddSingleton<WardrobeViewModel>(sp => new WardrobeViewModel(
             sp.GetRequiredService<ISkinService>(),
@@ -642,7 +651,8 @@ public partial class App : Application
             sp.GetRequiredService<IDiscordRpcService>(),
             sp.GetRequiredService<IModManifestService>(),
             sp.GetRequiredService<IServerListSyncService>(),
-            sp.GetRequiredService<IWorkshopService>()));
+            sp.GetRequiredService<IWorkshopService>(),
+            sp.GetRequiredService<IMinecraftPingService>()));
         services.AddSingleton<FriendsViewModel>();
         services.AddSingleton<MainViewModel>();
     }

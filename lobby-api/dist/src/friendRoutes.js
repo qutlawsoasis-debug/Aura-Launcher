@@ -279,6 +279,7 @@ export async function handleInvite(req, res) {
         inviteId,
         friendId,
         state: 'pending',
+        lobbyCode,
         createdAt: now,
         expiresAt: now + 180_000 // 120s + 60s
     };

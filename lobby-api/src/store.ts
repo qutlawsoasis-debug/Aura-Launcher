@@ -33,6 +33,8 @@ export interface Lobby {
   players: string[];
   manifests?: Record<string, ModManifestItem[]>;
   manifestHashes?: Record<string, string>;
+  playerHeartbeats?: Record<string, number>;
+  kickedPlayers?: string[];
 }
 
 export function computeModManifestHash(manifest: ModManifestItem[]): string {
@@ -576,7 +578,7 @@ export class InMemoryStore implements LobbyStore {
         nick: fUser?.nick || 'Unknown',
         online: isOnline,
         status: isOnline ? fPres!.presence.status : 'offline',
-        lobbyCode: isOnline && fPres!.presence.status === 'lobby' ? fPres!.presence.lobbyCode : undefined,
+        lobbyCode: isOnline && (fPres!.presence.status === 'lobby' || fPres!.presence.status === 'playing') && fPres!.presence.lobbyCode ? fPres!.presence.lobbyCode : undefined,
         lastSeen: isOnline ? fPres!.presence.lastSeen : recordedLastSeen
       });
     }
@@ -1057,7 +1059,7 @@ export class UpstashStore implements LobbyStore {
         nick: u?.nick || 'Unknown',
         online: isOnline,
         status: isOnline ? pres!.status : 'offline',
-        lobbyCode: isOnline && pres!.status === 'lobby' ? pres!.lobbyCode : null,
+        lobbyCode: isOnline && (pres!.status === 'lobby' || pres!.status === 'playing') && pres!.lobbyCode ? pres!.lobbyCode : null,
         lastSeen: isOnline ? pres!.lastSeen : recordedLastSeen
       });
     }

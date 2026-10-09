@@ -114,7 +114,7 @@ public class AnthemServiceTests
 
     private class MockPackUpdateService : IPackUpdateService
     {
-        public Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default)
+        public Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default, bool forceFullCheck = false)
             => Task.FromResult(new PackUpdateResult(PackUpdateStatus.UpToDate, "OK"));
     }
 

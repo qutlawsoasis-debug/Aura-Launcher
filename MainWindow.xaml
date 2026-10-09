@@ -520,182 +520,310 @@
                 </views:SettingsView>
             </Grid>
 
-            <!-- Toast notifications (top-right corner of window) -->
-            <!-- Update Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
-            <Border x:Name="UpdateToastBorder"
-                    VerticalAlignment="Top" HorizontalAlignment="Right"
-                    Width="290" Panel.ZIndex="150"
-                    Background="{DynamicResource PanelCard}"
-                    BorderBrush="{StaticResource LineInkBrush}"
-                    BorderThickness="1"
-                    CornerRadius="3"
-                    ClipToBounds="True"
-                    Margin="0,48,20,0"
-                    Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
-                    RenderTransformOrigin="0.5,0.5">
-                <Border.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
-                </Border.Effect>
-                <Border.RenderTransform>
-                    <TranslateTransform x:Name="ToastTransform" X="0" />
-                </Border.RenderTransform>
-                <StackPanel Margin="12,10,12,10">
-                    <TextBlock Text="{Binding UpdateBannerTitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="SemiBold"
-                               FontSize="13"
-                               Foreground="{StaticResource InkBrush}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding UpdateBannerMessage}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="Normal"
-                               FontSize="11"
-                               Foreground="{StaticResource DimInkBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,3,0,8" />
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Command="{Binding ApplyBannerUpdateCommand}"
-                                IsEnabled="{Binding CanApplyUpdate}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Height="28" Padding="12,0" FontSize="12"
-                                Content="{Binding UpdateBannerButtonText}"
-                                Margin="0,0,12,0" VerticalAlignment="Center" />
-                        <TextBlock VerticalAlignment="Center">
-                            <Hyperlink Command="{Binding DismissBannerCommand}"
-                                       Foreground="{StaticResource MuteBrush}"
-                                       TextDecorations="None">
-                                <Run Text="Позже" FontFamily="{StaticResource MainFont}" FontSize="12" />
-                            </Hyperlink>
-                        </TextBlock>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
+            <!-- 3.4 TOAST NOTIFICATIONS STACK (top-right corner of window) -->
+            <StackPanel VerticalAlignment="Top" HorizontalAlignment="Right"
+                        Margin="0,48,20,0" Width="310" Panel.ZIndex="150"
+                        IsHitTestVisible="True">
 
-            <!-- Invite Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
-            <Border x:Name="InviteToastBorder"
-                    VerticalAlignment="Top" HorizontalAlignment="Right"
-                    Width="290" Panel.ZIndex="151"
-                    Background="{DynamicResource PanelCard}"
-                    BorderBrush="{StaticResource LineInkBrush}"
-                    BorderThickness="1"
-                    CornerRadius="3"
-                    ClipToBounds="True"
-                    Margin="0,48,20,0"
-                    Visibility="{Binding IsInviteToastVisible, Converter={StaticResource BoolToVis}}"
-                    RenderTransformOrigin="0.5,0.5">
-                <Border.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
-                </Border.Effect>
-                <Border.RenderTransform>
-                    <TranslateTransform x:Name="InviteToastTransform" X="0" />
-                </Border.RenderTransform>
-                <StackPanel Margin="12,10,12,10">
-                    <TextBlock Text="{Binding InviteToastTitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="SemiBold"
-                               FontSize="13"
-                               Foreground="{StaticResource InkBrush}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding InviteToastSubtitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="Normal"
-                               FontSize="11"
-                               Foreground="{StaticResource DimInkBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,3,0,8" />
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Command="{Binding AcceptInviteCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Height="28" Padding="12,0" FontSize="12"
-                                Content="Принять"
-                                Margin="0,0,12,0" VerticalAlignment="Center" />
-                        <TextBlock VerticalAlignment="Center">
-                            <Hyperlink Command="{Binding DeclineInviteCommand}"
-                                       Foreground="{StaticResource MuteBrush}"
-                                       TextDecorations="None">
-                                <Run Text="Отклонить" FontFamily="{StaticResource MainFont}" FontSize="12" />
-                            </Hyperlink>
-                        </TextBlock>
+                <!-- Update Toast: аккуратная прямоугольная плашка -->
+                <Border x:Name="UpdateToastBorder"
+                        HorizontalAlignment="Stretch"
+                        Background="{DynamicResource PanelCard}"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                    </Border.Effect>
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="ToastTransform" X="0" />
+                    </Border.RenderTransform>
+                    <StackPanel Margin="12,10,12,10">
+                        <TextBlock Text="{Binding UpdateBannerTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding UpdateBannerMessage}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,8" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding ApplyBannerUpdateCommand}"
+                                    IsEnabled="{Binding CanApplyUpdate}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="28" Padding="12,0" FontSize="12"
+                                    Content="{Binding UpdateBannerButtonText}"
+                                    Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Command="{Binding DismissBannerCommand}"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextDecorations="None">
+                                    <Run Text="Позже" FontFamily="{StaticResource MainFont}" FontSize="12" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <!-- Protocol Action Prompt Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
-            <Border x:Name="ProtocolPromptBorder"
-                    VerticalAlignment="Top" HorizontalAlignment="Right"
-                    Width="290" Panel.ZIndex="152"
-                    Background="{DynamicResource PanelCard}"
-                    BorderBrush="{StaticResource LineInkBrush}"
-                    BorderThickness="1"
-                    CornerRadius="3"
-                    ClipToBounds="True"
-                    Margin="0,48,20,0"
-                    Visibility="{Binding IsProtocolPromptVisible, Converter={StaticResource BoolToVis}}">
-                <Border.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
-                </Border.Effect>
-                <StackPanel Margin="12,10,12,10">
-                    <TextBlock Text="{Binding ProtocolPromptTitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="SemiBold"
-                               FontSize="13"
-                               Foreground="{StaticResource InkBrush}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding ProtocolPromptSubtitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="Normal"
-                               FontSize="11"
-                               Foreground="{StaticResource DimInkBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,3,0,8" />
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Command="{Binding ConfirmProtocolPromptCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Height="28" Padding="12,0" FontSize="12"
-                                Content="{Binding ProtocolPromptConfirmText}"
-                                Margin="0,0,12,0" VerticalAlignment="Center" />
-                        <TextBlock VerticalAlignment="Center">
-                            <Hyperlink Command="{Binding CancelProtocolPromptCommand}"
-                                       Foreground="{StaticResource MuteBrush}"
-                                       TextDecorations="None">
-                                <Run Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="12" />
-                            </Hyperlink>
-                        </TextBlock>
+                <!-- Invite Toast: аккуратная прямоугольная плашка -->
+                <Border x:Name="InviteToastBorder"
+                        HorizontalAlignment="Stretch"
+                        Background="{DynamicResource PanelCard}"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding IsInviteToastVisible, Converter={StaticResource BoolToVis}}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                    </Border.Effect>
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="InviteToastTransform" X="0" />
+                    </Border.RenderTransform>
+                    <StackPanel Margin="12,10,12,10">
+                        <TextBlock Text="{Binding InviteToastTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding InviteToastSubtitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,8" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding AcceptInviteCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="28" Padding="12,0" FontSize="12"
+                                    Content="Принять"
+                                    Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Command="{Binding DeclineInviteCommand}"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextDecorations="None">
+                                    <Run Text="Отклонить" FontFamily="{StaticResource MainFont}" FontSize="12" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
-            </Border>
+                </Border>
 
-            <!-- Info Toast: правый верхний угол, аккуратная прямоугольная плашка 290px -->
-            <Border x:Name="InfoToastBorder"
-                    VerticalAlignment="Top" HorizontalAlignment="Right"
-                    Width="290" Panel.ZIndex="153"
-                    Background="{DynamicResource PanelCard}"
-                    BorderBrush="{StaticResource LineInkBrush}"
-                    BorderThickness="1"
-                    CornerRadius="3"
-                    ClipToBounds="True"
-                    Margin="0,48,20,0"
-                    Visibility="{Binding IsInfoToastVisible, Converter={StaticResource BoolToVis}}">
-                <Border.Effect>
-                    <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
-                </Border.Effect>
-                <StackPanel Margin="12,10,12,10">
-                    <TextBlock Text="{Binding InfoToastTitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="SemiBold"
-                               FontSize="13"
-                               Foreground="{StaticResource InkBrush}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding InfoToastSubtitle}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontWeight="Normal"
-                               FontSize="11"
-                               Foreground="{StaticResource DimInkBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,3,0,0"
-                               Visibility="{Binding HasInfoToastSubtitle, Converter={StaticResource BoolToVis}}" />
-                </StackPanel>
-            </Border>
+                <!-- Protocol Action Prompt Toast: аккуратная прямоугольная плашка -->
+                <Border x:Name="ProtocolPromptBorder"
+                        HorizontalAlignment="Stretch"
+                        Background="{DynamicResource PanelCard}"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding IsProtocolPromptVisible, Converter={StaticResource BoolToVis}}">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                    </Border.Effect>
+                    <StackPanel Margin="12,10,12,10">
+                        <TextBlock Text="{Binding ProtocolPromptTitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="SemiBold"
+                                   FontSize="13"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ProtocolPromptSubtitle}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontWeight="Normal"
+                                   FontSize="11"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,3,0,8" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Command="{Binding ConfirmProtocolPromptCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="28" Padding="12,0" FontSize="12"
+                                    Content="{Binding ProtocolPromptConfirmText}"
+                                    Margin="0,0,12,0" VerticalAlignment="Center" />
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Command="{Binding CancelProtocolPromptCommand}"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           TextDecorations="None">
+                                    <Run Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="12" />
+                                </Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Info Toast: улучшенная плашка с акцентной полосой, иконкой статуса, кнопкой закрытия и переходом -->
+                <Border x:Name="InfoToastBorder"
+                        HorizontalAlignment="Stretch"
+                        Background="{DynamicResource PanelCard}"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        ClipToBounds="True"
+                        Margin="0,0,0,8"
+                        Visibility="{Binding IsInfoToastVisible, Converter={StaticResource BoolToVis}}"
+                        RenderTransformOrigin="0.5,0.5">
+                    <Border.Effect>
+                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                    </Border.Effect>
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="InfoToastTransform" X="0" />
+                    </Border.RenderTransform>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="3" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Левая акцентная полоска -->
+                        <Border Grid.Column="0">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="{StaticResource EmberBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsInfoToastWarning}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource BadBrush}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsInfoToastSuccess}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource OkBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                        </Border>
+
+                        <!-- Основная карточка тоста -->
+                        <Grid Grid.Column="1" Margin="10,9,10,9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Векторная иконка статуса тоста -->
+                            <Border Grid.Column="0" Width="28" Height="28"
+                                    CornerRadius="3" Background="{DynamicResource PanelRaised}"
+                                    VerticalAlignment="Top" Margin="0,1,10,0">
+                                <Path Width="14" Height="14"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path.Style>
+                                        <Style TargetType="Path" BasedOn="{StaticResource IconPath}">
+                                            <Setter Property="Data" Value="{StaticResource IconInfo}" />
+                                            <Setter Property="Stroke" Value="{StaticResource EmberBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsInfoToastScreenshot}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconCamera}" />
+                                                    <Setter Property="Stroke" Value="{StaticResource EmberBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsInfoToastWarning}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconWarning}" />
+                                                    <Setter Property="Stroke" Value="{StaticResource BadBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsInfoToastSuccess}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconCheck}" />
+                                                    <Setter Property="Stroke" Value="{StaticResource OkBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsInfoToastLobby}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconWorld}" />
+                                                    <Setter Property="Stroke" Value="{StaticResource EmberBrush}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsInfoToastFriends}" Value="True">
+                                                    <Setter Property="Data" Value="{StaticResource IconUser}" />
+                                                    <Setter Property="Stroke" Value="{StaticResource EmberBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Path.Style>
+                                </Path>
+                            </Border>
+
+                            <!-- Текстовый контент (кликабелен при наличии целевой вкладки) -->
+                            <Button Grid.Column="1" Command="{Binding ClickInfoToastCommand}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="Transparent" BorderThickness="0" Padding="0"
+                                    FocusVisualStyle="{x:Null}">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Cursor" Value="Arrow" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasInfoToastAction}" Value="True">
+                                                <Setter Property="Cursor" Value="Hand" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <ContentPresenter />
+                                    </ControlTemplate>
+                                </Button.Template>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding InfoToastTitle}"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"
+                                               Foreground="{StaticResource InkBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding InfoToastSubtitle}"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontWeight="Normal"
+                                               FontSize="11"
+                                               Foreground="{StaticResource DimInkBrush}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,2,0,0"
+                                               Visibility="{Binding HasInfoToastSubtitle, Converter={StaticResource BoolToVis}}" />
+                                    <TextBlock Text="Нажмите, чтобы открыть"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontWeight="Medium"
+                                               FontSize="10"
+                                               Foreground="{StaticResource EmberBrush}"
+                                               Margin="0,3,0,0"
+                                               Visibility="{Binding HasInfoToastAction, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Кнопка закрытия тоста (крестик) -->
+                            <Button Grid.Column="2" Command="{Binding DismissInfoToastCommand}"
+                                    Width="20" Height="20" Margin="4,0,-2,0"
+                                    VerticalAlignment="Top" HorizontalAlignment="Right"
+                                    Background="Transparent" BorderThickness="0" Padding="0"
+                                    Cursor="Hand" ToolTip="Закрыть" FocusVisualStyle="{x:Null}">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="CloseBtnBorder" Background="Transparent" CornerRadius="3" Width="20" Height="20">
+                                            <Path x:Name="CloseBtnIcon" Style="{StaticResource IconPath}"
+                                                  Width="10" Height="10" Stroke="{StaticResource DimInkBrush}"
+                                                  Data="{StaticResource IconClose}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="CloseBtnBorder" Property="Background" Value="{DynamicResource BorderSubtle}" />
+                                                <Setter TargetName="CloseBtnIcon" Property="Stroke" Value="{StaticResource InkBrush}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </StackPanel>
 
             <!-- 3.5 CHANGELOG MODAL OVERLAY -->
             <Grid x:Name="ChangelogModalOverlay"

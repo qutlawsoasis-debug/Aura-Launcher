@@ -20,6 +20,7 @@ public interface ILobbyService
     event Action<string>? TunnelAddressReady;
     event Action<LobbyStatusResponse>? LobbyStatusUpdated;
     event Action<IReadOnlyDictionary<string, PlayerModSyncInfo>>? ModSyncUpdated;
+    event Action? KickedFromLobby;
 
     Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default);
     Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, int localPort = 25565, CancellationToken cancellationToken = default);
@@ -28,5 +29,6 @@ public interface ILobbyService
     Task<bool> JoinLobbyAsGuestAsync(string code, string playerName, CancellationToken cancellationToken = default);
     Task<LobbyStatusResponse?> RefreshGuestStatusAsync(CancellationToken cancellationToken = default);
     Task UpdateManifestAsync(CancellationToken cancellationToken = default);
+    Task<bool> KickPlayerAsync(string playerName, CancellationToken cancellationToken = default);
     void LeaveLobby();
 }

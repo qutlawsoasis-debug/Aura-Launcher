@@ -8,16 +8,21 @@ namespace AuraLauncher.Services.Implementations;
 public class NotificationService : INotificationService
 {
     private readonly IConfigService _configService;
-    private Action<string, string>? _showInAppToastCallback;
+    private Action<string, string, string, string?>? _showInAppToastCallback;
 
     public NotificationService(IConfigService configService)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
     }
 
-    public void RegisterInAppToastHandler(Action<string, string> showToast)
+    public void RegisterInAppToastHandler(Action<string, string, string, string?> showToast)
     {
         _showInAppToastCallback = showToast;
+    }
+
+    public void RegisterInAppToastHandler(Action<string, string> showToast)
+    {
+        _showInAppToastCallback = (t, m, type, tab) => showToast(t, m);
     }
 
     public bool IsWindowVisibleAndFocused()
@@ -38,11 +43,11 @@ public class NotificationService : INotificationService
         }
     }
 
-    public void Notify(string title, string message, string targetTab = "Overview")
+    public void Notify(string title, string message, string targetTab = "Overview", string type = "info")
     {
         if (IsWindowVisibleAndFocused())
         {
-            _showInAppToastCallback?.Invoke(title, message);
+            _showInAppToastCallback?.Invoke(title, message, type, targetTab);
         }
         else
         {
@@ -72,7 +77,7 @@ public class NotificationService : INotificationService
     {
         if (IsWindowVisibleAndFocused())
         {
-            _showInAppToastCallback?.Invoke("Заявка в друзья", $"{fromNick} хочет добавить вас в друзья");
+            _showInAppToastCallback?.Invoke("Заявка в друзья", $"{fromNick} хочет добавить вас в друзья", "friends", "Friends");
         }
         else
         {
@@ -87,7 +92,7 @@ public class NotificationService : INotificationService
     {
         if (IsWindowVisibleAndFocused())
         {
-            _showInAppToastCallback?.Invoke("Игрок в лобби", $"{playerNick} зашёл в ваше лобби");
+            _showInAppToastCallback?.Invoke("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "lobby", "Lobby");
         }
         else
         {
@@ -102,7 +107,7 @@ public class NotificationService : INotificationService
     {
         if (IsWindowVisibleAndFocused())
         {
-            _showInAppToastCallback?.Invoke("Мир открыт", "Хост открыл мир");
+            _showInAppToastCallback?.Invoke("Мир открыт", "Хост открыл мир", "lobby", "Lobby");
         }
         else
         {
@@ -110,6 +115,59 @@ public class NotificationService : INotificationService
             {
                 ShowWindowsToast("Мир открыт", "Хост открыл мир", "Lobby");
             }
+        }
+    }
+
+    public void NotifyScreenshotTaken(string filePath, string fileName)
+    {
+        // Всегда показываем тост внутри лаунчера
+        _showInAppToastCallback?.Invoke("Скриншот сохранён", $"{fileName} скопирован в буфер", "screenshot", "Workshop");
+
+        // Если игра запущена или лаунчер не активен — шлем уведомление прямо поверх игры через Windows Toast
+        if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
+        {
+            ShowWindowsToast("Скриншот скопирован", $"{fileName} сохранён и помещён в буфер", "Workshop");
+        }
+    }
+
+    public void NotifyGameCrash(int exitCode, string? reason = null)
+    {
+        string desc = !string.IsNullOrWhiteSpace(reason) ? reason : $"Игра завершилась с кодом {exitCode}";
+        _showInAppToastCallback?.Invoke("Сбой Minecraft", desc, "warning", "Overview");
+
+        if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
+        {
+            ShowWindowsToast("Сбой Minecraft", desc, "Overview");
+        }
+    }
+
+    public void NotifyKickedFromLobby()
+    {
+        _showInAppToastCallback?.Invoke("Исключение из лобби", "Вы были исключены хостом", "warning", "Lobby");
+
+        if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
+        {
+            ShowWindowsToast("Исключение из лобби", "Вы были исключены хостом", "Lobby");
+        }
+    }
+
+    public void NotifyUpdateAvailable(string updateTitle, string updateMessage)
+    {
+        _showInAppToastCallback?.Invoke(updateTitle, updateMessage, "info", "Overview");
+
+        if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
+        {
+            ShowWindowsToast(updateTitle, updateMessage, "Overview");
+        }
+    }
+
+    public void NotifyIntegrityChecked(string statusText)
+    {
+        _showInAppToastCallback?.Invoke("Целостность сборки", statusText, "success", "Settings");
+
+        if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
+        {
+            ShowWindowsToast("Целостность сборки", statusText, "Settings");
         }
     }
 

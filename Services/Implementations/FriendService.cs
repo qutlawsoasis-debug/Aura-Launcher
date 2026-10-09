@@ -36,10 +36,50 @@ public class FriendService : IFriendService
     public string? CurrentFriendCode => _configService.CurrentConfig?.FriendCode;
 
     public bool IsFriendsTabActive { get; set; }
-    public bool IsInLobby { get; set; }
-    public string? CurrentLobbyCode { get; set; }
+
+    private bool _isInLobby;
+    public bool IsInLobby
+    {
+        get => _isInLobby;
+        set
+        {
+            if (_isInLobby != value)
+            {
+                _isInLobby = value;
+                _ = SyncNowAsync();
+            }
+        }
+    }
+
+    private string? _currentLobbyCode;
+    public string? CurrentLobbyCode
+    {
+        get => _currentLobbyCode;
+        set
+        {
+            if (!string.Equals(_currentLobbyCode, value, StringComparison.OrdinalIgnoreCase))
+            {
+                _currentLobbyCode = value;
+                _ = SyncNowAsync();
+            }
+        }
+    }
+
     public string? CurrentHostToken { get; set; }
-    public bool IsGameRunning { get; set; }
+
+    private bool _isGameRunning;
+    public bool IsGameRunning
+    {
+        get => _isGameRunning;
+        set
+        {
+            if (_isGameRunning != value)
+            {
+                _isGameRunning = value;
+                _ = SyncNowAsync();
+            }
+        }
+    }
 
     public event Action<SyncResponse>? SyncUpdated;
     public event Action<IReadOnlyList<FriendPresenceItem>>? FriendsListUpdated;

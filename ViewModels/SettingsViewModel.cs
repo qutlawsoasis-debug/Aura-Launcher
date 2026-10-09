@@ -21,6 +21,10 @@ public class SettingsViewModel : ObservableObject
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IReportService? _reportService;
     private readonly IBackgroundService? _backgroundService;
+    private readonly IPackUpdateService? _packUpdateService;
+    private readonly INotificationService? _notificationService;
+    private bool _isCheckingIntegrity;
+    private string _integrityStatusText = string.Empty;
     private CancellationTokenSource? _debounceCts;
     private string _errorMessage = string.Empty;
     private string _nickname = string.Empty;
@@ -398,9 +402,36 @@ public class SettingsViewModel : ObservableObject
 
     public bool HasError => !string.IsNullOrWhiteSpace(_errorMessage);
 
+    public bool IsCheckingIntegrity
+    {
+        get => _isCheckingIntegrity;
+        set
+        {
+            if (SetProperty(ref _isCheckingIntegrity, value))
+            {
+                CheckIntegrityCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string IntegrityStatusText
+    {
+        get => _integrityStatusText;
+        set
+        {
+            if (SetProperty(ref _integrityStatusText, value))
+            {
+                OnPropertyChanged(nameof(HasIntegrityStatus));
+            }
+        }
+    }
+
+    public bool HasIntegrityStatus => !string.IsNullOrWhiteSpace(_integrityStatusText);
+
     public RelayCommand SelectGameFolderCommand { get; }
     public AsyncRelayCommand GenerateReportCommand { get; }
     public RelayCommand OpenSendReportCommand { get; }
+    public AsyncRelayCommand CheckIntegrityCommand { get; }
 
     public event Action<string?>? SendReportRequested;
 
@@ -409,13 +440,19 @@ public class SettingsViewModel : ObservableObject
         ISkinService skinService,
         IDiscordRpcService? discordRpcService = null,
         IReportService? reportService = null,
-        IBackgroundService? backgroundService = null)
+        IBackgroundService? backgroundService = null,
+        IPackUpdateService? packUpdateService = null,
+        INotificationService? notificationService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _discordRpcService = discordRpcService;
         _reportService = reportService;
         _backgroundService = backgroundService;
+        _packUpdateService = packUpdateService;
+        _notificationService = notificationService;
+
+        CheckIntegrityCommand = new AsyncRelayCommand(CheckIntegrityAsync, () => !IsCheckingIntegrity);
 
         NextBackgroundCommand = new RelayCommand(_ =>
         {
@@ -523,6 +560,49 @@ public class SettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             ErrorMessage = $"Ошибка сохранения: {ex.Message}";
+        }
+    }
+
+    public async Task CheckIntegrityAsync()
+    {
+        if (IsCheckingIntegrity || _packUpdateService == null) return;
+
+        IsCheckingIntegrity = true;
+        IntegrityStatusText = "Проверка файлов сборки...";
+
+        try
+        {
+            var progress = new Progress<DownloadProgressReport>(report =>
+            {
+                IntegrityStatusText = !string.IsNullOrWhiteSpace(report.FormattedSpeed)
+                    ? $"{report.StatusText} ({report.Percentage:F0}%)"
+                    : report.StatusText;
+            });
+
+            var result = await _packUpdateService.CheckAndApplyAsync(progress, forceFullCheck: true);
+            if (result.Status == PackUpdateStatus.UpToDate)
+            {
+                IntegrityStatusText = "Все файлы сборки проверены и в порядке";
+            }
+            else if (result.Status == PackUpdateStatus.Updated)
+            {
+                IntegrityStatusText = $"Восстановлено файлов: {result.FilesChanged}";
+                OnPropertyChanged(nameof(CurrentVersion));
+            }
+            else
+            {
+                IntegrityStatusText = result.Message;
+            }
+
+            _notificationService?.NotifyIntegrityChecked(IntegrityStatusText);
+        }
+        catch (Exception ex)
+        {
+            IntegrityStatusText = $"Ошибка проверки: {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingIntegrity = false;
         }
     }
 }

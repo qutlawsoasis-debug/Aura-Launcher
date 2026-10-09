@@ -39,8 +39,10 @@ public class FriendsAndLobbyScenarioTests
         public event Action<string>? TunnelAddressReady;
         public event Action<LobbyStatusResponse>? LobbyStatusUpdated;
         public event Action<IReadOnlyDictionary<string, PlayerModSyncInfo>>? ModSyncUpdated;
+        public event Action? KickedFromLobby;
 
         public Task UpdateManifestAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> KickPlayerAsync(string playerName, CancellationToken cancellationToken = default) => Task.FromResult(true);
 
         public async Task<string?> CreateLobbyAsHostAsync(string hostName, CancellationToken cancellationToken = default)
         {
@@ -571,11 +573,14 @@ public class FriendsAndLobbyScenarioTests
         public Task<bool> UpdateManifestAsync(string code, string playerName, IReadOnlyList<ModManifestEntry> manifest, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
 
-        public Task<LobbyStatusResponse?> GetStatusAsync(string code, CancellationToken cancellationToken = default)
+        public Task<LobbyStatusResponse?> GetStatusAsync(string code, string? playerName = null, CancellationToken cancellationToken = default)
             => Task.FromResult(DetailedStatusResponse);
 
-        public Task<(HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, CancellationToken cancellationToken = default)
+        public Task<(HttpStatusCode? StatusCode, LobbyStatusResponse? Response, string RawBody)> GetStatusDetailedAsync(string code, string? playerName = null, CancellationToken cancellationToken = default)
             => Task.FromResult((DetailedStatusCode, DetailedStatusResponse, string.Empty));
+
+        public Task<bool> KickPlayerAsync(string code, string hostToken, string playerToKick, CancellationToken cancellationToken = default)
+            => Task.FromResult(true);
 
         public Task<bool> OpenLobbyAsync(string code, string hostToken, string tunnelAddress, CancellationToken cancellationToken = default)
             => Task.FromResult(true);

@@ -54,6 +54,16 @@ public class WorldSaveItem : ObservableObject
     public bool HasBackups => BackupsCount > 0;
     public string LastBackupText { get; set; } = "бэкапов нет";
 
+    public string? DayFormatted { get; set; }
+    public string? DimensionFormatted { get; set; }
+    public string? CoordinatesFormatted { get; set; }
+    public string? SeedFormatted { get; set; }
+    public bool HasDetails => !string.IsNullOrWhiteSpace(DayFormatted) || !string.IsNullOrWhiteSpace(CoordinatesFormatted) || !string.IsNullOrWhiteSpace(DimensionFormatted);
+    public bool HasDay => !string.IsNullOrWhiteSpace(DayFormatted);
+    public bool HasDimension => !string.IsNullOrWhiteSpace(DimensionFormatted);
+    public bool HasCoordinates => !string.IsNullOrWhiteSpace(CoordinatesFormatted);
+    public bool HasSeed => !string.IsNullOrWhiteSpace(SeedFormatted);
+
     public List<BackupTickItem> BackupTicks { get; set; } = new();
     public List<WorldBackupItem> Backups { get; set; } = new();
 

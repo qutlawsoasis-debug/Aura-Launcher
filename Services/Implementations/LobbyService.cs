@@ -37,6 +37,7 @@ public class LobbyService : ILobbyService, IDisposable
     public event Action<string>? TunnelAddressReady;
     public event Action<LobbyStatusResponse>? LobbyStatusUpdated;
     public event Action<IReadOnlyDictionary<string, PlayerModSyncInfo>>? ModSyncUpdated;
+    public event Action? KickedFromLobby;
 
     public LobbyService(
         ILobbyApiClient apiClient,
@@ -94,6 +95,14 @@ public class LobbyService : ILobbyService, IDisposable
         CurrentHostToken = response.HostToken;
         CurrentStatus = response.Status;
         IsHost = true;
+
+        if (_configService?.CurrentConfig != null)
+        {
+            _configService.CurrentConfig.LastActiveLobbyCode = response.Code;
+            _configService.CurrentConfig.LastActiveLobbyRole = "host";
+            _configService.CurrentConfig.LastActiveHostToken = response.HostToken;
+            _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
+        }
 
         StatusChanged?.Invoke(CurrentStatus);
         StartModsWatcher(gameDir);
@@ -250,6 +259,14 @@ public class LobbyService : ILobbyService, IDisposable
         _currentGuestPlayerName = playerName;
         IsHost = false;
 
+        if (_configService?.CurrentConfig != null)
+        {
+            _configService.CurrentConfig.LastActiveLobbyCode = CurrentLobbyCode;
+            _configService.CurrentConfig.LastActiveLobbyRole = "guest";
+            _configService.CurrentConfig.LastActiveHostToken = null;
+            _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
+        }
+
         StatusChanged?.Invoke(CurrentStatus);
         if (!string.IsNullOrWhiteSpace(CurrentTunnelAddress))
         {
@@ -267,7 +284,8 @@ public class LobbyService : ILobbyService, IDisposable
         if (string.IsNullOrWhiteSpace(code)) return null;
         int opVersion = _operationVersion;
 
-        var status = await _apiClient.GetStatusAsync(code, cancellationToken);
+        string? myPlayerName = IsHost ? _currentHostPlayerName : _currentGuestPlayerName;
+        var status = await _apiClient.GetStatusAsync(code, myPlayerName, cancellationToken);
         if (_operationVersion != opVersion || !string.Equals(CurrentLobbyCode, code, StringComparison.OrdinalIgnoreCase))
         {
             return null;
@@ -275,7 +293,7 @@ public class LobbyService : ILobbyService, IDisposable
 
         if (status == null && !IsHost)
         {
-            var detailed = await _apiClient.GetStatusDetailedAsync(code, cancellationToken);
+            var detailed = await _apiClient.GetStatusDetailedAsync(code, myPlayerName, cancellationToken);
             if (_operationVersion != opVersion || !string.Equals(CurrentLobbyCode, code, StringComparison.OrdinalIgnoreCase))
             {
                 return null;
@@ -295,6 +313,22 @@ public class LobbyService : ILobbyService, IDisposable
 
         if (status != null)
         {
+            if (!IsHost)
+            {
+                if (status.Kicked)
+                {
+                    LeaveLobby();
+                    KickedFromLobby?.Invoke();
+                    return null;
+                }
+                if (status.Players != null && !string.IsNullOrWhiteSpace(_currentGuestPlayerName) &&
+                    !System.Linq.Enumerable.Any(status.Players, p => string.Equals(p, _currentGuestPlayerName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    LeaveLobby();
+                    KickedFromLobby?.Invoke();
+                    return null;
+                }
+            }
             if (!IsHost && status.LastHeartbeat > 0)
             {
                 long nowTick = Environment.TickCount64;
@@ -357,6 +391,21 @@ public class LobbyService : ILobbyService, IDisposable
 
         await _apiClient.UpdateManifestAsync(CurrentLobbyCode, myNick, manifest, cancellationToken);
         await RefreshGuestStatusAsync(cancellationToken);
+    }
+
+    public async Task<bool> KickPlayerAsync(string playerName, CancellationToken cancellationToken = default)
+    {
+        if (!IsHost || string.IsNullOrWhiteSpace(CurrentLobbyCode) || string.IsNullOrWhiteSpace(CurrentHostToken) || string.IsNullOrWhiteSpace(playerName))
+        {
+            return false;
+        }
+
+        bool success = await _apiClient.KickPlayerAsync(CurrentLobbyCode, CurrentHostToken, playerName, cancellationToken);
+        if (success)
+        {
+            await RefreshGuestStatusAsync(cancellationToken);
+        }
+        return success;
     }
 
     private void StartModsWatcher(string gameDir)
@@ -489,6 +538,15 @@ public class LobbyService : ILobbyService, IDisposable
         CurrentStatus = "idle";
         IsHost = false;
         CurrentModSync = null;
+
+        if (_configService?.CurrentConfig != null && (!string.IsNullOrEmpty(_configService.CurrentConfig.LastActiveLobbyCode) || !string.IsNullOrEmpty(_configService.CurrentConfig.LastActiveLobbyRole)))
+        {
+            _configService.CurrentConfig.LastActiveLobbyCode = null;
+            _configService.CurrentConfig.LastActiveLobbyRole = null;
+            _configService.CurrentConfig.LastActiveHostToken = null;
+            _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
+        }
+
         StatusChanged?.Invoke(CurrentStatus);
     }
 

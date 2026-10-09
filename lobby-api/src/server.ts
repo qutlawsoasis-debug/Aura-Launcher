@@ -192,6 +192,11 @@ export const server = http.createServer(async (req, res) => {
         return;
       }
 
+      if (lobby.kickedPlayers && lobby.kickedPlayers.some(p => p.toLowerCase() === playerName.toLowerCase())) {
+        sendJson(res, 403, { error: 'Вы были исключены из этого лобби' });
+        return;
+      }
+
       if (!lobby.players.includes(playerName)) {
         lobby.players.push(playerName);
       }
@@ -246,6 +251,56 @@ export const server = http.createServer(async (req, res) => {
         code: lobby.code,
         players: lobby.players,
         playerCount: lobby.players.length
+      });
+      return;
+    }
+
+    // 2bb. POST /api/lobby/kick
+    if (req.method === 'POST' && (pathname === '/api/lobby/kick' || pathname === '/api/kick' || pathname === '/kick')) {
+      const body = await parseBody(req);
+      const code = (body.code || '').toUpperCase().trim();
+      const hostToken = (body.hostToken || '').trim();
+      const targetPlayer = (body.player || body.playerName || body.targetPlayer || '').trim();
+
+      if (!code || !hostToken || !targetPlayer) {
+        sendJson(res, 400, { error: 'code, hostToken and player required' });
+        return;
+      }
+
+      const lobby = await store.get(code);
+      if (!lobby || lobby.status === 'closed') {
+        sendJson(res, 404, { error: 'Lobby not found or closed' });
+        return;
+      }
+
+      if (lobby.hostToken !== hostToken) {
+        sendJson(res, 403, { error: 'Unauthorized: invalid host token' });
+        return;
+      }
+
+      if (targetPlayer.toLowerCase() === lobby.hostName.toLowerCase()) {
+        sendJson(res, 400, { error: 'Cannot kick host from their own lobby' });
+        return;
+      }
+
+      lobby.players = lobby.players.filter(p => p.toLowerCase() !== targetPlayer.toLowerCase());
+      if (lobby.manifests) delete lobby.manifests[targetPlayer];
+      if (lobby.manifestHashes) delete lobby.manifestHashes[targetPlayer];
+      if (lobby.playerHeartbeats) delete lobby.playerHeartbeats[targetPlayer.toLowerCase()];
+
+      lobby.kickedPlayers = lobby.kickedPlayers || [];
+      if (!lobby.kickedPlayers.some(p => p.toLowerCase() === targetPlayer.toLowerCase())) {
+        lobby.kickedPlayers.push(targetPlayer);
+      }
+
+      await store.set(lobby, 1800);
+
+      sendJson(res, 200, {
+        success: true,
+        code: lobby.code,
+        players: lobby.players,
+        playerCount: lobby.players.length,
+        kicked: targetPlayer
       });
       return;
     }
@@ -306,6 +361,53 @@ export const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const playerName = ((parsedUrl.query.player as string) || '').trim();
+
+      // Проверка на исключение игрока
+      if (playerName && lobby.kickedPlayers && lobby.kickedPlayers.some(p => p.toLowerCase() === playerName.toLowerCase())) {
+        sendJson(res, 200, {
+          code: lobby.code,
+          status: 'closed',
+          kicked: true,
+          playerCount: lobby.players.length,
+          players: lobby.players,
+          hostName: lobby.hostName
+        });
+        return;
+      }
+
+      // Обновление пульса
+      const now = Date.now();
+      lobby.playerHeartbeats = lobby.playerHeartbeats || {};
+      if (playerName) {
+        lobby.playerHeartbeats[playerName.toLowerCase()] = now;
+      }
+
+      // Авто-очистка неактивных гостей (> 25 сек)
+      const hostLower = lobby.hostName.toLowerCase();
+      let playersChanged = false;
+
+      const activePlayers = lobby.players.filter(p => {
+        const pLower = p.toLowerCase();
+        if (pLower === hostLower) return true;
+        const lastBeat = lobby.playerHeartbeats![pLower] || lobby.createdAt;
+        if (now - lastBeat > 25000) {
+          playersChanged = true;
+          delete lobby.playerHeartbeats![pLower];
+          if (lobby.manifests) delete lobby.manifests[p];
+          if (lobby.manifestHashes) delete lobby.manifestHashes[p];
+          return false;
+        }
+        return true;
+      });
+
+      if (playersChanged) {
+        lobby.players = activePlayers;
+        await store.set(lobby, 1800);
+      } else if (playerName) {
+        await store.set(lobby, 1800);
+      }
+
       const modSync = computeLobbyModSync(lobby);
 
       sendJson(res, 200, {
@@ -316,7 +418,8 @@ export const server = http.createServer(async (req, res) => {
         players: lobby.players,
         hostName: lobby.hostName,
         lastHeartbeat: lobby.lastHeartbeat,
-        modSync
+        modSync,
+        kicked: false
       });
       return;
     }
