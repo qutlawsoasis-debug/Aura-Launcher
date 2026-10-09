@@ -443,7 +443,7 @@
                                       Style="{StaticResource IconPath}"
                                       Width="11" Height="11"
                                       Margin="0,0,6,0"
-                                      Stroke="{DynamicResource TextMuted}" />
+                                      Stroke="{DynamicResource TextSecondary}" />
                                 <TextBlock Text="{Binding ServerPingText}"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="12"
@@ -464,7 +464,7 @@
                                       Style="{StaticResource IconPath}"
                                       Width="11" Height="11"
                                       Margin="0,0,6,0"
-                                      Stroke="{DynamicResource TextMuted}" />
+                                      Stroke="{DynamicResource TextSecondary}" />
                                 <TextBlock Text="{Binding ServerPlayersText}"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="12"
@@ -474,7 +474,7 @@
                                 <TextBlock Text="в мире"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="11"
-                                           Foreground="{DynamicResource TextMuted}" />
+                                           Foreground="{DynamicResource TextSecondary}" />
                             </StackPanel>
                         </Border>
                     </StackPanel>

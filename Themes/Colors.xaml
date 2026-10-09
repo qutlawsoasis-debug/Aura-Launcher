@@ -49,6 +49,7 @@
     <SolidColorBrush x:Key="Night" Color="{StaticResource ColorNight}" po:Freeze="True" />
     <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
     <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource ColorTextSecondary}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TextMuted" Color="{StaticResource ColorTextSecondary}" po:Freeze="True" />
     <SolidColorBrush x:Key="TextWhite" Color="{StaticResource ColorTextWhite}" po:Freeze="True" />
     <SolidColorBrush x:Key="Accent" Color="{StaticResource ColorAccent}" po:Freeze="True" />
     <SolidColorBrush x:Key="AccentDim" Color="{StaticResource ColorAccentDim}" po:Freeze="True" />

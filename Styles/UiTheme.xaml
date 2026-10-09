@@ -657,42 +657,31 @@
     <!-- RAM Selector Hardware Chip Radio Button -->
     <Style x:Key="RamPillRadio" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Height" Value="30" />
+        <Setter Property="Height" Value="32" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Margin" Value="0,0,8,0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="ChipBorder"
                             CornerRadius="3"
-                            Background="#0E171E"
-                            BorderBrush="#2EFFFFFF"
-                            BorderThickness="1,1,1,2"
-                            Padding="10,0"
+                            Background="{DynamicResource Panel}"
+                            BorderBrush="{DynamicResource BorderSubtle}"
+                            BorderThickness="1"
+                            Padding="12,0"
                             SnapsToDevicePixels="True">
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center">
-                            <Border x:Name="ChipBar"
-                                    Width="3"
-                                    Height="11"
-                                    CornerRadius="1"
-                                    Background="#38EAF1EF"
-                                    VerticalAlignment="Center"
-                                    Margin="0,0,7,0" />
-                            <TextBlock x:Name="Txt"
-                                       Text="{TemplateBinding Content}"
-                                       FontFamily="{TemplateBinding FontFamily}"
-                                       FontSize="{TemplateBinding FontSize}"
-                                       FontWeight="{TemplateBinding FontWeight}"
-                                       Foreground="#C8D6DF"
-                                       VerticalAlignment="Center" />
-                        </StackPanel>
+                        <TextBlock x:Name="Txt"
+                                   Text="{TemplateBinding Content}"
+                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   FontWeight="{TemplateBinding FontWeight}"
+                                   Foreground="{DynamicResource TextSecondary}"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <MultiTrigger>
@@ -700,16 +689,15 @@
                                 <Condition Property="IsMouseOver" Value="True" />
                                 <Condition Property="IsChecked" Value="False" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="ChipBorder" Property="Background" Value="#16242F" />
-                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="#66F2A63C" />
-                            <Setter TargetName="ChipBar" Property="Background" Value="#99F2A63C" />
-                            <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource InkBrush}" />
+                            <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                            <Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource TextPrimary}" />
                         </MultiTrigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="ChipBorder" Property="Background" Value="#2B1D0E" />
-                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
-                            <Setter TargetName="ChipBar" Property="Background" Value="{StaticResource EmberBrush}" />
-                            <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Txt" Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="ChipBorder" Property="Opacity" Value="0.85" />
@@ -723,13 +711,13 @@
     <!-- Segmented Switch Radio Button (Graphics Profile & Launch Mode in Settings) -->
     <Style x:Key="SettingsSegmentRadio" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
         <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Medium" />
-        <Setter Property="Height" Value="30" />
+        <Setter Property="Height" Value="28" />
         <Setter Property="Padding" Value="14,0" />
-        <Setter Property="Margin" Value="0,0,3,0" />
+        <Setter Property="Margin" Value="0,0,2,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
@@ -739,7 +727,7 @@
                             CornerRadius="3"
                             Background="Transparent"
                             BorderBrush="Transparent"
-                            BorderThickness="0,0,0,2"
+                            BorderThickness="1"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <TextBlock x:Name="SegText"
@@ -747,7 +735,7 @@
                                    FontFamily="{TemplateBinding FontFamily}"
                                    FontSize="{TemplateBinding FontSize}"
                                    FontWeight="{TemplateBinding FontWeight}"
-                                   Foreground="#C8D6DF"
+                                   Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center" />
                     </Border>
@@ -757,21 +745,13 @@
                                 <Condition Property="IsMouseOver" Value="True" />
                                 <Condition Property="IsChecked" Value="False" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="SegBorder" Property="Background" Value="#16242F" />
-                            <Setter TargetName="SegBorder" Property="BorderBrush" Value="#2EFFFFFF" />
-                            <Setter TargetName="SegText" Property="Foreground" Value="{StaticResource InkBrush}" />
+                            <Setter TargetName="SegBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
+                            <Setter TargetName="SegText" Property="Foreground" Value="{DynamicResource TextPrimary}" />
                         </MultiTrigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="SegBorder" Property="BorderBrush" Value="{StaticResource EmberDarkBrush}" />
-                            <Setter TargetName="SegBorder" Property="Background">
-                                <Setter.Value>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#F7B44F" Offset="0" />
-                                        <GradientStop Color="#EB962B" Offset="1" />
-                                    </LinearGradientBrush>
-                                </Setter.Value>
-                            </Setter>
-                            <Setter TargetName="SegText" Property="Foreground" Value="#1C1106" />
+                            <Setter TargetName="SegBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
+                            <Setter TargetName="SegBorder" Property="BorderBrush" Value="{DynamicResource AccentDim}" />
+                            <Setter TargetName="SegText" Property="Foreground" Value="{DynamicResource TextPrimary}" />
                             <Setter TargetName="SegText" Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
@@ -783,7 +763,7 @@
         </Setter>
     </Style>
 
-    <!-- Tactile Settings Action Button (e.g. "Изменить" folder button) -->
+    <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку") -->
     <Style x:Key="SettingsActionBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
@@ -791,16 +771,16 @@
         <Setter Property="Padding" Value="14,0" />
         <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{StaticResource EmberBrush}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="ActionBorder"
                             CornerRadius="3"
-                            Background="#14212B"
-                            BorderBrush="#66F2A63C"
-                            BorderThickness="1,1,1,2"
+                            Background="{DynamicResource PanelRaised}"
+                            BorderBrush="{DynamicResource BorderSubtle}"
+                            BorderThickness="1"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
                         <ContentPresenter HorizontalAlignment="Center"
@@ -809,12 +789,12 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ActionBorder" Property="Background" Value="#2B1D0E" />
-                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
-                            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+                            <Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource PanelInput}" />
+                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextWhite}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.84" />
+                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.85" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="ActionBorder" Property="Opacity" Value="0.4" />

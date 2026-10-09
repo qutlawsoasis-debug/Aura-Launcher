@@ -197,7 +197,7 @@
 
                     <Border Grid.Column="1"
                             Background="{DynamicResource Panel}"
-                            BorderBrush="{DynamicResource BorderStrong}"
+                            BorderBrush="{DynamicResource BorderSubtle}"
                             BorderThickness="1"
                             CornerRadius="3"
                             Padding="3"
@@ -238,7 +238,7 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
                         <Border Background="{DynamicResource Panel}"
-                                BorderBrush="{DynamicResource BorderStrong}"
+                                BorderBrush="{DynamicResource BorderSubtle}"
                                 BorderThickness="1"
                                 CornerRadius="3"
                                 MinHeight="34"
@@ -249,7 +249,7 @@
                                 <Path Data="{StaticResource IconFolder}"
                                       Style="{StaticResource IconPath}"
                                       Width="14" Height="14"
-                                      Stroke="{DynamicResource AccentDim}"
+                                      Stroke="{DynamicResource TextSecondary}"
                                       VerticalAlignment="Center"
                                       Margin="0,0,8,0" />
                                 <TextBlock Text="{Binding GameDir}"
@@ -460,7 +460,7 @@
 
                     <Border Grid.Column="1"
                             Background="{DynamicResource Panel}"
-                            BorderBrush="{DynamicResource BorderStrong}"
+                            BorderBrush="{DynamicResource BorderSubtle}"
                             BorderThickness="1"
                             CornerRadius="3"
                             Padding="3"

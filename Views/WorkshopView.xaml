@@ -338,10 +338,10 @@
                                             <TextBlock Text="{Binding DimensionFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
                                         </Border>
                                         <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="8,3" Margin="0,0,8,4" Visibility="{Binding HasCoordinates, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock Text="{Binding CoordinatesFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                                            <TextBlock Text="{Binding CoordinatesFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextSecondary}" />
                                         </Border>
                                         <Border Background="{DynamicResource PanelRaised}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="8,3" Margin="0,0,8,4" Visibility="{Binding HasSeed, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock Text="{Binding SeedFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextMuted}" />
+                                            <TextBlock Text="{Binding SeedFormatted}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextSecondary}" />
                                         </Border>
                                     </WrapPanel>
 
@@ -519,7 +519,7 @@
                                                                        Visibility="{Binding HasDimension, Converter={StaticResource BoolToVis}}" />
                                                             <TextBlock Text="{Binding CoordinatesFormatted}"
                                                                        FontFamily="{StaticResource MainFont}" FontSize="12"
-                                                                       Foreground="{DynamicResource TextMuted}" Margin="0,0,10,0"
+                                                                       Foreground="{DynamicResource TextSecondary}" Margin="0,0,10,0"
                                                                        Visibility="{Binding HasCoordinates, Converter={StaticResource BoolToVis}}" />
                                                             <TextBlock Text="{Binding SizeFormatted}"
                                                                        FontFamily="{StaticResource MainFont}" FontSize="12"
