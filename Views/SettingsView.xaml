@@ -158,18 +158,24 @@
                                 Style="{StaticResource SettingsRamSlider}"
                                 Margin="0,0,0,6" />
 
-                        <!-- Quick links: 4, 6, 8, 12 ГБ -->
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                            <RadioButton Content="4 ГБ" IsChecked="{Binding IsRam4, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                            <RadioButton Content="6 ГБ" IsChecked="{Binding IsRam6, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                            <RadioButton Content="8 ГБ" IsChecked="{Binding IsRam8, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" />
-                            <RadioButton Content="12 ГБ" IsChecked="{Binding IsRam12, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" Margin="0" />
-                        </StackPanel>
+                        <!-- Quick links: 4, 6, 8, 12 ГБ (Tactile Hardware Chips) -->
+                        <Grid Margin="0,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <RadioButton Grid.Column="0" Content="4 ГБ" IsChecked="{Binding IsRam4, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" Margin="0,0,6,0" />
+                            <RadioButton Grid.Column="1" Content="6 ГБ" IsChecked="{Binding IsRam6, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" Margin="2,0,4,0" />
+                            <RadioButton Grid.Column="2" Content="8 ГБ" IsChecked="{Binding IsRam8, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" Margin="4,0,2,0" />
+                            <RadioButton Grid.Column="3" Content="12 ГБ" IsChecked="{Binding IsRam12, Mode=TwoWay}" Style="{StaticResource RamPillRadio}" Margin="6,0,0,0" />
+                        </Grid>
                     </StackPanel>
                 </Grid>
 
                 <!-- 1.2b "Профиль графики" -->
-                <Grid MinHeight="56" Margin="0,4,0,6">
+                <Grid MinHeight="56" Margin="0,6,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -189,21 +195,30 @@
                                    Margin="0,2,0,0" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <RadioButton Content="Слабый ПК"
-                                     GroupName="GraphicsPresetGroup"
-                                     IsChecked="{Binding IsPresetLow, Mode=TwoWay}"
-                                     Style="{StaticResource RamPillRadio}" />
-                        <RadioButton Content="Баланс"
-                                     GroupName="GraphicsPresetGroup"
-                                     IsChecked="{Binding IsPresetBalanced, Mode=TwoWay}"
-                                     Style="{StaticResource RamPillRadio}" />
-                        <RadioButton Content="Ультра"
-                                     GroupName="GraphicsPresetGroup"
-                                     IsChecked="{Binding IsPresetUltra, Mode=TwoWay}"
-                                     Style="{StaticResource RamPillRadio}"
-                                     Margin="0" />
-                    </StackPanel>
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource Panel}"
+                            BorderBrush="{DynamicResource BorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="3"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Content="Слабый ПК"
+                                         GroupName="GraphicsPresetGroup"
+                                         IsChecked="{Binding IsPresetLow, Mode=TwoWay}"
+                                         Style="{StaticResource SettingsSegmentRadio}" />
+                            <RadioButton Content="Баланс"
+                                         GroupName="GraphicsPresetGroup"
+                                         IsChecked="{Binding IsPresetBalanced, Mode=TwoWay}"
+                                         Style="{StaticResource SettingsSegmentRadio}" />
+                            <RadioButton Content="Ультра"
+                                         GroupName="GraphicsPresetGroup"
+                                         IsChecked="{Binding IsPresetUltra, Mode=TwoWay}"
+                                         Style="{StaticResource SettingsSegmentRadio}"
+                                         Margin="0" />
+                        </StackPanel>
+                    </Border>
                 </Grid>
 
                 <!-- 1.3 "Папка игры" -->
@@ -222,21 +237,44 @@
                                VerticalAlignment="Center" />
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <TextBlock Text="{Binding GameDir}"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="13"
-                                   FontWeight="Normal"
-                                   Foreground="{StaticResource DimInkBrush}"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="260"
-                                   VerticalAlignment="Center"
-                                   Margin="0,0,14,0" />
+                        <Border Background="{DynamicResource Panel}"
+                                BorderBrush="{DynamicResource BorderStrong}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                MinHeight="34"
+                                Padding="12,5"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconFolder}"
+                                      Style="{StaticResource IconPath}"
+                                      Width="14" Height="14"
+                                      Stroke="{DynamicResource AccentDim}"
+                                      VerticalAlignment="Center"
+                                      Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding GameDir}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="Normal"
+                                           Foreground="{StaticResource InkBrush}"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="260"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
 
                         <Button Command="{Binding SelectGameFolderCommand}"
-                                Style="{StaticResource GhostBtn}"
-                                Content="Изменить"
-                                Foreground="{StaticResource EmberBrush}"
-                                VerticalAlignment="Center" />
+                                Style="{StaticResource SettingsActionBtn}"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Path Data="{StaticResource IconFolderOpen}"
+                                      Style="{StaticResource IconPath}"
+                                      Width="14" Height="14"
+                                      Margin="0,0,7,0"
+                                      VerticalAlignment="Center" />
+                                <TextBlock Text="Изменить" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Grid>
 
@@ -376,45 +414,28 @@
                                Foreground="{StaticResource InkBrush}"
                                VerticalAlignment="Center" />
 
-                    <Grid Grid.Column="1" VerticalAlignment="Center">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="6" />
-                            <RowDefinition Height="3" />
-                        </Grid.RowDefinitions>
-
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource Panel}"
+                            BorderBrush="{DynamicResource BorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="3"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right">
+                        <StackPanel Orientation="Horizontal">
                             <RadioButton x:Name="StartModeWindowedRadio"
                                          Content="В окне"
                                          GroupName="StartModeTextGroup"
                                          IsChecked="{Binding IsStartModeWindowed, Mode=TwoWay}"
-                                         Checked="OnStartModeChecked"
-                                         Style="{StaticResource TextTabRadioButton}"
-                                         Margin="0,0,28,0" />
+                                         Style="{StaticResource SettingsSegmentRadio}" />
                             <RadioButton x:Name="StartModeMaximizedRadio"
                                          Content="На весь экран"
                                          GroupName="StartModeTextGroup"
                                          IsChecked="{Binding IsStartModeMaximized, Mode=TwoWay}"
-                                         Checked="OnStartModeChecked"
-                                         Style="{StaticResource TextTabRadioButton}" />
+                                         Style="{StaticResource SettingsSegmentRadio}"
+                                         Margin="0" />
                         </StackPanel>
-
-                        <!-- Accent-подчёркивание 3 px (радиус 3, на 6 px ниже текста) -->
-                        <Border x:Name="StartModeUnderline"
-                                Grid.Row="2"
-                                HorizontalAlignment="Left"
-                                Height="3"
-                                CornerRadius="3"
-                                Background="{DynamicResource Accent}"
-                                RenderTransformOrigin="0,0">
-                            <Border.RenderTransform>
-                                <TransformGroup>
-                                    <ScaleTransform x:Name="StartModeUnderlineScale" ScaleX="1" />
-                                    <TranslateTransform x:Name="StartModeUnderlineTrans" X="0" />
-                                </TransformGroup>
-                            </Border.RenderTransform>
-                        </Border>
-                    </Grid>
+                    </Border>
                 </Grid>
 
                 <!-- 2.7 "Автосмена фона" -->
@@ -442,8 +463,8 @@
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Command="{Binding NextBackgroundCommand}"
                                 Content="Сменить фон"
-                                Style="{StaticResource StandardBtn}"
-                                Height="30" Padding="12,0" FontSize="12"
+                                Style="{StaticResource SettingsActionBtn}"
+                                Height="32" Padding="12,0" FontSize="12"
                                 Margin="0,0,12,0" />
                         <CheckBox IsChecked="{Binding AutoRotateBackgrounds, Mode=TwoWay}"
                                   Style="{StaticResource AlexToggleSwitch}"

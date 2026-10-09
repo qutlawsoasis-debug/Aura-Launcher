@@ -261,6 +261,7 @@ public partial class MainWindow : Window
                 tt.BeginAnimation(TranslateTransform.YProperty, null);
                 tt.Y = 0.0;
             }
+            Behaviors.SmoothScroll.ResetAllScrollViewers(targetView);
             return;
         }
 
@@ -279,6 +280,7 @@ public partial class MainWindow : Window
         // Приходящий экран одновременно плавно проявляется (220 мс) со сдвигом на 6px
         targetView.Visibility = Visibility.Visible;
         targetView.IsHitTestVisible = true;
+        Behaviors.SmoothScroll.ResetAllScrollViewers(targetView);
 
         double currentY = 6.0;
         if (targetView.RenderTransform is TranslateTransform inTrans)

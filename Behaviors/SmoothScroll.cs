@@ -84,16 +84,61 @@ public static class SmoothScroll
             scrollViewer.PreviewMouseWheel += ScrollViewer_PreviewMouseWheel;
             scrollViewer.ScrollChanged += ScrollViewer_ScrollChanged;
             scrollViewer.Unloaded += ScrollViewer_Unloaded;
+            scrollViewer.IsVisibleChanged += ScrollViewer_IsVisibleChanged;
         }
         else
         {
             scrollViewer.PreviewMouseWheel -= ScrollViewer_PreviewMouseWheel;
             scrollViewer.ScrollChanged -= ScrollViewer_ScrollChanged;
             scrollViewer.Unloaded -= ScrollViewer_Unloaded;
+            scrollViewer.IsVisibleChanged -= ScrollViewer_IsVisibleChanged;
             if (scrollViewer.GetValue(ScrollStateProperty) is ScrollState state)
             {
                 StopAnimation(scrollViewer, state);
             }
+        }
+    }
+
+    public static void ResetScrollViewer(ScrollViewer scrollViewer)
+    {
+        if (scrollViewer == null) return;
+
+        var state = GetOrCreateState(scrollViewer);
+        StopAnimation(scrollViewer, state);
+        state.CurrentOffset = 0.0;
+        state.TargetOffset = 0.0;
+        state.LastRequestedOffset = 0.0;
+        state.HasPendingInternalScroll = true;
+        scrollViewer.ScrollToVerticalOffset(0.0);
+    }
+
+    public static void ResetAllScrollViewers(DependencyObject? root)
+    {
+        if (root == null) return;
+
+        if (root is ScrollViewer sv)
+        {
+            ResetScrollViewer(sv);
+        }
+
+        if (root is not Visual && root is not System.Windows.Media.Media3D.Visual3D)
+        {
+            return;
+        }
+
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            ResetAllScrollViewers(child);
+        }
+    }
+
+    private static void ScrollViewer_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is ScrollViewer scrollViewer)
+        {
+            ResetScrollViewer(scrollViewer);
         }
     }
 

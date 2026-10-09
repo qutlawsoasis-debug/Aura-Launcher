@@ -654,29 +654,65 @@
         </Setter>
     </Style>
 
-    <!-- RAM Selector Pill Radio Button -->
+    <!-- RAM Selector Hardware Chip Radio Button -->
     <Style x:Key="RamPillRadio" TargetType="RadioButton">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{StaticResource MuteBrush}" />
-        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Height" Value="30" />
         <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Margin" Value="0,0,16,0" />
+        <Setter Property="Margin" Value="0,0,8,0" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <TextBlock x:Name="Txt" Text="{TemplateBinding Content}"
-                               Foreground="{TemplateBinding Foreground}"
-                               TextDecorations="Underline" />
+                    <Border x:Name="ChipBorder"
+                            CornerRadius="3"
+                            Background="#0E171E"
+                            BorderBrush="#2EFFFFFF"
+                            BorderThickness="1,1,1,2"
+                            Padding="10,0"
+                            SnapsToDevicePixels="True">
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                            <Border x:Name="ChipBar"
+                                    Width="3"
+                                    Height="11"
+                                    CornerRadius="1"
+                                    Background="#38EAF1EF"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,7,0" />
+                            <TextBlock x:Name="Txt"
+                                       Text="{TemplateBinding Content}"
+                                       FontFamily="{TemplateBinding FontFamily}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       FontWeight="{TemplateBinding FontWeight}"
+                                       Foreground="#C8D6DF"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource EmberBrush}" />
-                            <Setter TargetName="Txt" Property="FontWeight" Value="SemiBold" />
-                        </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="ChipBorder" Property="Background" Value="#16242F" />
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="#66F2A63C" />
+                            <Setter TargetName="ChipBar" Property="Background" Value="#99F2A63C" />
                             <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource InkBrush}" />
+                        </MultiTrigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="ChipBorder" Property="Background" Value="#2B1D0E" />
+                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="ChipBar" Property="Background" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="Txt" Property="Foreground" Value="{StaticResource EmberBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="ChipBorder" Property="Opacity" Value="0.85" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -684,7 +720,113 @@
         </Setter>
     </Style>
 
-    <!-- Settings RAM Slider (track 6px ember, thumb 14x22 radius 3) -->
+    <!-- Segmented Switch Radio Button (Graphics Profile & Launch Mode in Settings) -->
+    <Style x:Key="SettingsSegmentRadio" TargetType="RadioButton">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Height" Value="30" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Margin" Value="0,0,3,0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="SegBorder"
+                            CornerRadius="3"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="0,0,0,2"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <TextBlock x:Name="SegText"
+                                   Text="{TemplateBinding Content}"
+                                   FontFamily="{TemplateBinding FontFamily}"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   FontWeight="{TemplateBinding FontWeight}"
+                                   Foreground="#C8D6DF"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="SegBorder" Property="Background" Value="#16242F" />
+                            <Setter TargetName="SegBorder" Property="BorderBrush" Value="#2EFFFFFF" />
+                            <Setter TargetName="SegText" Property="Foreground" Value="{StaticResource InkBrush}" />
+                        </MultiTrigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="SegBorder" Property="BorderBrush" Value="{StaticResource EmberDarkBrush}" />
+                            <Setter TargetName="SegBorder" Property="Background">
+                                <Setter.Value>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#F7B44F" Offset="0" />
+                                        <GradientStop Color="#EB962B" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter TargetName="SegText" Property="Foreground" Value="#1C1106" />
+                            <Setter TargetName="SegText" Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="SegBorder" Property="Opacity" Value="0.85" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Tactile Settings Action Button (e.g. "Изменить" folder button) -->
+    <Style x:Key="SettingsActionBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource EmberBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="ActionBorder"
+                            CornerRadius="3"
+                            Background="#14212B"
+                            BorderBrush="#66F2A63C"
+                            BorderThickness="1,1,1,2"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ActionBorder" Property="Background" Value="#2B1D0E" />
+                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.84" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Settings RAM Slider (track 8px dark/ember, thumb 14x22 radius 3) -->
     <Style x:Key="SettingsRamSlider" TargetType="Slider">
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="OverridesDefaultStyle" Value="True" />
@@ -694,19 +836,52 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
                     <Grid VerticalAlignment="Center">
-                        <!-- Track 6px -->
-                        <Border Height="6" Background="#26FFFFFF" CornerRadius="3" VerticalAlignment="Center" />
+                        <!-- Base Track -->
+                        <Border Height="8"
+                                Background="#0C141A"
+                                BorderBrush="#2EFFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                VerticalAlignment="Center" />
                         <Track x:Name="PART_Track">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="Slider.DecreaseLarge" Focusable="False" IsTabStop="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="6"
+                                                    Background="#66F2A63C"
+                                                    CornerRadius="3,0,0,3"
+                                                    Margin="1,0,0,0"
+                                                    VerticalAlignment="Center" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="Slider.IncreaseLarge" Focusable="False" IsTabStop="False">
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Background="Transparent" />
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseRepeatButton>
                             <Track.Thumb>
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Border Width="14" Height="22"
+                                            <Border x:Name="ThumbBrd"
+                                                    Width="14" Height="22"
                                                     CornerRadius="3"
                                                     Background="{StaticResource EmberBrush}"
                                                     BorderBrush="{StaticResource EmberDarkBrush}"
-                                                    BorderThickness="1"
+                                                    BorderThickness="1,1,1,2"
                                                     Cursor="Hand" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ThumbBrd" Property="Background" Value="#F7B44F" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Thumb.Template>
                                 </Thumb>

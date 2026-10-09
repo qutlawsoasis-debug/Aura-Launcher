@@ -134,4 +134,37 @@ public class SmoothScrollTests
             Assert.Equal(950.0, scrollViewer.VerticalOffset, precision: 1);
         });
     }
+
+    [Fact]
+    public void ResetAllScrollViewers_ResetsVerticalOffsetAndTargetToZero()
+    {
+        RunOnStaThread(() =>
+        {
+            var content = new Border { Width = 200, Height = 2000 };
+            var scrollViewer = new ScrollViewer
+            {
+                Width = 200,
+                Height = 200,
+                Content = content
+            };
+            var container = new Grid();
+            container.Children.Add(scrollViewer);
+
+            SmoothScroll.SetIsEnabled(scrollViewer, true);
+
+            container.Measure(new Size(200, 200));
+            container.Arrange(new Rect(0, 0, 200, 200));
+            container.UpdateLayout();
+
+            SmoothScroll.SetSmoothVerticalOffset(scrollViewer, 650.0);
+            container.UpdateLayout();
+            Assert.Equal(650.0, scrollViewer.VerticalOffset, precision: 1);
+
+            SmoothScroll.ResetAllScrollViewers(container);
+            container.UpdateLayout();
+
+            Assert.Equal(0.0, scrollViewer.VerticalOffset, precision: 1);
+            Assert.Equal(0.0, SmoothScroll.GetTargetVerticalOffset(scrollViewer), precision: 1);
+        });
+    }
 }
