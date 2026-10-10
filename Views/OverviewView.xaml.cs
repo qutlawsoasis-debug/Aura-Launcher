@@ -32,23 +32,39 @@ public partial class OverviewView : UserControl
         {
             AnimateEntrance();
             RefreshData();
+            if (DataContext is OverviewViewModel ovm)
+            {
+                ovm.StartCarouselTimer();
+            }
         }
     }
 
     private void OverviewView_Unloaded(object sender, RoutedEventArgs e)
     {
         DetachWindow();
+        if (DataContext is OverviewViewModel ovm)
+        {
+            ovm.StopCarouselTimer();
+        }
     }
 
     private void OverviewView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (IsVisible)
+        if (DataContext is OverviewViewModel ovm)
         {
-            UpdateRailVisibility();
-            if (StoriesRail != null && StoriesRail.Visibility == Visibility.Visible)
+            if (IsVisible)
             {
-                AnimateEntrance();
-                RefreshData();
+                UpdateRailVisibility();
+                if (StoriesRail != null && StoriesRail.Visibility == Visibility.Visible)
+                {
+                    AnimateEntrance();
+                    RefreshData();
+                    ovm.StartCarouselTimer();
+                }
+            }
+            else
+            {
+                ovm.StopCarouselTimer();
             }
         }
     }
@@ -128,6 +144,22 @@ public partial class OverviewView : UserControl
         if (StoriesRail.Visibility != Visibility.Visible)
         {
             StoriesRail.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void StoriesRail_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (DataContext is OverviewViewModel ovm)
+        {
+            ovm.PauseCarouselCommand.Execute(null);
+        }
+    }
+
+    private void StoriesRail_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (DataContext is OverviewViewModel ovm)
+        {
+            ovm.ResumeCarouselCommand.Execute(null);
         }
     }
 }

@@ -1822,7 +1822,7 @@ public class MainViewModel : ObservableObject
         _backgroundUpdateTimer?.Stop();
         _backgroundUpdateTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMinutes(30)
+            Interval = TimeSpan.FromMinutes(2)
         };
         _backgroundUpdateTimer.Tick += async (s, e) =>
         {
@@ -1861,6 +1861,10 @@ public class MainViewModel : ObservableObject
                         UpdateBannerButtonText = "Обновить";
                         OnPropertyChanged(nameof(UpdateBannerMessage));
                         IsUpdateBannerVisible = true;
+
+                        _notificationService?.NotifyUpdateAvailable(
+                            $"Вышло обновление {displayVer}",
+                            "Нажмите, чтобы установить новую версию лаунчера.");
                     }
                     return;
                 }

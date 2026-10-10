@@ -132,17 +132,40 @@ public class OverviewViewModel : ObservableObject
     public double Story1Progress => ActiveStoryIndex > 1 ? 1.0 : (ActiveStoryIndex == 1 ? _storyProgress : 0.0);
     public double Story2Progress => ActiveStoryIndex > 2 ? 1.0 : (ActiveStoryIndex == 2 ? _storyProgress : 0.0);
 
+    public double Story0ProgressPercent => Story0Progress * 100.0;
+    public double Story1ProgressPercent => Story1Progress * 100.0;
+    public double Story2ProgressPercent => Story2Progress * 100.0;
+
     private void UpdateStoryProgresses()
     {
         OnPropertyChanged(nameof(Story0Progress));
         OnPropertyChanged(nameof(Story1Progress));
         OnPropertyChanged(nameof(Story2Progress));
+        OnPropertyChanged(nameof(Story0ProgressPercent));
+        OnPropertyChanged(nameof(Story1ProgressPercent));
+        OnPropertyChanged(nameof(Story2ProgressPercent));
         OnPropertyChanged(nameof(Story0FilledStar));
         OnPropertyChanged(nameof(Story0EmptyStar));
         OnPropertyChanged(nameof(Story1FilledStar));
         OnPropertyChanged(nameof(Story1EmptyStar));
         OnPropertyChanged(nameof(Story2FilledStar));
         OnPropertyChanged(nameof(Story2EmptyStar));
+    }
+
+    public void StartCarouselTimer()
+    {
+        _carouselTimer?.Stop();
+        _storyProgress = 0.0;
+        if (ActiveStoryIndex == 0 && !HasLatestScreenshot)
+        {
+            ActiveStoryIndex = 1;
+        }
+        _carouselTimer?.Start();
+    }
+
+    public void StopCarouselTimer()
+    {
+        _carouselTimer?.Stop();
     }
 
     public OverviewViewModel(IConfigService configService, IGameLaunchService launchService, IBackgroundService? backgroundService = null)
@@ -166,6 +189,7 @@ public class OverviewViewModel : ObservableObject
         {
             if (param != null && int.TryParse(param.ToString(), out int idx) && idx >= 0 && idx <= 2)
             {
+                if (idx == 0 && !HasLatestScreenshot) return;
                 _storyProgress = 0.0;
                 ActiveStoryIndex = idx;
             }
@@ -182,11 +206,16 @@ public class OverviewViewModel : ObservableObject
         {
             if (_isCarouselPaused) return;
 
-            _storyProgress += 0.01; // 5000ms / 50ms = 100 steps
+            _storyProgress += (50.0 / 6000.0); // 6000ms total fill duration (6s)
             if (_storyProgress >= 1.0)
             {
                 _storyProgress = 0.0;
-                ActiveStoryIndex = (ActiveStoryIndex + 1) % 3;
+                int next = (ActiveStoryIndex + 1) % 3;
+                if (next == 0 && !HasLatestScreenshot)
+                {
+                    next = 1;
+                }
+                ActiveStoryIndex = next;
             }
             else
             {

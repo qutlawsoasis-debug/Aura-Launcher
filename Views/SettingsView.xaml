@@ -133,11 +133,31 @@
                                    FontWeight="Medium"
                                    Foreground="{StaticResource InkBrush}" />
                         <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                            <TextBlock Text="{Binding RamGb}"
-                                       FontFamily="{StaticResource HeadingFont}"
-                                       FontSize="20"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource EmberBrush}" />
+                            <!-- Odometer Number Transition Container -->
+                            <Grid Height="26" ClipToBounds="True" VerticalAlignment="Center">
+                                <TextBlock x:Name="OldRamNumberText"
+                                           Text=""
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="20"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource EmberBrush}"
+                                           Opacity="0.0">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="OldRamTranslate" Y="0" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                                <TextBlock x:Name="RamNumberText"
+                                           Text="{Binding RamGb, NotifyOnTargetUpdated=True}"
+                                           TargetUpdated="OnRamGbTargetUpdated"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="20"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource EmberBrush}">
+                                    <TextBlock.RenderTransform>
+                                        <TranslateTransform x:Name="RamTranslate" Y="0" />
+                                    </TextBlock.RenderTransform>
+                                </TextBlock>
+                            </Grid>
                             <TextBlock Text=" ГБ"
                                        FontFamily="{StaticResource HeadingFont}"
                                        FontSize="14"
@@ -150,7 +170,8 @@
 
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" Width="360">
                         <!-- Slider 2..16 GB -->
-                        <Slider Minimum="2" Maximum="16"
+                        <Slider x:Name="RamSlider"
+                                Minimum="2" Maximum="16"
                                 SmallChange="1" LargeChange="2"
                                 TickFrequency="1"
                                 IsSnapToTickEnabled="True"
