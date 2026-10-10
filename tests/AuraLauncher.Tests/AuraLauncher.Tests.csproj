@@ -23,4 +23,10 @@
     <ProjectReference Include="..\..\AuraLauncher.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\Data\achievements.json" Link="Data\achievements.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

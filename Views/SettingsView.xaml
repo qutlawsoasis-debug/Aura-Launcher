@@ -195,30 +195,25 @@
                                    Margin="0,2,0,0" />
                     </StackPanel>
 
-                    <Border Grid.Column="1"
-                            Background="{DynamicResource Panel}"
-                            BorderBrush="{DynamicResource BorderSubtle}"
-                            BorderThickness="1"
-                            CornerRadius="3"
-                            Padding="3"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Right">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton Content="Слабый ПК"
-                                         GroupName="GraphicsPresetGroup"
-                                         IsChecked="{Binding IsPresetLow, Mode=TwoWay}"
-                                         Style="{StaticResource SettingsSegmentRadio}" />
-                            <RadioButton Content="Баланс"
-                                         GroupName="GraphicsPresetGroup"
-                                         IsChecked="{Binding IsPresetBalanced, Mode=TwoWay}"
-                                         Style="{StaticResource SettingsSegmentRadio}" />
-                            <RadioButton Content="Ультра"
-                                         GroupName="GraphicsPresetGroup"
-                                         IsChecked="{Binding IsPresetUltra, Mode=TwoWay}"
-                                         Style="{StaticResource SettingsSegmentRadio}"
-                                         Margin="0" />
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right">
+                        <RadioButton Content="Слабый ПК"
+                                     GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetLow, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}"
+                                     Margin="0,0,4,0" />
+                        <RadioButton Content="Баланс"
+                                     GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetBalanced, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}"
+                                     Margin="0,0,4,0" />
+                        <RadioButton Content="Ультра"
+                                     GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetUltra, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}" />
+                    </StackPanel>
                 </Grid>
 
                 <!-- 1.3 "Папка игры" -->
@@ -348,7 +343,7 @@
 
                     <CheckBox Grid.Column="1"
                               IsChecked="{Binding HideLauncherWhilePlaying, Mode=TwoWay}"
-                              Style="{StaticResource AlexToggleSwitch}"
+                              Style="{StaticResource AuraCheckBox}"
                               VerticalAlignment="Center" />
                 </Grid>
 
@@ -374,7 +369,7 @@
 
                     <CheckBox Grid.Column="1"
                               IsChecked="{Binding MusicOnStartup, Mode=TwoWay}"
-                              Style="{StaticResource AlexToggleSwitch}"
+                              Style="{StaticResource AuraCheckBox}"
                               VerticalAlignment="Center" />
                 </Grid>
 
@@ -397,7 +392,7 @@
 
                     <CheckBox Grid.Column="1"
                               IsChecked="{Binding AutoConnectOnInviteAccept, Mode=TwoWay}"
-                              Style="{StaticResource AlexToggleSwitch}"
+                              Style="{StaticResource AuraCheckBox}"
                               VerticalAlignment="Center" />
                 </Grid>
 
@@ -418,7 +413,7 @@
 
                     <CheckBox Grid.Column="1"
                               IsChecked="{Binding WindowsNotificationsEnabled, Mode=TwoWay}"
-                              Style="{StaticResource AlexToggleSwitch}"
+                              Style="{StaticResource AuraCheckBox}"
                               VerticalAlignment="Center" />
                 </Grid>
 
@@ -439,7 +434,7 @@
 
                     <CheckBox Grid.Column="1"
                               IsChecked="{Binding DiscordRpcEnabled, Mode=TwoWay}"
-                              Style="{StaticResource AlexToggleSwitch}"
+                              Style="{StaticResource AuraCheckBox}"
                               VerticalAlignment="Center" />
                 </Grid>
 
@@ -458,28 +453,22 @@
                                Foreground="{StaticResource InkBrush}"
                                VerticalAlignment="Center" />
 
-                    <Border Grid.Column="1"
-                            Background="{DynamicResource Panel}"
-                            BorderBrush="{DynamicResource BorderSubtle}"
-                            BorderThickness="1"
-                            CornerRadius="3"
-                            Padding="3"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Right">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="StartModeWindowedRadio"
-                                         Content="В окне"
-                                         GroupName="StartModeTextGroup"
-                                         IsChecked="{Binding IsStartModeWindowed, Mode=TwoWay}"
-                                         Style="{StaticResource SettingsSegmentRadio}" />
-                            <RadioButton x:Name="StartModeMaximizedRadio"
-                                         Content="На весь экран"
-                                         GroupName="StartModeTextGroup"
-                                         IsChecked="{Binding IsStartModeMaximized, Mode=TwoWay}"
-                                         Style="{StaticResource SettingsSegmentRadio}"
-                                         Margin="0" />
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right">
+                        <RadioButton x:Name="StartModeWindowedRadio"
+                                     Content="В окне"
+                                     GroupName="StartModeTextGroup"
+                                     IsChecked="{Binding IsStartModeWindowed, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}"
+                                     Margin="0,0,4,0" />
+                        <RadioButton x:Name="StartModeMaximizedRadio"
+                                     Content="На весь экран"
+                                     GroupName="StartModeTextGroup"
+                                     IsChecked="{Binding IsStartModeMaximized, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}" />
+                    </StackPanel>
                 </Grid>
 
                 <!-- 2.7 "Автосмена фона" -->
@@ -511,7 +500,7 @@
                                 Height="32" Padding="12,0" FontSize="12"
                                 Margin="0,0,12,0" />
                         <CheckBox IsChecked="{Binding AutoRotateBackgrounds, Mode=TwoWay}"
-                                  Style="{StaticResource AlexToggleSwitch}"
+                                  Style="{StaticResource AuraCheckBox}"
                                   VerticalAlignment="Center" />
                     </StackPanel>
                 </Grid>
@@ -549,7 +538,7 @@
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Command="{Binding OpenSendReportCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
+                                Style="{StaticResource PrimaryActionBtn}"
                                 Height="40"
                                 Padding="18,0"
                                 FontSize="13"

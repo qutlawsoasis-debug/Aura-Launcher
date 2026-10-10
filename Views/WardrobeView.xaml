@@ -246,7 +246,7 @@
 
                 <!-- Toggle "Тонкие руки (Alex)" -->
                 <CheckBox IsChecked="{Binding IsSlimModel, Mode=TwoWay}"
-                          Style="{StaticResource AlexToggleSwitch}"
+                          Style="{StaticResource AuraCheckBox}"
                           Margin="0,0,0,16">
                     <TextBlock Text="Тонкие руки (Alex)"
                                FontFamily="{StaticResource MainFont}"

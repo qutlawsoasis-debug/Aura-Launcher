@@ -654,114 +654,11 @@
         </Setter>
     </Style>
 
-    <!-- RAM Selector Hardware Chip Radio Button -->
-    <Style x:Key="RamPillRadio" TargetType="RadioButton">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
-        <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Height" Value="32" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="ChipBorder"
-                            CornerRadius="3"
-                            Background="{DynamicResource Panel}"
-                            BorderBrush="{DynamicResource BorderSubtle}"
-                            BorderThickness="1"
-                            Padding="12,0"
-                            SnapsToDevicePixels="True">
-                        <TextBlock x:Name="Txt"
-                                   Text="{TemplateBinding Content}"
-                                   FontFamily="{TemplateBinding FontFamily}"
-                                   FontSize="{TemplateBinding FontSize}"
-                                   FontWeight="{TemplateBinding FontWeight}"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True" />
-                                <Condition Property="IsChecked" Value="False" />
-                            </MultiTrigger.Conditions>
-                            <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
-                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                            <Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                        </MultiTrigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
-                            <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource Accent}" />
-                            <Setter TargetName="Txt" Property="Foreground" Value="{DynamicResource Accent}" />
-                            <Setter TargetName="Txt" Property="FontWeight" Value="SemiBold" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ChipBorder" Property="Opacity" Value="0.85" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
+    <!-- RAM Selector Pill Radio Button (Alias based on SubNavPillRadio) -->
+    <Style x:Key="RamPillRadio" BasedOn="{StaticResource SubNavPillRadio}" TargetType="RadioButton" />
 
-    <!-- Segmented Switch Radio Button (Graphics Profile & Launch Mode in Settings) -->
-    <Style x:Key="SettingsSegmentRadio" TargetType="RadioButton">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
-        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
-        <Setter Property="FontSize" Value="13" />
-        <Setter Property="FontWeight" Value="Medium" />
-        <Setter Property="Height" Value="28" />
-        <Setter Property="Padding" Value="14,0" />
-        <Setter Property="Margin" Value="0,0,2,0" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="SegBorder"
-                            CornerRadius="3"
-                            Background="Transparent"
-                            BorderBrush="Transparent"
-                            BorderThickness="1"
-                            Padding="{TemplateBinding Padding}"
-                            SnapsToDevicePixels="True">
-                        <TextBlock x:Name="SegText"
-                                   Text="{TemplateBinding Content}"
-                                   FontFamily="{TemplateBinding FontFamily}"
-                                   FontSize="{TemplateBinding FontSize}"
-                                   FontWeight="{TemplateBinding FontWeight}"
-                                   Foreground="{DynamicResource TextSecondary}"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <MultiTrigger>
-                            <MultiTrigger.Conditions>
-                                <Condition Property="IsMouseOver" Value="True" />
-                                <Condition Property="IsChecked" Value="False" />
-                            </MultiTrigger.Conditions>
-                            <Setter TargetName="SegBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
-                            <Setter TargetName="SegText" Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                        </MultiTrigger>
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="SegBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
-                            <Setter TargetName="SegBorder" Property="BorderBrush" Value="{DynamicResource AccentDim}" />
-                            <Setter TargetName="SegText" Property="Foreground" Value="{DynamicResource TextPrimary}" />
-                            <Setter TargetName="SegText" Property="FontWeight" Value="SemiBold" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="SegBorder" Property="Opacity" Value="0.85" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
+    <!-- Segmented Switch Radio Button (Alias based on SubNavPillRadio) -->
+    <Style x:Key="SettingsSegmentRadio" BasedOn="{StaticResource SubNavPillRadio}" TargetType="RadioButton" />
 
     <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку") -->
     <Style x:Key="SettingsActionBtn" TargetType="Button">
@@ -873,46 +770,64 @@
         </Setter>
     </Style>
 
-    <!-- Custom CheckBox styled as Alex Toggle (46x26, radius 3, knob 20x20, ember when checked) -->
-    <Style x:Key="AlexToggleSwitch" TargetType="CheckBox">
+    <!-- Aura Desktop CheckBox (20x20, CornerRadius 3, dark background #0C141A, subtle border, Ember checkmark when checked) -->
+    <Style x:Key="AuraCheckBox" TargetType="CheckBox">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Height" Value="26" />
-        <Setter Property="behaviors:SmoothToggle.IsEnabled" Value="True" />
-        <Setter Property="behaviors:SmoothToggle.UncheckedLeft" Value="3" />
-        <Setter Property="behaviors:SmoothToggle.CheckedLeft" Value="23" />
+        <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Grid Width="46" Height="26">
-                            <Border x:Name="SwitchTrack" CornerRadius="3"
-                                    Background="#1AFFFFFF" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" />
-                            <Border x:Name="ActiveTrack" CornerRadius="3"
-                                    Background="#33F2A63C" BorderBrush="{StaticResource EmberBrush}" BorderThickness="1"
-                                    Opacity="0" />
-                            <Border x:Name="Thumb" Width="20" Height="20" CornerRadius="2"
-                                    Background="{StaticResource MuteBrush}"
-                                    HorizontalAlignment="Left" VerticalAlignment="Center"
-                                    Margin="3,0,0,0">
-                                <Border x:Name="ThumbActive" CornerRadius="2"
-                                        Background="{StaticResource EmberBrush}"
-                                        Opacity="0" />
-                            </Border>
-                        </Grid>
-                        <ContentPresenter Margin="12,0,0,0" VerticalAlignment="Center" />
+                        <Border x:Name="CheckBorder"
+                                Width="20" Height="20"
+                                CornerRadius="3"
+                                Background="#0C141A"
+                                BorderBrush="{StaticResource LineInkBrush}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <Path x:Name="CheckGlyph"
+                                  Data="{StaticResource IconCheck}"
+                                  Style="{StaticResource IconPath}"
+                                  Width="12" Height="12"
+                                  Stroke="{StaticResource EmberBrush}"
+                                  StrokeThickness="2"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Visibility="Collapsed" />
+                        </Border>
+                        <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
                     </StackPanel>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="ActiveTrack" Property="Opacity" Value="1" />
-                            <Setter TargetName="ThumbActive" Property="Opacity" Value="1" />
-                            <Setter TargetName="Thumb" Property="Margin" Value="23,0,0,0" />
+                            <Setter TargetName="CheckBorder" Property="Background" Value="#2B1D0E" />
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CheckBorder" Property="Background" Value="#14212B" />
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#40EAF1EF" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.4" />
+                            <Setter Property="Cursor" Value="Arrow" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Alias AlexToggleSwitch and WorkshopToggleSwitch to AuraCheckBox -->
+    <Style x:Key="AlexToggleSwitch" BasedOn="{StaticResource AuraCheckBox}" TargetType="CheckBox" />
+    <Style x:Key="WorkshopToggleSwitch" BasedOn="{StaticResource AuraCheckBox}" TargetType="CheckBox" />
 
     <!-- Invisible RepeatButton for ScrollBar Track page up/down -->
     <Style x:Key="AuraScrollBarPageButton" TargetType="{x:Type RepeatButton}">
