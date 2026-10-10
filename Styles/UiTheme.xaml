@@ -293,7 +293,7 @@
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="PillBorder"
                             CornerRadius="3"
-                            Background="#0C141A"
+                            Background="#1AFFFFFF"
                             BorderBrush="{StaticResource LineInkBrush}"
                             BorderThickness="1"
                             Padding="{TemplateBinding Padding}">
@@ -306,9 +306,9 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="PillBorder" Property="Background" Value="#2B1D0E" />
-                            <Setter TargetName="PillBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
-                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="PillBorder" Property="Background" Value="#38FFFFFF" />
+                            <Setter TargetName="PillBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
+                            <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource InkBrush}" />
                             <Setter TargetName="PillText" Property="FontWeight" Value="SemiBold" />
                         </Trigger>
                         <MultiTrigger>
@@ -316,7 +316,7 @@
                                 <Condition Property="IsMouseOver" Value="True" />
                                 <Condition Property="IsChecked" Value="False" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="PillBorder" Property="Background" Value="#14212B" />
+                            <Setter TargetName="PillBorder" Property="Background" Value="#2BFFFFFF" />
                             <Setter TargetName="PillText" Property="Foreground" Value="{StaticResource InkBrush}" />
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
@@ -785,7 +785,7 @@
                         <Border x:Name="CheckBorder"
                                 Width="20" Height="20"
                                 CornerRadius="3"
-                                Background="#0C141A"
+                                Background="#1AFFFFFF"
                                 BorderBrush="{StaticResource LineInkBrush}"
                                 BorderThickness="1"
                                 VerticalAlignment="Center">
@@ -793,7 +793,7 @@
                                   Data="{DynamicResource IconCheck}"
                                   Style="{DynamicResource IconPath}"
                                   Width="12" Height="12"
-                                  Stroke="{StaticResource EmberBrush}"
+                                  Stroke="{StaticResource InkBrush}"
                                   StrokeThickness="2"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center"
@@ -803,8 +803,8 @@
                     </StackPanel>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="CheckBorder" Property="Background" Value="#2B1D0E" />
-                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                            <Setter TargetName="CheckBorder" Property="Background" Value="#38FFFFFF" />
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
                             <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible" />
                         </Trigger>
                         <MultiTrigger>
@@ -812,8 +812,8 @@
                                 <Condition Property="IsMouseOver" Value="True" />
                                 <Condition Property="IsChecked" Value="False" />
                             </MultiTrigger.Conditions>
-                            <Setter TargetName="CheckBorder" Property="Background" Value="#14212B" />
-                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#40EAF1EF" />
+                            <Setter TargetName="CheckBorder" Property="Background" Value="#2BFFFFFF" />
+                            <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
                         </MultiTrigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.4" />
