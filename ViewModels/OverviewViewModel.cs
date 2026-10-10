@@ -91,77 +91,6 @@ public class OverviewViewModel : ObservableObject
     public bool HasAchievementsPage => false;
 
     public RelayCommand OpenAchievementsCommand { get; }
-    public RelayCommand SelectStoryCommand { get; }
-    public RelayCommand PauseCarouselCommand { get; }
-    public RelayCommand ResumeCarouselCommand { get; }
-
-    private int _activeStoryIndex = 0;
-    private double _storyProgress = 0.0;
-
-    public int ActiveStoryIndex
-    {
-        get => _activeStoryIndex;
-        set
-        {
-            if (SetProperty(ref _activeStoryIndex, value))
-            {
-                UpdateStoryProgresses();
-                OnPropertyChanged(nameof(IsStory0Active));
-                OnPropertyChanged(nameof(IsStory1Active));
-                OnPropertyChanged(nameof(IsStory2Active));
-            }
-        }
-    }
-
-    public bool IsStory0Active => ActiveStoryIndex == 0;
-    public bool IsStory1Active => ActiveStoryIndex == 1;
-    public bool IsStory2Active => ActiveStoryIndex == 2;
-
-    public System.Windows.GridLength Story0FilledStar => new System.Windows.GridLength(Math.Clamp(Story0Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
-    public System.Windows.GridLength Story0EmptyStar => new System.Windows.GridLength(Math.Clamp(1.0 - Story0Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
-
-    public System.Windows.GridLength Story1FilledStar => new System.Windows.GridLength(Math.Clamp(Story1Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
-    public System.Windows.GridLength Story1EmptyStar => new System.Windows.GridLength(Math.Clamp(1.0 - Story1Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
-
-    public System.Windows.GridLength Story2FilledStar => new System.Windows.GridLength(Math.Clamp(Story2Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
-    public System.Windows.GridLength Story2EmptyStar => new System.Windows.GridLength(Math.Clamp(1.0 - Story2Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
-
-    public double Story0Progress => ActiveStoryIndex > 0 ? 1.0 : (ActiveStoryIndex == 0 ? _storyProgress : 0.0);
-    public double Story1Progress => ActiveStoryIndex > 1 ? 1.0 : (ActiveStoryIndex == 1 ? _storyProgress : 0.0);
-    public double Story2Progress => ActiveStoryIndex > 2 ? 1.0 : (ActiveStoryIndex == 2 ? _storyProgress : 0.0);
-
-    public double Story0ProgressPercent => Story0Progress * 100.0;
-    public double Story1ProgressPercent => Story1Progress * 100.0;
-    public double Story2ProgressPercent => Story2Progress * 100.0;
-
-    private void UpdateStoryProgresses()
-    {
-        OnPropertyChanged(nameof(Story0Progress));
-        OnPropertyChanged(nameof(Story1Progress));
-        OnPropertyChanged(nameof(Story2Progress));
-        OnPropertyChanged(nameof(Story0ProgressPercent));
-        OnPropertyChanged(nameof(Story1ProgressPercent));
-        OnPropertyChanged(nameof(Story2ProgressPercent));
-        OnPropertyChanged(nameof(Story0FilledStar));
-        OnPropertyChanged(nameof(Story0EmptyStar));
-        OnPropertyChanged(nameof(Story1FilledStar));
-        OnPropertyChanged(nameof(Story1EmptyStar));
-        OnPropertyChanged(nameof(Story2FilledStar));
-        OnPropertyChanged(nameof(Story2EmptyStar));
-    }
-
-    public void StartCarouselTimer()
-    {
-        _storyProgress = 0.0;
-        if (ActiveStoryIndex == 0 && !HasLatestScreenshot)
-        {
-            ActiveStoryIndex = 1;
-        }
-    }
-
-    public void StopCarouselTimer()
-    {
-    }
 
     public OverviewViewModel(IConfigService configService, IGameLaunchService launchService, IBackgroundService? backgroundService = null)
     {
@@ -179,19 +108,6 @@ public class OverviewViewModel : ObservableObject
         }
 
         OpenAchievementsCommand = new RelayCommand(_ => { });
-
-        SelectStoryCommand = new RelayCommand(param =>
-        {
-            if (param != null && int.TryParse(param.ToString(), out int idx) && idx >= 0 && idx <= 2)
-            {
-                if (idx == 0 && !HasLatestScreenshot) return;
-                _storyProgress = 0.0;
-                ActiveStoryIndex = idx;
-            }
-        });
-
-        PauseCarouselCommand = new RelayCommand(_ => { });
-        ResumeCarouselCommand = new RelayCommand(_ => { });
 
         RefreshStats();
 

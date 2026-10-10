@@ -1,7 +1,6 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Animation;
 using AuraLauncher.ViewModels;
 
@@ -9,13 +8,11 @@ namespace AuraLauncher.Views;
 
 /// <summary>
 /// Логика взаимодействия для OverviewView.xaml.
-/// Правая колонка: карусель историй (Скриншот, Достижения, Что нового) с плавной анимацией 350 мс перехода слайдов, 6с зумом скриншота и автопропуском при отсутствии скриншотов.
+/// Отображает обзор сборки, статус запуска и правую панель StoriesRail с элементом StoriesCarousel.
 /// </summary>
 public partial class OverviewView : UserControl
 {
     private Window? _parentWindow;
-    private Storyboard? _activeProgressStoryboard;
-    private bool _isMouseOverStoriesRail = false;
 
     public OverviewView()
     {
@@ -35,14 +32,12 @@ public partial class OverviewView : UserControl
         {
             AnimateEntrance();
             RefreshData();
-            ResetAndStartCarousel();
         }
     }
 
     private void OverviewView_Unloaded(object sender, RoutedEventArgs e)
     {
         DetachWindow();
-        ResetCarousel();
     }
 
     private void OverviewView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -54,12 +49,7 @@ public partial class OverviewView : UserControl
             {
                 AnimateEntrance();
                 RefreshData();
-                ResetAndStartCarousel();
             }
-        }
-        else
-        {
-            ResetCarousel();
         }
     }
 
@@ -74,346 +64,6 @@ public partial class OverviewView : UserControl
         {
             ovm.RefreshStoriesData();
         }
-    }
-
-    private void ResetAndStartCarousel()
-    {
-        StopProgressAnimation();
-        StopZoomAnimation();
-
-        if (DataContext is OverviewViewModel ovm)
-        {
-            if (ovm.ActiveStoryIndex == 0 && !ovm.HasLatestScreenshot)
-            {
-                ovm.ActiveStoryIndex = 1;
-            }
-
-            ResetSlidesState(ovm.ActiveStoryIndex);
-            _isMouseOverStoriesRail = StoriesRail?.IsMouseOver ?? false;
-            StartProgressAnimation(ovm.ActiveStoryIndex);
-            TriggerSlideEntranceEffects(ovm.ActiveStoryIndex);
-        }
-    }
-
-    private void ResetCarousel()
-    {
-        StopProgressAnimation();
-        StopZoomAnimation();
-
-        if (DataContext is OverviewViewModel ovm)
-        {
-            ResetSlidesState(ovm.ActiveStoryIndex);
-        }
-    }
-
-    private void ResetSlidesState(int activeIndex)
-    {
-        for (int i = 0; i < 3; i++)
-        {
-            Grid? slide = GetSlideGrid(i);
-            if (slide != null)
-            {
-                slide.BeginAnimation(UIElement.OpacityProperty, null);
-                if (slide.RenderTransform is TranslateTransform tt)
-                {
-                    tt.BeginAnimation(TranslateTransform.XProperty, null);
-                    tt.X = 0;
-                }
-
-                if (i == activeIndex)
-                {
-                    slide.Visibility = Visibility.Visible;
-                    slide.Opacity = 1.0;
-                }
-                else
-                {
-                    slide.Visibility = Visibility.Collapsed;
-                    slide.Opacity = 0.0;
-                }
-            }
-        }
-
-        if (Story0Scale != null)
-        {
-            Story0Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            Story0Scale.ScaleX = activeIndex > 0 ? 1.0 : 0.0;
-        }
-        if (Story1Scale != null)
-        {
-            Story1Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            Story1Scale.ScaleX = activeIndex > 1 ? 1.0 : 0.0;
-        }
-        if (Story2Scale != null)
-        {
-            Story2Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            Story2Scale.ScaleX = activeIndex > 2 ? 1.0 : 0.0;
-        }
-    }
-
-    private void StartProgressAnimation(int storyIndex)
-    {
-        StopProgressAnimation();
-
-        if (Story0Scale != null) Story0Scale.ScaleX = storyIndex > 0 ? 1.0 : 0.0;
-        if (Story1Scale != null) Story1Scale.ScaleX = storyIndex > 1 ? 1.0 : 0.0;
-        if (Story2Scale != null) Story2Scale.ScaleX = storyIndex > 2 ? 1.0 : 0.0;
-
-        ScaleTransform? targetScale = storyIndex switch
-        {
-            0 => Story0Scale,
-            1 => Story1Scale,
-            2 => Story2Scale,
-            _ => null
-        };
-
-        if (targetScale == null) return;
-
-        targetScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        targetScale.ScaleX = 0.0;
-
-        var fillAnimation = new DoubleAnimation
-        {
-            From = 0.0,
-            To = 1.0,
-            Duration = TimeSpan.FromSeconds(6),
-            EasingFunction = null
-        };
-
-        Storyboard.SetTarget(fillAnimation, targetScale);
-        Storyboard.SetTargetProperty(fillAnimation, new PropertyPath(ScaleTransform.ScaleXProperty));
-
-        _activeProgressStoryboard = new Storyboard();
-        _activeProgressStoryboard.Children.Add(fillAnimation);
-        _activeProgressStoryboard.Completed += OnStoryAnimationCompleted;
-
-        _activeProgressStoryboard.Begin(this, isControllable: true);
-
-        if (_isMouseOverStoriesRail)
-        {
-            _activeProgressStoryboard.Pause(this);
-        }
-    }
-
-    private void OnStoryAnimationCompleted(object? sender, EventArgs e)
-    {
-        if (DataContext is OverviewViewModel ovm)
-        {
-            int nextIndex = (ovm.ActiveStoryIndex + 1) % 3;
-            if (nextIndex == 0 && !ovm.HasLatestScreenshot)
-            {
-                nextIndex = 1;
-            }
-            SwitchToStoryInternal(nextIndex, isInitial: false);
-        }
-    }
-
-    private void StopProgressAnimation()
-    {
-        if (_activeProgressStoryboard != null)
-        {
-            _activeProgressStoryboard.Completed -= OnStoryAnimationCompleted;
-            _activeProgressStoryboard.Stop(this);
-            _activeProgressStoryboard = null;
-        }
-
-        Story0Scale?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        Story1Scale?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-        Story2Scale?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-    }
-
-    private void StopZoomAnimation()
-    {
-        if (ScreenshotZoomTransform != null)
-        {
-            ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-            ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-            ScreenshotZoomTransform.ScaleX = 1.0;
-            ScreenshotZoomTransform.ScaleY = 1.0;
-        }
-    }
-
-    private void OnStoryBar0Click(object sender, RoutedEventArgs e) => SwitchToStory(0);
-    private void OnStoryBar1Click(object sender, RoutedEventArgs e) => SwitchToStory(1);
-    private void OnStoryBar2Click(object sender, RoutedEventArgs e) => SwitchToStory(2);
-
-    private void SwitchToStory(int index)
-    {
-        if (DataContext is OverviewViewModel ovm)
-        {
-            if (index == 0 && !ovm.HasLatestScreenshot) return;
-            if (ovm.ActiveStoryIndex == index) return;
-            SwitchToStoryInternal(index, isInitial: false);
-        }
-    }
-
-    private void SwitchToStoryInternal(int targetIndex, bool isInitial)
-    {
-        if (DataContext is OverviewViewModel ovm)
-        {
-            int oldIndex = ovm.ActiveStoryIndex;
-            ovm.ActiveStoryIndex = targetIndex;
-
-            if (!isInitial && oldIndex != targetIndex)
-            {
-                AnimateSlideTransition(oldIndex, targetIndex);
-            }
-            else
-            {
-                ResetSlidesState(targetIndex);
-                TriggerSlideEntranceEffects(targetIndex);
-            }
-
-            StartProgressAnimation(targetIndex);
-        }
-    }
-
-    private void AnimateSlideTransition(int oldIndex, int targetIndex)
-    {
-        Grid? oldSlide = GetSlideGrid(oldIndex);
-        Grid? newSlide = GetSlideGrid(targetIndex);
-
-        for (int i = 0; i < 3; i++)
-        {
-            if (i != oldIndex && i != targetIndex)
-            {
-                Grid? other = GetSlideGrid(i);
-                if (other != null)
-                {
-                    other.BeginAnimation(UIElement.OpacityProperty, null);
-                    if (other.RenderTransform is TranslateTransform ott)
-                    {
-                        ott.BeginAnimation(TranslateTransform.XProperty, null);
-                        ott.X = 0;
-                    }
-                    other.Visibility = Visibility.Collapsed;
-                    other.Opacity = 0.0;
-                }
-            }
-        }
-
-        if (oldSlide != null && oldSlide != newSlide)
-        {
-            oldSlide.Visibility = Visibility.Visible;
-            var oldTranslate = oldSlide.RenderTransform as TranslateTransform;
-            if (oldTranslate != null)
-            {
-                oldTranslate.BeginAnimation(TranslateTransform.XProperty, null);
-                oldTranslate.X = 0;
-                var animX = new DoubleAnimation(0, -24, TimeSpan.FromMilliseconds(350))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                oldTranslate.BeginAnimation(TranslateTransform.XProperty, animX);
-            }
-
-            oldSlide.BeginAnimation(UIElement.OpacityProperty, null);
-            oldSlide.Opacity = 1.0;
-            var animOpacity = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(350))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            animOpacity.Completed += (s, e) =>
-            {
-                oldSlide.Visibility = Visibility.Collapsed;
-                oldSlide.BeginAnimation(UIElement.OpacityProperty, null);
-                oldSlide.Opacity = 1.0;
-                if (oldTranslate != null)
-                {
-                    oldTranslate.BeginAnimation(TranslateTransform.XProperty, null);
-                    oldTranslate.X = 0;
-                }
-            };
-            oldSlide.BeginAnimation(UIElement.OpacityProperty, animOpacity);
-        }
-
-        if (newSlide != null)
-        {
-            newSlide.Visibility = Visibility.Visible;
-            var newTranslate = newSlide.RenderTransform as TranslateTransform;
-            if (newTranslate != null)
-            {
-                newTranslate.BeginAnimation(TranslateTransform.XProperty, null);
-                newTranslate.X = 24;
-                var animX = new DoubleAnimation(24, 0, TimeSpan.FromMilliseconds(350))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                newTranslate.BeginAnimation(TranslateTransform.XProperty, animX);
-            }
-
-            newSlide.BeginAnimation(UIElement.OpacityProperty, null);
-            newSlide.Opacity = 0.0;
-            var animOpacity = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(350))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            animOpacity.Completed += (s, e) =>
-            {
-                newSlide.BeginAnimation(UIElement.OpacityProperty, null);
-                newSlide.Opacity = 1.0;
-                if (newTranslate != null)
-                {
-                    newTranslate.BeginAnimation(TranslateTransform.XProperty, null);
-                    newTranslate.X = 0;
-                }
-            };
-            newSlide.BeginAnimation(UIElement.OpacityProperty, animOpacity);
-
-            TriggerSlideEntranceEffects(targetIndex);
-        }
-    }
-
-    private Grid? GetSlideGrid(int index) => index switch
-    {
-        0 => Slide0View,
-        1 => Slide1View,
-        2 => Slide2View,
-        _ => null
-    };
-
-    private void TriggerSlideEntranceEffects(int slideIndex)
-    {
-        if (slideIndex == 0)
-        {
-            if (ScreenshotZoomTransform != null)
-            {
-                ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
-                ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
-
-                var zoomX = new DoubleAnimation(1.0, 1.06, TimeSpan.FromSeconds(6));
-                var zoomY = new DoubleAnimation(1.0, 1.06, TimeSpan.FromSeconds(6));
-
-                ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleXProperty, zoomX);
-                ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleYProperty, zoomY);
-            }
-        }
-        else if (slideIndex == 1)
-        {
-            if (NextAchProgressBar != null && DataContext is OverviewViewModel ovm)
-            {
-                NextAchProgressBar.BeginAnimation(FrameworkElement.WidthProperty, null);
-                double parentWidth = 260.0;
-                double targetWidth = Math.Clamp(ovm.NextAchievementRatio * parentWidth, 12.0, parentWidth);
-
-                var fillAnim = new DoubleAnimation(0.0, targetWidth, TimeSpan.FromMilliseconds(500))
-                {
-                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                };
-                NextAchProgressBar.BeginAnimation(FrameworkElement.WidthProperty, fillAnim);
-            }
-        }
-    }
-
-    private void StoriesRail_MouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        _isMouseOverStoriesRail = true;
-        _activeProgressStoryboard?.Pause(this);
-    }
-
-    private void StoriesRail_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
-    {
-        _isMouseOverStoriesRail = false;
-        _activeProgressStoryboard?.Resume(this);
     }
 
     private void AnimateEntrance()

@@ -1,0 +1,68 @@
+<UserControl x:Class="AuraLauncher.Controls.StoriesCarousel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AuraLauncher.Controls"
+             mc:Ignorable="d" 
+             Focusable="False"
+             FocusVisualStyle="{x:Null}">
+
+    <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" /> <!-- 1. Верхние 3 полоски индикатора -->
+            <RowDefinition Height="*" />    <!-- 2. Слайды карусели -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Индикаторы историй (3 полоски: StoriesTrack, высота 3px, отступ 4px) -->
+        <Grid Grid.Row="0" Margin="16,14,16,10" Panel.ZIndex="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Полоска 0: Скриншот -->
+            <Button Grid.Column="0" Click="OnIndicator0Click" Style="{StaticResource StoryBarBtn}" ToolTip="Скриншот">
+                <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
+                    <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="Indicator0Scale" ScaleX="0" ScaleY="1" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </Button>
+
+            <!-- Полоска 1: Достижения -->
+            <Button Grid.Column="2" Click="OnIndicator1Click" Style="{StaticResource StoryBarBtn}" ToolTip="Достижения и цели">
+                <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
+                    <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="Indicator1Scale" ScaleX="0" ScaleY="1" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </Button>
+
+            <!-- Полоска 2: Что нового -->
+            <Button Grid.Column="4" Click="OnIndicator2Click" Style="{StaticResource StoryBarBtn}" ToolTip="Что нового">
+                <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
+                    <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
+                        <Border.RenderTransform>
+                            <ScaleTransform x:Name="Indicator2Scale" ScaleX="0" ScaleY="1" />
+                        </Border.RenderTransform>
+                    </Border>
+                </Border>
+            </Button>
+        </Grid>
+
+        <!-- 2. Контейнер слайдов (350 мс, 24px сдвиг, fade) -->
+        <Grid Grid.Row="1" ClipToBounds="True">
+            <local:ScreenshotsSlide x:Name="SlideScreenshots" Visibility="Visible" />
+            <local:AchievementsSlide x:Name="SlideAchievements" Visibility="Collapsed" />
+            <local:WhatsNewSlide x:Name="SlideWhatsNew" Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</UserControl>

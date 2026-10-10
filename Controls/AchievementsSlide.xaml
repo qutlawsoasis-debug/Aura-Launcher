@@ -1,0 +1,101 @@
+<UserControl x:Class="AuraLauncher.Controls.AchievementsSlide"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             Focusable="False"
+             FocusVisualStyle="{x:Null}">
+
+    <Grid Margin="16,8,16,16" RenderTransformOrigin="0.5,0.5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />  <!-- 0: Заголовок достижения и иконка -->
+            <RowDefinition Height="*" />     <!-- 1: Равномерное гибкое пространство -->
+            <RowDefinition Height="Auto" />  <!-- 2: Блок "Следующая цель" -->
+            <RowDefinition Height="*" />     <!-- 3: Равномерное гибкое пространство -->
+            <RowDefinition Height="Auto" />  <!-- 4: Нижний ряд иконок -->
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок достижения и большая иконка со свечением -->
+        <StackPanel Grid.Row="0" HorizontalAlignment="Center">
+            <Border x:Name="Slide1IconBorder"
+                    Width="56" Height="56"
+                    CornerRadius="28"
+                    Background="{StaticResource EmberBrush}"
+                    HorizontalAlignment="Center"
+                    Margin="0,0,0,10">
+                <Path Style="{StaticResource IconPath}"
+                      Data="{StaticResource IconCrown}"
+                      Width="26" Height="26"
+                      Stroke="{DynamicResource PrimaryActionText}"
+                      StrokeThickness="2"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center" />
+            </Border>
+
+            <TextBlock x:Name="Slide1Title"
+                       Text="{Binding AchievementTitle}"
+                       FontFamily="{StaticResource HeadingFont}"
+                       FontSize="22"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextWhite}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="6" Opacity="0.55" ShadowDepth="1" Direction="270" />
+                </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock x:Name="Slide1Desc"
+                       Text="{Binding AchievementDescription}"
+                       FontFamily="{StaticResource MainFont}"
+                       FontSize="12"
+                       Foreground="{DynamicResource Text90}"
+                       HorizontalAlignment="Center"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0" />
+        </StackPanel>
+
+        <!-- Блок "Следующая цель" в стиле панели (StoriesCardGlass, StoriesCardBorder) -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource StoriesCardGlass}"
+                BorderBrush="{DynamicResource StoriesCardBorder}"
+                BorderThickness="1"
+                CornerRadius="3"
+                Padding="14,12">
+            <StackPanel x:Name="Slide1NextBlock">
+                <Grid Margin="0,0,0,6">
+                    <TextBlock Text="СЛЕДУЮЩАЯ ЦЕЛЬ" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" />
+                    <TextBlock Text="{Binding NextAchievementProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" HorizontalAlignment="Right" />
+                </Grid>
+                <TextBlock Text="{Binding NextAchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,0,0,2" />
+                <TextBlock Text="{Binding NextAchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource Text90}" TextWrapping="Wrap" Margin="0,0,10,0" />
+
+                <!-- Толстая полоса прогресса (8px, CornerRadius 4) -->
+                <Border Height="8" Background="{DynamicResource TrackSubtle}" CornerRadius="4" ClipToBounds="True">
+                    <Border x:Name="NextAchProgressBar" Height="8" CornerRadius="4" Background="{StaticResource EmberBrush}" HorizontalAlignment="Left" Width="100" />
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- Нижний ряд маленьких иконок остальных достижений -->
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
+            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Margin="0,0,8,0">
+                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCheck}" Width="13" Height="13" Stroke="{StaticResource EmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Margin="0,0,8,0">
+                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrown}" Width="13" Height="13" Stroke="{StaticResource EmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4" Margin="0,0,8,0">
+                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUser}" Width="13" Height="13" Stroke="{DynamicResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4" Margin="0,0,8,0">
+                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWorld}" Width="13" Height="13" Stroke="{DynamicResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4">
+                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="13" Height="13" Stroke="{DynamicResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

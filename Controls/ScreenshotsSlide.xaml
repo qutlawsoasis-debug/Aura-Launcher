@@ -1,0 +1,89 @@
+<UserControl x:Class="AuraLauncher.Controls.ScreenshotsSlide"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:core="clr-namespace:AuraLauncher.Core"
+             mc:Ignorable="d" 
+             Focusable="False"
+             FocusVisualStyle="{x:Null}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <core:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" />
+    </UserControl.Resources>
+
+    <Grid RenderTransformOrigin="0.5,0.5">
+        <!-- 1. Заглушка, когда скриншотов нет -->
+        <Grid Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}"
+              Background="{DynamicResource MediaPlaceholder}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="20">
+                <Border Width="56" Height="56"
+                        CornerRadius="28"
+                        Background="{DynamicResource PanelRaised}"
+                        HorizontalAlignment="Center"
+                        Margin="0,0,0,14">
+                    <Path Style="{StaticResource IconPath}"
+                          Data="{StaticResource IconCamera}"
+                          Width="24" Height="24"
+                          Stroke="{DynamicResource DimInkBrush}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="НЕТ СКРИНШОТОВ"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextWhite}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,6" />
+                <TextBlock Text="Нажмите F2 в игре, чтобы сделать снимок"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           Foreground="{DynamicResource Text90}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 2. Скриншот, когда скриншот есть -->
+        <Grid Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
+            <Image Source="{Binding FeedImage0}"
+                   Stretch="UniformToFill"
+                   RenderOptions.BitmapScalingMode="HighQuality"
+                   RenderTransformOrigin="0.5,0.5">
+                <Image.RenderTransform>
+                    <ScaleTransform x:Name="ScreenshotZoomTransform" ScaleX="1.0" ScaleY="1.0" />
+                </Image.RenderTransform>
+            </Image>
+
+            <!-- Тёмный нижний градиент для читаемости текста -->
+            <Border IsHitTestVisible="False">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="{DynamicResource ColorStoriesShadeTransparent}" Offset="0.0" />
+                        <GradientStop Color="{DynamicResource ColorStoriesShadeBottom}" Offset="0.5" />
+                        <GradientStop Color="{DynamicResource ColorNight}" Offset="1.0" />
+                    </LinearGradientBrush>
+                </Border.Background>
+            </Border>
+
+            <!-- Текстовая подпись снизу -->
+            <StackPanel VerticalAlignment="Bottom" Margin="16,0,16,16">
+                <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource EmberBrush}"
+                           Margin="0,0,0,2" />
+                <TextBlock Text="{Binding LatestScreenshotDateText, StringFormat='{}Скриншот · {0}'}"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource TextWhite}"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
