@@ -11,6 +11,7 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <core:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" xmlns:core="clr-namespace:AuraLauncher.Core" />
     </UserControl.Resources>
 
     <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
@@ -56,7 +57,7 @@
                 </TextBlock.Effect>
             </TextBlock>
 
-            <!-- 3) Button "Играть" 260x70 with bottom progress bar, right of it label MaxWidth 300 wrap -->
+            <!-- 3) Button "Играть" 260x70 with bottom progress bar -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Grid Width="260" Height="70">
                     <Button Command="{Binding DataContext.LaunchOrCancelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -73,9 +74,8 @@
                                  Visibility="{Binding DataContext.IsProgressVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVis}}" />
                 </Grid>
 
-                <!-- Right of button: MaxWidth 300, TextWrapping=Wrap, no clipping -->
+                <!-- Right of button: MaxWidth 300, TextWrapping=Wrap -->
                 <StackPanel VerticalAlignment="Center" Margin="18,0,0,0" MaxWidth="300">
-                    <!-- Extra state indicator when launching or running -->
                     <TextBlock Text="{Binding DataContext.StateTitle, RelativeSource={RelativeSource AncestorType=Window}}"
                                FontFamily="{StaticResource MainFont}"
                                FontSize="13"
@@ -101,18 +101,16 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Правая колонка: Единая стеклянная карточка карусели историй (Скриншот, Достижения, Что нового) -->
+        <!-- Правая колонка: Матовое стекло с каруселью историй -->
         <Border x:Name="StoriesRail"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Stretch"
-                Width="320"
+                Width="330"
                 MinWidth="280"
                 MaxWidth="360"
-                Margin="0,0,0,0"
-                Padding="16"
                 CornerRadius="3"
-                Background="{DynamicResource ShadeOverlay}"
-                BorderBrush="{StaticResource LineInkBrush}"
+                Background="{DynamicResource PanelGlass}"
+                BorderBrush="{DynamicResource BorderSubtle}"
                 BorderThickness="1"
                 ClipToBounds="True"
                 UseLayoutRounding="True"
@@ -121,24 +119,24 @@
 
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" /> <!-- 1. Верхний прогресс-бар из 3 сегментов -->
-                    <RowDefinition Height="*" />    <!-- 2. Активный слайд истории -->
+                    <RowDefinition Height="Auto" /> <!-- 1. Верхние 3 полоски индикатора -->
+                    <RowDefinition Height="*" />    <!-- 2. Слайды карусели -->
                 </Grid.RowDefinitions>
 
-                <!-- 1. ИНДИКАТОРЫ ИСТОРИЙ (3 сегмента: Скриншот, Достижения, Что нового) -->
-                <Grid Grid.Row="0" Margin="0,0,0,14">
+                <!-- 1. ИНДИКАТОРЫ ИСТОРИЙ (3 полоски: высота 3px, отступ 4px) -->
+                <Grid Grid.Row="0" Margin="16,14,16,10" Panel.ZIndex="10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="4" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="6" />
+                        <ColumnDefinition Width="4" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Сегмент 0: Скриншот -->
+                    <!-- Полоска 0: Скриншот -->
                     <Button Grid.Column="0" Click="OnStoryBar0Click" Style="{StaticResource StoryBarBtn}" ToolTip="Скриншот">
-                        <Border Height="4" Background="{StaticResource TrackSubtle}" CornerRadius="2" ClipToBounds="True">
-                            <Border x:Name="Story0Fill" Background="{StaticResource EmberBrush}" CornerRadius="2" RenderTransformOrigin="0,0">
+                        <Border Height="3" Background="{DynamicResource TrackSubtle}" CornerRadius="1.5" ClipToBounds="False">
+                            <Border x:Name="Story0Fill" Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
                                 <Border.RenderTransform>
                                     <ScaleTransform x:Name="Story0Scale" ScaleX="0" ScaleY="1" />
                                 </Border.RenderTransform>
@@ -146,10 +144,10 @@
                         </Border>
                     </Button>
 
-                    <!-- Сегмент 1: Достижения -->
+                    <!-- Полоска 1: Достижения -->
                     <Button Grid.Column="2" Click="OnStoryBar1Click" Style="{StaticResource StoryBarBtn}" ToolTip="Достижения и цели">
-                        <Border Height="4" Background="{StaticResource TrackSubtle}" CornerRadius="2" ClipToBounds="True">
-                            <Border x:Name="Story1Fill" Background="{StaticResource EmberBrush}" CornerRadius="2" RenderTransformOrigin="0,0">
+                        <Border Height="3" Background="{DynamicResource TrackSubtle}" CornerRadius="1.5" ClipToBounds="False">
+                            <Border x:Name="Story1Fill" Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
                                 <Border.RenderTransform>
                                     <ScaleTransform x:Name="Story1Scale" ScaleX="0" ScaleY="1" />
                                 </Border.RenderTransform>
@@ -157,10 +155,10 @@
                         </Border>
                     </Button>
 
-                    <!-- Сегмент 2: Что нового -->
+                    <!-- Полоска 2: Что нового -->
                     <Button Grid.Column="4" Click="OnStoryBar2Click" Style="{StaticResource StoryBarBtn}" ToolTip="Что нового">
-                        <Border Height="4" Background="{StaticResource TrackSubtle}" CornerRadius="2" ClipToBounds="True">
-                            <Border x:Name="Story2Fill" Background="{StaticResource EmberBrush}" CornerRadius="2" RenderTransformOrigin="0,0">
+                        <Border Height="3" Background="{DynamicResource TrackSubtle}" CornerRadius="1.5" ClipToBounds="False">
+                            <Border x:Name="Story2Fill" Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
                                 <Border.RenderTransform>
                                     <ScaleTransform x:Name="Story2Scale" ScaleX="0" ScaleY="1" />
                                 </Border.RenderTransform>
@@ -169,135 +167,173 @@
                     </Button>
                 </Grid>
 
-                <!-- 2. СЛАЙДЫ ИСТОРИЙ (На всю оставшуюся высоту панели) -->
-                <Grid Grid.Row="1">
+                <!-- 2. АНИМИРОВАННЫЙ КОНТЕЙНЕР СЛАЙДОВ (350 мс, 24px сдвиг, fade) -->
+                <Grid Grid.Row="1" ClipToBounds="True">
 
-                    <!-- СЛАЙД 0: ПОСЛЕДНИЙ СКРИНШОТ -->
-                    <Grid Visibility="{Binding IsStory0Active, Converter={StaticResource BoolToVis}}">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                    <!-- СЛАЙД 0: ПОСЛЕДНИЙ СКРИНШОТ (на всю панель, slow zoom 1.0 -> 1.06 за 6с) -->
+                    <Grid x:Name="Slide0View" Visibility="{Binding IsStory0Active, Converter={StaticResource BoolToVis}}" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="Slide0Translate" X="0" />
+                        </Grid.RenderTransform>
 
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,12">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="14" Height="14" Stroke="{StaticResource DimInkBrush}" Margin="0,0,6,0" />
-                            <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="Medium" Foreground="{StaticResource MuteBrush}" VerticalAlignment="Center" />
+                        <!-- Фоновая картинка скриншота с медленным зумом -->
+                        <Image Source="{Binding FeedImage0}"
+                               Stretch="UniformToFill"
+                               RenderOptions.BitmapScalingMode="HighQuality"
+                               RenderTransformOrigin="0.5,0.5">
+                            <Image.RenderTransform>
+                                <ScaleTransform x:Name="ScreenshotZoomTransform" ScaleX="1.0" ScaleY="1.0" />
+                            </Image.RenderTransform>
+                        </Image>
+
+                        <!-- Тёмный нижний градиент для читаемости текста -->
+                        <Border IsHitTestVisible="False">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="{DynamicResource ColorStoriesShadeTransparent}" Offset="0.0" />
+                                    <GradientStop Color="{DynamicResource ColorStoriesShadeBottom}" Offset="0.5" />
+                                    <GradientStop Color="{DynamicResource ColorNight}" Offset="1.0" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+
+                        <!-- Текстовая подпись снизу "Скриншот · дата" -->
+                        <StackPanel VerticalAlignment="Bottom" Margin="16,0,16,16">
+                            <TextBlock x:Name="Slide0Sub1"
+                                       Text="ПОСЛЕДНИЙ СКРИНШОТ"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource EmberBrush}"
+                                       Margin="0,0,0,2" />
+                            <TextBlock x:Name="Slide0Sub2"
+                                       Text="{Binding LatestScreenshotDateText, StringFormat='{}Скриншот · {0}'}"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextWhite}"
+                                       TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-
-                        <!-- Картинка скриншота или пустое состояние -->
-                        <Grid Grid.Row="1" Margin="0,0,0,12">
-                            <Border Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}"
-                                    CornerRadius="3" ClipToBounds="True" Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
-                                <Grid>
-                                    <Image Source="{Binding FeedImage0}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="{DynamicResource DialogBackdrop}" Padding="10,8">
-                                        <TextBlock Text="{Binding LatestScreenshotDateText}" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" />
-                                    </Border>
-                                </Grid>
-                            </Border>
-
-                            <Border Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}"
-                                    CornerRadius="3" Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" Padding="16">
-                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="32" Height="32" Stroke="{StaticResource MuteBrush}" HorizontalAlignment="Center" Margin="0,0,0,10" />
-                                    <TextBlock Text="Скриншотов пока нет" FontFamily="{StaticResource MainFont}" FontSize="14" FontWeight="Medium" Foreground="{StaticResource TextWhite}" HorizontalAlignment="Center" Margin="0,0,0,4" />
-                                    <TextBlock Text="Нажмите F2 во время игры, чтобы сделать скриншот" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                        <!-- Кнопка "Открыть скриншот" -->
-                        <Button Grid.Row="2"
-                                Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                CommandParameter="{Binding LatestScreenshot}"
-                                Style="{StaticResource SettingsActionBtn}"
-                                HorizontalAlignment="Stretch"
-                                Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}">
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Width="14" Height="14" Margin="0,0,6,0" Stroke="{StaticResource InkBrush}" />
-                                <TextBlock Text="Открыть скриншот" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
                     </Grid>
 
                     <!-- СЛАЙД 1: ДОСТИЖЕНИЯ И СЛЕДУЮЩАЯ ЦЕЛЬ -->
-                    <Grid Visibility="{Binding IsStory1Active, Converter={StaticResource BoolToVis}}">
+                    <Grid x:Name="Slide1View" Visibility="{Binding IsStory1Active, Converter={StaticResource BoolToVis}}" Margin="16,6,16,16" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="Slide1Translate" X="0" />
+                        </Grid.RenderTransform>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,12">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrown}" Width="14" Height="14" Stroke="{StaticResource EmberBrush}" Margin="0,0,6,0" />
-                            <TextBlock Text="ДОСТИЖЕНИЯ И ЦЕЛИ" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="Medium" Foreground="{StaticResource MuteBrush}" VerticalAlignment="Center" />
+                        <!-- Заголовок достижения и большая иконка со свечением -->
+                        <StackPanel Grid.Row="0" Margin="0,4,0,12" HorizontalAlignment="Center">
+                            <Border x:Name="Slide1IconBorder"
+                                    Width="56" Height="56"
+                                    CornerRadius="28"
+                                    Background="{StaticResource EmberBrush}"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,10">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrown}" Width="26" Height="26" Stroke="{DynamicResource PrimaryActionText}" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+
+                            <TextBlock x:Name="Slide1Title"
+                                       Text="{Binding AchievementTitle}"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextWhite}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap" />
+                            <TextBlock x:Name="Slide1Desc"
+                                       Text="{Binding AchievementDescription}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource DimInkBrush}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,0" />
                         </StackPanel>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Style="{StaticResource AuraScrollViewer}">
-                            <StackPanel>
-                                <!-- Последнее полученное достижение -->
-                                <Border Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="3" Padding="12" Margin="0,0,0,10">
-                                    <StackPanel>
-                                        <Grid Margin="0,0,0,4">
-                                            <TextBlock Text="ПОСЛЕДНЕЕ ДОСТИЖЕНИЕ" FontFamily="{StaticResource MainFont}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" />
-                                            <TextBlock Text="{Binding AchievementDateOrProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" Foreground="{StaticResource EmberBrush}" HorizontalAlignment="Right" />
-                                        </Grid>
-                                        <TextBlock Text="{Binding AchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,2,0,4" />
-                                        <TextBlock Text="{Binding AchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
+                        <!-- Блок "Следующая цель" с толстой полосой прогресса -->
+                        <Border Grid.Row="1" Background="{DynamicResource PanelCard}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="14,12" VerticalAlignment="Center">
+                            <StackPanel x:Name="Slide1NextBlock">
+                                <Grid Margin="0,0,0,6">
+                                    <TextBlock Text="СЛЕДУЮЩАЯ ЦЕЛЬ" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" />
+                                    <TextBlock Text="{Binding NextAchievementProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Right" />
+                                </Grid>
+                                <TextBlock Text="{Binding NextAchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,0,0,2" />
+                                <TextBlock Text="{Binding NextAchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
 
-                                <!-- Следующая цель -->
-                                <Border Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="3" Padding="12">
-                                    <StackPanel>
-                                        <Grid Margin="0,0,0,4">
-                                            <TextBlock Text="СЛЕДУЮЩАЯ ЦЕЛЬ" FontFamily="{StaticResource MainFont}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MuteBrush}" />
-                                            <TextBlock Text="{Binding NextAchievementProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" HorizontalAlignment="Right" />
-                                        </Grid>
-                                        <TextBlock Text="{Binding NextAchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,2,0,4" />
-                                        <TextBlock Text="{Binding NextAchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" TextWrapping="Wrap" />
-                                    </StackPanel>
+                                <!-- Толстая полоса прогресса (8px, CornerRadius 4) -->
+                                <Border Height="8" Background="{DynamicResource TrackSubtle}" CornerRadius="4" ClipToBounds="True">
+                                    <Border x:Name="NextAchProgressBar" Height="8" CornerRadius="4" Background="{StaticResource EmberBrush}" HorizontalAlignment="Left" Width="100" />
                                 </Border>
                             </StackPanel>
-                        </ScrollViewer>
+                        </Border>
 
-                        <TextBlock Grid.Row="2" Text="Выполняйте цели во время игры!" FontFamily="{StaticResource MainFont}" FontSize="11" Foreground="{StaticResource MuteBrush}" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                        <!-- Нижний ряд маленьких иконок остальных достижений -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Margin="0,0,8,0">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCheck}" Width="13" Height="13" Stroke="{StaticResource EmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Margin="0,0,8,0">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrown}" Width="13" Height="13" Stroke="{StaticResource EmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4" Margin="0,0,8,0">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUser}" Width="13" Height="13" Stroke="{StaticResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4" Margin="0,0,8,0">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWorld}" Width="13" Height="13" Stroke="{StaticResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="13" Height="13" Stroke="{StaticResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
                     </Grid>
 
                     <!-- СЛАЙД 2: ЧТО НОВОГО -->
-                    <Grid Visibility="{Binding IsStory2Active, Converter={StaticResource BoolToVis}}">
+                    <Grid x:Name="Slide2View" Visibility="{Binding IsStory2Active, Converter={StaticResource BoolToVis}}" Margin="16,6,16,16" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <TranslateTransform x:Name="Slide2Translate" X="0" />
+                        </Grid.RenderTransform>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,12">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconInfo}" Width="14" Height="14" Stroke="{StaticResource EmberBrush}" Margin="0,0,6,0" />
-                            <TextBlock Text="ОБНОВЛЕНИЕ" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="Medium" Foreground="{StaticResource MuteBrush}" VerticalAlignment="Center" />
-                            <Border Background="{StaticResource EmberBrush}" CornerRadius="2" Padding="6,1" Margin="8,0,0,0">
-                                <TextBlock Text="{Binding WhatsNewVersion}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource PrimaryActionText}" />
-                            </Border>
+                        <!-- Заголовок + плашка версии -->
+                        <StackPanel Grid.Row="0" Margin="0,4,0,14">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+                                <TextBlock Text="ЧТО НОВОГО" FontFamily="{StaticResource HeadingFont}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" VerticalAlignment="Center" />
+                                <Border Background="{StaticResource EmberBrush}" CornerRadius="3" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding WhatsNewVersion}" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource PrimaryActionText}" />
+                                </Border>
+                            </StackPanel>
+                            <Border Height="1" Background="{DynamicResource BorderSubtle}" />
                         </StackPanel>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Style="{StaticResource AuraScrollViewer}" Margin="0,0,0,10">
-                            <ItemsControl ItemsSource="{Binding WhatsNewLines}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="14" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="•" FontFamily="{StaticResource MainFont}" FontSize="14" Foreground="{StaticResource EmberBrush}" VerticalAlignment="Top" />
-                                            <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+                        <!-- 3 главных пункта -->
+                        <ItemsControl Grid.Row="1" ItemsSource="{Binding TopWhatsNewLines}" VerticalAlignment="Center">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="20" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Path Grid.Column="0" Style="{StaticResource IconPath}" Data="{StaticResource IconCheck}" Width="12" Height="12" Stroke="{StaticResource EmberBrush}" VerticalAlignment="Top" Margin="0,3,0,0" />
+                                        <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="Medium" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
+                        <!-- Кнопка "Все изменения" -->
                         <Button Grid.Row="2"
                                 Command="{Binding DataContext.OpenChangelogCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 Style="{StaticResource SettingsActionBtn}"

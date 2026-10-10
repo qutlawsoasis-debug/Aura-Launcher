@@ -427,11 +427,20 @@ public class OverviewViewModel : ObservableObject
         private set => SetProperty(ref _nextAchievementProgress, value);
     }
 
+    private double _nextAchievementRatio = 0.4;
+    public double NextAchievementRatio
+    {
+        get => _nextAchievementRatio;
+        private set => SetProperty(ref _nextAchievementRatio, value);
+    }
+
     public string WhatsNewPrimaryLine
     {
         get => _whatsNewPrimaryLine;
         private set => SetProperty(ref _whatsNewPrimaryLine, value);
     }
+
+    public ObservableCollection<string> TopWhatsNewLines { get; } = new();
 
     public bool HasRightFeed
     {
@@ -685,6 +694,7 @@ public class OverviewViewModel : ObservableObject
                 NextAchievementProgress = !string.IsNullOrEmpty(unit)
                     ? $"{(int)nextCurrent} из {nextDef.Target} {unit}"
                     : $"{(int)nextCurrent} из {nextDef.Target}";
+                NextAchievementRatio = Math.Clamp(nextCurrent / Math.Max(1, nextDef.Target), 0.0, 1.0);
             }
             else
             {
@@ -692,6 +702,7 @@ public class OverviewViewModel : ObservableObject
                 NextAchievementTitle = fallbackDef.Title;
                 NextAchievementDescription = fallbackDef.Description;
                 NextAchievementProgress = "Выполнено";
+                NextAchievementRatio = 1.0;
             }
         }
         catch
@@ -749,6 +760,16 @@ public class OverviewViewModel : ObservableObject
             WhatsNewVersion = ver;
             WhatsNewLines = lines;
             WhatsNewPrimaryLine = lines[0];
+
+            TopWhatsNewLines.Clear();
+            int count = 0;
+            foreach (var l in lines)
+            {
+                if (count >= 3) break;
+                TopWhatsNewLines.Add(l);
+                count++;
+            }
+
             HasWhatsNewBlock = true;
         }
         catch
