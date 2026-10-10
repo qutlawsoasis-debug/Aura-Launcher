@@ -201,6 +201,9 @@ export const server = http.createServer(async (req, res) => {
         lobby.players.push(playerName);
       }
 
+      lobby.playerHeartbeats = lobby.playerHeartbeats || {};
+      lobby.playerHeartbeats[playerName.toLowerCase()] = Date.now();
+
       if (Array.isArray(body.manifest)) {
         lobby.manifests = lobby.manifests || {};
         lobby.manifestHashes = lobby.manifestHashes || {};

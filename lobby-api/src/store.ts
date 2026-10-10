@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { MongoClient, Db } from 'mongodb';
 
 export interface ModManifestItem {
   id: string;
@@ -1144,10 +1145,551 @@ export class UpstashStore implements LobbyStore {
   }
 }
 
+export class MongoStore implements LobbyStore {
+  private client: MongoClient;
+  private db: Db;
+  private inMemoryFallback: InMemoryStore = new InMemoryStore();
+  private initialized = false;
+  private initPromise: Promise<void> | null = null;
+
+  constructor(uri: string, dbName: string = 'aura') {
+    this.client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+    });
+    this.db = this.client.db(dbName);
+  }
+
+  private async ensureInit(): Promise<void> {
+    if (this.initialized) return;
+    if (!this.initPromise) {
+      this.initPromise = (async () => {
+        try {
+          await this.client.connect();
+          await Promise.allSettled([
+            this.db.collection('lobbies').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            this.db.collection('presences').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            this.db.collection('users').createIndex({ nickLower: 1 }),
+            this.db.collection('users').createIndex({ friendCode: 1 }),
+            this.db.collection('friends').createIndex({ userId: 1 }),
+            this.db.collection('friend_requests').createIndex({ toId: 1 }),
+            this.db.collection('friend_requests').createIndex({ fromId: 1 }),
+            this.db.collection('invites').createIndex({ toId: 1 }),
+            this.db.collection('invites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            this.db.collection('sent_invites').createIndex({ fromId: 1 }),
+            this.db.collection('sent_invites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            this.db.collection('rate_limits').createIndex({ resetAt: 1 }, { expireAfterSeconds: 0 })
+          ]);
+          this.initialized = true;
+        } catch (e) {
+          console.error('[MongoStore] Init error:', e);
+        }
+      })();
+    }
+    await this.initPromise;
+  }
+
+  async get(code: string): Promise<Lobby | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('lobbies').findOne({ _id: code.toUpperCase() as any });
+    if (!doc) return null;
+    if (doc.expiresAt && Date.now() > new Date(doc.expiresAt).getTime()) {
+      return null;
+    }
+    return doc.lobby as Lobby;
+  }
+
+  async set(lobby: Lobby, ttlSeconds: number = 60): Promise<void> {
+    await this.ensureInit();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    await this.db.collection('lobbies').updateOne(
+      { _id: lobby.code.toUpperCase() as any },
+      { $set: { lobby, expiresAt } },
+      { upsert: true }
+    );
+  }
+
+  async delete(code: string): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('lobbies').deleteOne({ _id: code.toUpperCase() as any });
+  }
+
+  async generateCode(): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let attempts = 0; attempts < 100; attempts++) {
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += chars.charAt(crypto.randomInt(chars.length));
+      }
+      const existing = await this.get(code);
+      if (!existing) return code;
+    }
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  async getSkin(nickLower: string): Promise<SkinRecord | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('skins').findOne({ _id: nickLower.toLowerCase() as any });
+    if (!doc) return null;
+    if (doc.expiresAt && Date.now() > new Date(doc.expiresAt).getTime()) {
+      return null;
+    }
+    return doc.skin as SkinRecord;
+  }
+
+  async setSkin(skin: SkinRecord, ttlSeconds: number = 30 * 24 * 3600): Promise<void> {
+    await this.ensureInit();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    await this.db.collection('skins').updateOne(
+      { _id: skin.nickname.toLowerCase() as any },
+      { $set: { skin, expiresAt } },
+      { upsert: true }
+    );
+  }
+
+  async deleteSkin(nickLower: string): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('skins').deleteOne({ _id: nickLower.toLowerCase() as any });
+  }
+
+  async getSkinByHash(sha1: string): Promise<Buffer | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('textures').findOne({ _id: sha1.toLowerCase() as any });
+    if (!doc || !doc.data) return null;
+    if (doc.expiresAt && Date.now() > new Date(doc.expiresAt).getTime()) {
+      return null;
+    }
+    return Buffer.isBuffer(doc.data) ? doc.data : Buffer.from(doc.data.buffer || doc.data);
+  }
+
+  async setSkinByHash(sha1: string, buffer: Buffer, ttlSeconds: number = 30 * 24 * 3600): Promise<void> {
+    await this.ensureInit();
+    const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    await this.db.collection('textures').updateOne(
+      { _id: sha1.toLowerCase() as any },
+      { $set: { data: buffer, expiresAt } },
+      { upsert: true }
+    );
+  }
+
+  async checkRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {
+    try {
+      await this.ensureInit();
+      const now = new Date();
+      const resetAt = new Date(now.getTime() + windowSeconds * 1000);
+      const res = await this.db.collection('rate_limits').findOneAndUpdate(
+        { _id: key as any },
+        {
+          $inc: { count: 1 },
+          $setOnInsert: { resetAt }
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+      const count = res?.count || 1;
+      return count <= limit;
+    } catch {
+      return this.inMemoryFallback.checkRateLimit(key, limit, windowSeconds);
+    }
+  }
+
+  async generateFriendCode(): Promise<string> {
+    await this.ensureInit();
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let attempts = 0; attempts < 100; attempts++) {
+      let code = '';
+      for (let i = 0; i < 8; i++) {
+        code += chars.charAt(crypto.randomInt(chars.length));
+      }
+      const existing = await this.getUserByFriendCode(code);
+      if (!existing) return code;
+    }
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
+  }
+
+  async createUser(user: UserRecord): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('users').updateOne(
+      { _id: user.id as any },
+      {
+        $set: {
+          id: user.id,
+          nick: user.nick,
+          nickLower: user.nick.toLowerCase(),
+          tokenHash: user.tokenHash,
+          friendCode: user.friendCode.toUpperCase(),
+          createdAt: user.createdAt
+        }
+      },
+      { upsert: true }
+    );
+  }
+
+  async getUser(userId: string): Promise<UserRecord | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('users').findOne({ _id: userId as any });
+    if (!doc) return null;
+    return {
+      id: doc.id || String(doc._id),
+      nick: doc.nick,
+      tokenHash: doc.tokenHash,
+      friendCode: doc.friendCode,
+      createdAt: doc.createdAt
+    };
+  }
+
+  async getUserByNick(nick: string): Promise<UserRecord | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('users').findOne({ nickLower: nick.toLowerCase() });
+    if (!doc) return null;
+    return {
+      id: doc.id || String(doc._id),
+      nick: doc.nick,
+      tokenHash: doc.tokenHash,
+      friendCode: doc.friendCode,
+      createdAt: doc.createdAt
+    };
+  }
+
+  async updateUserNick(userId: string, newNick: string): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('users').updateOne(
+      { _id: userId as any },
+      {
+        $set: {
+          nick: newNick,
+          nickLower: newNick.toLowerCase()
+        }
+      }
+    );
+  }
+
+  async getUserByFriendCode(code: string): Promise<UserRecord | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('users').findOne({ friendCode: code.toUpperCase() });
+    if (!doc) return null;
+    return {
+      id: doc.id || String(doc._id),
+      nick: doc.nick,
+      tokenHash: doc.tokenHash,
+      friendCode: doc.friendCode,
+      createdAt: doc.createdAt
+    };
+  }
+
+  async getUsers(userIds: string[]): Promise<Map<string, UserRecord>> {
+    const map = new Map<string, UserRecord>();
+    if (userIds.length === 0) return map;
+    await this.ensureInit();
+    const docs = await this.db.collection('users').find({ _id: { $in: userIds as any } }).toArray();
+    for (const doc of docs) {
+      const u: UserRecord = {
+        id: doc.id || String(doc._id),
+        nick: doc.nick,
+        tokenHash: doc.tokenHash,
+        friendCode: doc.friendCode,
+        createdAt: doc.createdAt
+      };
+      map.set(u.id, u);
+    }
+    return map;
+  }
+
+  async getFriends(userId: string): Promise<string[]> {
+    await this.ensureInit();
+    const docs = await this.db.collection('friends').find({ userId }).toArray();
+    return docs.map(d => d.friendId);
+  }
+
+  async isFriend(userId: string, friendId: string): Promise<boolean> {
+    await this.ensureInit();
+    const doc = await this.db.collection('friends').findOne({ _id: `${userId}:${friendId}` as any });
+    return Boolean(doc);
+  }
+
+  async getFriendCount(userId: string): Promise<number> {
+    await this.ensureInit();
+    return await this.db.collection('friends').countDocuments({ userId });
+  }
+
+  async addFriend(userId: string, friendId: string): Promise<void> {
+    await this.ensureInit();
+    const now = Date.now();
+    await Promise.all([
+      this.db.collection('friends').updateOne(
+        { _id: `${userId}:${friendId}` as any },
+        { $set: { userId, friendId, createdAt: now } },
+        { upsert: true }
+      ),
+      this.db.collection('friends').updateOne(
+        { _id: `${friendId}:${userId}` as any },
+        { $set: { userId: friendId, friendId: userId, createdAt: now } },
+        { upsert: true }
+      )
+    ]);
+  }
+
+  async removeFriend(userId: string, friendId: string): Promise<void> {
+    await this.ensureInit();
+    await Promise.all([
+      this.db.collection('friends').deleteOne({ _id: `${userId}:${friendId}` as any }),
+      this.db.collection('friends').deleteOne({ _id: `${friendId}:${userId}` as any })
+    ]);
+  }
+
+  async getIncomingRequests(userId: string): Promise<string[]> {
+    await this.ensureInit();
+    const docs = await this.db.collection('friend_requests').find({ toId: userId }).toArray();
+    return docs.map(d => d.fromId);
+  }
+
+  async getOutgoingRequests(userId: string): Promise<string[]> {
+    await this.ensureInit();
+    const docs = await this.db.collection('friend_requests').find({ fromId: userId }).toArray();
+    return docs.map(d => d.toId);
+  }
+
+  async hasFriendRequest(fromId: string, toId: string): Promise<boolean> {
+    await this.ensureInit();
+    const doc = await this.db.collection('friend_requests').findOne({ _id: `${fromId}:${toId}` as any });
+    return Boolean(doc);
+  }
+
+  async addFriendRequest(fromId: string, toId: string): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('friend_requests').updateOne(
+      { _id: `${fromId}:${toId}` as any },
+      { $set: { fromId, toId, createdAt: Date.now() } },
+      { upsert: true }
+    );
+  }
+
+  async removeFriendRequest(fromId: string, toId: string): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('friend_requests').deleteOne({ _id: `${fromId}:${toId}` as any });
+  }
+
+  async createInvite(invite: InviteRecord): Promise<void> {
+    await this.ensureInit();
+    const expiresAt = new Date(invite.expiresAt);
+    await this.db.collection('invites').updateOne(
+      { _id: invite.inviteId as any },
+      { $set: { toId: invite.toId, invite, expiresAt } },
+      { upsert: true }
+    );
+  }
+
+  async createSentInvite(fromId: string, sentInvite: SentInviteRecord): Promise<void> {
+    await this.ensureInit();
+    const expiresAt = new Date(sentInvite.expiresAt);
+    await this.db.collection('sent_invites').updateOne(
+      { _id: `${fromId}:${sentInvite.inviteId}` as any },
+      { $set: { fromId, inviteId: sentInvite.inviteId, sentInvite, expiresAt } },
+      { upsert: true }
+    );
+  }
+
+  async getInvite(toId: string, inviteId: string): Promise<InviteRecord | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('invites').findOne({ _id: inviteId as any, toId });
+    if (!doc) return null;
+    if (doc.expiresAt && Date.now() > new Date(doc.expiresAt).getTime()) {
+      await this.db.collection('invites').deleteOne({ _id: inviteId as any });
+      return null;
+    }
+    return doc.invite as InviteRecord;
+  }
+
+  async removeInvite(toId: string, inviteId: string): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('invites').deleteOne({ _id: inviteId as any, toId });
+  }
+
+  async updateSentInvite(fromId: string, inviteId: string, state: 'accepted' | 'declined' | 'expired'): Promise<void> {
+    await this.ensureInit();
+    const key = `${fromId}:${inviteId}`;
+    const doc = await this.db.collection('sent_invites').findOne({ _id: key as any });
+    if (doc && doc.sentInvite) {
+      const sent = doc.sentInvite as SentInviteRecord;
+      sent.state = state;
+      const expiresAt = new Date(Date.now() + 60_000);
+      sent.expiresAt = expiresAt.getTime();
+      await this.db.collection('sent_invites').updateOne(
+        { _id: key as any },
+        { $set: { sentInvite: sent, expiresAt } }
+      );
+    }
+  }
+
+  async sync(userId: string, presence: UserPresence): Promise<SyncResult> {
+    await this.ensureInit();
+    const now = Date.now();
+
+    // 1. Presences
+    if (presence.status === 'offline') {
+      await this.db.collection('presences').deleteOne({ _id: userId as any });
+    } else {
+      const expiresAt = new Date(now + 60_000);
+      await this.db.collection('presences').updateOne(
+        { _id: userId as any },
+        {
+          $set: {
+            presence,
+            expiresAt,
+            lastSeen: presence.lastSeen || now
+          }
+        },
+        { upsert: true }
+      );
+    }
+
+    // Update user nick if changed
+    if (presence.nick && presence.nick !== 'Player' && presence.nick !== 'Unknown') {
+      await this.db.collection('users').updateOne(
+        { _id: userId as any, nick: { $ne: presence.nick } },
+        { $set: { nick: presence.nick, nickLower: presence.nick.toLowerCase() } }
+      ).catch(() => {});
+    }
+
+    // 2. Friends
+    const friendDocs = await this.db.collection('friends').find({ userId }).toArray();
+    const friendIds = friendDocs.map(d => d.friendId);
+
+    const friends: FriendInfo[] = [];
+    if (friendIds.length > 0) {
+      const [fUsers, fPresences] = await Promise.all([
+        this.db.collection('users').find({ _id: { $in: friendIds as any } }).toArray(),
+        this.db.collection('presences').find({ _id: { $in: friendIds as any } }).toArray()
+      ]);
+
+      const userMap = new Map(fUsers.map(u => [u.id || String(u._id), u]));
+      const presMap = new Map(fPresences.map(p => [String(p._id), p]));
+
+      for (const fId of friendIds) {
+        const u = userMap.get(fId);
+        const p = presMap.get(fId);
+        const isOnline = Boolean(p && now <= new Date(p.expiresAt).getTime() && p.presence?.status !== 'offline');
+        const recordedLastSeen = p?.lastSeen || p?.presence?.lastSeen || u?.createdAt || 0;
+        const effectiveNick = (p?.presence?.nick && p.presence.nick !== 'Unknown')
+          ? p.presence.nick
+          : (u?.nick || 'Unknown');
+
+        friends.push({
+          id: fId,
+          nick: effectiveNick,
+          online: isOnline,
+          status: isOnline ? p!.presence.status : 'offline',
+          lobbyCode: isOnline && (p!.presence.status === 'lobby' || p!.presence.status === 'playing') && p!.presence.lobbyCode
+            ? p!.presence.lobbyCode
+            : undefined,
+          lastSeen: isOnline ? p!.presence.lastSeen : recordedLastSeen
+        });
+      }
+    }
+
+    // 3. Incoming Requests
+    const inDocs = await this.db.collection('friend_requests').find({ toId: userId }).toArray();
+    const inIds = inDocs.map(d => d.fromId);
+    const incomingRequests: UserSummary[] = [];
+    if (inIds.length > 0) {
+      const inUsers = await this.db.collection('users').find({ _id: { $in: inIds as any } }).toArray();
+      const inUserMap = new Map(inUsers.map(u => [u.id || String(u._id), u]));
+      for (const fId of inIds) {
+        const u = inUserMap.get(fId);
+        incomingRequests.push({ id: fId, nick: u?.nick || 'Unknown' });
+      }
+    }
+
+    // 4. Outgoing Requests
+    const outDocs = await this.db.collection('friend_requests').find({ fromId: userId }).toArray();
+    const outIds = outDocs.map(d => d.toId);
+    const outgoingRequests: UserSummary[] = [];
+    if (outIds.length > 0) {
+      const outUsers = await this.db.collection('users').find({ _id: { $in: outIds as any } }).toArray();
+      const outUserMap = new Map(outUsers.map(u => [u.id || String(u._id), u]));
+      for (const tId of outIds) {
+        const u = outUserMap.get(tId);
+        outgoingRequests.push({ id: tId, nick: u?.nick || 'Unknown' });
+      }
+    }
+
+    // 5. Invites
+    const rawInvites = await this.db.collection('invites').find({ toId: userId }).toArray();
+    const invites: IncomingInviteInfo[] = [];
+    const expiredInviteIds: string[] = [];
+    for (const doc of rawInvites) {
+      const inv: InviteRecord = doc.invite;
+      if (now > new Date(doc.expiresAt).getTime()) {
+        expiredInviteIds.push(String(doc._id));
+      } else {
+        invites.push({
+          inviteId: inv.inviteId,
+          fromId: inv.fromId,
+          fromNick: inv.fromNick,
+          ts: inv.ts
+        });
+      }
+    }
+    if (expiredInviteIds.length > 0) {
+      this.db.collection('invites').deleteMany({ _id: { $in: expiredInviteIds as any } }).catch(() => {});
+    }
+
+    // 6. Sent Invites
+    const rawSent = await this.db.collection('sent_invites').find({ fromId: userId }).toArray();
+    const sentInvites: SentInviteInfo[] = [];
+    const expiredSentIds: string[] = [];
+    for (const doc of rawSent) {
+      const sent: SentInviteRecord = doc.sentInvite;
+      if (sent.state === 'pending' && now > sent.createdAt + 120_000) {
+        sent.state = 'expired';
+        const newExp = new Date(Math.min(new Date(doc.expiresAt).getTime(), now + 60_000));
+        this.db.collection('sent_invites').updateOne(
+          { _id: doc._id as any },
+          { $set: { sentInvite: sent, expiresAt: newExp } }
+        ).catch(() => {});
+      }
+      if (now > new Date(doc.expiresAt).getTime()) {
+        expiredSentIds.push(String(doc._id));
+      } else {
+        sentInvites.push({
+          inviteId: sent.inviteId,
+          friendId: sent.friendId,
+          state: sent.state,
+          lobbyCode: sent.lobbyCode || null
+        });
+      }
+    }
+    if (expiredSentIds.length > 0) {
+      this.db.collection('sent_invites').deleteMany({ _id: { $in: expiredSentIds as any } }).catch(() => {});
+    }
+
+    return {
+      friends,
+      incomingRequests,
+      outgoingRequests,
+      invites,
+      sentInvites
+    };
+  }
+}
+
 let activeStore: LobbyStore | null = null;
 
 export function getStore(): LobbyStore {
   if (activeStore) return activeStore;
+
+  let mongoUri = process.env.MONGODB_URI?.trim();
+  if (mongoUri) {
+    if (mongoUri.startsWith('"') && mongoUri.endsWith('"')) {
+      mongoUri = mongoUri.slice(1, -1).trim();
+    }
+    if (mongoUri.startsWith("'") && mongoUri.endsWith("'")) {
+      mongoUri = mongoUri.slice(1, -1).trim();
+    }
+    mongoUri = mongoUri.replace(/^\uFEFF/, '').trim();
+    activeStore = new MongoStore(mongoUri);
+    return activeStore;
+  }
 
   const upstashUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
   const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;

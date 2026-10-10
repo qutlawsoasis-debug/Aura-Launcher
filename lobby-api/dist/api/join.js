@@ -25,6 +25,8 @@ export default async function handler(req, res) {
         if (!lobby.players.includes(playerName)) {
             lobby.players.push(playerName);
         }
+        lobby.playerHeartbeats = lobby.playerHeartbeats || {};
+        lobby.playerHeartbeats[playerName.toLowerCase()] = Date.now();
         if (Array.isArray(body.manifest)) {
             lobby.manifests = lobby.manifests || {};
             lobby.manifestHashes = lobby.manifestHashes || {};

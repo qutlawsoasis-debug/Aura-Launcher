@@ -522,7 +522,20 @@ public class FriendService : IFriendService
             {
                 try
                 {
-                    int delayMs = (IsFriendsTabActive || IsInLobby) ? 5000 : 20000;
+                    int delayMs;
+                    if (IsFriendsTabActive || IsInLobby)
+                    {
+                        delayMs = 15000;
+                    }
+                    else if (IsGameRunning)
+                    {
+                        delayMs = 60000;
+                    }
+                    else
+                    {
+                        delayMs = 30000;
+                    }
+
                     await Task.Delay(delayMs, token);
                     await SyncNowAsync(token);
                 }

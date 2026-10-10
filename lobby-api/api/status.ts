@@ -54,7 +54,11 @@ export default async function handler(req: any, res: any) {
     const activePlayers = lobby.players.filter(p => {
       const pLower = p.toLowerCase();
       if (pLower === hostLower) return true;
-      const lastBeat = lobby.playerHeartbeats![pLower] || lobby.createdAt;
+      if (!lobby.playerHeartbeats![pLower]) {
+        lobby.playerHeartbeats![pLower] = now;
+        playersChanged = true;
+      }
+      const lastBeat = lobby.playerHeartbeats![pLower];
       if (now - lastBeat > 25000) {
         playersChanged = true;
         delete lobby.playerHeartbeats![pLower];
