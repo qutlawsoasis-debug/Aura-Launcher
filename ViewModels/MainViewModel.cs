@@ -261,6 +261,28 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _isChangelogModalVisible, value);
     }
 
+    private readonly IReleaseNotesService? _releaseNotesService;
+    private ObservableCollection<ReleaseNoteVersion> _releaseNoteVersions = new();
+    private ReleaseNoteVersion? _selectedReleaseNoteVersion;
+
+    public ObservableCollection<ReleaseNoteVersion> ReleaseNoteVersions => _releaseNoteVersions;
+
+    public ReleaseNoteVersion? SelectedReleaseNoteVersion
+    {
+        get => _selectedReleaseNoteVersion;
+        set
+        {
+            if (SetProperty(ref _selectedReleaseNoteVersion, value))
+            {
+                SelectedVersionChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+    }
+
+    public event EventHandler? SelectedVersionChanged;
+
+    public RelayCommand SelectReleaseNoteVersionCommand { get; }
+    public RelayCommand CopyChangelogCommand { get; }
     public RelayCommand OpenChangelogCommand { get; }
     public RelayCommand CloseChangelogCommand { get; }
     public RelayCommand OpenOverviewScreenshotCommand { get; }
@@ -703,7 +725,8 @@ public class MainViewModel : ObservableObject
         IWorkshopService? workshopService = null,
         IAchievementService? achievementService = null,
         IScreenshotWatcherService? screenshotWatcher = null,
-        IReportService? reportService = null)
+        IReportService? reportService = null,
+        IReleaseNotesService? releaseNotesService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -715,6 +738,7 @@ public class MainViewModel : ObservableObject
         _discordRpcService = discordRpcService;
         _reportService = reportService ?? new ReportService(configService, notificationService ?? new NotificationService(configService));
         _achievementService = achievementService;
+        _releaseNotesService = releaseNotesService ?? (App.Services?.GetService(typeof(IReleaseNotesService)) as IReleaseNotesService);
         _screenshotWatcher = screenshotWatcher ?? new ScreenshotWatcherService();
         _screenshotWatcher.ScreenshotCaptured += path =>
         {
@@ -801,8 +825,49 @@ public class MainViewModel : ObservableObject
         _discordRpcService?.Initialize();
         _discordRpcService?.SetInLauncher();
 
-        OpenChangelogCommand = new RelayCommand(_ => IsChangelogModalVisible = true);
+        SelectReleaseNoteVersionCommand = new RelayCommand(param =>
+        {
+            if (param is ReleaseNoteVersion ver)
+            {
+                SelectedReleaseNoteVersion = ver;
+            }
+        });
+
+        CopyChangelogCommand = new RelayCommand(_ =>
+        {
+            if (SelectedReleaseNoteVersion != null)
+            {
+                try
+                {
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine($"Aura Launcher — {SelectedReleaseNoteVersion.Version} ({SelectedReleaseNoteVersion.DateText})");
+                    sb.AppendLine($"Заголовок: {SelectedReleaseNoteVersion.ShortTitle}");
+                    sb.AppendLine();
+                    foreach (var item in SelectedReleaseNoteVersion.Items)
+                    {
+                        sb.AppendLine($"• [{item.BadgeText}] {item.Text}");
+                    }
+                    System.Windows.Clipboard.SetText(sb.ToString());
+                    if (_notificationService != null)
+                    {
+                        _notificationService.Notify("Скопировано", $"Список изменений {SelectedReleaseNoteVersion.Version} скопирован в буфер обмена");
+                    }
+                    else
+                    {
+                        ShowInfoToast("Скопировано", $"Список изменений {SelectedReleaseNoteVersion.Version} скопирован в буфер обмена");
+                    }
+                }
+                catch { }
+            }
+        });
+
+        OpenChangelogCommand = new RelayCommand(_ =>
+        {
+            LoadReleaseNotes();
+            IsChangelogModalVisible = true;
+        });
         CloseChangelogCommand = new RelayCommand(_ => IsChangelogModalVisible = false);
+        LoadReleaseNotes();
         OpenOverviewScreenshotCommand = new RelayCommand(p =>
         {
             if (p is ScreenshotItem item)
@@ -1977,4 +2042,19 @@ public class MainViewModel : ObservableObject
         IsProtocolPromptVisible = true;
         _notificationService?.NotifyGameCrash(exitCode, report.Title);
     }
+
+    public void LoadReleaseNotes()
+    {
+        if (_releaseNotesService != null)
+        {
+            var versions = _releaseNotesService.GetAllVersions();
+            _releaseNoteVersions.Clear();
+            foreach (var v in versions)
+            {
+                _releaseNoteVersions.Add(v);
+            }
+            SelectedReleaseNoteVersion = _releaseNotesService.GetCurrentVersion();
+        }
+    }
 }
+

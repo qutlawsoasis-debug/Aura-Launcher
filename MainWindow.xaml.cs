@@ -103,6 +103,7 @@ public partial class MainWindow : Window
                     AnimateChangelogModal(vm.IsChangelogModalVisible);
                 }
             };
+            vm.SelectedVersionChanged += (s, e) => AnimateReleaseNotesContent();
             TransitionToTab(vm.CurrentTabName, animate: false);
             UpdateScreenOverlay(vm.IsOverviewActive);
             if (vm.IsUpdateBannerVisible)
@@ -433,6 +434,42 @@ public partial class MainWindow : Window
         }
     }
 
+    private void AnimateReleaseNotesContent()
+    {
+        if (ReleaseNotesContentArea == null || ReleaseNotesTranslate == null) return;
+
+        ReleaseNotesContentArea.BeginAnimation(UIElement.OpacityProperty, null);
+        ReleaseNotesTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+
+        ReleaseNotesContentArea.Opacity = 0.0;
+        ReleaseNotesTranslate.Y = 8.0;
+
+        var fadeAnim = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var slideAnim = new DoubleAnimation(8.0, 0.0, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        ReleaseNotesContentArea.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
+        ReleaseNotesTranslate.BeginAnimation(TranslateTransform.YProperty, slideAnim);
+    }
+
+    private void OnChangelogModalOverlayMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            vm.IsChangelogModalVisible = false;
+        }
+    }
+
+    private void OnChangelogModalCardMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+    }
+
     private void UpdateScreenOverlay(bool isOverview)
     {
         if (OtherScreensOverlay == null) return;
@@ -725,6 +762,12 @@ public partial class MainWindow : Window
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
         base.OnPreviewKeyDown(e);
+        if (e.Key == Key.Escape && DataContext is MainViewModel vm && vm.IsChangelogModalVisible)
+        {
+            vm.IsChangelogModalVisible = false;
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.F11)
         {
             ToggleFullscreen();

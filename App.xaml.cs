@@ -637,6 +637,7 @@ public partial class App : Application
         services.AddSingleton<IAchievementService, AchievementService>();
         services.AddSingleton<IMinecraftPingService, MinecraftPingService>();
         services.AddSingleton<IScreenshotWatcherService, ScreenshotWatcherService>();
+        services.AddSingleton<IReleaseNotesService, ReleaseNotesService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();

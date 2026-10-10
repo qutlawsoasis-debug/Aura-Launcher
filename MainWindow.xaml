@@ -833,12 +833,14 @@
                   Panel.ZIndex="120"
                   Visibility="Collapsed"
                   Opacity="0"
-                  Background="{DynamicResource ModalBackdrop}">
+                  Background="{DynamicResource ModalBackdrop}"
+                  MouseDown="OnChangelogModalOverlayMouseDown">
                 <Border x:Name="ChangelogModalCard"
+                        MouseDown="OnChangelogModalCardMouseDown"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Width="580" MaxHeight="520"
-                        Background="{DynamicResource PanelCard}"
-                        BorderBrush="{StaticResource LineInkBrush}"
+                        Width="860" Height="560"
+                        Background="{DynamicResource PanelGlass}"
+                        BorderBrush="{DynamicResource BorderSubtle}"
                         BorderThickness="1"
                         CornerRadius="3"
                         Padding="24,20,24,20">
@@ -853,22 +855,13 @@
                         </Grid.RowDefinitions>
 
                         <!-- Header with Title and Close Button -->
-                        <Grid Grid.Row="0" Margin="0,0,0,14">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="Список изменений"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="22"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource InkBrush}"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding OverviewVM.WhatsNewVersion}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
-                                           FontWeight="SemiBold"
-                                           Foreground="{StaticResource EmberBrush}"
-                                           VerticalAlignment="Center"
-                                           Margin="12,3,0,0" />
-                            </StackPanel>
+                        <Grid Grid.Row="0" Margin="0,0,0,16">
+                            <TextBlock Text="Список изменений"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextWhite}"
+                                       VerticalAlignment="Center" />
 
                             <Button Command="{Binding CloseChangelogCommand}"
                                     Style="{StaticResource WinCloseBtn}"
@@ -881,50 +874,181 @@
                             </Button>
                         </Grid>
 
-                        <!-- Dynamic list of changelog items and current environment status -->
-                        <ScrollViewer Grid.Row="1" Style="{StaticResource AuraScrollViewer}" MaxHeight="390" Margin="0,0,0,14">
-                            <StackPanel Margin="0,0,10,0">
-                                <TextBlock Text="{Binding OverviewVM.SpecLine}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="13"
-                                           Foreground="{StaticResource DimInkBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,0,4" />
-                                <TextBlock Text="{Binding OverviewVM.LastUpdateText}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           Foreground="{StaticResource MuteBrush}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,0,12" />
+                        <!-- Main Two-Column Content Area -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="230" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                                <ItemsControl ItemsSource="{Binding OverviewVM.WhatsNewLines}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{DynamicResource PanelInput}"
-                                                    BorderBrush="{DynamicResource BorderSubtle}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="3"
-                                                    Padding="12,10"
-                                                    Margin="0,0,0,8">
-                                                <TextBlock Text="{Binding}"
-                                                           FontFamily="{StaticResource MainFont}"
-                                                           FontSize="13"
-                                                           Foreground="{StaticResource InkBrush}"
-                                                           TextWrapping="Wrap" />
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </ScrollViewer>
+                            <!-- LEFT COLUMN: Fixed Version List -->
+                            <Border Grid.Column="0" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="0,0,1,0" Padding="0,0,14,0">
+                                <ScrollViewer Style="{StaticResource AuraScrollViewer}">
+                                    <ItemsControl ItemsSource="{Binding ReleaseNoteVersions}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Command="{Binding DataContext.SelectReleaseNoteVersionCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource GhostBtn}"
+                                                        HorizontalContentAlignment="Stretch"
+                                                        Margin="0,0,0,6" Padding="10,8">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
 
-                        <!-- Footer button -->
-                        <Button Grid.Row="2"
-                                Command="{Binding CloseChangelogCommand}"
-                                Style="{StaticResource PrimaryNeonBtn}"
-                                Content="Понятно"
-                                HorizontalAlignment="Right"
-                                Height="34" Padding="20,0" FontSize="13" />
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Version}"
+                                                                   FontFamily="{StaticResource HeadingFont}"
+                                                                   FontSize="15"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextWhite}"
+                                                                   VerticalAlignment="Center" />
+
+                                                        <!-- Tag "Вы здесь" for current version -->
+                                                        <Border Grid.Column="1"
+                                                                Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}"
+                                                                Background="{StaticResource EmberBrush}"
+                                                                CornerRadius="3"
+                                                                Padding="6,2"
+                                                                VerticalAlignment="Center"
+                                                                Margin="6,0,0,0">
+                                                            <TextBlock Text="Вы здесь"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="10"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{DynamicResource PrimaryActionText}" />
+                                                        </Border>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+
+                            <!-- RIGHT COLUMN: Selected Version Notes (Scrollable) -->
+                            <Grid Grid.Column="1" Margin="20,0,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Version Header Info -->
+                                <StackPanel Grid.Row="0" Margin="0,0,0,8">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding SelectedReleaseNoteVersion.Version}"
+                                                   FontFamily="{StaticResource HeadingFont}"
+                                                   FontSize="24"
+                                                   FontWeight="Bold"
+                                                   Foreground="{StaticResource TextWhite}" />
+                                        <TextBlock Text="{Binding SelectedReleaseNoteVersion.ShortTitle}"
+                                                   FontFamily="{StaticResource HeadingFont}"
+                                                   FontSize="16"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{StaticResource EmberBrush}"
+                                                   Margin="12,4,0,0"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding SelectedReleaseNoteVersion.DateText}"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource DimInkBrush}"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <Border Grid.Row="1" Height="1" Background="{DynamicResource BorderSubtle}" Margin="0,0,0,14" />
+
+                                <!-- Scrollable List of Items -->
+                                <ScrollViewer Grid.Row="2" Style="{StaticResource AuraScrollViewer}">
+                                    <Grid x:Name="ReleaseNotesContentArea" RenderTransformOrigin="0.5,0.5">
+                                        <Grid.RenderTransform>
+                                            <TranslateTransform x:Name="ReleaseNotesTranslate" Y="0" />
+                                        </Grid.RenderTransform>
+
+                                        <ItemsControl ItemsSource="{Binding SelectedReleaseNoteVersion.Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,10,12">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <!-- Pill Badge -->
+                                                        <Border Grid.Column="0"
+                                                                CornerRadius="3"
+                                                                Padding="8,3"
+                                                                Margin="0,0,12,0"
+                                                                VerticalAlignment="Top">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding BadgeText}" Value="Новое">
+                                                                            <Setter Property="Background" Value="{StaticResource EmberBrush}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding BadgeText}" Value="Улучшено">
+                                                                            <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding BadgeText}" Value="Исправлено">
+                                                                            <Setter Property="Background" Value="{StaticResource Success}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+
+                                                            <TextBlock Text="{Binding BadgeText}"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="11"
+                                                                       FontWeight="Bold">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextWhite}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding BadgeText}" Value="Новое">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource PrimaryActionText}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
+
+                                                        <!-- Clean Text Without Outer Borders -->
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding Text}"
+                                                                   FontFamily="{StaticResource MainFont}"
+                                                                   FontSize="13"
+                                                                   Foreground="{StaticResource TextWhite}"
+                                                                   TextWrapping="Wrap"
+                                                                   VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </ScrollViewer>
+                            </Grid>
+                        </Grid>
+
+                        <!-- Footer Actions -->
+                        <Grid Grid.Row="2" Margin="0,16,0,0">
+                            <Button Command="{Binding CopyChangelogCommand}"
+                                    Style="{StaticResource SecondaryBtn}"
+                                    Content="Скопировать для друзей"
+                                    HorizontalAlignment="Left"
+                                    Height="34" Padding="16,0" FontSize="13" />
+
+                            <Button Command="{Binding CloseChangelogCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Content="Понятно"
+                                    HorizontalAlignment="Right"
+                                    Height="34" Padding="24,0" FontSize="13" />
+                        </Grid>
                     </Grid>
                 </Border>
             </Grid>
