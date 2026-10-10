@@ -5,6 +5,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 
+using System.Windows.Threading;
+
 namespace AuraLauncher.Controls;
 
 /// <summary>
@@ -20,12 +22,21 @@ public partial class StoriesCarousel : UserControl
 
     private readonly StoriesCarouselState _state;
     private readonly ScaleTransform[] _indicatorScales;
+    private readonly DispatcherTimer _popupTimer;
+    private FrameworkElement? _pendingPopupTarget;
+    private string _pendingPopupText = string.Empty;
     private AnimationClock? _activeProgressClock;
     private bool _isRunning = false;
 
     public StoriesCarousel()
     {
         InitializeComponent();
+
+        _popupTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(300)
+        };
+        _popupTimer.Tick += OnPopupTimerTick;
 
         _state = new StoriesCarouselState(new UserControl[]
         {
@@ -94,6 +105,7 @@ public partial class StoriesCarousel : UserControl
     public void StopCarousel()
     {
         _isRunning = false;
+        HideIndicatorPopup();
         StopProgressAnimation();
         ResetSlidesToInitialState();
 
@@ -106,12 +118,87 @@ public partial class StoriesCarousel : UserControl
         }
     }
 
+    private void OnPopupTimerTick(object? sender, EventArgs e)
+    {
+        _popupTimer.Stop();
+        if (_pendingPopupTarget != null && _pendingPopupTarget.IsMouseOver)
+        {
+            IndicatorPopup.PlacementTarget = _pendingPopupTarget;
+            IndicatorPopupText.Text = _pendingPopupText;
+            IndicatorPopup.IsOpen = true;
+        }
+    }
+
+    private void HideIndicatorPopup()
+    {
+        _popupTimer.Stop();
+        _pendingPopupTarget = null;
+        if (IndicatorPopup != null)
+        {
+            IndicatorPopup.IsOpen = false;
+        }
+    }
+
+    private void ScheduleIndicatorPopup(FrameworkElement target, string text)
+    {
+        _popupTimer.Stop();
+        _pendingPopupTarget = target;
+        _pendingPopupText = text;
+        _popupTimer.Start();
+    }
+
+    private static void AnimateBarHeight(Border track, double targetHeight)
+    {
+        var anim = new DoubleAnimation(track.ActualHeight > 0 ? track.ActualHeight : track.Height, targetHeight, TimeSpan.FromMilliseconds(150))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        track.BeginAnimation(FrameworkElement.HeightProperty, anim);
+    }
+
+    private void OnIndicator0MouseEnter(object sender, MouseEventArgs e)
+    {
+        AnimateBarHeight(Indicator0Track, 5.0);
+        ScheduleIndicatorPopup(IndicatorBtn0, "Скриншот");
+    }
+
+    private void OnIndicator0MouseLeave(object sender, MouseEventArgs e)
+    {
+        AnimateBarHeight(Indicator0Track, 3.0);
+        HideIndicatorPopup();
+    }
+
+    private void OnIndicator1MouseEnter(object sender, MouseEventArgs e)
+    {
+        AnimateBarHeight(Indicator1Track, 5.0);
+        ScheduleIndicatorPopup(IndicatorBtn1, "Достижения и цели");
+    }
+
+    private void OnIndicator1MouseLeave(object sender, MouseEventArgs e)
+    {
+        AnimateBarHeight(Indicator1Track, 3.0);
+        HideIndicatorPopup();
+    }
+
+    private void OnIndicator2MouseEnter(object sender, MouseEventArgs e)
+    {
+        AnimateBarHeight(Indicator2Track, 5.0);
+        ScheduleIndicatorPopup(IndicatorBtn2, "Что нового");
+    }
+
+    private void OnIndicator2MouseLeave(object sender, MouseEventArgs e)
+    {
+        AnimateBarHeight(Indicator2Track, 3.0);
+        HideIndicatorPopup();
+    }
+
     private void OnIndicator0Click(object sender, RoutedEventArgs e) => OnIndicatorClicked(0);
     private void OnIndicator1Click(object sender, RoutedEventArgs e) => OnIndicatorClicked(1);
     private void OnIndicator2Click(object sender, RoutedEventArgs e) => OnIndicatorClicked(2);
 
     private void OnIndicatorClicked(int targetIndex)
     {
+        HideIndicatorPopup();
         if (targetIndex < 0 || targetIndex >= _state.Slides.Count) return;
 
         if (_state.ActiveIndex == targetIndex)

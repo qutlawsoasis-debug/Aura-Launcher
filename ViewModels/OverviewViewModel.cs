@@ -115,6 +115,15 @@ public class OverviewViewModel : ObservableObject
         {
             RefreshStats();
         };
+
+        var achService = App.Services?.GetService(typeof(IAchievementService)) as IAchievementService;
+        if (achService != null)
+        {
+            achService.AchievementUnlocked += (s, def) =>
+            {
+                System.Windows.Application.Current?.Dispatcher?.InvokeAsync(RefreshAchievementBlock);
+            };
+        }
     }
 
     /// <summary>
@@ -317,6 +326,38 @@ public class OverviewViewModel : ObservableObject
     {
         get => _nextAchievementRatio;
         private set => SetProperty(ref _nextAchievementRatio, value);
+    }
+
+    public ObservableCollection<AchievementDisplayItem> AchievementsGrid { get; } = new();
+    public ObservableCollection<AchievementDisplayItem> UnlockedAchievements { get; } = new();
+    public ObservableCollection<AchievementDisplayItem> LockedAchievements { get; } = new();
+
+    private string _achievementsHeaderText = "ДОСТИЖЕНИЯ 0 ИЗ 14";
+    public string AchievementsHeaderText
+    {
+        get => _achievementsHeaderText;
+        private set => SetProperty(ref _achievementsHeaderText, value);
+    }
+
+    private double _achievementsProgressRatio = 0.0;
+    public double AchievementsProgressRatio
+    {
+        get => _achievementsProgressRatio;
+        private set => SetProperty(ref _achievementsProgressRatio, value);
+    }
+
+    private int _achievementsUnlockedCount = 0;
+    public int AchievementsUnlockedCount
+    {
+        get => _achievementsUnlockedCount;
+        private set => SetProperty(ref _achievementsUnlockedCount, value);
+    }
+
+    private int _achievementsTotalCount = 14;
+    public int AchievementsTotalCount
+    {
+        get => _achievementsTotalCount;
+        private set => SetProperty(ref _achievementsTotalCount, value);
     }
 
     public string WhatsNewPrimaryLine
@@ -589,12 +630,87 @@ public class OverviewViewModel : ObservableObject
                 NextAchievementProgress = "Выполнено";
                 NextAchievementRatio = 1.0;
             }
+
+            // 4. Полноразмерный список для Steam-сетки и списка
+            var allItems = new List<AchievementDisplayItem>();
+            int unlockedCount = 0;
+            int totalCount = defs.Count;
+
+            foreach (var d in defs)
+            {
+                bool isUnlocked = progress.TryGetValue(d.Id, out var p) && p.Unlocked;
+                if (isUnlocked) unlockedCount++;
+
+                double cur = p != null ? p.CurrentValue : 0;
+                double ratio = Math.Clamp(cur / Math.Max(1, d.Target), 0.0, 1.0);
+                string statusText;
+                if (isUnlocked)
+                {
+                    statusText = p?.UnlockedAtUtc.HasValue == true
+                        ? $"Получено {p.UnlockedAtUtc.Value.ToLocalTime():dd.MM.yyyy}"
+                        : "Получено";
+                }
+                else
+                {
+                    string unit = GetAchievementUnit(d.Id);
+                    statusText = !string.IsNullOrEmpty(unit)
+                        ? $"{(int)cur} из {d.Target} {unit}"
+                        : $"{(int)cur} из {d.Target}";
+                }
+
+                allItems.Add(new AchievementDisplayItem
+                {
+                    Id = d.Id,
+                    Title = d.Title,
+                    Description = d.Description,
+                    Target = d.Target,
+                    CurrentValue = cur,
+                    IsUnlocked = isUnlocked,
+                    UnlockedAtUtc = p?.UnlockedAtUtc,
+                    StatusText = statusText,
+                    ProgressRatio = ratio,
+                    IconKey = GetAchievementIconKey(d.Id)
+                });
+            }
+
+            AchievementsUnlockedCount = unlockedCount;
+            AchievementsTotalCount = totalCount;
+            AchievementsHeaderText = $"ДОСТИЖЕНИЯ {unlockedCount} ИЗ {totalCount}";
+            AchievementsProgressRatio = totalCount > 0 ? (double)unlockedCount / totalCount : 0.0;
+
+            AchievementsGrid.Clear();
+            foreach (var it in allItems) AchievementsGrid.Add(it);
+
+            UnlockedAchievements.Clear();
+            foreach (var it in allItems.Where(x => x.IsUnlocked)) UnlockedAchievements.Add(it);
+
+            LockedAchievements.Clear();
+            foreach (var it in allItems.Where(x => !x.IsUnlocked)) LockedAchievements.Add(it);
         }
         catch
         {
             HasAchievementBlock = false;
         }
     }
+
+    public static string GetAchievementIconKey(string id) => id switch
+    {
+        "first_launch" => "IconSparkles",
+        "ten_launches" => "IconRefresh",
+        "hundred_hours" => "IconClock",
+        "marathon" => "IconCompass",
+        "night_shift" => "IconMoon",
+        "first_lobby" => "IconServer",
+        "full_table" => "IconUsers",
+        "reconnected" => "IconRefresh",
+        "first_friend" => "IconUser",
+        "five_friends" => "IconUsers",
+        "first_backup" => "IconSave",
+        "ten_backups" => "IconFolder",
+        "photographer" => "IconCamera",
+        "own_style" => "IconShirt",
+        _ => "IconCrown"
+    };
 
     private void RefreshWhatsNewBlock()
     {

@@ -38,3 +38,17 @@ public class AchievementsData
     [JsonPropertyName("progress")]
     public System.Collections.Generic.Dictionary<string, AchievementProgress> Progress { get; set; } = new();
 }
+
+public class AchievementDisplayItem
+{
+    public string Id { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public int Target { get; set; } = 1;
+    public double CurrentValue { get; set; }
+    public bool IsUnlocked { get; set; }
+    public DateTime? UnlockedAtUtc { get; set; }
+    public string StatusText { get; set; } = string.Empty;
+    public double ProgressRatio { get; set; }
+    public string IconKey { get; set; } = "IconCrown";
+}

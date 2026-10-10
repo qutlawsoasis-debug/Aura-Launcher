@@ -14,7 +14,7 @@
             <RowDefinition Height="*" />    <!-- 2. Слайды карусели -->
         </Grid.RowDefinitions>
 
-        <!-- 1. Индикаторы историй (3 полоски: StoriesTrack, высота 3px, отступ 4px) -->
+        <!-- 1. Индикаторы историй (3 полоски: область нажатия 14px, видимая 3px с утолщением до 5px на ховере) -->
         <Grid Grid.Row="0" Margin="16,14,16,10" Panel.ZIndex="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -25,34 +25,55 @@
             </Grid.ColumnDefinitions>
 
             <!-- Полоска 0: Скриншот -->
-            <Button Grid.Column="0" Click="OnIndicator0Click" Style="{StaticResource StoryBarBtn}" ToolTip="Скриншот">
-                <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
-                    <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
-                        <Border.RenderTransform>
-                            <ScaleTransform x:Name="Indicator0Scale" ScaleX="0" ScaleY="1" />
-                        </Border.RenderTransform>
+            <Button x:Name="IndicatorBtn0"
+                    Grid.Column="0"
+                    Click="OnIndicator0Click"
+                    MouseEnter="OnIndicator0MouseEnter"
+                    MouseLeave="OnIndicator0MouseLeave"
+                    Style="{StaticResource StoryBarBtn}">
+                <Border Height="14" Background="Transparent" VerticalAlignment="Center">
+                    <Border x:Name="Indicator0Track" Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" VerticalAlignment="Center">
+                        <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="Indicator0Scale" ScaleX="0" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
                     </Border>
                 </Border>
             </Button>
 
             <!-- Полоска 1: Достижения -->
-            <Button Grid.Column="2" Click="OnIndicator1Click" Style="{StaticResource StoryBarBtn}" ToolTip="Достижения и цели">
-                <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
-                    <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
-                        <Border.RenderTransform>
-                            <ScaleTransform x:Name="Indicator1Scale" ScaleX="0" ScaleY="1" />
-                        </Border.RenderTransform>
+            <Button x:Name="IndicatorBtn1"
+                    Grid.Column="2"
+                    Click="OnIndicator1Click"
+                    MouseEnter="OnIndicator1MouseEnter"
+                    MouseLeave="OnIndicator1MouseLeave"
+                    Style="{StaticResource StoryBarBtn}">
+                <Border Height="14" Background="Transparent" VerticalAlignment="Center">
+                    <Border x:Name="Indicator1Track" Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" VerticalAlignment="Center">
+                        <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="Indicator1Scale" ScaleX="0" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
                     </Border>
                 </Border>
             </Button>
 
             <!-- Полоска 2: Что нового -->
-            <Button Grid.Column="4" Click="OnIndicator2Click" Style="{StaticResource StoryBarBtn}" ToolTip="Что нового">
-                <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
-                    <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
-                        <Border.RenderTransform>
-                            <ScaleTransform x:Name="Indicator2Scale" ScaleX="0" ScaleY="1" />
-                        </Border.RenderTransform>
+            <Button x:Name="IndicatorBtn2"
+                    Grid.Column="4"
+                    Click="OnIndicator2Click"
+                    MouseEnter="OnIndicator2MouseEnter"
+                    MouseLeave="OnIndicator2MouseLeave"
+                    Style="{StaticResource StoryBarBtn}">
+                <Border Height="14" Background="Transparent" VerticalAlignment="Center">
+                    <Border x:Name="Indicator2Track" Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" VerticalAlignment="Center">
+                        <Border Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
+                            <Border.RenderTransform>
+                                <ScaleTransform x:Name="Indicator2Scale" ScaleX="0" ScaleY="1" />
+                            </Border.RenderTransform>
+                        </Border>
                     </Border>
                 </Border>
             </Button>
@@ -64,5 +85,25 @@
             <local:AchievementsSlide x:Name="SlideAchievements" Visibility="Collapsed" />
             <local:WhatsNewSlide x:Name="SlideWhatsNew" Visibility="Collapsed" />
         </Grid>
+
+        <!-- Кастомный Popup подсказки под полоской индикатора -->
+        <Popup x:Name="IndicatorPopup"
+               Placement="Bottom"
+               AllowsTransparency="True"
+               PopupAnimation="Fade"
+               StaysOpen="True"
+               Focusable="False">
+            <Border Background="{DynamicResource ChangelogModalBg}"
+                    BorderBrush="{DynamicResource StoriesCardBorder}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="8,5"
+                    Margin="0,4,0,0">
+                <TextBlock x:Name="IndicatorPopupText"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextPrimary}" />
+            </Border>
+        </Popup>
     </Grid>
 </UserControl>

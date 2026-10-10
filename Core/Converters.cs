@@ -144,3 +144,21 @@ public class BoolToEnabledTextConverter : IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
 }
+
+public class IconKeyToGeometryConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string key && Application.Current != null)
+        {
+            if (Application.Current.TryFindResource(key) is Geometry geom)
+            {
+                return geom;
+            }
+        }
+        return Application.Current?.TryFindResource("IconCrown") as Geometry;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
