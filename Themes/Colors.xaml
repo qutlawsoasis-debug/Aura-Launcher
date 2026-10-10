@@ -39,6 +39,8 @@
     <Color x:Key="ColorStoriesDim55">#8C091015</Color>
     <Color x:Key="ColorStoriesTrack">#47FFFFFF</Color>
     <Color x:Key="ColorStoriesTextSecondary">#80E8F0F8</Color>
+    <Color x:Key="ColorPanelGlass">#1AFFFFFF</Color>
+    <Color x:Key="ColorPrimaryActionText">#1C1106</Color>
 
     <!-- Named SolidColorBrush resources for UI controls (Frozen for GPU performance) -->
     <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" po:Freeze="True" />
@@ -46,6 +48,8 @@
     <SolidColorBrush x:Key="PanelRaised" Color="{StaticResource ColorPanelRaised}" po:Freeze="True" />
     <SolidColorBrush x:Key="PanelCard" Color="{StaticResource ColorPanelCard}" po:Freeze="True" />
     <SolidColorBrush x:Key="PanelInput" Color="{StaticResource ColorPanelInput}" po:Freeze="True" />
+    <SolidColorBrush x:Key="PanelGlass" Color="{StaticResource ColorPanelGlass}" po:Freeze="True" />
+    <SolidColorBrush x:Key="PrimaryActionText" Color="{StaticResource ColorPrimaryActionText}" po:Freeze="True" />
     <SolidColorBrush x:Key="Night" Color="{StaticResource ColorNight}" po:Freeze="True" />
     <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
     <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource ColorTextSecondary}" po:Freeze="True" />

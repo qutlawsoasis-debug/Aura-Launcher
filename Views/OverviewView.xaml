@@ -145,8 +145,8 @@
                 <Border Grid.Row="0"
                         CornerRadius="3"
                         ClipToBounds="True"
-                        Background="{DynamicResource Panel}"
-                        BorderBrush="{DynamicResource BorderSubtle}"
+                        Background="{DynamicResource PanelGlass}"
+                        BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
                         Margin="0,0,0,8">
                     <Grid>
@@ -167,14 +167,14 @@
                                   Data="{StaticResource IconCamera}"
                                   Width="20"
                                   Height="20"
-                                  Stroke="{DynamicResource StoriesTextSecondary}"
+                                  Stroke="{StaticResource DimInkBrush}"
                                   HorizontalAlignment="Center"
                                   Margin="0,0,0,6" />
                             <TextBlock Text="Последних скриншотов нет"
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="12"
                                        FontWeight="Medium"
-                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       Foreground="{StaticResource DimInkBrush}"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap" />
@@ -195,7 +195,7 @@
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="11"
                                    FontWeight="Medium"
-                                   Foreground="{DynamicResource StoriesTextSecondary}"
+                                   Foreground="{StaticResource MuteBrush}"
                                    VerticalAlignment="Center" />
 
                         <Button Grid.Column="1"
@@ -210,7 +210,7 @@
                             <TextBlock Text="Открыть"
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="12"
-                                       Foreground="{DynamicResource Accent}"
+                                       Foreground="{StaticResource EmberBrush}"
                                        TextDecorations="Underline" />
                         </Button>
                     </Grid>
@@ -219,25 +219,25 @@
                                FontFamily="{StaticResource MainFont}"
                                FontSize="13"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextPrimary}"
+                               Foreground="{StaticResource InkBrush}"
                                TextWrapping="Wrap"
                                Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}" />
 
                     <TextBlock Text="Нажмите F2 в игре, чтобы сделать скриншот"
                                FontFamily="{StaticResource MainFont}"
                                FontSize="12"
-                               Foreground="{DynamicResource StoriesTextSecondary}"
+                               Foreground="{StaticResource DimInkBrush}"
                                TextWrapping="Wrap"
                                Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}" />
                 </StackPanel>
 
-                <Border Grid.Row="2" Height="1" Background="{DynamicResource BorderSubtle}" Margin="0,10,0,10" />
+                <Border Grid.Row="2" Height="1" Background="{StaticResource LineInkBrush}" Margin="0,10,0,10" />
 
                 <!-- 2. ДОСТИЖЕНИЕ -->
                 <Border Grid.Row="3"
                         CornerRadius="3"
-                        Background="{DynamicResource Panel}"
-                        BorderBrush="{DynamicResource BorderSubtle}"
+                        Background="{DynamicResource PanelGlass}"
+                        BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
                         Padding="12,10"
                         Visibility="{Binding HasAchievementBlock, Converter={StaticResource BoolToVis}}">
@@ -253,14 +253,14 @@
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="11"
                                        FontWeight="Medium"
-                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       Foreground="{StaticResource MuteBrush}"
                                        VerticalAlignment="Center" />
 
                             <TextBlock Grid.Column="1"
                                        Text="{Binding AchievementDateOrProgress}"
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="11"
-                                       Foreground="{DynamicResource TextPrimary}"
+                                       Foreground="{StaticResource InkBrush}"
                                        VerticalAlignment="Center"
                                        Margin="8,0,0,0" />
                         </Grid>
@@ -269,21 +269,21 @@
                                    FontFamily="{StaticResource HeadingFont}"
                                    FontSize="18"
                                    FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"
+                                   Foreground="{StaticResource InkBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,2" />
 
                         <TextBlock Text="{Binding AchievementDescription}"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
-                                   Foreground="{DynamicResource StoriesTextSecondary}"
+                                   Foreground="{StaticResource DimInkBrush}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
                 <Border Grid.Row="4"
                         Height="1"
-                        Background="{DynamicResource BorderSubtle}"
+                        Background="{StaticResource LineInkBrush}"
                         Margin="0,10,0,10"
                         Visibility="{Binding HasAchievementBlock, Converter={StaticResource BoolToVis}}" />
 
@@ -291,8 +291,8 @@
                 <Border x:Name="CardNextGoalText"
                         Grid.Row="5"
                         CornerRadius="3"
-                        Background="{DynamicResource Panel}"
-                        BorderBrush="{DynamicResource BorderSubtle}"
+                        Background="{DynamicResource PanelGlass}"
+                        BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
                         Padding="12,10"
                         Visibility="{Binding HasAchievementBlock, Converter={StaticResource BoolToVis}}">
@@ -308,7 +308,7 @@
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="11"
                                        FontWeight="Medium"
-                                       Foreground="{DynamicResource StoriesTextSecondary}"
+                                       Foreground="{StaticResource MuteBrush}"
                                        VerticalAlignment="Center" />
 
                             <TextBlock Grid.Column="1"
@@ -316,7 +316,7 @@
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="11"
                                        FontWeight="SemiBold"
-                                       Foreground="{DynamicResource Accent}"
+                                       Foreground="{StaticResource EmberBrush}"
                                        VerticalAlignment="Center"
                                        Margin="8,0,0,0" />
                         </Grid>
@@ -325,14 +325,14 @@
                                    FontFamily="{StaticResource HeadingFont}"
                                    FontSize="18"
                                    FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextPrimary}"
+                                   Foreground="{StaticResource InkBrush}"
                                    TextWrapping="Wrap"
                                    Margin="0,0,0,2" />
 
                         <TextBlock Text="{Binding NextAchievementDescription}"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
-                                   Foreground="{DynamicResource StoriesTextSecondary}"
+                                   Foreground="{StaticResource DimInkBrush}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
@@ -340,15 +340,15 @@
                 <Border x:Name="CardNextGoalDivider"
                         Grid.Row="6"
                         Height="1"
-                        Background="{DynamicResource BorderSubtle}"
+                        Background="{StaticResource LineInkBrush}"
                         Margin="0,10,0,10"
                         Visibility="{Binding HasAchievementBlock, Converter={StaticResource BoolToVis}}" />
 
                 <!-- 4. ЧТО НОВОГО -->
                 <Border Grid.Row="7"
                         CornerRadius="3"
-                        Background="{DynamicResource Panel}"
-                        BorderBrush="{DynamicResource BorderSubtle}"
+                        Background="{DynamicResource PanelGlass}"
+                        BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
                         Padding="12,10">
                     <StackPanel>
@@ -363,13 +363,13 @@
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="11"
                                            FontWeight="Medium"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
+                                           Foreground="{StaticResource MuteBrush}"
                                            VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding WhatsNewVersion}"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="11"
                                            FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Accent}"
+                                           Foreground="{StaticResource EmberBrush}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
 
@@ -383,7 +383,7 @@
                                 <TextBlock Text="Все изменения"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="12"
-                                           Foreground="{DynamicResource Accent}"
+                                           Foreground="{StaticResource EmberBrush}"
                                            TextDecorations="Underline" />
                             </Button>
                         </Grid>
@@ -391,7 +391,7 @@
                         <TextBlock Text="{Binding WhatsNewPrimaryLine}"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
-                                   Foreground="{DynamicResource TextPrimary}"
+                                   Foreground="{StaticResource InkBrush}"
                                    TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>

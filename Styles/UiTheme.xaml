@@ -660,7 +660,7 @@
     <!-- Segmented Switch Radio Button (Alias based on SubNavPillRadio) -->
     <Style x:Key="SettingsSegmentRadio" BasedOn="{StaticResource SubNavPillRadio}" TargetType="RadioButton" />
 
-    <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку") -->
+    <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку", "Сменить фон") -->
     <Style x:Key="SettingsActionBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
@@ -669,14 +669,14 @@
         <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Medium" />
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="ActionBorder"
                             CornerRadius="3"
-                            Background="{DynamicResource PanelRaised}"
-                            BorderBrush="{DynamicResource BorderSubtle}"
+                            Background="#1AFFFFFF"
+                            BorderBrush="{StaticResource LineInkBrush}"
                             BorderThickness="1"
                             Padding="{TemplateBinding Padding}"
                             SnapsToDevicePixels="True">
@@ -686,12 +686,12 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource PanelInput}" />
-                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                            <Setter Property="Foreground" Value="{DynamicResource TextWhite}" />
+                            <Setter TargetName="ActionBorder" Property="Background" Value="#2BFFFFFF" />
+                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
+                            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.85" />
+                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.82" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="ActionBorder" Property="Opacity" Value="0.4" />
@@ -770,7 +770,7 @@
         </Setter>
     </Style>
 
-    <!-- Aura Desktop CheckBox (20x20, CornerRadius 3, dark background #0C141A, subtle border, Ember checkmark when checked) -->
+    <!-- Aura Desktop CheckBox (20x20, CornerRadius 3, dark background #1AFFFFFF, stroke checkmark with smooth draw-on animation) -->
     <Style x:Key="AuraCheckBox" TargetType="CheckBox">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -795,9 +795,10 @@
                                   Width="12" Height="12"
                                   Stroke="{StaticResource InkBrush}"
                                   StrokeThickness="2"
+                                  StrokeDashArray="30,30"
+                                  StrokeDashOffset="30"
                                   HorizontalAlignment="Center"
-                                  VerticalAlignment="Center"
-                                  Visibility="Collapsed" />
+                                  VerticalAlignment="Center" />
                         </Border>
                         <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
                     </StackPanel>
@@ -805,7 +806,34 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="CheckBorder" Property="Background" Value="#38FFFFFF" />
                             <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
-                            <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible" />
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="CheckGlyph"
+                                                         Storyboard.TargetProperty="StrokeDashOffset"
+                                                         To="0"
+                                                         Duration="0:0:0.22">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="CheckGlyph"
+                                                         Storyboard.TargetProperty="StrokeDashOffset"
+                                                         To="30"
+                                                         Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseIn" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>

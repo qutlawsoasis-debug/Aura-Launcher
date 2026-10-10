@@ -137,6 +137,57 @@ public class SettingsViewModel : ObservableObject
         _ => string.Empty
     };
 
+    private CancellationTokenSource? _ramAnimCts;
+
+    private async Task AnimateRamMbAsync(int targetMb)
+    {
+        _ramAnimCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _ramAnimCts = cts;
+        var token = cts.Token;
+
+        int startMb = _configService.CurrentConfig.RamMb;
+        if (startMb == targetMb) return;
+
+        int durationMs = 220;
+        int steps = 14;
+        int stepDelay = Math.Max(10, durationMs / steps);
+
+        try
+        {
+            for (int i = 1; i <= steps; i++)
+            {
+                if (token.IsCancellationRequested) break;
+                double progress = (double)i / steps;
+                double easeProgress = 1 - Math.Pow(1 - progress, 3);
+                int currentMb = (int)Math.Round(startMb + (targetMb - startMb) * easeProgress);
+
+                _configService.CurrentConfig.RamMb = currentMb;
+                OnPropertyChanged(nameof(RamMb));
+                OnPropertyChanged(nameof(RamGb));
+                OnPropertyChanged(nameof(IsRam4));
+                OnPropertyChanged(nameof(IsRam6));
+                OnPropertyChanged(nameof(IsRam8));
+                OnPropertyChanged(nameof(IsRam12));
+
+                await Task.Delay(stepDelay, token).ConfigureAwait(true);
+            }
+
+            if (!token.IsCancellationRequested)
+            {
+                _configService.CurrentConfig.RamMb = targetMb;
+                OnPropertyChanged(nameof(RamMb));
+                OnPropertyChanged(nameof(RamGb));
+                OnPropertyChanged(nameof(IsRam4));
+                OnPropertyChanged(nameof(IsRam6));
+                OnPropertyChanged(nameof(IsRam8));
+                OnPropertyChanged(nameof(IsRam12));
+                _ = SaveImmediatelyAsync();
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
     public int RamMb
     {
         get => _configService.CurrentConfig.RamMb;
@@ -144,6 +195,7 @@ public class SettingsViewModel : ObservableObject
         {
             if (_configService.CurrentConfig.RamMb != value)
             {
+                _ramAnimCts?.Cancel();
                 _configService.CurrentConfig.RamMb = value;
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(RamGb));
@@ -171,26 +223,26 @@ public class SettingsViewModel : ObservableObject
 
     public bool IsRam4
     {
-        get => _configService.CurrentConfig.RamMb == 4096;
-        set { if (value) RamMb = 4096; }
+        get => Math.Abs(_configService.CurrentConfig.RamMb - 4096) < 256;
+        set { if (value) _ = AnimateRamMbAsync(4096); }
     }
 
     public bool IsRam6
     {
-        get => _configService.CurrentConfig.RamMb == 6144;
-        set { if (value) RamMb = 6144; }
+        get => Math.Abs(_configService.CurrentConfig.RamMb - 6144) < 256;
+        set { if (value) _ = AnimateRamMbAsync(6144); }
     }
 
     public bool IsRam8
     {
-        get => _configService.CurrentConfig.RamMb == 8192;
-        set { if (value) RamMb = 8192; }
+        get => Math.Abs(_configService.CurrentConfig.RamMb - 8192) < 256;
+        set { if (value) _ = AnimateRamMbAsync(8192); }
     }
 
     public bool IsRam12
     {
-        get => _configService.CurrentConfig.RamMb == 12288;
-        set { if (value) RamMb = 12288; }
+        get => Math.Abs(_configService.CurrentConfig.RamMb - 12288) < 256;
+        set { if (value) _ = AnimateRamMbAsync(12288); }
     }
 
     public string GraphicsPreset

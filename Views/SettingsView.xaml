@@ -232,8 +232,8 @@
                                VerticalAlignment="Center" />
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right">
-                        <Border Background="{DynamicResource Panel}"
-                                BorderBrush="{DynamicResource BorderSubtle}"
+                        <Border Background="{DynamicResource PanelGlass}"
+                                BorderBrush="{StaticResource LineInkBrush}"
                                 BorderThickness="1"
                                 CornerRadius="3"
                                 MinHeight="34"
