@@ -583,24 +583,18 @@ public class OverviewViewModel : ObservableObject
         try
         {
             var achService = App.Services?.GetService(typeof(IAchievementService)) as IAchievementService;
-            if (achService == null)
-            {
-                AchievementTitle = string.Empty;
-                AchievementDescription = string.Empty;
-                AchievementDateOrProgress = string.Empty;
-                NextAchievementTitle = string.Empty;
-                NextAchievementDescription = string.Empty;
-                NextAchievementProgress = string.Empty;
-                HasAchievementBlock = false;
-                return;
-            }
+            var defs = achService?.Definitions;
+            var progress = achService?.Progress;
 
-            var defs = achService.Definitions;
-            var progress = achService.Progress;
-
-            if (defs == null || defs.Count == 0)
+            if (achService == null || defs == null || defs.Count == 0 || progress == null)
             {
-                HasAchievementBlock = false;
+                AchievementTitle = "Первый запуск";
+                AchievementDescription = "Добро пожаловать в Aura Launcher!";
+                AchievementDateOrProgress = "В процессе";
+                NextAchievementTitle = "Компания";
+                NextAchievementDescription = "Добавьте 5 друзей в ваш список";
+                NextAchievementProgress = "0 из 5 друзей";
+                HasAchievementBlock = true;
                 return;
             }
 

@@ -34,9 +34,12 @@ public class StartupWindowViewModel : ObservableObject
     private double _progressValue = 0;
     private bool _isProgressVisible = false;
     private string _progressPercentText = "";
+    private string _speedText = "";
     private string _versionText = "—";
     private bool _isFlowRunning = false;
+    private bool _isErrorState = false;
     private CancellationTokenSource? _flowCts;
+    private TaskCompletionSource<bool>? _errorActionTcs;
 
     public string StatusText
     {
@@ -83,11 +86,34 @@ public class StartupWindowViewModel : ObservableObject
         set => SetProperty(ref _progressPercentText, value);
     }
 
+    public string SpeedText
+    {
+        get => _speedText;
+        set
+        {
+            if (SetProperty(ref _speedText, value))
+            {
+                OnPropertyChanged(nameof(HasSpeedText));
+            }
+        }
+    }
+
+    public bool HasSpeedText => !string.IsNullOrWhiteSpace(_speedText);
+
+    public bool IsErrorState
+    {
+        get => _isErrorState;
+        set => SetProperty(ref _isErrorState, value);
+    }
+
     public string VersionText
     {
         get => _versionText;
         set => SetProperty(ref _versionText, value);
     }
+
+    public RelayCommand RetryCommand { get; }
+    public RelayCommand SkipCommand { get; }
 
     public StartupWindowViewModel(
         ILauncherUpdateService launcherUpdateService,
@@ -97,6 +123,18 @@ public class StartupWindowViewModel : ObservableObject
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
         _onLaunchMainRequested = onLaunchMainRequested ?? throw new ArgumentNullException(nameof(onLaunchMainRequested));
         _onCloseRequested = onCloseRequested ?? throw new ArgumentNullException(nameof(onCloseRequested));
+
+        RetryCommand = new RelayCommand(_ =>
+        {
+            IsErrorState = false;
+            _errorActionTcs?.TrySetResult(true);
+        });
+
+        SkipCommand = new RelayCommand(_ =>
+        {
+            IsErrorState = false;
+            _errorActionTcs?.TrySetResult(false);
+        });
 
         ResolveResources();
         ResolveVersionText();
@@ -162,11 +200,14 @@ public class StartupWindowViewModel : ObservableObject
 
         try
         {
+            IsErrorState = false;
+
             // 1. Начальное: «Проверка обновления» + анимированные точки каждые 0.4s
             StatusText = "Проверка обновления";
             DotsText = ".";
             SetStatusColor(isAccent: false);
             IsProgressVisible = false;
+            SpeedText = "";
 
             using var dotsCts = new CancellationTokenSource();
             var dotsTask = AnimateDotsAsync(dotsCts.Token);
@@ -200,17 +241,28 @@ public class StartupWindowViewModel : ObservableObject
 
             if (!checkSucceeded)
             {
-                // Ошибка сети/нет связи: «Не удалось проверить обновления», через 2s запуск без обновления
+                // Ошибка сети/нет связи: «Не удалось проверить обновления», кнопки Повторить / Пропустить
                 StatusText = "Не удалось проверить обновления";
                 DotsText = "";
                 SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
-                await Task.Delay(2000, ct);
+                IsErrorState = true;
+
+                _errorActionTcs = new TaskCompletionSource<bool>();
+                bool shouldRetry = await _errorActionTcs.Task;
+                IsErrorState = false;
+
+                if (shouldRetry)
+                {
+                    _isFlowRunning = false;
+                    _ = StartStartupFlowAsync();
+                    return;
+                }
             }
             else if (!string.IsNullOrWhiteSpace(newVersion))
             {
-                // Если есть обновление: «Загрузка обновления», тонкий Accent-прогрессбар 2px под сценой + процент числом, затем «Установка...» -> автоперезапуск
-                StatusText = "Загрузка обновления";
+                // Если есть обновление: «Скачивание 42%», тонкий Accent-прогрессбар 3px под статусом + реальный процент и скорость МБ/с
+                StatusText = "Скачивание 0%";
                 DotsText = "";
                 SetStatusColor(isAccent: false);
                 IsProgressVisible = true;
@@ -219,6 +271,8 @@ public class StartupWindowViewModel : ObservableObject
                 var progress = new Progress<DownloadProgressReport>(report =>
                 {
                     ProgressValue = report.Percentage;
+                    SpeedText = report.SpeedMBs > 0 ? $"{report.SpeedMBs:F1} МБ/с" : "";
+                    StatusText = $"Скачивание {Math.Round(report.Percentage)}%";
                 });
 
                 var updateResult = await _launcherUpdateService.DownloadAndApplyAsync(progress, ct);
@@ -250,19 +304,19 @@ public class StartupWindowViewModel : ObservableObject
                 await Task.Delay(1000, ct);
             }
 
-            // Минимальное время показа: 1.5s (даже если проверка мгновенная), чтобы окно не мелькало
+            // Минимальное время показа: 1.5s
             long elapsedMs = stopwatch.ElapsedMilliseconds;
             if (elapsedMs < 1500)
             {
                 await Task.Delay((int)(1500 - elapsedMs), ct);
             }
 
-            // «Запуск лаунчера» с точками (~1s) -> плавное угасание окна (Opacity 250ms) -> открытие главного окна
-            StatusText = "Запуск лаунчера";
+            // «Запуск»
+            StatusText = "Запуск";
             SetStatusColor(isAccent: false);
             using var launchDotsCts = new CancellationTokenSource();
             var launchDotsTask = AnimateDotsAsync(launchDotsCts.Token);
-            await Task.Delay(1000, ct);
+            await Task.Delay(800, ct);
             launchDotsCts.Cancel();
             try { await launchDotsTask; } catch { }
             DotsText = "";
@@ -300,6 +354,7 @@ public class StartupWindowViewModel : ObservableObject
     public void SetFakeState(string state)
     {
         _flowCts?.Cancel();
+        IsErrorState = false;
         switch (state.ToLowerInvariant())
         {
             case "checking":
@@ -316,14 +371,15 @@ public class StartupWindowViewModel : ObservableObject
                 IsProgressVisible = false;
                 break;
             case "downloading":
-                StatusText = "Загрузка обновления";
+                StatusText = "Скачивание 42%";
                 DotsText = "";
                 SetStatusColor(isAccent: false);
                 IsProgressVisible = true;
-                ProgressValue = 63;
+                ProgressValue = 42;
+                SpeedText = "5.2 МБ/с";
                 break;
             case "launching":
-                StatusText = "Запуск лаунчера";
+                StatusText = "Запуск";
                 DotsText = "...";
                 SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
@@ -333,6 +389,7 @@ public class StartupWindowViewModel : ObservableObject
                 DotsText = "";
                 SetStatusColor(isAccent: false);
                 IsProgressVisible = false;
+                IsErrorState = true;
                 break;
             case "installing":
                 StatusText = "Установка...";

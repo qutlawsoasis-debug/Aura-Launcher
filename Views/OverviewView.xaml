@@ -111,7 +111,7 @@
                 Margin="0,0,0,0"
                 Padding="16"
                 CornerRadius="3"
-                Background="{DynamicResource PanelGlass}"
+                Background="{DynamicResource ShadeOverlay}"
                 BorderBrush="{StaticResource LineInkBrush}"
                 BorderThickness="1"
                 ClipToBounds="True"
@@ -136,18 +136,36 @@
                     </Grid.ColumnDefinitions>
 
                     <!-- Сегмент 0: Скриншот -->
-                    <Button Grid.Column="0" Command="{Binding SelectStoryCommand}" CommandParameter="0" Style="{StaticResource StoryBarBtn}" ToolTip="Скриншот">
-                        <ProgressBar Style="{StaticResource StoryProgressBar}" Value="{Binding Story0ProgressPercent}" />
+                    <Button Grid.Column="0" Click="OnStoryBar0Click" Style="{StaticResource StoryBarBtn}" ToolTip="Скриншот">
+                        <Border Height="4" Background="{StaticResource TrackSubtle}" CornerRadius="2" ClipToBounds="True">
+                            <Border x:Name="Story0Fill" Background="{StaticResource EmberBrush}" CornerRadius="2" RenderTransformOrigin="0,0">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="Story0Scale" ScaleX="0" ScaleY="1" />
+                                </Border.RenderTransform>
+                            </Border>
+                        </Border>
                     </Button>
 
                     <!-- Сегмент 1: Достижения -->
-                    <Button Grid.Column="2" Command="{Binding SelectStoryCommand}" CommandParameter="1" Style="{StaticResource StoryBarBtn}" ToolTip="Достижения и цели">
-                        <ProgressBar Style="{StaticResource StoryProgressBar}" Value="{Binding Story1ProgressPercent}" />
+                    <Button Grid.Column="2" Click="OnStoryBar1Click" Style="{StaticResource StoryBarBtn}" ToolTip="Достижения и цели">
+                        <Border Height="4" Background="{StaticResource TrackSubtle}" CornerRadius="2" ClipToBounds="True">
+                            <Border x:Name="Story1Fill" Background="{StaticResource EmberBrush}" CornerRadius="2" RenderTransformOrigin="0,0">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="Story1Scale" ScaleX="0" ScaleY="1" />
+                                </Border.RenderTransform>
+                            </Border>
+                        </Border>
                     </Button>
 
                     <!-- Сегмент 2: Что нового -->
-                    <Button Grid.Column="4" Command="{Binding SelectStoryCommand}" CommandParameter="2" Style="{StaticResource StoryBarBtn}" ToolTip="Что нового">
-                        <ProgressBar Style="{StaticResource StoryProgressBar}" Value="{Binding Story2ProgressPercent}" />
+                    <Button Grid.Column="4" Click="OnStoryBar2Click" Style="{StaticResource StoryBarBtn}" ToolTip="Что нового">
+                        <Border Height="4" Background="{StaticResource TrackSubtle}" CornerRadius="2" ClipToBounds="True">
+                            <Border x:Name="Story2Fill" Background="{StaticResource EmberBrush}" CornerRadius="2" RenderTransformOrigin="0,0">
+                                <Border.RenderTransform>
+                                    <ScaleTransform x:Name="Story2Scale" ScaleX="0" ScaleY="1" />
+                                </Border.RenderTransform>
+                            </Border>
+                        </Border>
                     </Button>
                 </Grid>
 
@@ -170,20 +188,20 @@
                         <!-- Картинка скриншота или пустое состояние -->
                         <Grid Grid.Row="1" Margin="0,0,0,12">
                             <Border Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}"
-                                    CornerRadius="3" ClipToBounds="True" Background="{DynamicResource Panel}">
+                                    CornerRadius="3" ClipToBounds="True" Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1">
                                 <Grid>
                                     <Image Source="{Binding FeedImage0}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border VerticalAlignment="Bottom" Background="{DynamicResource DialogBackdrop}" Padding="10,6">
-                                        <TextBlock Text="{Binding LatestScreenshotDateText}" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" />
+                                    <Border VerticalAlignment="Bottom" Background="{DynamicResource DialogBackdrop}" Padding="10,8">
+                                        <TextBlock Text="{Binding LatestScreenshotDateText}" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" />
                                     </Border>
                                 </Grid>
                             </Border>
 
                             <Border Visibility="{Binding HasLatestScreenshot, Converter={StaticResource InverseBoolToVis}}"
-                                    CornerRadius="3" Background="{DynamicResource PanelGlass}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" Padding="16">
+                                    CornerRadius="3" Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" Padding="16">
                                 <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                     <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="32" Height="32" Stroke="{StaticResource MuteBrush}" HorizontalAlignment="Center" Margin="0,0,0,10" />
-                                    <TextBlock Text="Скриншотов пока нет" FontFamily="{StaticResource MainFont}" FontSize="14" FontWeight="Medium" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Center" Margin="0,0,0,4" />
+                                    <TextBlock Text="Скриншотов пока нет" FontFamily="{StaticResource MainFont}" FontSize="14" FontWeight="Medium" Foreground="{StaticResource TextWhite}" HorizontalAlignment="Center" Margin="0,0,0,4" />
                                     <TextBlock Text="Нажмите F2 во время игры, чтобы сделать скриншот" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
                                 </StackPanel>
                             </Border>
@@ -219,25 +237,25 @@
                         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Style="{StaticResource AuraScrollViewer}">
                             <StackPanel>
                                 <!-- Последнее полученное достижение -->
-                                <Border Background="{DynamicResource PanelGlass}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="3" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="3" Padding="12" Margin="0,0,0,10">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,4">
                                             <TextBlock Text="ПОСЛЕДНЕЕ ДОСТИЖЕНИЕ" FontFamily="{StaticResource MainFont}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" />
-                                            <TextBlock Text="{Binding AchievementDateOrProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" Foreground="{StaticResource DimInkBrush}" HorizontalAlignment="Right" />
+                                            <TextBlock Text="{Binding AchievementDateOrProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" Foreground="{StaticResource EmberBrush}" HorizontalAlignment="Right" />
                                         </Grid>
-                                        <TextBlock Text="{Binding AchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,4" />
+                                        <TextBlock Text="{Binding AchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,2,0,4" />
                                         <TextBlock Text="{Binding AchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
 
                                 <!-- Следующая цель -->
-                                <Border Background="{DynamicResource PanelGlass}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="3" Padding="12">
+                                <Border Background="{DynamicResource PanelCard}" BorderBrush="{StaticResource LineInkBrush}" BorderThickness="1" CornerRadius="3" Padding="12">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,4">
                                             <TextBlock Text="СЛЕДУЮЩАЯ ЦЕЛЬ" FontFamily="{StaticResource MainFont}" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource MuteBrush}" />
                                             <TextBlock Text="{Binding NextAchievementProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" HorizontalAlignment="Right" />
                                         </Grid>
-                                        <TextBlock Text="{Binding NextAchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" Margin="0,2,0,4" />
+                                        <TextBlock Text="{Binding NextAchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,2,0,4" />
                                         <TextBlock Text="{Binding NextAchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource DimInkBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
@@ -273,7 +291,7 @@
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="•" FontFamily="{StaticResource MainFont}" FontSize="14" Foreground="{StaticResource EmberBrush}" VerticalAlignment="Top" />
-                                            <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" />
+                                            <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" />
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>

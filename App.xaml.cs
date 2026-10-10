@@ -289,15 +289,29 @@ public partial class App : Application
         StartPipeServer(pipeName, mainWindow);
 
         MainWindow = mainWindow;
+        mainWindow.Opacity = 0.0;
         mainWindow.Show();
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
-        // Плавное закрытие splash-окна ПОСЛЕ показа главного окна
+        // Плавный переход из сплеша в главное окно: fade-out сплеша + fade-in главного (300 мс)
+        try
+        {
+            var mainFadeIn = new System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(300))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+            };
+            mainWindow.BeginAnimation(UIElement.OpacityProperty, mainFadeIn);
+        }
+        catch { }
+
         if (splashWin != null)
         {
             try
             {
-                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(250));
+                var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(300))
+                {
+                    EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+                };
                 fadeOut.Completed += (s, ev) =>
                 {
                     try { splashWin.Close(); } catch { }

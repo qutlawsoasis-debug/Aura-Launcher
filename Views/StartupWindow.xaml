@@ -14,7 +14,8 @@
         FontFamily="{DynamicResource MainFont}"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True"
-        MouseDown="Window_MouseDown">
+        MouseDown="Window_MouseDown"
+        Loaded="Window_Loaded">
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -33,11 +34,11 @@
                                      AutoReverse="True"
                                      RepeatBehavior="Forever" />
 
-                    <!-- Бегущая Accent-полоска 2px внизу окна (когда нет явного прогресс-бара) -->
-                    <DoubleAnimation Storyboard.TargetName="ActivityBar"
-                                     Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                    <!-- Бегущий блик 3px (indeterminate) при проверке обновления -->
+                    <DoubleAnimation Storyboard.TargetName="ShimmerTransform"
+                                     Storyboard.TargetProperty="X"
                                      From="-80" To="340"
-                                     Duration="0:0:2.0"
+                                     Duration="0:0:1.6"
                                      RepeatBehavior="Forever" />
                 </Storyboard>
             </BeginStoryboard>
@@ -74,8 +75,14 @@
 
             <!-- Слой 1: типографика и блок статуса -->
             <Grid>
-                <!-- 1. Логотип Aura и строгая акцентная риска -->
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,78,0,0">
+                <!-- 1. Логотип Aura и строгая акцентная риска (плавное появление fade-in + подъём 10px, 500мс) -->
+                <StackPanel x:Name="AuraLogoHost"
+                            HorizontalAlignment="Center" VerticalAlignment="Top"
+                            Margin="0,78,0,0" Opacity="0.0"
+                            RenderTransformOrigin="0.5,0.5">
+                    <StackPanel.RenderTransform>
+                        <TranslateTransform x:Name="AuraLogoTranslate" Y="10" />
+                    </StackPanel.RenderTransform>
                     <TextBlock Text="Aura"
                                FontFamily="{DynamicResource HeadingFont}"
                                FontWeight="SemiBold"
@@ -106,7 +113,7 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Статус + анимированные точки -->
+                                <!-- Статус с плавным Crossfade 200 мс -->
                                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Border x:Name="StatusDot"
                                             Width="8" Height="8"
@@ -114,13 +121,26 @@
                                             Background="{DynamicResource Accent}"
                                             VerticalAlignment="Center"
                                             Margin="0,0,10,0" />
-                                    <TextBlock Text="{Binding StatusText}"
-                                               FontFamily="{DynamicResource MainFont}"
-                                               FontSize="13"
-                                               FontWeight="Medium"
-                                               Foreground="{Binding StatusForeground}"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" />
+                                    <Grid VerticalAlignment="Center">
+                                        <TextBlock x:Name="OldStatusTextBlock"
+                                                   Text=""
+                                                   FontFamily="{DynamicResource MainFont}"
+                                                   FontSize="13"
+                                                   FontWeight="Medium"
+                                                   Foreground="{Binding StatusForeground}"
+                                                   VerticalAlignment="Center"
+                                                   Opacity="0.0"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock x:Name="StatusTextBlock"
+                                                   Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
+                                                   TargetUpdated="OnStatusTextTargetUpdated"
+                                                   FontFamily="{DynamicResource MainFont}"
+                                                   FontSize="13"
+                                                   FontWeight="Medium"
+                                                   Foreground="{Binding StatusForeground}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
                                     <TextBlock Text="{Binding DotsText}"
                                                FontFamily="{DynamicResource MainFont}"
                                                FontSize="13"
@@ -130,31 +150,66 @@
                                                VerticalAlignment="Center" />
                                 </StackPanel>
 
-                                <!-- Процент скачивания справа -->
-                                <TextBlock Grid.Column="1"
-                                           Text="{Binding ProgressPercentText}"
-                                           FontFamily="{DynamicResource HeadingFont}"
-                                           FontSize="14"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource Accent}"
-                                           VerticalAlignment="Center"
-                                           Margin="8,0,0,0"
-                                           Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
+                                <!-- Процент скачивания + Скорость (МБ/с) справа -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0"
+                                            Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding ProgressPercentText}"
+                                               FontFamily="{DynamicResource HeadingFont}"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Accent}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding SpeedText}"
+                                               FontFamily="{DynamicResource MainFont}"
+                                               FontSize="11"
+                                               FontWeight="Normal"
+                                               Foreground="{DynamicResource StoriesTextSecondary}"
+                                               VerticalAlignment="Center"
+                                               Margin="6,1,0,0"
+                                               Visibility="{Binding HasSpeedText, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
                             </Grid>
 
-                            <!-- Полоса прогресса скачивания обновления -->
+                            <!-- Тонкая полоска прогресса (3px, Accent): бегущий блик при проверке, реальный прогресс при скачивании -->
                             <Grid x:Name="ProgressTrack"
                                   Height="3"
                                   Margin="0,10,0,0"
                                   Background="{DynamicResource TrackSubtle}"
-                                  Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}">
+                                  ClipToBounds="True">
+                                <!-- Индетерминантный блик (при проверке) -->
+                                <Rectangle x:Name="IndeterminateShimmer"
+                                           Width="80" Height="3"
+                                           Fill="{DynamicResource Accent}"
+                                           HorizontalAlignment="Left"
+                                           Visibility="{Binding IsProgressVisible, Converter={StaticResource InverseBoolToVis}}">
+                                    <Rectangle.RenderTransform>
+                                        <TranslateTransform x:Name="ShimmerTransform" X="-80" />
+                                    </Rectangle.RenderTransform>
+                                </Rectangle>
+
+                                <!-- Реальный прогресс-бар при скачивании -->
                                 <Border x:Name="ProgressBarFill"
                                         HorizontalAlignment="Left"
                                         Height="3"
                                         CornerRadius="1.5"
                                         Background="{DynamicResource Accent}"
-                                        Width="0" />
+                                        Width="0"
+                                        Visibility="{Binding IsProgressVisible, Converter={StaticResource BoolToVis}}" />
                             </Grid>
+
+                            <!-- Кнопки Повторить / Пропустить при ошибке сети -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0"
+                                        Visibility="{Binding IsErrorState, Converter={StaticResource BoolToVis}}">
+                                <Button Command="{Binding RetryCommand}"
+                                        Content="Повторить"
+                                        Style="{StaticResource PrimaryActionBtn}"
+                                        Height="28" Padding="12,0" FontSize="12"
+                                        Margin="0,0,8,0" />
+                                <Button Command="{Binding SkipCommand}"
+                                        Content="Пропустить"
+                                        Style="{StaticResource SettingsActionBtn}"
+                                        Height="28" Padding="12,0" FontSize="12" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -166,22 +221,6 @@
                                HorizontalAlignment="Center"
                                Margin="0,12,0,0" />
                 </StackPanel>
-
-                <!-- 3. Бегущая полоса активности 2px по нижнему краю (скрывается при показе прогресс-бара) -->
-                <Grid VerticalAlignment="Bottom"
-                      Height="2"
-                      ClipToBounds="True"
-                      Background="Transparent"
-                      Visibility="{Binding IsProgressVisible, Converter={StaticResource InverseBoolToVis}}">
-                    <Rectangle x:Name="ActivityBar"
-                               Width="80" Height="2"
-                               Fill="{DynamicResource Accent}"
-                               HorizontalAlignment="Left">
-                        <Rectangle.RenderTransform>
-                            <TranslateTransform X="-80" />
-                        </Rectangle.RenderTransform>
-                    </Rectangle>
-                </Grid>
             </Grid>
         </Grid>
     </Border>

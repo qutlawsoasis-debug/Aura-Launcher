@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using AuraLauncher.ViewModels;
@@ -9,10 +11,31 @@ namespace AuraLauncher.Views;
 
 public partial class StartupWindow : Window
 {
+    private string _previousStatusText = "";
+
     public StartupWindow()
     {
         InitializeComponent();
         DataContextChanged += StartupWindow_DataContextChanged;
+    }
+
+    private void Window_Loaded(object sender, RoutedEventArgs e)
+    {
+        // 1. Плавное появление логотипа "Aura" (fade-in + подъём на 10px, 500 мс)
+        AuraLogoHost.Opacity = 0.0;
+        AuraLogoTranslate.Y = 10.0;
+
+        var logoFade = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(500))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var logoRise = new DoubleAnimation(10.0, 0.0, TimeSpan.FromMilliseconds(500))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+
+        AuraLogoHost.BeginAnimation(UIElement.OpacityProperty, logoFade);
+        AuraLogoTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, logoRise);
     }
 
     private void StartupWindow_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -36,6 +59,35 @@ public partial class StartupWindow : Window
             {
                 UpdateProgress(vm.ProgressValue);
             }
+        }
+    }
+
+    private void OnStatusTextTargetUpdated(object sender, DataTransferEventArgs e)
+    {
+        if (sender is TextBlock tb)
+        {
+            string newText = tb.Text;
+            if (!string.IsNullOrEmpty(_previousStatusText) && _previousStatusText != newText && OldStatusTextBlock != null)
+            {
+                OldStatusTextBlock.Text = _previousStatusText;
+
+                OldStatusTextBlock.BeginAnimation(UIElement.OpacityProperty, null);
+                StatusTextBlock.BeginAnimation(UIElement.OpacityProperty, null);
+
+                // 3. Смена текста статуса через crossfade 200 мс
+                var fadeOut = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(200))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+                var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(200))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                };
+
+                OldStatusTextBlock.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+                StatusTextBlock.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            }
+            _previousStatusText = newText;
         }
     }
 

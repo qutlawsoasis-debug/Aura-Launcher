@@ -511,6 +511,8 @@ public class SettingsViewModel : ObservableObject
         };
     }
 
+    public event Action? ConfigSaved;
+
     private bool _isSavedToastVisible;
     public bool IsSavedToastVisible
     {
@@ -521,7 +523,11 @@ public class SettingsViewModel : ObservableObject
     private void ShowSavedToast()
     {
         IsSavedToastVisible = true;
-        _ = Task.Delay(1400).ContinueWith(_ =>
+        System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+        {
+            ConfigSaved?.Invoke();
+        });
+        _ = Task.Delay(2150).ContinueWith(_ =>
         {
             System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => IsSavedToastVisible = false);
         });

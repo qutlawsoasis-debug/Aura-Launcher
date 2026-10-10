@@ -20,7 +20,7 @@
         FocusVisualStyle="{x:Null}">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome x:Name="AuraWindowChrome" GlassFrameThickness="0" CornerRadius="3" CaptionHeight="40" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
+        <WindowChrome x:Name="AuraWindowChrome" GlassFrameThickness="0,0,0,1" CornerRadius="3" CaptionHeight="32" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -139,6 +139,9 @@
     <!-- Outer Window Border -->
     <Border x:Name="OuterWindowBorder" Background="{StaticResource NightBrush}" BorderThickness="0" BorderBrush="{StaticResource LineInkBrush}" CornerRadius="0" ClipToBounds="True">
         <Grid>
+            <!-- Top Transparent Window Drag Zone (~32px) -->
+            <Border Height="32" VerticalAlignment="Top" Background="Transparent" Panel.ZIndex="5" />
+
             <!-- 0. DYNAMIC ROTATING BACKGROUND WITH SMOOTH CROSS-FADE -->
             <Grid x:Name="BackgroundHost" ClipToBounds="True">
                 <Image x:Name="BgImageCurrent"
