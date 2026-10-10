@@ -24,6 +24,10 @@ public class SettingsViewModel : ObservableObject
     private readonly IPackUpdateService? _packUpdateService;
     private readonly INotificationService? _notificationService;
     private readonly IFriendService? _friendService;
+    private readonly IGraphicsPresetService _graphicsPresetService;
+    private readonly IWorkshopService _workshopService;
+    private bool _isApplyingPreset = false;
+    public event Action? PresetApplied;
     private bool _isCheckingIntegrity;
     private string _integrityStatusText = string.Empty;
     private CancellationTokenSource? _debounceCts;
@@ -145,6 +149,18 @@ public class SettingsViewModel : ObservableObject
             if (_configService.CurrentConfig.RamMb != value)
             {
                 _configService.CurrentConfig.RamMb = value;
+                if (!_isApplyingPreset && !string.Equals(GraphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
+                {
+                    _configService.CurrentConfig.GraphicsPreset = "Custom";
+                    OnPropertyChanged(nameof(GraphicsPreset));
+                    OnPropertyChanged(nameof(IsPresetLow));
+                    OnPropertyChanged(nameof(IsPresetMedium));
+                    OnPropertyChanged(nameof(IsPresetHigh));
+                    OnPropertyChanged(nameof(IsPresetUltra));
+                    OnPropertyChanged(nameof(IsPresetCustom));
+                    OnPropertyChanged(nameof(PresetChangesDescription));
+                    OnPropertyChanged(nameof(GraphicsPresetDescription));
+                }
                 OnPropertyChanged();
                 OnPropertyChanged(nameof(RamGb));
                 OnPropertyChanged(nameof(IsRam4));
@@ -193,24 +209,62 @@ public class SettingsViewModel : ObservableObject
         set { if (value) RamMb = 12288; }
     }
 
+    public void ApplyPreset(string presetKey)
+    {
+        _isApplyingPreset = true;
+        try
+        {
+            _graphicsPresetService.ApplyPreset(GameDir, presetKey);
+            OnPropertyChanged(nameof(GraphicsPreset));
+            OnPropertyChanged(nameof(IsPresetLow));
+            OnPropertyChanged(nameof(IsPresetMedium));
+            OnPropertyChanged(nameof(IsPresetHigh));
+            OnPropertyChanged(nameof(IsPresetUltra));
+            OnPropertyChanged(nameof(IsPresetCustom));
+            OnPropertyChanged(nameof(GraphicsPresetDescription));
+            OnPropertyChanged(nameof(PresetChangesDescription));
+            OnPropertyChanged(nameof(RamMb));
+            OnPropertyChanged(nameof(RamGb));
+            OnPropertyChanged(nameof(IsRam4));
+            OnPropertyChanged(nameof(IsRam6));
+            OnPropertyChanged(nameof(IsRam8));
+            OnPropertyChanged(nameof(IsRam12));
+            PresetApplied?.Invoke();
+            _ = SaveImmediatelyAsync();
+        }
+        finally
+        {
+            _isApplyingPreset = false;
+        }
+    }
+
     public string GraphicsPreset
     {
         get => string.IsNullOrWhiteSpace(_configService.CurrentConfig.GraphicsPreset)
-            ? "Balanced"
+            ? "Medium"
             : _configService.CurrentConfig.GraphicsPreset;
         set
         {
-            var normalized = string.IsNullOrWhiteSpace(value) ? "Balanced" : value.Trim();
+            var normalized = string.IsNullOrWhiteSpace(value) ? "Medium" : value.Trim();
             if (!string.Equals(_configService.CurrentConfig.GraphicsPreset, normalized, StringComparison.OrdinalIgnoreCase))
             {
-                _configService.CurrentConfig.GraphicsPreset = normalized;
-                AuraLauncher.Services.Implementations.FabricGameLaunchService.ApplyGraphicsPreset(GameDir, normalized);
-                OnPropertyChanged();
-                OnPropertyChanged(nameof(IsPresetLow));
-                OnPropertyChanged(nameof(IsPresetBalanced));
-                OnPropertyChanged(nameof(IsPresetUltra));
-                OnPropertyChanged(nameof(GraphicsPresetDescription));
-                _ = SaveImmediatelyAsync();
+                if (string.Equals(normalized, "Custom", StringComparison.OrdinalIgnoreCase))
+                {
+                    _configService.CurrentConfig.GraphicsPreset = "Custom";
+                    OnPropertyChanged();
+                    OnPropertyChanged(nameof(IsPresetLow));
+                    OnPropertyChanged(nameof(IsPresetMedium));
+                    OnPropertyChanged(nameof(IsPresetHigh));
+                    OnPropertyChanged(nameof(IsPresetUltra));
+                    OnPropertyChanged(nameof(IsPresetCustom));
+                    OnPropertyChanged(nameof(PresetChangesDescription));
+                    OnPropertyChanged(nameof(GraphicsPresetDescription));
+                    _ = SaveImmediatelyAsync();
+                }
+                else
+                {
+                    ApplyPreset(normalized);
+                }
             }
         }
     }
@@ -218,26 +272,58 @@ public class SettingsViewModel : ObservableObject
     public bool IsPresetLow
     {
         get => string.Equals(GraphicsPreset, "Low", StringComparison.OrdinalIgnoreCase);
-        set { if (value) GraphicsPreset = "Low"; }
+        set { if (value) ApplyPreset("Low"); }
     }
 
-    public bool IsPresetBalanced
+    public bool IsPresetMedium
     {
-        get => !IsPresetLow && !IsPresetUltra;
-        set { if (value) GraphicsPreset = "Balanced"; }
+        get => string.Equals(GraphicsPreset, "Medium", StringComparison.OrdinalIgnoreCase);
+        set { if (value) ApplyPreset("Medium"); }
+    }
+
+    public bool IsPresetHigh
+    {
+        get => string.Equals(GraphicsPreset, "High", StringComparison.OrdinalIgnoreCase);
+        set { if (value) ApplyPreset("High"); }
     }
 
     public bool IsPresetUltra
     {
         get => string.Equals(GraphicsPreset, "Ultra", StringComparison.OrdinalIgnoreCase);
-        set { if (value) GraphicsPreset = "Ultra"; }
+        set { if (value) ApplyPreset("Ultra"); }
+    }
+
+    public bool IsPresetCustom =>
+        !IsPresetLow && !IsPresetMedium && !IsPresetHigh && !IsPresetUltra;
+
+    public string PresetChangesDescription
+    {
+        get
+        {
+            if (IsPresetCustom)
+            {
+                return "Свои настройки (чанки, память или шейдеры изменены вручную)";
+            }
+
+            var preset = _graphicsPresetService.GetPreset(GraphicsPreset);
+            if (preset != null)
+            {
+                string shaderInfo = preset.EnableShaders ? preset.ShaderPack.Replace(".zip", "") : "выкл";
+                int ramGb = (int)Math.Round(preset.RamMb / 1024.0);
+                return $"Прорисовка {preset.RenderDistance}/{preset.SimulationDistance} чанков, память {ramGb} ГБ, шейдерпак {shaderInfo}";
+            }
+
+            return "Свои настройки (чанки, память или шейдеры изменены вручную)";
+        }
     }
 
     public string GraphicsPresetDescription => GraphicsPreset.ToLowerInvariant() switch
     {
-        "low" => "Прорисовка 8 чанков, быстрая графика, без шейдеров",
-        "ultra" => "Прорисовка 16 чанков, максимум деталей и теней",
-        _ => "Прорисовка 12 чанков, оптимальный баланс FPS и качества"
+        "low" => "Прорисовка 12 чанков, быстрая графика, легкие шейдеры",
+        "medium" => "Прорисовка 16 чанков, оптимальный баланс FPS и качества",
+        "high" => "Прорисовка 24 чанка, высокая детализация и шейдеры Photon",
+        "ultra" => "Прорисовка 32 чанка, максимум деталей и Complementary + Euphoria Patches",
+        _ => "Пользовательский профиль настроек"
     };
 
     public string GameDir
@@ -445,7 +531,9 @@ public class SettingsViewModel : ObservableObject
         IBackgroundService? backgroundService = null,
         IPackUpdateService? packUpdateService = null,
         INotificationService? notificationService = null,
-        IFriendService? friendService = null)
+        IFriendService? friendService = null,
+        IGraphicsPresetService? graphicsPresetService = null,
+        IWorkshopService? workshopService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
@@ -455,6 +543,8 @@ public class SettingsViewModel : ObservableObject
         _packUpdateService = packUpdateService;
         _notificationService = notificationService;
         _friendService = friendService;
+        _workshopService = workshopService ?? new AuraLauncher.Services.Implementations.WorkshopService();
+        _graphicsPresetService = graphicsPresetService ?? new AuraLauncher.Services.Implementations.GraphicsPresetService(_configService, _workshopService);
 
         CheckIntegrityCommand = new AsyncRelayCommand(CheckIntegrityAsync, () => !IsCheckingIntegrity);
 

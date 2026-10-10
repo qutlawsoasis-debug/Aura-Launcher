@@ -615,28 +615,11 @@
                         </Button>
                     </Grid>
 
-                    <!-- Shaders Section with Iris Hotkeys (K, O) in regular text -->
-                    <Grid Grid.Row="1" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="Горячие клавиши Iris: K включает шейдеры, O открывает выбор шейдера в игре"
-                                       FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" />
-                        </StackPanel>
-
-                        <!-- Text link «Папка шейдеров» -->
-                        <Button Grid.Column="1" Command="{Binding OpenShadersFolderCommand}"
-                                Style="{StaticResource GhostBtn}"
-                                Padding="0" FocusVisualStyle="{x:Null}" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFolderOpen}" Width="14" Height="14" Margin="0,0,6,0" Stroke="{DynamicResource TextPrimary}" />
-                                <TextBlock Text="Папка шейдеров" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource TextPrimary}" />
-                            </StackPanel>
-                        </Button>
-                    </Grid>
+                    <!-- Shaders Section with Iris Hotkey K -->
+                    <StackPanel Grid.Row="1" Margin="0,0,0,16" VerticalAlignment="Center">
+                        <TextBlock Text="Горячая клавиша Iris: K включает шейдеры"
+                                   FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" />
+                    </StackPanel>
 
                     <!-- Mods List (Virtualized with Recycling & Pixel Smooth Scroll) -->
                     <Grid Grid.Row="2">

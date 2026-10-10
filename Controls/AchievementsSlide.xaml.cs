@@ -11,7 +11,7 @@ namespace AuraLauncher.Controls;
 
 public partial class AchievementsSlide : UserControl, ISlideLifecycle
 {
-    private bool _isListView = false;
+    private bool _isListView = true;
 
     public AchievementsSlide()
     {

@@ -1,0 +1,119 @@
+{
+  "presets": {
+    "Low": {
+      "name": "Слабый ПК",
+      "hardware": "RX 560, GTX 1660 и подобные",
+      "renderDistance": 12,
+      "simulationDistance": 6,
+      "graphics": "fast",
+      "particles": "decreased",
+      "clouds": "off",
+      "entityDistanceScaling": 0.75,
+      "biomeBlendRadius": 1,
+      "mipmapLevels": 2,
+      "ao": 1,
+      "ramMb": 6144,
+      "jvmArgs": [
+        "-XX:+UseG1GC",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1ReservePercent=20",
+        "-XX:MaxGCPauseMillis=50",
+        "-XX:G1HeapRegionSize=16M"
+      ],
+      "shaderPack": "MakeUp-UltraFast-9.5f.zip",
+      "enableShaders": true,
+      "shaderOptions": {}
+    },
+    "Medium": {
+      "name": "Средний",
+      "hardware": "RTX 20",
+      "renderDistance": 16,
+      "simulationDistance": 8,
+      "graphics": "fancy",
+      "particles": "decreased",
+      "clouds": "on",
+      "entityDistanceScaling": 1.0,
+      "biomeBlendRadius": 3,
+      "mipmapLevels": 3,
+      "ao": 2,
+      "ramMb": 8192,
+      "jvmArgs": [
+        "-XX:+UseG1GC",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1ReservePercent=20",
+        "-XX:MaxGCPauseMillis=50",
+        "-XX:G1HeapRegionSize=16M"
+      ],
+      "shaderPack": "BSL_v10.1.8.zip",
+      "enableShaders": true,
+      "shaderOptions": {}
+    },
+    "High": {
+      "name": "Высокий",
+      "hardware": "RTX 30",
+      "renderDistance": 24,
+      "simulationDistance": 10,
+      "graphics": "fancy",
+      "particles": "all",
+      "clouds": "on",
+      "entityDistanceScaling": 1.25,
+      "biomeBlendRadius": 5,
+      "mipmapLevels": 4,
+      "ao": 2,
+      "ramMb": 8192,
+      "jvmArgs": [
+        "-XX:+UseG1GC",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1ReservePercent=20",
+        "-XX:MaxGCPauseMillis=50",
+        "-XX:G1HeapRegionSize=16M"
+      ],
+      "shaderPack": "photon_v1.3b.zip",
+      "enableShaders": true,
+      "shaderOptions": {
+        "profile": "high",
+        "INFO": "2",
+        "shadowMapResolution": "2048",
+        "SHADOW_PCF": "true",
+        "SHADOW_COLOR": "true",
+        "SHADOW_VPS": "true",
+        "ENTITY_SHADOWS": "true",
+        "BLOCK_ENTITY_SHADOWS": "false",
+        "ENVIRONMENT_REFLECTIONS": "true",
+        "GTAO": "true",
+        "VL": "true",
+        "AIR_FOG_COLORED_LIGHT_SHAFTS": "false",
+        "WATER_CAUSTICS": "false",
+        "WATER_PARALLAX": "true",
+        "COLORED_LIGHTS": "false",
+        "SHADOW_SSRT": "true"
+      }
+    },
+    "Ultra": {
+      "name": "Ультра",
+      "hardware": "RTX 40 и 50",
+      "renderDistance": 32,
+      "simulationDistance": 12,
+      "graphics": "fancy",
+      "particles": "all",
+      "clouds": "on",
+      "entityDistanceScaling": 1.5,
+      "biomeBlendRadius": 7,
+      "mipmapLevels": 4,
+      "ao": 2,
+      "ramMb": 10240,
+      "jvmArgs": [
+        "-XX:+UseG1GC",
+        "-XX:G1NewSizePercent=20",
+        "-XX:G1ReservePercent=20",
+        "-XX:MaxGCPauseMillis=50",
+        "-XX:G1HeapRegionSize=32M"
+      ],
+      "shaderPack": "ComplementaryReimagined_r5.9.3.zip",
+      "enableShaders": true,
+      "shaderOptions": {
+        "profile": "ULTRA"
+      }
+    }
+  }
+}

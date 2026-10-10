@@ -206,45 +206,163 @@
                 </Grid>
 
                 <!-- 1.2b "Профиль графики" -->
-                <Grid MinHeight="56" Margin="0,6,0,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <Grid Margin="0,8,0,12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
-                        <TextBlock Text="Профиль графики"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="14"
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource InkBrush}" />
-                        <TextBlock Text="{Binding GraphicsPresetDescription}"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MuteBrush}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                VerticalAlignment="Center"
-                                HorizontalAlignment="Right">
-                        <RadioButton Content="Слабый ПК"
-                                     GroupName="GraphicsPresetGroup"
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Профиль графики"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="14"
+                                       FontWeight="Medium"
+                                       Foreground="{StaticResource InkBrush}" />
+                            <Border Margin="10,0,0,0"
+                                    Background="{StaticResource StoriesCardGlass}"
+                                    BorderBrush="{StaticResource LineInkBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="8,2"
+                                    VerticalAlignment="Center"
+                                    Visibility="{Binding IsPresetCustom, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Свои настройки"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource EmberBrush}" />
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Toast-статус "Применено" с плавным появлением -->
+                        <TextBlock x:Name="PresetAppliedToastText"
+                                   Grid.Column="1"
+                                   Text="Применено"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource OkBrush}"
+                                   VerticalAlignment="Center"
+                                   Opacity="0.0" />
+                    </Grid>
+
+                    <!-- Кнопки пресетов с подписями железа -->
+                    <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,8">
+                        <RadioButton GroupName="GraphicsPresetGroup"
                                      IsChecked="{Binding IsPresetLow, Mode=TwoWay}"
-                                     Style="{StaticResource SubNavPillRadio}"
-                                     Margin="0,0,4,0" />
-                        <RadioButton Content="Баланс"
-                                     GroupName="GraphicsPresetGroup"
-                                     IsChecked="{Binding IsPresetBalanced, Mode=TwoWay}"
-                                     Style="{StaticResource SubNavPillRadio}"
-                                     Margin="0,0,4,0" />
-                        <RadioButton Content="Ультра"
-                                     GroupName="GraphicsPresetGroup"
+                                     Style="{StaticResource GraphicsPresetCardRadio}"
+                                     Margin="0,0,6,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Слабый ПК"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="RX 560, GTX 1660 и подобные"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetMedium, Mode=TwoWay}"
+                                     Style="{StaticResource GraphicsPresetCardRadio}"
+                                     Margin="0,0,6,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Средний"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="RTX 20"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton GroupName="GraphicsPresetGroup"
+                                     IsChecked="{Binding IsPresetHigh, Mode=TwoWay}"
+                                     Style="{StaticResource GraphicsPresetCardRadio}"
+                                     Margin="0,0,6,0">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Высокий"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="RTX 30"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton GroupName="GraphicsPresetGroup"
                                      IsChecked="{Binding IsPresetUltra, Mode=TwoWay}"
-                                     Style="{StaticResource SubNavPillRadio}" />
-                    </StackPanel>
+                                     Style="{StaticResource GraphicsPresetCardRadio}">
+                            <StackPanel HorizontalAlignment="Center">
+                                <TextBlock Text="Ультра"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource InkBrush}"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Text="RTX 40 и 50"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource MuteBrush}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,2,0,0" />
+                            </StackPanel>
+                        </RadioButton>
+                    </UniformGrid>
+
+                    <!-- Строка "Что меняет пресет" -->
+                    <Border Grid.Row="2"
+                            Background="{StaticResource StoriesCardGlass}"
+                            BorderBrush="{StaticResource LineInkBrush}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="12,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0"
+                                       Text="Что меняет пресет:"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       FontWeight="Medium"
+                                       Foreground="{StaticResource DimInkBrush}"
+                                       Margin="0,0,8,0"
+                                       VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding PresetChangesDescription}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource InkBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
                 </Grid>
 
                 <!-- 1.3 "Папка игры" -->

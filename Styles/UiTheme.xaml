@@ -788,6 +788,43 @@
     <!-- Segmented Switch Radio Button (Alias based on SubNavPillRadio) -->
     <Style x:Key="SettingsSegmentRadio" BasedOn="{StaticResource SubNavPillRadio}" TargetType="RadioButton" />
 
+    <!-- Graphics Preset Card Radio Button -->
+    <Style x:Key="GraphicsPresetCardRadio" TargetType="RadioButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="CardBorder"
+                            CornerRadius="3"
+                            Background="#1AFFFFFF"
+                            BorderBrush="{StaticResource LineInkBrush}"
+                            BorderThickness="1"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="CardBorder" Property="Background" Value="#38FFFFFF" />
+                            <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource EmberBrush}" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsMouseOver" Value="True" />
+                                <Condition Property="IsChecked" Value="False" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="CardBorder" Property="Background" Value="#2BFFFFFF" />
+                        </MultiTrigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="CardBorder" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку", "Сменить фон") -->
     <Style x:Key="SettingsActionBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />

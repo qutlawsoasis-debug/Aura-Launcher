@@ -23,16 +23,53 @@ public partial class SettingsView : UserControl
         DataContextChanged += SettingsView_DataContextChanged;
     }
 
+    private Storyboard? _presetAppliedStoryboard;
+
     private void SettingsView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
         if (e.OldValue is SettingsViewModel oldVm)
         {
             oldVm.ConfigSaved -= TriggerSavedToastAnimation;
+            oldVm.PresetApplied -= TriggerPresetAppliedAnimation;
         }
         if (e.NewValue is SettingsViewModel newVm)
         {
             newVm.ConfigSaved += TriggerSavedToastAnimation;
+            newVm.PresetApplied += TriggerPresetAppliedAnimation;
         }
+    }
+
+    private void TriggerPresetAppliedAnimation()
+    {
+        _presetAppliedStoryboard?.Stop();
+
+        var sb = new Storyboard();
+
+        var fadeIn = new DoubleAnimation
+        {
+            From = PresetAppliedToastText.Opacity,
+            To = 1.0,
+            Duration = TimeSpan.FromMilliseconds(250),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(fadeIn, PresetAppliedToastText);
+        Storyboard.SetTargetProperty(fadeIn, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(fadeIn);
+
+        var fadeOut = new DoubleAnimation
+        {
+            From = 1.0,
+            To = 0.0,
+            BeginTime = TimeSpan.FromMilliseconds(1750),
+            Duration = TimeSpan.FromMilliseconds(400),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        Storyboard.SetTarget(fadeOut, PresetAppliedToastText);
+        Storyboard.SetTargetProperty(fadeOut, new PropertyPath(UIElement.OpacityProperty));
+        sb.Children.Add(fadeOut);
+
+        _presetAppliedStoryboard = sb;
+        sb.Begin();
     }
 
     private void TriggerSavedToastAnimation()

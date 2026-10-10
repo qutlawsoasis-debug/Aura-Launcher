@@ -27,6 +27,9 @@
     <None Include="..\..\Data\achievements.json" Link="Data\achievements.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\..\Data\presets.json" Link="Data\presets.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -17,7 +17,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />  <!-- 0: Заголовок и кнопка Список/Сетка -->
             <RowDefinition Height="Auto" />  <!-- 1: Полоса общего прогресса -->
-            <RowDefinition Height="*" />     <!-- 2: Содержимое: Сетка или Список -->
+            <RowDefinition Height="*" />     <!-- 2: Содержимое: Список (по умолчанию) или Сетка -->
         </Grid.RowDefinitions>
 
         <!-- 0. Заголовок "ДОСТИЖЕНИЯ 3 ИЗ 14" и переключатель Список / Сетка -->
@@ -29,28 +29,31 @@
                        Foreground="{StaticResource TextWhite}"
                        VerticalAlignment="Center" />
 
+            <!-- Кнопка переключения режимов: стеклянная, высота 28px, текст Onest 12px обычный -->
             <Button x:Name="ViewModeBtn"
                     Click="OnToggleViewModeClick"
                     Style="{StaticResource StoryBarBtn}"
                     HorizontalAlignment="Right"
-                    VerticalAlignment="Center">
+                    VerticalAlignment="Center"
+                    Height="28">
                 <Border Background="{DynamicResource StoriesCardGlass}"
                         BorderBrush="{DynamicResource StoriesCardBorder}"
                         BorderThickness="1"
                         CornerRadius="3"
-                        Padding="8,4">
+                        Padding="10,0"
+                        Height="28">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Path x:Name="ViewModeIcon"
                               Style="{StaticResource IconPath}"
-                              Data="{StaticResource IconList}"
+                              Data="{StaticResource IconGrid}"
                               Width="12" Height="12"
                               Stroke="{DynamicResource TextPrimary}"
-                              Margin="0,0,5,0" />
+                              Margin="0,0,6,0" />
                         <TextBlock x:Name="ViewModeText"
-                                   Text="Список"
+                                   Text="Сетка"
                                    FontFamily="{StaticResource MainFont}"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
+                                   FontSize="12"
+                                   FontWeight="Normal"
                                    Foreground="{DynamicResource TextPrimary}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -74,72 +77,17 @@
             </Border>
         </Border>
 
-        <!-- 2. Область отображения: Режим "Сетка" (по умолчанию) и Режим "Список" -->
+        <!-- 2. Область отображения: Режим "Список" (по умолчанию) и Режим "Сетка" -->
         <Grid Grid.Row="2">
-            <!-- Режим "Сетка" -->
-            <ScrollViewer x:Name="GridViewContainer"
-                          VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled"
-                          Focusable="False">
-                <ItemsControl ItemsSource="{Binding AchievementsGrid}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel HorizontalAlignment="Center" VerticalAlignment="Top" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate DataType="{x:Type models:AchievementDisplayItem}">
-                            <Border x:Name="ItemBorder"
-                                    Width="44" Height="44"
-                                    Margin="4,5"
-                                    CornerRadius="22"
-                                    Cursor="Hand"
-                                    Background="{DynamicResource PanelCard}"
-                                    BorderBrush="{DynamicResource BorderSubtle}"
-                                    BorderThickness="1"
-                                    Opacity="0.35"
-                                    MouseEnter="OnAchievementMouseEnter"
-                                    MouseLeave="OnAchievementMouseLeave"
-                                    Tag="{Binding}">
-                                <Path x:Name="ItemIcon"
-                                      Style="{StaticResource IconPath}"
-                                      Width="20" Height="20"
-                                      Stroke="{DynamicResource DimInkBrush}"
-                                      Data="{Binding IconKey, Converter={StaticResource IconKeyToGeom}}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center" />
-                            </Border>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding IsUnlocked}" Value="True">
-                                    <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource PanelRaised}" />
-                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource Accent}" />
-                                    <Setter TargetName="ItemBorder" Property="BorderThickness" Value="1.5" />
-                                    <Setter TargetName="ItemBorder" Property="Opacity" Value="1.0" />
-                                    <Setter TargetName="ItemIcon" Property="Stroke" Value="{StaticResource Accent}" />
-                                </DataTrigger>
-                                <MultiDataTrigger>
-                                    <MultiDataTrigger.Conditions>
-                                        <Condition Binding="{Binding IsMouseOver, ElementName=ItemBorder}" Value="True" />
-                                        <Condition Binding="{Binding IsUnlocked}" Value="False" />
-                                    </MultiDataTrigger.Conditions>
-                                    <Setter TargetName="ItemBorder" Property="Opacity" Value="0.8" />
-                                    <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                                </MultiDataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-
-            <!-- Режим "Список" -->
+            <!-- Режим "Список" (по умолчанию) -->
             <ScrollViewer x:Name="ListViewContainer"
-                          Visibility="Collapsed"
-                          Opacity="0.0"
+                          Visibility="Visible"
+                          Opacity="1.0"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Disabled"
                           Focusable="False">
                 <StackPanel Margin="0,0,4,0">
-                    <!-- 1. Полученные достижения -->
+                    <!-- 1. Полученные достижения сверху -->
                     <ItemsControl ItemsSource="{Binding UnlockedAchievements}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:AchievementDisplayItem}">
@@ -151,59 +99,73 @@
                                         CornerRadius="3">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="44" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
+                                        <!-- Плитка-иконка 44px: заливка золотистым градиентом, иконка темная, без колец -->
                                         <Border Grid.Column="0"
-                                                Width="40" Height="40"
-                                                CornerRadius="20"
-                                                Background="{DynamicResource PanelRaised}"
-                                                BorderBrush="{StaticResource Accent}"
-                                                BorderThickness="1.5"
-                                                HorizontalAlignment="Left">
+                                                Width="44" Height="44"
+                                                CornerRadius="3"
+                                                Background="{DynamicResource AchievementGoldBrush}"
+                                                BorderThickness="0"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Center">
                                             <Path Style="{StaticResource IconPath}"
-                                                  Width="18" Height="18"
-                                                  Stroke="{StaticResource Accent}"
+                                                  Width="20" Height="20"
+                                                  Stroke="{DynamicResource PrimaryActionText}"
                                                   Data="{Binding IconKey, Converter={StaticResource IconKeyToGeom}}"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center" />
                                         </Border>
 
-                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Title}"
-                                                       FontFamily="{StaticResource HeadingFont}"
-                                                       FontSize="14"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TextWhite}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Description}"
+                                        <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Название (Oswald 15, белый) + дата получения справа -->
+                                            <Grid Grid.Row="0">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontFamily="{StaticResource HeadingFont}"
+                                                           FontSize="15"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TextWhite}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Margin="0,0,60,0" />
+                                                <TextBlock Text="{Binding StatusText}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource Text70}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+
+                                            <!-- Описание (Onest 12, Text70) -->
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Description}"
                                                        FontFamily="{StaticResource MainFont}"
-                                                       FontSize="11"
-                                                       Foreground="{DynamicResource Text90}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource Text70}"
                                                        TextWrapping="Wrap"
-                                                       Margin="0,2,0,2" />
-                                            <TextBlock Text="{Binding StatusText}"
-                                                       FontFamily="{StaticResource MainFont}"
-                                                       FontSize="10"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource Accent}" />
-                                        </StackPanel>
+                                                       Margin="0,3,0,0" />
+                                        </Grid>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <!-- 2. Заголовок "НЕ ПОЛУЧЕНЫ" -->
+                    <!-- 2. Заголовок "Не получены" -->
                     <TextBlock Text="НЕ ПОЛУЧЕНЫ"
                                FontFamily="{StaticResource HeadingFont}"
                                FontSize="12"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource TextMuted}"
-                               Margin="0,6,0,8" />
+                               Foreground="{DynamicResource Text55}"
+                               Margin="0,4,0,8" />
 
-                    <!-- 3. Неполученные достижения -->
+                    <!-- 3. Неполученные достижения с полоской прогресса и статусом -->
                     <ItemsControl ItemsSource="{Binding LockedAchievements}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:AchievementDisplayItem}">
@@ -215,50 +177,64 @@
                                         CornerRadius="3">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="44" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
 
+                                        <!-- Плитка неполученного: StoriesCardGlass 8%, иконка Text55 55% (хорошо видна) -->
                                         <Border Grid.Column="0"
-                                                Width="40" Height="40"
-                                                CornerRadius="20"
-                                                Background="{DynamicResource PanelCard}"
-                                                BorderBrush="{DynamicResource BorderSubtle}"
-                                                BorderThickness="1"
-                                                Opacity="0.45"
-                                                HorizontalAlignment="Left">
+                                                Width="44" Height="44"
+                                                CornerRadius="3"
+                                                Background="{DynamicResource StoriesCardGlass}"
+                                                BorderThickness="0"
+                                                HorizontalAlignment="Left"
+                                                VerticalAlignment="Center">
                                             <Path Style="{StaticResource IconPath}"
-                                                  Width="18" Height="18"
-                                                  Stroke="{DynamicResource DimInkBrush}"
+                                                  Width="20" Height="20"
+                                                  Stroke="{DynamicResource Text55}"
                                                   Data="{Binding IconKey, Converter={StaticResource IconKeyToGeom}}"
                                                   HorizontalAlignment="Center"
                                                   VerticalAlignment="Center" />
                                         </Border>
 
-                                        <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                            <Grid Margin="0,0,0,2">
+                                        <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+
+                                            <!-- Название (Oswald 15, белый) + прогресс "2 из 5" -->
+                                            <Grid Grid.Row="0">
                                                 <TextBlock Text="{Binding Title}"
                                                            FontFamily="{StaticResource HeadingFont}"
-                                                           FontSize="14"
+                                                           FontSize="15"
                                                            FontWeight="SemiBold"
                                                            Foreground="{StaticResource TextWhite}"
-                                                           TextTrimming="CharacterEllipsis" />
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Margin="0,0,60,0" />
                                                 <TextBlock Text="{Binding StatusText}"
                                                            FontFamily="{StaticResource MainFont}"
-                                                           FontSize="10"
-                                                           Foreground="{DynamicResource TextMuted}"
-                                                           HorizontalAlignment="Right" />
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource Text70}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center" />
                                             </Grid>
 
-                                            <TextBlock Text="{Binding Description}"
+                                            <!-- Описание (Onest 12, Text70) -->
+                                            <TextBlock Grid.Row="1"
+                                                       Text="{Binding Description}"
                                                        FontFamily="{StaticResource MainFont}"
-                                                       FontSize="11"
-                                                       Foreground="{DynamicResource Text90}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource Text70}"
                                                        TextWrapping="Wrap"
-                                                       Margin="0,0,0,5" />
+                                                       Margin="0,2,0,5" />
 
-                                            <!-- Тонкая полоска прогресса (3px) -->
-                                            <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5">
+                                            <!-- Полоска прогресса 3px -->
+                                            <Border Grid.Row="2"
+                                                    Height="3"
+                                                    Background="{DynamicResource StoriesTrack}"
+                                                    CornerRadius="1.5">
                                                 <Border Background="{StaticResource Accent}"
                                                         CornerRadius="1.5"
                                                         RenderTransformOrigin="0,0">
@@ -267,7 +243,7 @@
                                                     </Border.RenderTransform>
                                                 </Border>
                                             </Border>
-                                        </StackPanel>
+                                        </Grid>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -275,9 +251,66 @@
                     </ItemsControl>
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- Режим "Сетка" (3 колонки плиток 64px, название под каждой, ряды заполняют высоту) -->
+            <ScrollViewer x:Name="GridViewContainer"
+                          Visibility="Collapsed"
+                          Opacity="0.0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Focusable="False">
+                <ItemsControl ItemsSource="{Binding AchievementsGrid}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="3" HorizontalAlignment="Stretch" VerticalAlignment="Top" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type models:AchievementDisplayItem}">
+                            <StackPanel Margin="2,0,2,14" HorizontalAlignment="Center" VerticalAlignment="Top">
+                                <!-- Плитка 64x64, тот же стиль (золото для полученных, стекло 8% для неполученных) -->
+                                <Border x:Name="GridTile"
+                                        Width="64" Height="64"
+                                        CornerRadius="3"
+                                        Cursor="Hand"
+                                        Background="{DynamicResource StoriesCardGlass}"
+                                        BorderThickness="0"
+                                        MouseEnter="OnAchievementMouseEnter"
+                                        MouseLeave="OnAchievementMouseLeave"
+                                        Tag="{Binding}">
+                                    <Path x:Name="GridTileIcon"
+                                          Style="{StaticResource IconPath}"
+                                          Width="28" Height="28"
+                                          Stroke="{DynamicResource Text55}"
+                                          Data="{Binding IconKey, Converter={StaticResource IconKeyToGeom}}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+
+                                <!-- Название под каждой плиткой (Onest 11, до 2 строк) -->
+                                <TextBlock Text="{Binding Title}"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource Text90}"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           MaxHeight="32"
+                                           Width="76"
+                                           Margin="0,5,0,0" />
+                            </StackPanel>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsUnlocked}" Value="True">
+                                    <Setter TargetName="GridTile" Property="Background" Value="{DynamicResource AchievementGoldBrush}" />
+                                    <Setter TargetName="GridTileIcon" Property="Stroke" Value="{DynamicResource PrimaryActionText}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </Grid>
 
-        <!-- Кастомный Popup для ховера по иконке достижения -->
+        <!-- Кастомный Popup для ховера по плитке достижения -->
         <Popup x:Name="AchievementPopup"
                Placement="Bottom"
                AllowsTransparency="True"

@@ -172,7 +172,7 @@ public class FabricGameLaunchService : IGameLaunchService
                 var content = "version:3465\nlang:ru_ru\nguiScale:2\nfullscreen:true\n";
                 File.WriteAllText(optionsPath, content, new UTF8Encoding(false));
                 LogLauncherEvent($"[OPTIONS] Создан файл настроек по умолчанию (options.txt): {optionsPath}");
-                ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Balanced");
+                ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Medium");
             }
         }
         catch (Exception ex)
@@ -181,7 +181,20 @@ public class FabricGameLaunchService : IGameLaunchService
         }
     }
 
-    public static void ApplyGraphicsPreset(string gameDir, string? preset)
+    public static void LogGameLaunchEvent(string gameDir, string message)
+    {
+        LogLauncherEvent(message);
+        try
+        {
+            var logsDir = Path.Combine(gameDir, "logs");
+            Directory.CreateDirectory(logsDir);
+            var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
+            File.AppendAllText(gameLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+        }
+        catch { }
+    }
+
+    public static void ApplyGraphicsPreset(string gameDir, string? preset, IGraphicsPresetService? presetService = null)
     {
         if (string.IsNullOrWhiteSpace(gameDir))
         {
@@ -190,115 +203,15 @@ public class FabricGameLaunchService : IGameLaunchService
 
         try
         {
-            Directory.CreateDirectory(gameDir);
-            var optionsPath = Path.Combine(gameDir, "options.txt");
-            var lines = File.Exists(optionsPath)
-                ? File.ReadAllLines(optionsPath, Encoding.UTF8).ToList()
-                : new List<string> { "version:3465", "lang:ru_ru", "guiScale:2", "fullscreen:true" };
-
-            string normalized = (preset ?? "Balanced").Trim();
-            Dictionary<string, string> targetValues = normalized.ToLowerInvariant() switch
+            var service = presetService ?? new GraphicsPresetService(new JsonConfigService(), new WorkshopService());
+            string targetKey = string.IsNullOrWhiteSpace(preset) ? "Medium" : preset;
+            if (string.Equals(targetKey, "Custom", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(targetKey, "Balanced", StringComparison.OrdinalIgnoreCase) ||
+                service.GetPreset(targetKey) == null)
             {
-                "low" => new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["renderDistance"] = "8",
-                    ["simulationDistance"] = "6",
-                    ["graphicsMode"] = "0",
-                    ["clouds"] = "\"false\"",
-                    ["particles"] = "2",
-                    ["entityShadows"] = "false",
-                    ["entityDistanceScaling"] = "0.75",
-                    ["biomeBlendRadius"] = "1",
-                    ["ao"] = "1",
-                    ["mipmapLevels"] = "2",
-                    ["enableVsync"] = "false",
-                    ["maxFps"] = "120"
-                },
-                "ultra" => new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["renderDistance"] = "16",
-                    ["simulationDistance"] = "12",
-                    ["graphicsMode"] = "1",
-                    ["clouds"] = "\"true\"",
-                    ["particles"] = "0",
-                    ["entityShadows"] = "true",
-                    ["entityDistanceScaling"] = "1.25",
-                    ["biomeBlendRadius"] = "4",
-                    ["ao"] = "2",
-                    ["mipmapLevels"] = "4",
-                    ["enableVsync"] = "true",
-                    ["maxFps"] = "260"
-                },
-                _ => new Dictionary<string, string>(StringComparer.Ordinal)
-                {
-                    ["renderDistance"] = "12",
-                    ["simulationDistance"] = "8",
-                    ["graphicsMode"] = "1",
-                    ["clouds"] = "\"fast\"",
-                    ["particles"] = "1",
-                    ["entityShadows"] = "true",
-                    ["entityDistanceScaling"] = "1.0",
-                    ["biomeBlendRadius"] = "2",
-                    ["ao"] = "2",
-                    ["mipmapLevels"] = "4",
-                    ["enableVsync"] = "true",
-                    ["maxFps"] = "120"
-                }
-            };
-
-            var appliedKeys = new HashSet<string>(StringComparer.Ordinal);
-            for (int i = 0; i < lines.Count; i++)
-            {
-                int colonIdx = lines[i].IndexOf(':');
-                if (colonIdx <= 0)
-                {
-                    continue;
-                }
-
-                string key = lines[i][..colonIdx].Trim();
-                if (targetValues.TryGetValue(key, out var newVal))
-                {
-                    lines[i] = $"{key}:{newVal}";
-                    appliedKeys.Add(key);
-                }
+                return;
             }
-
-            foreach (var kvp in targetValues)
-            {
-                if (!appliedKeys.Contains(kvp.Key))
-                {
-                    lines.Add($"{kvp.Key}:{kvp.Value}");
-                }
-            }
-
-            var tmpOptionsPath = optionsPath + ".tmp";
-            File.WriteAllLines(tmpOptionsPath, lines, new UTF8Encoding(false));
-            File.Move(tmpOptionsPath, optionsPath, overwrite: true);
-
-            if (string.Equals(normalized, "Low", StringComparison.OrdinalIgnoreCase))
-            {
-                var irisPath = Path.Combine(gameDir, "config", "iris.properties");
-                if (File.Exists(irisPath))
-                {
-                    var irisLines = File.ReadAllLines(irisPath, Encoding.UTF8);
-                    bool irisChanged = false;
-                    for (int i = 0; i < irisLines.Length; i++)
-                    {
-                        if (irisLines[i].StartsWith("enableShaders=", StringComparison.OrdinalIgnoreCase))
-                        {
-                            irisLines[i] = "enableShaders=false";
-                            irisChanged = true;
-                        }
-                    }
-
-                    if (irisChanged)
-                    {
-                        File.WriteAllLines(irisPath, irisLines, new UTF8Encoding(false));
-                    }
-                }
-            }
-
-            LogLauncherEvent($"[OPTIONS] Применён профиль графики '{normalized}' в {optionsPath}");
+            service.ApplyPreset(gameDir, targetKey);
         }
         catch (Exception ex)
         {
@@ -979,17 +892,10 @@ public class FabricGameLaunchService : IGameLaunchService
             {
                 UserType = "legacy"
             },
-            ExtraJvmArguments = new[]
-            {
-                new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main "),
-                new MArgument("-XX:+UnlockExperimentalVMOptions"),
-                new MArgument("-XX:+UseG1GC"),
-                new MArgument("-XX:G1NewSizePercent=20"),
-                new MArgument("-XX:G1ReservePercent=20"),
-                new MArgument("-XX:MaxGCPauseMillis=50"),
-                new MArgument("-XX:G1HeapRegionSize=16M")
-            }
+            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs)
         };
+
+        LogGameLaunchEvent(gameDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
 
         var process = await launcher.CreateProcessAsync(fabricVersionName, launchOptions);
         process.StartInfo.UseShellExecute = false;
@@ -1216,6 +1122,33 @@ public class FabricGameLaunchService : IGameLaunchService
         {
             LogLauncherEvent($"[FABRIC-FIX: ERROR] Ошибка синхронизации Fabric JAR: {ex.Message}");
         }
+    }
+
+    private static MArgument[] BuildJvmArguments(string? jvmArgs)
+    {
+        var list = new List<MArgument>
+        {
+            new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main ")
+        };
+
+        if (!string.IsNullOrWhiteSpace(jvmArgs))
+        {
+            var tokens = jvmArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var t in tokens)
+            {
+                list.Add(new MArgument(t));
+            }
+        }
+        else
+        {
+            list.Add(new MArgument("-XX:+UseG1GC"));
+            list.Add(new MArgument("-XX:G1NewSizePercent=20"));
+            list.Add(new MArgument("-XX:G1ReservePercent=20"));
+            list.Add(new MArgument("-XX:MaxGCPauseMillis=50"));
+            list.Add(new MArgument("-XX:G1HeapRegionSize=16M"));
+        }
+
+        return list.ToArray();
     }
 
     /// <summary>

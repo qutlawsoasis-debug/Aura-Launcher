@@ -638,6 +638,7 @@ public partial class App : Application
         services.AddSingleton<IMinecraftPingService, MinecraftPingService>();
         services.AddSingleton<IScreenshotWatcherService, ScreenshotWatcherService>();
         services.AddSingleton<IReleaseNotesService, ReleaseNotesService>();
+        services.AddSingleton<IGraphicsPresetService, GraphicsPresetService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
@@ -649,7 +650,9 @@ public partial class App : Application
             sp.GetService<IBackgroundService>(),
             sp.GetRequiredService<IPackUpdateService>(),
             sp.GetService<INotificationService>(),
-            sp.GetService<IFriendService>()));
+            sp.GetService<IFriendService>(),
+            sp.GetRequiredService<IGraphicsPresetService>(),
+            sp.GetRequiredService<IWorkshopService>()));
         services.AddSingleton<WorkshopViewModel>();
         services.AddSingleton<WardrobeViewModel>(sp => new WardrobeViewModel(
             sp.GetRequiredService<ISkinService>(),

@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\aura-icon.ico</ApplicationIcon>
-    <Version>1.2.80</Version>
+    <Version>1.2.81</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -48,6 +48,10 @@
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
     <Content Include="Data\achievements.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Data\presets.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

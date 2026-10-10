@@ -59,7 +59,10 @@
 
     <Color x:Key="ColorText85">#D9E8F0F8</Color>
     <Color x:Key="ColorText70">#B3E8F0F8</Color>
+    <Color x:Key="ColorText55">#8CE8F0F8</Color>
     <Color x:Key="ColorText90">#E6E8F0F8</Color>
+    <Color x:Key="ColorAchievementGoldStart">#F2A63C</Color>
+    <Color x:Key="ColorAchievementGoldEnd">#E08E1E</Color>
 
     <!-- Named SolidColorBrush resources for UI controls (Frozen for GPU performance) -->
     <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" po:Freeze="True" />
@@ -119,5 +122,11 @@
 
     <SolidColorBrush x:Key="Text85" Color="{StaticResource ColorText85}" po:Freeze="True" />
     <SolidColorBrush x:Key="Text70" Color="{StaticResource ColorText70}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Text55" Color="{StaticResource ColorText55}" po:Freeze="True" />
 
+    <LinearGradientBrush x:Key="AchievementGoldBrush" StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
+        <GradientStop Color="{StaticResource ColorAchievementGoldStart}" Offset="0.0" />
+        <GradientStop Color="{StaticResource ColorAchievementGoldEnd}" Offset="1.0" />
+    </LinearGradientBrush>
 </ResourceDictionary>
+
