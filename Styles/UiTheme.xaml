@@ -790,8 +790,8 @@
                                 BorderThickness="1"
                                 VerticalAlignment="Center">
                             <Path x:Name="CheckGlyph"
-                                  Data="{StaticResource IconCheck}"
-                                  Style="{StaticResource IconPath}"
+                                  Data="{DynamicResource IconCheck}"
+                                  Style="{DynamicResource IconPath}"
                                   Width="12" Height="12"
                                   Stroke="{StaticResource EmberBrush}"
                                   StrokeThickness="2"
