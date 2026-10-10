@@ -15,9 +15,7 @@ public partial class OverviewView : UserControl
 {
     private Window? _parentWindow;
     private Storyboard? _activeProgressStoryboard;
-    private Storyboard? _zoomStoryboard;
     private bool _isMouseOverStoriesRail = false;
-    private int _currentSlideIndex = -1;
 
     public OverviewView()
     {
@@ -37,15 +35,14 @@ public partial class OverviewView : UserControl
         {
             AnimateEntrance();
             RefreshData();
-            StartCurrentStoryAnimation();
+            ResetAndStartCarousel();
         }
     }
 
     private void OverviewView_Unloaded(object sender, RoutedEventArgs e)
     {
         DetachWindow();
-        StopProgressAnimation();
-        StopZoomAnimation();
+        ResetCarousel();
     }
 
     private void OverviewView_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -57,13 +54,12 @@ public partial class OverviewView : UserControl
             {
                 AnimateEntrance();
                 RefreshData();
-                StartCurrentStoryAnimation();
+                ResetAndStartCarousel();
             }
         }
         else
         {
-            StopProgressAnimation();
-            StopZoomAnimation();
+            ResetCarousel();
         }
     }
 
@@ -80,15 +76,77 @@ public partial class OverviewView : UserControl
         }
     }
 
-    private void StartCurrentStoryAnimation()
+    private void ResetAndStartCarousel()
     {
+        StopProgressAnimation();
+        StopZoomAnimation();
+
         if (DataContext is OverviewViewModel ovm)
         {
             if (ovm.ActiveStoryIndex == 0 && !ovm.HasLatestScreenshot)
             {
                 ovm.ActiveStoryIndex = 1;
             }
-            SwitchToStoryInternal(ovm.ActiveStoryIndex, isInitial: true);
+
+            ResetSlidesState(ovm.ActiveStoryIndex);
+            _isMouseOverStoriesRail = StoriesRail?.IsMouseOver ?? false;
+            StartProgressAnimation(ovm.ActiveStoryIndex);
+            TriggerSlideEntranceEffects(ovm.ActiveStoryIndex);
+        }
+    }
+
+    private void ResetCarousel()
+    {
+        StopProgressAnimation();
+        StopZoomAnimation();
+
+        if (DataContext is OverviewViewModel ovm)
+        {
+            ResetSlidesState(ovm.ActiveStoryIndex);
+        }
+    }
+
+    private void ResetSlidesState(int activeIndex)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            Grid? slide = GetSlideGrid(i);
+            if (slide != null)
+            {
+                slide.BeginAnimation(UIElement.OpacityProperty, null);
+                if (slide.RenderTransform is TranslateTransform tt)
+                {
+                    tt.BeginAnimation(TranslateTransform.XProperty, null);
+                    tt.X = 0;
+                }
+
+                if (i == activeIndex)
+                {
+                    slide.Visibility = Visibility.Visible;
+                    slide.Opacity = 1.0;
+                }
+                else
+                {
+                    slide.Visibility = Visibility.Collapsed;
+                    slide.Opacity = 0.0;
+                }
+            }
+        }
+
+        if (Story0Scale != null)
+        {
+            Story0Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            Story0Scale.ScaleX = activeIndex > 0 ? 1.0 : 0.0;
+        }
+        if (Story1Scale != null)
+        {
+            Story1Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            Story1Scale.ScaleX = activeIndex > 1 ? 1.0 : 0.0;
+        }
+        if (Story2Scale != null)
+        {
+            Story2Scale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            Story2Scale.ScaleX = activeIndex > 2 ? 1.0 : 0.0;
         }
     }
 
@@ -110,6 +168,7 @@ public partial class OverviewView : UserControl
 
         if (targetScale == null) return;
 
+        targetScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
         targetScale.ScaleX = 0.0;
 
         var fillAnimation = new DoubleAnimation
@@ -117,7 +176,7 @@ public partial class OverviewView : UserControl
             From = 0.0,
             To = 1.0,
             Duration = TimeSpan.FromSeconds(6),
-            EasingFunction = null // Линейное заполнение слева направо
+            EasingFunction = null
         };
 
         Storyboard.SetTarget(fillAnimation, targetScale);
@@ -156,14 +215,20 @@ public partial class OverviewView : UserControl
             _activeProgressStoryboard.Stop(this);
             _activeProgressStoryboard = null;
         }
+
+        Story0Scale?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        Story1Scale?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+        Story2Scale?.BeginAnimation(ScaleTransform.ScaleXProperty, null);
     }
 
     private void StopZoomAnimation()
     {
-        if (_zoomStoryboard != null)
+        if (ScreenshotZoomTransform != null)
         {
-            _zoomStoryboard.Stop(this);
-            _zoomStoryboard = null;
+            ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+            ScreenshotZoomTransform.ScaleX = 1.0;
+            ScreenshotZoomTransform.ScaleY = 1.0;
         }
     }
 
@@ -176,6 +241,7 @@ public partial class OverviewView : UserControl
         if (DataContext is OverviewViewModel ovm)
         {
             if (index == 0 && !ovm.HasLatestScreenshot) return;
+            if (ovm.ActiveStoryIndex == index) return;
             SwitchToStoryInternal(index, isInitial: false);
         }
     }
@@ -193,10 +259,10 @@ public partial class OverviewView : UserControl
             }
             else
             {
+                ResetSlidesState(targetIndex);
                 TriggerSlideEntranceEffects(targetIndex);
             }
 
-            _currentSlideIndex = targetIndex;
             StartProgressAnimation(targetIndex);
         }
     }
@@ -206,12 +272,33 @@ public partial class OverviewView : UserControl
         Grid? oldSlide = GetSlideGrid(oldIndex);
         Grid? newSlide = GetSlideGrid(targetIndex);
 
-        if (oldSlide != null)
+        for (int i = 0; i < 3; i++)
         {
+            if (i != oldIndex && i != targetIndex)
+            {
+                Grid? other = GetSlideGrid(i);
+                if (other != null)
+                {
+                    other.BeginAnimation(UIElement.OpacityProperty, null);
+                    if (other.RenderTransform is TranslateTransform ott)
+                    {
+                        ott.BeginAnimation(TranslateTransform.XProperty, null);
+                        ott.X = 0;
+                    }
+                    other.Visibility = Visibility.Collapsed;
+                    other.Opacity = 0.0;
+                }
+            }
+        }
+
+        if (oldSlide != null && oldSlide != newSlide)
+        {
+            oldSlide.Visibility = Visibility.Visible;
             var oldTranslate = oldSlide.RenderTransform as TranslateTransform;
             if (oldTranslate != null)
             {
                 oldTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                oldTranslate.X = 0;
                 var animX = new DoubleAnimation(0, -24, TimeSpan.FromMilliseconds(350))
                 {
                     EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
@@ -220,9 +307,21 @@ public partial class OverviewView : UserControl
             }
 
             oldSlide.BeginAnimation(UIElement.OpacityProperty, null);
+            oldSlide.Opacity = 1.0;
             var animOpacity = new DoubleAnimation(1.0, 0.0, TimeSpan.FromMilliseconds(350))
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            animOpacity.Completed += (s, e) =>
+            {
+                oldSlide.Visibility = Visibility.Collapsed;
+                oldSlide.BeginAnimation(UIElement.OpacityProperty, null);
+                oldSlide.Opacity = 1.0;
+                if (oldTranslate != null)
+                {
+                    oldTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                    oldTranslate.X = 0;
+                }
             };
             oldSlide.BeginAnimation(UIElement.OpacityProperty, animOpacity);
         }
@@ -248,6 +347,16 @@ public partial class OverviewView : UserControl
             {
                 EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
             };
+            animOpacity.Completed += (s, e) =>
+            {
+                newSlide.BeginAnimation(UIElement.OpacityProperty, null);
+                newSlide.Opacity = 1.0;
+                if (newTranslate != null)
+                {
+                    newTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                    newTranslate.X = 0;
+                }
+            };
             newSlide.BeginAnimation(UIElement.OpacityProperty, animOpacity);
 
             TriggerSlideEntranceEffects(targetIndex);
@@ -266,7 +375,6 @@ public partial class OverviewView : UserControl
     {
         if (slideIndex == 0)
         {
-            // Medленный зум 1.0 -> 1.06 за 6 сек на Слайде 0
             if (ScreenshotZoomTransform != null)
             {
                 ScreenshotZoomTransform.BeginAnimation(ScaleTransform.ScaleXProperty, null);
@@ -281,7 +389,6 @@ public partial class OverviewView : UserControl
         }
         else if (slideIndex == 1)
         {
-            // Анимация заполнения толстой полосы прогресса "Следующая цель" (500 мс)
             if (NextAchProgressBar != null && DataContext is OverviewViewModel ovm)
             {
                 NextAchProgressBar.BeginAnimation(FrameworkElement.WidthProperty, null);

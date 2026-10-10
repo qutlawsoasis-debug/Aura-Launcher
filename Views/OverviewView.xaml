@@ -109,7 +109,7 @@
                 MinWidth="280"
                 MaxWidth="360"
                 CornerRadius="3"
-                Background="{DynamicResource PanelGlass}"
+                Background="{DynamicResource StoriesPanelBg}"
                 BorderBrush="{DynamicResource BorderSubtle}"
                 BorderThickness="1"
                 ClipToBounds="True"
@@ -123,7 +123,7 @@
                     <RowDefinition Height="*" />    <!-- 2. Слайды карусели -->
                 </Grid.RowDefinitions>
 
-                <!-- 1. ИНДИКАТОРЫ ИСТОРИЙ (3 полоски: высота 3px, отступ 4px) -->
+                <!-- 1. ИНДИКАТОРЫ ИСТОРИЙ (3 полоски: StoriesTrack, высота 3px, отступ 4px) -->
                 <Grid Grid.Row="0" Margin="16,14,16,10" Panel.ZIndex="10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -135,7 +135,7 @@
 
                     <!-- Полоска 0: Скриншот -->
                     <Button Grid.Column="0" Click="OnStoryBar0Click" Style="{StaticResource StoryBarBtn}" ToolTip="Скриншот">
-                        <Border Height="3" Background="{DynamicResource TrackSubtle}" CornerRadius="1.5" ClipToBounds="False">
+                        <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
                             <Border x:Name="Story0Fill" Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
                                 <Border.RenderTransform>
                                     <ScaleTransform x:Name="Story0Scale" ScaleX="0" ScaleY="1" />
@@ -146,7 +146,7 @@
 
                     <!-- Полоска 1: Достижения -->
                     <Button Grid.Column="2" Click="OnStoryBar1Click" Style="{StaticResource StoryBarBtn}" ToolTip="Достижения и цели">
-                        <Border Height="3" Background="{DynamicResource TrackSubtle}" CornerRadius="1.5" ClipToBounds="False">
+                        <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
                             <Border x:Name="Story1Fill" Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
                                 <Border.RenderTransform>
                                     <ScaleTransform x:Name="Story1Scale" ScaleX="0" ScaleY="1" />
@@ -157,7 +157,7 @@
 
                     <!-- Полоска 2: Что нового -->
                     <Button Grid.Column="4" Click="OnStoryBar2Click" Style="{StaticResource StoryBarBtn}" ToolTip="Что нового">
-                        <Border Height="3" Background="{DynamicResource TrackSubtle}" CornerRadius="1.5" ClipToBounds="False">
+                        <Border Height="3" Background="{DynamicResource StoriesTrack}" CornerRadius="1.5" ClipToBounds="False">
                             <Border x:Name="Story2Fill" Background="{StaticResource EmberBrush}" CornerRadius="1.5" RenderTransformOrigin="0,0">
                                 <Border.RenderTransform>
                                     <ScaleTransform x:Name="Story2Scale" ScaleX="0" ScaleY="1" />
@@ -171,7 +171,7 @@
                 <Grid Grid.Row="1" ClipToBounds="True">
 
                     <!-- СЛАЙД 0: ПОСЛЕДНИЙ СКРИНШОТ (на всю панель, slow zoom 1.0 -> 1.06 за 6с) -->
-                    <Grid x:Name="Slide0View" Visibility="{Binding IsStory0Active, Converter={StaticResource BoolToVis}}" RenderTransformOrigin="0.5,0.5">
+                    <Grid x:Name="Slide0View" Visibility="Collapsed" RenderTransformOrigin="0.5,0.5">
                         <Grid.RenderTransform>
                             <TranslateTransform x:Name="Slide0Translate" X="0" />
                         </Grid.RenderTransform>
@@ -217,18 +217,20 @@
                     </Grid>
 
                     <!-- СЛАЙД 1: ДОСТИЖЕНИЯ И СЛЕДУЮЩАЯ ЦЕЛЬ -->
-                    <Grid x:Name="Slide1View" Visibility="{Binding IsStory1Active, Converter={StaticResource BoolToVis}}" Margin="16,6,16,16" RenderTransformOrigin="0.5,0.5">
+                    <Grid x:Name="Slide1View" Visibility="Visible" Margin="16,8,16,16" RenderTransformOrigin="0.5,0.5">
                         <Grid.RenderTransform>
                             <TranslateTransform x:Name="Slide1Translate" X="0" />
                         </Grid.RenderTransform>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />  <!-- 0: Заголовок достижения и иконка -->
+                            <RowDefinition Height="*" />     <!-- 1: Равномерное гибкое пространство -->
+                            <RowDefinition Height="Auto" />  <!-- 2: Блок "Следующая цель" -->
+                            <RowDefinition Height="*" />     <!-- 3: Равномерное гибкое пространство -->
+                            <RowDefinition Height="Auto" />  <!-- 4: Нижний ряд иконок -->
                         </Grid.RowDefinitions>
 
                         <!-- Заголовок достижения и большая иконка со свечением -->
-                        <StackPanel Grid.Row="0" Margin="0,4,0,12" HorizontalAlignment="Center">
+                        <StackPanel Grid.Row="0" HorizontalAlignment="Center">
                             <Border x:Name="Slide1IconBorder"
                                     Width="56" Height="56"
                                     CornerRadius="28"
@@ -246,27 +248,36 @@
                                        Foreground="{StaticResource TextWhite}"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
-                                       TextWrapping="Wrap" />
+                                       TextWrapping="Wrap">
+                                <TextBlock.Effect>
+                                    <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="6" Opacity="0.55" ShadowDepth="1" Direction="270" />
+                                </TextBlock.Effect>
+                            </TextBlock>
                             <TextBlock x:Name="Slide1Desc"
                                        Text="{Binding AchievementDescription}"
                                        FontFamily="{StaticResource MainFont}"
                                        FontSize="12"
-                                       Foreground="{StaticResource DimInkBrush}"
+                                       Foreground="{DynamicResource Text90}"
                                        HorizontalAlignment="Center"
                                        TextAlignment="Center"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,0" />
                         </StackPanel>
 
-                        <!-- Блок "Следующая цель" с толстой полосой прогресса -->
-                        <Border Grid.Row="1" Background="{DynamicResource PanelCard}" BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" CornerRadius="3" Padding="14,12" VerticalAlignment="Center">
+                        <!-- Блок "Следующая цель" в стиле панели (StoriesCardGlass, StoriesCardBorder) -->
+                        <Border Grid.Row="2"
+                                Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource StoriesCardBorder}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="14,12">
                             <StackPanel x:Name="Slide1NextBlock">
                                 <Grid Margin="0,0,0,6">
                                     <TextBlock Text="СЛЕДУЮЩАЯ ЦЕЛЬ" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource EmberBrush}" />
-                                    <TextBlock Text="{Binding NextAchievementProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource InkBrush}" HorizontalAlignment="Right" />
+                                    <TextBlock Text="{Binding NextAchievementProgress}" FontFamily="{StaticResource MainFont}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" HorizontalAlignment="Right" />
                                 </Grid>
                                 <TextBlock Text="{Binding NextAchievementTitle}" FontFamily="{StaticResource HeadingFont}" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" TextWrapping="Wrap" Margin="0,0,0,2" />
-                                <TextBlock Text="{Binding NextAchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                <TextBlock Text="{Binding NextAchievementDescription}" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource Text90}" TextWrapping="Wrap" Margin="0,0,10,0" />
 
                                 <!-- Толстая полоса прогресса (8px, CornerRadius 4) -->
                                 <Border Height="8" Background="{DynamicResource TrackSubtle}" CornerRadius="4" ClipToBounds="True">
@@ -276,7 +287,7 @@
                         </Border>
 
                         <!-- Нижний ряд маленьких иконок остальных достижений -->
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center">
                             <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Margin="0,0,8,0">
                                 <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCheck}" Width="13" Height="13" Stroke="{StaticResource EmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
@@ -284,19 +295,19 @@
                                 <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrown}" Width="13" Height="13" Stroke="{StaticResource EmberBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4" Margin="0,0,8,0">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUser}" Width="13" Height="13" Stroke="{StaticResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUser}" Width="13" Height="13" Stroke="{DynamicResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4" Margin="0,0,8,0">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWorld}" Width="13" Height="13" Stroke="{StaticResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWorld}" Width="13" Height="13" Stroke="{DynamicResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                             <Border Width="28" Height="28" CornerRadius="14" Background="{DynamicResource PanelRaised}" Opacity="0.4">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="13" Height="13" Stroke="{StaticResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCamera}" Width="13" Height="13" Stroke="{DynamicResource DimInkBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
                         </StackPanel>
                     </Grid>
 
                     <!-- СЛАЙД 2: ЧТО НОВОГО -->
-                    <Grid x:Name="Slide2View" Visibility="{Binding IsStory2Active, Converter={StaticResource BoolToVis}}" Margin="16,6,16,16" RenderTransformOrigin="0.5,0.5">
+                    <Grid x:Name="Slide2View" Visibility="Collapsed" Margin="16,8,16,16" RenderTransformOrigin="0.5,0.5">
                         <Grid.RenderTransform>
                             <TranslateTransform x:Name="Slide2Translate" X="0" />
                         </Grid.RenderTransform>
@@ -323,11 +334,11 @@
                                 <DataTemplate>
                                     <Grid Margin="0,0,0,12">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="20" />
+                                             <ColumnDefinition Width="20" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <Path Grid.Column="0" Style="{StaticResource IconPath}" Data="{StaticResource IconCheck}" Width="12" Height="12" Stroke="{StaticResource EmberBrush}" VerticalAlignment="Top" Margin="0,3,0,0" />
-                                        <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="Medium" Foreground="{StaticResource InkBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Text90}" TextWrapping="Wrap" />
                                     </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>

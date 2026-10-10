@@ -97,8 +97,6 @@ public class OverviewViewModel : ObservableObject
 
     private int _activeStoryIndex = 0;
     private double _storyProgress = 0.0;
-    private bool _isCarouselPaused = false;
-    private readonly System.Windows.Threading.DispatcherTimer _carouselTimer;
 
     public int ActiveStoryIndex
     {
@@ -154,18 +152,15 @@ public class OverviewViewModel : ObservableObject
 
     public void StartCarouselTimer()
     {
-        _carouselTimer?.Stop();
         _storyProgress = 0.0;
         if (ActiveStoryIndex == 0 && !HasLatestScreenshot)
         {
             ActiveStoryIndex = 1;
         }
-        _carouselTimer?.Start();
     }
 
     public void StopCarouselTimer()
     {
-        _carouselTimer?.Stop();
     }
 
     public OverviewViewModel(IConfigService configService, IGameLaunchService launchService, IBackgroundService? backgroundService = null)
@@ -195,34 +190,8 @@ public class OverviewViewModel : ObservableObject
             }
         });
 
-        PauseCarouselCommand = new RelayCommand(_ => _isCarouselPaused = true);
-        ResumeCarouselCommand = new RelayCommand(_ => _isCarouselPaused = false);
-
-        _carouselTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(50)
-        };
-        _carouselTimer.Tick += (s, e) =>
-        {
-            if (_isCarouselPaused) return;
-
-            _storyProgress += (50.0 / 6000.0); // 6000ms total fill duration (6s)
-            if (_storyProgress >= 1.0)
-            {
-                _storyProgress = 0.0;
-                int next = (ActiveStoryIndex + 1) % 3;
-                if (next == 0 && !HasLatestScreenshot)
-                {
-                    next = 1;
-                }
-                ActiveStoryIndex = next;
-            }
-            else
-            {
-                UpdateStoryProgresses();
-            }
-        };
-        _carouselTimer.Start();
+        PauseCarouselCommand = new RelayCommand(_ => { });
+        ResumeCarouselCommand = new RelayCommand(_ => { });
 
         RefreshStats();
 

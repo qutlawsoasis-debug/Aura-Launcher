@@ -94,6 +94,14 @@
     <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" po:Freeze="True" />
     <SolidColorBrush x:Key="StoriesFill" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
     <SolidColorBrush x:Key="StoriesTextSecondary" Color="{StaticResource ColorStoriesTextSecondary}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Text90" Color="{StaticResource ColorText90}" po:Freeze="True" />
+    <SolidColorBrush x:Key="StoriesCardGlass" Color="#14FFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="StoriesCardBorder" Color="#26FFFFFF" po:Freeze="True" />
+
+    <LinearGradientBrush x:Key="StoriesPanelBg" StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
+        <GradientStop Color="{StaticResource ColorStoriesHeaderShade}" Offset="0.0" />
+        <GradientStop Color="{StaticResource ColorStoriesShadeBottom}" Offset="1.0" />
+    </LinearGradientBrush>
 
     <SolidColorBrush x:Key="ChangelogModalBg" Color="{StaticResource ColorChangelogModalBg}" po:Freeze="True" />
 
@@ -111,6 +119,5 @@
 
     <SolidColorBrush x:Key="Text85" Color="{StaticResource ColorText85}" po:Freeze="True" />
     <SolidColorBrush x:Key="Text70" Color="{StaticResource ColorText70}" po:Freeze="True" />
-    <SolidColorBrush x:Key="Text90" Color="{StaticResource ColorText90}" po:Freeze="True" />
 
 </ResourceDictionary>
