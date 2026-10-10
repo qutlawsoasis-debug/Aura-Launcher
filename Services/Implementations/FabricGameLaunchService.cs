@@ -1128,7 +1128,8 @@ public class FabricGameLaunchService : IGameLaunchService
     {
         var list = new List<MArgument>
         {
-            new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main ")
+            new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main "),
+            new MArgument("-XX:+UnlockExperimentalVMOptions")
         };
 
         if (!string.IsNullOrWhiteSpace(jvmArgs))
@@ -1136,6 +1137,10 @@ public class FabricGameLaunchService : IGameLaunchService
             var tokens = jvmArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             foreach (var t in tokens)
             {
+                if (t.Equals("-XX:+UnlockExperimentalVMOptions", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
                 list.Add(new MArgument(t));
             }
         }

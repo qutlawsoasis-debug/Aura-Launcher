@@ -110,6 +110,7 @@ public class GraphicsPresetService : IGraphicsPresetService
             RamMb = 6144,
             JvmArgs = new List<string>
             {
+                "-XX:+UnlockExperimentalVMOptions",
                 "-XX:+UseG1GC",
                 "-XX:G1NewSizePercent=20",
                 "-XX:G1ReservePercent=20",
@@ -137,6 +138,7 @@ public class GraphicsPresetService : IGraphicsPresetService
             RamMb = 8192,
             JvmArgs = new List<string>
             {
+                "-XX:+UnlockExperimentalVMOptions",
                 "-XX:+UseG1GC",
                 "-XX:G1NewSizePercent=20",
                 "-XX:G1ReservePercent=20",
@@ -164,6 +166,7 @@ public class GraphicsPresetService : IGraphicsPresetService
             RamMb = 8192,
             JvmArgs = new List<string>
             {
+                "-XX:+UnlockExperimentalVMOptions",
                 "-XX:+UseG1GC",
                 "-XX:G1NewSizePercent=20",
                 "-XX:G1ReservePercent=20",
@@ -209,6 +212,7 @@ public class GraphicsPresetService : IGraphicsPresetService
             RamMb = 10240,
             JvmArgs = new List<string>
             {
+                "-XX:+UnlockExperimentalVMOptions",
                 "-XX:+UseG1GC",
                 "-XX:G1NewSizePercent=20",
                 "-XX:G1ReservePercent=20",
