@@ -643,6 +643,48 @@ public class LobbyViewModel : ObservableObject
     public bool IsStatusOpen => IsInLobby && (IsHost ? IsWorldOpen : CanGuestConnect);
     public bool IsStatusWaiting => IsInLobby && !IsStatusOpen;
 
+    public bool IsHostHintVisible => IsInLobby && IsHost;
+
+    public string HostActionHintText
+    {
+        get
+        {
+            if (!IsInLobby || !IsHost) return string.Empty;
+            if (IsWorldOpen)
+            {
+                return "Мир открыт! Друзья в лобби могут подключаться.";
+            }
+            if (_launchService.IsGameRunning)
+            {
+                return "Игра запущена. Зайдите в мир и откройте его для сети (Esc → Открыть для сети).";
+            }
+            return "Нажмите «Открыть мир» выше для запуска игры и открытия туннеля.";
+        }
+    }
+
+    public bool IsGuestHintVisible => IsInLobby && !IsHost;
+
+    public string GuestActionHintText
+    {
+        get
+        {
+            if (!IsInLobby || IsHost) return string.Empty;
+            if (CanGuestConnect)
+            {
+                return "Мир открыт хостом! Нажмите «Подключиться к игре» выше.";
+            }
+            if (string.Equals(_lobbyService?.CurrentStatus, "open", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Хост открыл мир! Получаем адрес сервера туннеля...";
+            }
+            return "Ожидание хоста: хост должен запустить мир и открыть сеть (Esc → Открыть для сети).";
+        }
+    }
+
+    public string GuestConnectButtonToolTip => CanGuestConnect
+        ? "Запустить игру и подключиться к миру хоста"
+        : "Кнопка станет доступна, когда хост откроет мир для сети";
+
     public string CombinedStatusText
     {
         get
@@ -660,6 +702,11 @@ public class LobbyViewModel : ObservableObject
         OnPropertyChanged(nameof(CombinedStatusText));
         OnPropertyChanged(nameof(IsHost));
         OnPropertyChanged(nameof(IsServerMetricsVisible));
+        OnPropertyChanged(nameof(IsHostHintVisible));
+        OnPropertyChanged(nameof(HostActionHintText));
+        OnPropertyChanged(nameof(IsGuestHintVisible));
+        OnPropertyChanged(nameof(GuestActionHintText));
+        OnPropertyChanged(nameof(GuestConnectButtonToolTip));
         RaiseAllCommands();
     }
 
@@ -837,12 +884,30 @@ public class LobbyViewModel : ObservableObject
             
             _worldWatcher.Start(logPath);
 
-            HostStatusText = "Запуск игры...";
-            StatusText = "Подготовка и запуск Minecraft...";
-            StatusIcon = string.Empty;
+            if (_launchService.IsGameRunning)
+            {
+                // Проверяем, возможно мир уже был открыт для сети на порту 25565
+                bool alreadyListening = await PlayitTunnelProvider.TestTcpConnectAsync("127.0.0.1", 25565, 500, CancellationToken.None);
+                if (alreadyListening)
+                {
+                    OnLanWorldOpened(25565);
+                    return;
+                }
 
-            // Запускаем игру хоста через MainViewModel
-            HostLaunchRequested?.Invoke(this, EventArgs.Empty);
+                HostStatusText = "Ожидание открытия мира...";
+                StatusText = "Игра запущена. Зайдите в мир и откройте сеть (Esc → Открыть для сети)";
+                StatusIcon = string.Empty;
+                OnPropertyChanged(nameof(HostActionHintText));
+            }
+            else
+            {
+                HostStatusText = "Запуск игры...";
+                StatusText = "Подготовка и запуск Minecraft...";
+                StatusIcon = string.Empty;
+
+                // Запускаем игру хоста через MainViewModel
+                HostLaunchRequested?.Invoke(this, EventArgs.Empty);
+            }
         }
         catch (Exception ex)
         {
@@ -917,6 +982,8 @@ public class LobbyViewModel : ObservableObject
                         StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = false;
                         TunnelFailureReason = null;
+                        OnPropertyChanged(nameof(HostActionHintText));
+                        _notificationService?.Notify("Мир открыт для друзей", "Туннель запущен. Друзья могут подключаться!", "Lobby");
                     });
                 }
                 else
@@ -1402,8 +1469,10 @@ public class LobbyViewModel : ObservableObject
             if (IsHost && !IsWorldOpen)
             {
                 HostStatusText = "Ожидание открытия мира...";
-                StatusText = "Игра запущена. Открой мир для сети (Esc → Открыть для сети)";
+                StatusText = "Игра запущена. Откройте мир для сети (Esc → Открыть для сети)";
                 StatusIcon = string.Empty;
+                OnPropertyChanged(nameof(HostActionHintText));
+                _notificationService?.Notify("Minecraft запущен", "Зайдите в мир и нажмите Esc → Открыть для сети", "Lobby");
             }
         });
     }
@@ -1679,14 +1748,14 @@ public class LobbyViewModel : ObservableObject
         {
             case "waiting":
                 CanGuestConnect = false;
-                GuestStatusText = "Ожидание хоста...";
-                StatusText = "Ожидаем, пока хост откроет мир для сети";
+                GuestStatusText = "Ожидание хоста (нужно открыть сеть в игре)...";
+                StatusText = "Ожидаем, пока хост запустит мир и откроет сеть (Esc → Открыть для сети)";
                 StatusIcon = string.Empty;
                 break;
             case "open":
                 CanGuestConnect = !string.IsNullOrWhiteSpace(_lobbyService.CurrentTunnelAddress);
-                GuestStatusText = CanGuestConnect ? "Хост открыл мир, можно подключаться" : "Ожидание адреса сервера...";
-                StatusText = CanGuestConnect ? "Мир готов! Нажми «Подключиться к игре»" : "Получение адреса сервера...";
+                GuestStatusText = CanGuestConnect ? "Хост открыл мир, можно подключаться!" : "Подключение туннеля...";
+                StatusText = CanGuestConnect ? "Мир готов! Нажмите «Подключиться к игре»" : "Получение адреса сервера...";
                 StatusIcon = string.Empty;
                 break;
             case "closed":

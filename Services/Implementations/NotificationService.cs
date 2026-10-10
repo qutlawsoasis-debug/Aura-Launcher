@@ -45,16 +45,11 @@ public class NotificationService : INotificationService
 
     public void Notify(string title, string message, string targetTab = "Overview", string type = "info")
     {
-        if (IsWindowVisibleAndFocused())
+        _showInAppToastCallback?.Invoke(title, message, type, targetTab);
+
+        if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
         {
-            _showInAppToastCallback?.Invoke(title, message, type, targetTab);
-        }
-        else
-        {
-            if (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true)
-            {
-                ShowWindowsToast(title, message, targetTab);
-            }
+            ShowWindowsToast(title, message, targetTab);
         }
     }
 
@@ -90,32 +85,34 @@ public class NotificationService : INotificationService
 
     public void NotifyPlayerJoinedLobby(string playerNick)
     {
-        if (IsWindowVisibleAndFocused())
+        _showInAppToastCallback?.Invoke("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "lobby", "Lobby");
+
+        if (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true)
         {
-            _showInAppToastCallback?.Invoke("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "lobby", "Lobby");
+            ShowWindowsToast("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "Lobby");
         }
-        else
+
+        try
         {
-            if (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true)
-            {
-                ShowWindowsToast("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "Lobby");
-            }
+            System.Media.SystemSounds.Asterisk.Play();
         }
+        catch { }
     }
 
     public void NotifyHostOpenedWorld()
     {
-        if (IsWindowVisibleAndFocused())
+        _showInAppToastCallback?.Invoke("Мир открыт!", "Хост открыл мир. Нажмите для подключения к игре", "lobby", "Lobby");
+
+        if (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true)
         {
-            _showInAppToastCallback?.Invoke("Мир открыт", "Хост открыл мир", "lobby", "Lobby");
+            ShowWindowsToast("Мир открыт!", "Хост открыл мир. Подключайтесь через лаунчер!", "Lobby");
         }
-        else
+
+        try
         {
-            if (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true)
-            {
-                ShowWindowsToast("Мир открыт", "Хост открыл мир", "Lobby");
-            }
+            System.Media.SystemSounds.Asterisk.Play();
         }
+        catch { }
     }
 
     public void NotifyScreenshotTaken(string filePath, string fileName)

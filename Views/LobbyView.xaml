@@ -804,6 +804,7 @@
                             Height="44"
                             MinWidth="220"
                             Content="Открыть мир"
+                            ToolTip="Запустить игру и открыть туннель для друзей"
                             Margin="6,0"
                             Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
 
@@ -813,6 +814,7 @@
                             Height="44"
                             MinWidth="200"
                             Content="Подключиться к игре"
+                            ToolTip="{Binding GuestConnectButtonToolTip}"
                             Margin="6,0" />
 
                     <!-- Guest: "Переподключиться" -->
@@ -823,13 +825,35 @@
                             Margin="6,0" />
                 </WrapPanel>
 
+                <!-- Подсказка для хоста о текущем этапе -->
+                <TextBlock Text="{Binding HostActionHintText}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondary}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0"
+                           Visibility="{Binding IsHostHintVisible, Converter={StaticResource BoolToVis}}" />
+
+                <!-- Подсказка для гостей о текущем этапе -->
+                <TextBlock Text="{Binding GuestActionHintText}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondary}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0"
+                           Visibility="{Binding IsGuestHintVisible, Converter={StaticResource BoolToVis}}" />
+
                 <!-- Предупреждение для хоста -->
                 <TextBlock Text="Не показывайте код посторонним: в этом режиме проверка лицензии отключена."
                            FontFamily="{StaticResource MainFont}"
-                           FontSize="12"
+                           FontSize="11"
                            Foreground="{StaticResource MuteBrush}"
                            HorizontalAlignment="Center"
-                           Margin="0,6,0,0"
+                           Margin="0,4,0,0"
                            Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
             </StackPanel>
         </Grid>

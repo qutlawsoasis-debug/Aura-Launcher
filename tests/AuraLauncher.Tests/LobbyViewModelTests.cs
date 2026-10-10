@@ -326,4 +326,46 @@ public class LobbyViewModelTests
         Assert.False(kicked);
         Assert.Contains(vm.LobbyPlayers, p => p.Nickname == "Vetements");
     }
+
+    [Fact]
+    public async Task Host_ActionHints_ReflectCurrentState()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        configService.CurrentConfig.Nickname = "HostPlayer";
+        var launchService = new TestLaunchService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService);
+
+        await vm.CreateLobbyAsync();
+
+        Assert.True(vm.IsHostHintVisible);
+        Assert.False(vm.IsGuestHintVisible);
+        Assert.Contains("Открыть мир", vm.HostActionHintText);
+
+        launchService.IsGameRunning = true;
+        vm.OnHostGameStarted();
+        Assert.Contains("Открыть для сети", vm.HostActionHintText);
+    }
+
+    [Fact]
+    public async Task Guest_ActionHints_ReflectWaitingAndOpenState()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        configService.CurrentConfig.Nickname = "GuestPlayer";
+        var launchService = new TestLaunchService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService);
+
+        vm.GuestCodeInput = "TEST01";
+        await vm.JoinLobbyCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsGuestHintVisible);
+        Assert.False(vm.IsHostHintVisible);
+        Assert.Contains("Ожидание хоста", vm.GuestActionHintText);
+
+        mockLobby.SimulateWorldOpen("aura-test.playit.gg:25565");
+
+        Assert.True(vm.CanGuestConnect);
+        Assert.Contains("Мир открыт", vm.GuestActionHintText);
+    }
 }
