@@ -274,6 +274,13 @@ public class MainViewModel : ObservableObject
         {
             if (SetProperty(ref _selectedReleaseNoteVersion, value))
             {
+                if (_releaseNoteVersions != null)
+                {
+                    foreach (var v in _releaseNoteVersions)
+                    {
+                        v.IsSelected = (v == value || (value != null && !string.IsNullOrEmpty(v.Version) && v.Version == value.Version));
+                    }
+                }
                 SelectedVersionChanged?.Invoke(this, EventArgs.Empty);
             }
         }

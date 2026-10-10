@@ -42,6 +42,25 @@
     <Color x:Key="ColorPanelGlass">#1AFFFFFF</Color>
     <Color x:Key="ColorPrimaryActionText">#1C1106</Color>
 
+    <!-- Changelog Modal Colors -->
+    <Color x:Key="ColorChangelogModalBg">#E6091015</Color>
+
+    <Color x:Key="ColorBadgeNewBg">#2EF2A63C</Color>
+    <Color x:Key="ColorBadgeNewBorder">#59F2A63C</Color>
+    <Color x:Key="ColorBadgeNewText">#F2A63C</Color>
+
+    <Color x:Key="ColorBadgeImprovedBg">#14FFFFFF</Color>
+    <Color x:Key="ColorBadgeImprovedBorder">#26FFFFFF</Color>
+    <Color x:Key="ColorBadgeImprovedText">#CCE8F0F8</Color>
+
+    <Color x:Key="ColorBadgeFixedBg">#295FD39A</Color>
+    <Color x:Key="ColorBadgeFixedBorder">#595FD39A</Color>
+    <Color x:Key="ColorBadgeFixedText">#5FD39A</Color>
+
+    <Color x:Key="ColorText85">#D9E8F0F8</Color>
+    <Color x:Key="ColorText70">#B3E8F0F8</Color>
+    <Color x:Key="ColorText90">#E6E8F0F8</Color>
+
     <!-- Named SolidColorBrush resources for UI controls (Frozen for GPU performance) -->
     <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" po:Freeze="True" />
     <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" po:Freeze="True" />
@@ -75,5 +94,23 @@
     <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" po:Freeze="True" />
     <SolidColorBrush x:Key="StoriesFill" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />
     <SolidColorBrush x:Key="StoriesTextSecondary" Color="{StaticResource ColorStoriesTextSecondary}" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="ChangelogModalBg" Color="{StaticResource ColorChangelogModalBg}" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="BadgeNewBg" Color="{StaticResource ColorBadgeNewBg}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BadgeNewBorder" Color="{StaticResource ColorBadgeNewBorder}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BadgeNewText" Color="{StaticResource ColorBadgeNewText}" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="BadgeImprovedBg" Color="{StaticResource ColorBadgeImprovedBg}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BadgeImprovedBorder" Color="{StaticResource ColorBadgeImprovedBorder}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BadgeImprovedText" Color="{StaticResource ColorBadgeImprovedText}" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="BadgeFixedBg" Color="{StaticResource ColorBadgeFixedBg}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BadgeFixedBorder" Color="{StaticResource ColorBadgeFixedBorder}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BadgeFixedText" Color="{StaticResource ColorBadgeFixedText}" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Text85" Color="{StaticResource ColorText85}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Text70" Color="{StaticResource ColorText70}" po:Freeze="True" />
+    <SolidColorBrush x:Key="Text90" Color="{StaticResource ColorText90}" po:Freeze="True" />
 
 </ResourceDictionary>

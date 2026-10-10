@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using AuraLauncher.Core;
 
 namespace AuraLauncher.Models;
 
@@ -71,8 +72,15 @@ public class ReleaseNoteItem
     }
 }
 
-public class ReleaseNoteVersion
+public class ReleaseNoteVersion : ObservableObject
 {
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
+
     public string Version { get; set; } = string.Empty;           // e.g. "beta 1.0.66"
     public string InternalVersion { get; set; } = string.Empty;   // e.g. "1.2.74"
     public string DateText { get; set; } = string.Empty;          // e.g. "10 октября 2026"

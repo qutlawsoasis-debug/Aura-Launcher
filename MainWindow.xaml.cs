@@ -401,7 +401,14 @@ public partial class MainWindow : Window
             };
             var slideAnim = new DoubleAnimation(12.0, 0.0, TimeSpan.FromMilliseconds(240))
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.Stop
+            };
+
+            slideAnim.Completed += (s, e) =>
+            {
+                ChangelogModalTrans.BeginAnimation(TranslateTransform.YProperty, null);
+                ChangelogModalTrans.Y = 0;
             };
 
             ChangelogModalOverlay.BeginAnimation(UIElement.OpacityProperty, fadeAnim);
@@ -450,7 +457,14 @@ public partial class MainWindow : Window
         };
         var slideAnim = new DoubleAnimation(8.0, 0.0, TimeSpan.FromMilliseconds(220))
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            FillBehavior = FillBehavior.Stop
+        };
+
+        slideAnim.Completed += (s, e) =>
+        {
+            ReleaseNotesTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+            ReleaseNotesTranslate.Y = 0;
         };
 
         ReleaseNotesContentArea.BeginAnimation(UIElement.OpacityProperty, fadeAnim);

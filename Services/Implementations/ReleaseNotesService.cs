@@ -36,13 +36,27 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = currentUserFacing,
                 InternalVersion = currentInternal,
                 DateText = "10 октября 2026",
-                ShortTitle = "Список изменений",
+                ShortTitle = "Обновление оформления",
                 IsCurrent = true,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Двухоконный Список изменений с фильтрацией категорий и выбором версий"),
-                    ReleaseNoteItem.Parse("[Улучшено] Кнопка быстрого копирования текста обновлений для друзей"),
-                    ReleaseNoteItem.Parse("[Исправлено] Тексты заметок переписаны в понятном игроцком стиле")
+                    ReleaseNoteItem.Parse("[Новое] Полноэкранный просмотр заметок обновлений и руководство по оформлению релизов"),
+                    ReleaseNoteItem.Parse("[Улучшено] Приглушённые матовые оттенки и отсутствие просвечивания в окнах лаунчера"),
+                    ReleaseNoteItem.Parse("[Исправлено] Мгновенный отклик кнопок в заголовочной зоне и модальных окнах")
+                }
+            },
+            new ReleaseNoteVersion
+            {
+                Version = "beta 1.0.67",
+                InternalVersion = "1.2.75",
+                DateText = "10 октября 2026",
+                ShortTitle = "Удобный список изменений",
+                IsCurrent = false,
+                Items = new List<ReleaseNoteItem>
+                {
+                    ReleaseNoteItem.Parse("[Новое] Окно заметок с разделами по категориям и кнопкой скопировать для друзей"),
+                    ReleaseNoteItem.Parse("[Улучшено] Матовый фон и акцентные цвета интерфейса стали более приглушёнными"),
+                    ReleaseNoteItem.Parse("[Исправлено] Кнопки в окне изменений теперь мгновенно откликаются на клики")
                 }
             },
             new ReleaseNoteVersion
@@ -50,13 +64,13 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = "beta 1.0.66",
                 InternalVersion = "1.2.74",
                 DateText = "10 октября 2026",
-                ShortTitle = "Обновление карусели",
+                ShortTitle = "Стеклянная карусель новостей",
                 IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Стеклянная карусель на главной с анимацией историй и скриншотами"),
-                    ReleaseNoteItem.Parse("[Улучшено] Прогресс-бары карусели с эффектом свечения и паузой при наведении"),
-                    ReleaseNoteItem.Parse("[Исправлено] Переходы между слайдами карусели с каскадным появлением элементов")
+                    ReleaseNoteItem.Parse("[Новое] Интерактивная карусель на главной с историями и скриншотами"),
+                    ReleaseNoteItem.Parse("[Улучшено] Индикаторы прогресса плавно замирают при наведении курсора"),
+                    ReleaseNoteItem.Parse("[Исправлено] Анимация смены слайдов работает без рывков и провисаний")
                 }
             },
             new ReleaseNoteVersion
@@ -64,13 +78,13 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = "beta 1.0.65",
                 InternalVersion = "1.2.73",
                 DateText = "9 октября 2026",
-                ShortTitle = "Управление памятью",
+                ShortTitle = "Настройка памяти и загрузка",
                 IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Плавный одометр переключения выделенной ОЗУ в Настройках"),
-                    ReleaseNoteItem.Parse("[Улучшено] Прозрачная верхняя зона перетаскивания окна лаунчера"),
-                    ReleaseNoteItem.Parse("[Исправлено] Обновлённое окно загрузки с анимированным логотипом и повтором")
+                    ReleaseNoteItem.Parse("[Новое] Наглядный ползунок выбора оперативной памяти в Настройках"),
+                    ReleaseNoteItem.Parse("[Улучшено] Прозрачная верхняя область окна для удобного перетаскивания"),
+                    ReleaseNoteItem.Parse("[Исправлено] Экран запуска лаунчера с анимацией и кнопкой повтора")
                 }
             },
             new ReleaseNoteVersion
@@ -78,13 +92,13 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = "beta 1.0.64",
                 InternalVersion = "1.2.72",
                 DateText = "8 октября 2026",
-                ShortTitle = "Сетевой статус",
+                ShortTitle = "Уведомления и совместная игра",
                 IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Подсказки этапов в лобби и системные уведомления Windows"),
-                    ReleaseNoteItem.Parse("[Улучшено] Мгновенная синхронизация открытого локального мира"),
-                    ReleaseNoteItem.Parse("[Исправлено] Подключение к лобби по коду приглашения без сбоев")
+                    ReleaseNoteItem.Parse("[Новое] Системные уведомления Windows о подключении друзей и запуске сервера"),
+                    ReleaseNoteItem.Parse("[Улучшено] Автоматическое обнаружение открытого мира для друзей в сети"),
+                    ReleaseNoteItem.Parse("[Исправлено] Подключение к совместному лобби по коду приглашения")
                 }
             },
             new ReleaseNoteVersion
@@ -92,13 +106,13 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = "beta 1.0.63",
                 InternalVersion = "1.2.68",
                 DateText = "6 октября 2026",
-                ShortTitle = "Мастерская и моды",
+                ShortTitle = "Статистика миров и скриншоты",
                 IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Статистика мира в Мастерской: сид, координаты и текущий игровой день"),
-                    ReleaseNoteItem.Parse("[Улучшено] Автоматическое копирование сделанного скриншота в буфер обмена"),
-                    ReleaseNoteItem.Parse("[Исправлено] Очистка кнопок Мастерской и матовые стеклянные поля Настроек")
+                    ReleaseNoteItem.Parse("[Новое] Карточки миров показывают текущий игровой день, сид и координаты"),
+                    ReleaseNoteItem.Parse("[Улучшено] Сделанный в игре скриншот сразу копируется в буфер обмена"),
+                    ReleaseNoteItem.Parse("[Исправлено] Отображение информации о мире при переключении подразделов")
                 }
             },
             new ReleaseNoteVersion
@@ -106,13 +120,13 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = "beta 1.0.62",
                 InternalVersion = "1.2.64",
                 DateText = "4 октября 2026",
-                ShortTitle = "Интерфейс и стили",
+                ShortTitle = "Обновление интерфейса",
                 IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Векторная анимация отрисовки чекбоксов и обновлённые тост-уведомления"),
-                    ReleaseNoteItem.Parse("[Улучшено] Перекомпоновка элементов управления и десктопные переключатели"),
-                    ReleaseNoteItem.Parse("[Исправлено] Отображение системных уведомлений поверх открытой игры")
+                    ReleaseNoteItem.Parse("[Новое] Плавная анимация переключателей и обновлённые тосты в игре"),
+                    ReleaseNoteItem.Parse("[Улучшено] Обновлённый вид кнопок управления и переключателей разделов"),
+                    ReleaseNoteItem.Parse("[Исправлено] Уведомления больше не перекрывают элементы управления")
                 }
             }
         };

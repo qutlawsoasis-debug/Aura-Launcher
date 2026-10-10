@@ -235,12 +235,13 @@
                 <!-- Sound Root: slider on left, button on right -->
                 <Grid x:Name="SoundControlRoot"
                       Background="Transparent"
+                      WindowChrome.IsHitTestVisibleInChrome="True"
                       MouseEnter="SoundControl_MouseEnter"
                       MouseLeave="SoundControl_MouseLeave"
                       Height="34" Margin="0,0,4,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <!-- Sliding Volume Box to the LEFT (Width 0 -> 180) -->
-                        <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center">
+                        <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
                                 <!-- Prev Track -->
                                 <Button Command="{Binding PreviousTrackCommand}"
@@ -833,16 +834,18 @@
                   Panel.ZIndex="120"
                   Visibility="Collapsed"
                   Opacity="0"
-                  Background="{DynamicResource ModalBackdrop}"
+                  Background="{DynamicResource DialogBackdrop}"
+                  WindowChrome.IsHitTestVisibleInChrome="True"
                   MouseDown="OnChangelogModalOverlayMouseDown">
                 <Border x:Name="ChangelogModalCard"
                         MouseDown="OnChangelogModalCardMouseDown"
                         HorizontalAlignment="Center" VerticalAlignment="Center"
                         Width="860" Height="560"
-                        Background="{DynamicResource PanelGlass}"
+                        Background="{DynamicResource ChangelogModalBg}"
                         BorderBrush="{DynamicResource BorderSubtle}"
                         BorderThickness="1"
                         CornerRadius="3"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
                         Padding="24,20,24,20">
                     <Border.RenderTransform>
                         <TranslateTransform x:Name="ChangelogModalTrans" Y="10" />
@@ -891,36 +894,65 @@
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource GhostBtn}"
                                                         HorizontalContentAlignment="Stretch"
-                                                        Margin="0,0,0,6" Padding="10,8">
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
+                                                        Margin="0,0,0,4" Padding="0">
+                                                    <Border x:Name="VersionItemBorder"
+                                                            Padding="10,8"
+                                                            CornerRadius="3"
+                                                            BorderThickness="2,0,0,0">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                                <Setter Property="Background" Value="Transparent" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+                                                                        <Setter Property="Background" Value="#0FFFFFFF" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
 
-                                                        <TextBlock Grid.Column="0"
-                                                                   Text="{Binding Version}"
-                                                                   FontFamily="{StaticResource HeadingFont}"
-                                                                   FontSize="15"
-                                                                   FontWeight="SemiBold"
-                                                                   Foreground="{StaticResource TextWhite}"
-                                                                   VerticalAlignment="Center" />
+                                                            <TextBlock Grid.Column="0"
+                                                                       Text="{Binding Version}"
+                                                                       FontFamily="{StaticResource HeadingFont}"
+                                                                       FontSize="15"
+                                                                       FontWeight="Medium"
+                                                                       VerticalAlignment="Center">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource Text85}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                                <Setter Property="Foreground" Value="{StaticResource TextWhite}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
 
-                                                        <!-- Tag "Вы здесь" for current version -->
-                                                        <Border Grid.Column="1"
-                                                                Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}"
-                                                                Background="{StaticResource EmberBrush}"
-                                                                CornerRadius="3"
-                                                                Padding="6,2"
-                                                                VerticalAlignment="Center"
-                                                                Margin="6,0,0,0">
-                                                            <TextBlock Text="Вы здесь"
-                                                                       FontFamily="{StaticResource MainFont}"
-                                                                       FontSize="10"
-                                                                       FontWeight="Bold"
-                                                                       Foreground="{DynamicResource PrimaryActionText}" />
-                                                        </Border>
-                                                    </Grid>
+                                                            <!-- Tag "Вы здесь" for current version -->
+                                                            <Border Grid.Column="1"
+                                                                    Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}"
+                                                                    Background="{DynamicResource BadgeNewBg}"
+                                                                    BorderBrush="{DynamicResource BadgeNewBorder}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="3"
+                                                                    Padding="6,2"
+                                                                    VerticalAlignment="Center"
+                                                                    Margin="6,0,0,0">
+                                                                <TextBlock Text="Вы здесь"
+                                                                           FontFamily="{StaticResource MainFont}"
+                                                                           FontSize="10"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource BadgeNewText}" />
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
                                                 </Button>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -948,7 +980,7 @@
                                                    FontFamily="{StaticResource HeadingFont}"
                                                    FontSize="16"
                                                    FontWeight="SemiBold"
-                                                   Foreground="{StaticResource EmberBrush}"
+                                                   Foreground="{DynamicResource Text70}"
                                                    Margin="12,4,0,0"
                                                    VerticalAlignment="Center" />
                                     </StackPanel>
@@ -981,21 +1013,26 @@
                                                         <!-- Pill Badge -->
                                                         <Border Grid.Column="0"
                                                                 CornerRadius="3"
+                                                                BorderThickness="1"
                                                                 Padding="8,3"
                                                                 Margin="0,0,12,0"
                                                                 VerticalAlignment="Top">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
-                                                                    <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                                                    <Setter Property="Background" Value="{DynamicResource BadgeNewBg}" />
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource BadgeNewBorder}" />
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding BadgeText}" Value="Новое">
-                                                                            <Setter Property="Background" Value="{StaticResource EmberBrush}" />
+                                                                            <Setter Property="Background" Value="{DynamicResource BadgeNewBg}" />
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource BadgeNewBorder}" />
                                                                         </DataTrigger>
                                                                         <DataTrigger Binding="{Binding BadgeText}" Value="Улучшено">
-                                                                            <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                                                            <Setter Property="Background" Value="{DynamicResource BadgeImprovedBg}" />
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource BadgeImprovedBorder}" />
                                                                         </DataTrigger>
                                                                         <DataTrigger Binding="{Binding BadgeText}" Value="Исправлено">
-                                                                            <Setter Property="Background" Value="{StaticResource Success}" />
+                                                                            <Setter Property="Background" Value="{DynamicResource BadgeFixedBg}" />
+                                                                            <Setter Property="BorderBrush" Value="{DynamicResource BadgeFixedBorder}" />
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
@@ -1004,13 +1041,19 @@
                                                             <TextBlock Text="{Binding BadgeText}"
                                                                        FontFamily="{StaticResource MainFont}"
                                                                        FontSize="11"
-                                                                       FontWeight="Bold">
+                                                                       FontWeight="SemiBold">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground" Value="{StaticResource TextWhite}" />
+                                                                        <Setter Property="Foreground" Value="{DynamicResource BadgeNewText}" />
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding BadgeText}" Value="Новое">
-                                                                                <Setter Property="Foreground" Value="{DynamicResource PrimaryActionText}" />
+                                                                                <Setter Property="Foreground" Value="{DynamicResource BadgeNewText}" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding BadgeText}" Value="Улучшено">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource BadgeImprovedText}" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding BadgeText}" Value="Исправлено">
+                                                                                <Setter Property="Foreground" Value="{DynamicResource BadgeFixedText}" />
                                                                             </DataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
@@ -1023,7 +1066,9 @@
                                                                    Text="{Binding Text}"
                                                                    FontFamily="{StaticResource MainFont}"
                                                                    FontSize="13"
-                                                                   Foreground="{StaticResource TextWhite}"
+                                                                   Foreground="{DynamicResource Text90}"
+                                                                   LineHeight="17"
+                                                                   LineStackingStrategy="BlockLineHeight"
                                                                    TextWrapping="Wrap"
                                                                    VerticalAlignment="Center" />
                                                     </Grid>
@@ -1038,16 +1083,14 @@
                         <!-- Footer Actions -->
                         <Grid Grid.Row="2" Margin="0,16,0,0">
                             <Button Command="{Binding CopyChangelogCommand}"
-                                    Style="{StaticResource SecondaryBtn}"
+                                    Style="{StaticResource ChangelogGlassBtn}"
                                     Content="Скопировать для друзей"
-                                    HorizontalAlignment="Left"
-                                    Height="34" Padding="16,0" FontSize="13" />
+                                    HorizontalAlignment="Left" />
 
                             <Button Command="{Binding CloseChangelogCommand}"
-                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Style="{StaticResource ChangelogPrimaryBtn}"
                                     Content="Понятно"
-                                    HorizontalAlignment="Right"
-                                    Height="34" Padding="24,0" FontSize="13" />
+                                    HorizontalAlignment="Right" />
                         </Grid>
                     </Grid>
                 </Border>
