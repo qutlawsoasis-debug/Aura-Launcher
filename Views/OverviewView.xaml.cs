@@ -68,13 +68,10 @@ public partial class OverviewView : UserControl
 
     private void AnimateEntrance()
     {
-        if (StoriesRail == null || StoriesRailTranslate == null) return;
+        if (StoriesRail == null) return;
 
         StoriesRail.BeginAnimation(UIElement.OpacityProperty, null);
-        StoriesRailTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
-
         StoriesRail.Opacity = 0.0;
-        StoriesRailTranslate.X = 24.0;
 
         var opacityAnim = new DoubleAnimation
         {
@@ -84,16 +81,7 @@ public partial class OverviewView : UserControl
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
 
-        var translateAnim = new DoubleAnimation
-        {
-            From = 24.0,
-            To = 0.0,
-            Duration = TimeSpan.FromMilliseconds(240),
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-        };
-
         StoriesRail.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
-        StoriesRailTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, translateAnim);
     }
 
     private void AttachWindow()
@@ -140,30 +128,6 @@ public partial class OverviewView : UserControl
         if (StoriesRail.Visibility != Visibility.Visible)
         {
             StoriesRail.Visibility = Visibility.Visible;
-        }
-
-        double availableHeight = ActualHeight > 0 ? ActualHeight : Math.Max(0, _parentWindow.ActualHeight - 108);
-        bool showFourthCard = availableHeight >= 560;
-
-        if (CardNextGoalTextRow != null &&
-            CardNextGoalDividerRow != null &&
-            CardNextGoalText != null &&
-            CardNextGoalDivider != null)
-        {
-            if (showFourthCard)
-            {
-                CardNextGoalTextRow.Height = GridLength.Auto;
-                CardNextGoalDividerRow.Height = GridLength.Auto;
-                CardNextGoalText.Visibility = Visibility.Visible;
-                CardNextGoalDivider.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                CardNextGoalTextRow.Height = new GridLength(0);
-                CardNextGoalDividerRow.Height = new GridLength(0);
-                CardNextGoalText.Visibility = Visibility.Collapsed;
-                CardNextGoalDivider.Visibility = Visibility.Collapsed;
-            }
         }
     }
 }

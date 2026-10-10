@@ -703,7 +703,7 @@
         </Setter>
     </Style>
 
-    <!-- Settings RAM Slider (track 8px dark/ember, thumb 14x22 radius 3) -->
+    <!-- Settings RAM Slider (track 8px glass/ember, thumb 14x22 radius 3) -->
     <Style x:Key="SettingsRamSlider" TargetType="Slider">
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="OverridesDefaultStyle" Value="True" />
@@ -715,8 +715,8 @@
                     <Grid VerticalAlignment="Center">
                         <!-- Base Track -->
                         <Border Height="8"
-                                Background="#0C141A"
-                                BorderBrush="#2EFFFFFF"
+                                Background="{DynamicResource PanelGlass}"
+                                BorderBrush="{StaticResource LineInkBrush}"
                                 BorderThickness="1"
                                 CornerRadius="3"
                                 VerticalAlignment="Center" />
@@ -726,10 +726,16 @@
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
                                             <Border Height="6"
-                                                    Background="#66F2A63C"
                                                     CornerRadius="3,0,0,3"
                                                     Margin="1,0,0,0"
-                                                    VerticalAlignment="Center" />
+                                                    VerticalAlignment="Center">
+                                                <Border.Background>
+                                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                        <GradientStop Color="#EB962B" Offset="0" />
+                                                        <GradientStop Color="#F7B44F" Offset="1" />
+                                                    </LinearGradientBrush>
+                                                </Border.Background>
+                                            </Border>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
                                 </RepeatButton>
@@ -785,7 +791,7 @@
                         <Border x:Name="CheckBorder"
                                 Width="20" Height="20"
                                 CornerRadius="3"
-                                Background="#1AFFFFFF"
+                                Background="{DynamicResource PanelGlass}"
                                 BorderBrush="{StaticResource LineInkBrush}"
                                 BorderThickness="1"
                                 VerticalAlignment="Center">
@@ -797,6 +803,7 @@
                                   StrokeThickness="2"
                                   StrokeDashArray="30,30"
                                   StrokeDashOffset="30"
+                                  Opacity="0"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center" />
                         </Border>
@@ -806,13 +813,18 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="CheckBorder" Property="Background" Value="#38FFFFFF" />
                             <Setter TargetName="CheckBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
+                            <Setter TargetName="CheckGlyph" Property="Opacity" Value="1" />
                             <Trigger.EnterActions>
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="CheckGlyph"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0" To="1"
+                                                         Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="CheckGlyph"
                                                          Storyboard.TargetProperty="StrokeDashOffset"
-                                                         To="0"
-                                                         Duration="0:0:0.22">
+                                                         From="30" To="0"
+                                                         Duration="0:0:0.20">
                                             <DoubleAnimation.EasingFunction>
                                                 <CubicEase EasingMode="EaseOut" />
                                             </DoubleAnimation.EasingFunction>
@@ -824,9 +836,13 @@
                                 <BeginStoryboard>
                                     <Storyboard>
                                         <DoubleAnimation Storyboard.TargetName="CheckGlyph"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="1" To="0"
+                                                         Duration="0:0:0.12" />
+                                        <DoubleAnimation Storyboard.TargetName="CheckGlyph"
                                                          Storyboard.TargetProperty="StrokeDashOffset"
-                                                         To="30"
-                                                         Duration="0:0:0.18">
+                                                         From="0" To="30"
+                                                         Duration="0:0:0.15">
                                             <DoubleAnimation.EasingFunction>
                                                 <CubicEase EasingMode="EaseIn" />
                                             </DoubleAnimation.EasingFunction>

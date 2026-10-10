@@ -91,6 +91,59 @@ public class OverviewViewModel : ObservableObject
     public bool HasAchievementsPage => false;
 
     public RelayCommand OpenAchievementsCommand { get; }
+    public RelayCommand SelectStoryCommand { get; }
+    public RelayCommand PauseCarouselCommand { get; }
+    public RelayCommand ResumeCarouselCommand { get; }
+
+    private int _activeStoryIndex = 0;
+    private double _storyProgress = 0.0;
+    private bool _isCarouselPaused = false;
+    private readonly System.Windows.Threading.DispatcherTimer _carouselTimer;
+
+    public int ActiveStoryIndex
+    {
+        get => _activeStoryIndex;
+        set
+        {
+            if (SetProperty(ref _activeStoryIndex, value))
+            {
+                UpdateStoryProgresses();
+                OnPropertyChanged(nameof(IsStory0Active));
+                OnPropertyChanged(nameof(IsStory1Active));
+                OnPropertyChanged(nameof(IsStory2Active));
+            }
+        }
+    }
+
+    public bool IsStory0Active => ActiveStoryIndex == 0;
+    public bool IsStory1Active => ActiveStoryIndex == 1;
+    public bool IsStory2Active => ActiveStoryIndex == 2;
+
+    public System.Windows.GridLength Story0FilledStar => new System.Windows.GridLength(Math.Clamp(Story0Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
+    public System.Windows.GridLength Story0EmptyStar => new System.Windows.GridLength(Math.Clamp(1.0 - Story0Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
+
+    public System.Windows.GridLength Story1FilledStar => new System.Windows.GridLength(Math.Clamp(Story1Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
+    public System.Windows.GridLength Story1EmptyStar => new System.Windows.GridLength(Math.Clamp(1.0 - Story1Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
+
+    public System.Windows.GridLength Story2FilledStar => new System.Windows.GridLength(Math.Clamp(Story2Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
+    public System.Windows.GridLength Story2EmptyStar => new System.Windows.GridLength(Math.Clamp(1.0 - Story2Progress, 0.001, 0.999), System.Windows.GridUnitType.Star);
+
+    public double Story0Progress => ActiveStoryIndex > 0 ? 1.0 : (ActiveStoryIndex == 0 ? _storyProgress : 0.0);
+    public double Story1Progress => ActiveStoryIndex > 1 ? 1.0 : (ActiveStoryIndex == 1 ? _storyProgress : 0.0);
+    public double Story2Progress => ActiveStoryIndex > 2 ? 1.0 : (ActiveStoryIndex == 2 ? _storyProgress : 0.0);
+
+    private void UpdateStoryProgresses()
+    {
+        OnPropertyChanged(nameof(Story0Progress));
+        OnPropertyChanged(nameof(Story1Progress));
+        OnPropertyChanged(nameof(Story2Progress));
+        OnPropertyChanged(nameof(Story0FilledStar));
+        OnPropertyChanged(nameof(Story0EmptyStar));
+        OnPropertyChanged(nameof(Story1FilledStar));
+        OnPropertyChanged(nameof(Story1EmptyStar));
+        OnPropertyChanged(nameof(Story2FilledStar));
+        OnPropertyChanged(nameof(Story2EmptyStar));
+    }
 
     public OverviewViewModel(IConfigService configService, IGameLaunchService launchService, IBackgroundService? backgroundService = null)
     {
@@ -107,10 +160,40 @@ public class OverviewViewModel : ObservableObject
             };
         }
 
-        OpenAchievementsCommand = new RelayCommand(_ =>
+        OpenAchievementsCommand = new RelayCommand(_ => { });
+
+        SelectStoryCommand = new RelayCommand(param =>
         {
-            // Открывает страницу достижений, если её нет — ничего не делает
+            if (param != null && int.TryParse(param.ToString(), out int idx) && idx >= 0 && idx <= 2)
+            {
+                _storyProgress = 0.0;
+                ActiveStoryIndex = idx;
+            }
         });
+
+        PauseCarouselCommand = new RelayCommand(_ => _isCarouselPaused = true);
+        ResumeCarouselCommand = new RelayCommand(_ => _isCarouselPaused = false);
+
+        _carouselTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+        _carouselTimer.Tick += (s, e) =>
+        {
+            if (_isCarouselPaused) return;
+
+            _storyProgress += 0.01; // 5000ms / 50ms = 100 steps
+            if (_storyProgress >= 1.0)
+            {
+                _storyProgress = 0.0;
+                ActiveStoryIndex = (ActiveStoryIndex + 1) % 3;
+            }
+            else
+            {
+                UpdateStoryProgresses();
+            }
+        };
+        _carouselTimer.Start();
 
         RefreshStats();
 
