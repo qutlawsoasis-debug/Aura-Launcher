@@ -934,6 +934,7 @@ public partial class MainWindow : Window
         {
             AuraWindowChrome.CaptionHeight = _isFullscreen ? 0 : 40;
             AuraWindowChrome.CornerRadius = isBorderFull ? new CornerRadius(0) : new CornerRadius(3);
+            AuraWindowChrome.ResizeBorderThickness = isBorderFull ? new Thickness(0) : new Thickness(5);
         }
         try
         {

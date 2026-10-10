@@ -677,7 +677,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Brd" Background="{TemplateBinding Background}">
+                    <Border x:Name="Brd" Background="Transparent" WindowChrome.IsHitTestVisibleInChrome="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -702,7 +702,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Brd" Background="{TemplateBinding Background}">
+                    <Border x:Name="Brd" Background="Transparent" WindowChrome.IsHitTestVisibleInChrome="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>
@@ -728,7 +728,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="Brd" Background="{TemplateBinding Background}">
+                    <Border x:Name="Brd" Background="Transparent" WindowChrome.IsHitTestVisibleInChrome="True">
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <ControlTemplate.Triggers>

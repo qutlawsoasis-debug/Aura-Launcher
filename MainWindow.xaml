@@ -20,7 +20,7 @@
         FocusVisualStyle="{x:Null}">
 
     <WindowChrome.WindowChrome>
-        <WindowChrome x:Name="AuraWindowChrome" GlassFrameThickness="0,0,0,1" CornerRadius="3" CaptionHeight="32" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
+        <WindowChrome x:Name="AuraWindowChrome" GlassFrameThickness="0,0,0,1" CornerRadius="3" CaptionHeight="40" ResizeBorderThickness="5" UseAeroCaptionButtons="False" NonClientFrameEdges="None" />
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
@@ -139,9 +139,6 @@
     <!-- Outer Window Border -->
     <Border x:Name="OuterWindowBorder" Background="{StaticResource NightBrush}" BorderThickness="0" BorderBrush="{StaticResource LineInkBrush}" CornerRadius="0" ClipToBounds="True">
         <Grid>
-            <!-- Top Transparent Window Drag Zone (~32px) -->
-            <Border Height="32" VerticalAlignment="Top" Background="Transparent" Panel.ZIndex="5" />
-
             <!-- 0. DYNAMIC ROTATING BACKGROUND WITH SMOOTH CROSS-FADE -->
             <Grid x:Name="BackgroundHost" ClipToBounds="True">
                 <Image x:Name="BgImageCurrent"
@@ -239,13 +236,14 @@
                       MouseEnter="SoundControl_MouseEnter"
                       MouseLeave="SoundControl_MouseLeave"
                       Height="34" Margin="0,0,4,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
                         <!-- Sliding Volume Box to the LEFT (Width 0 -> 180) -->
                         <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0" WindowChrome.IsHitTestVisibleInChrome="True">
                                 <!-- Prev Track -->
                                 <Button Command="{Binding PreviousTrackCommand}"
                                         Style="{StaticResource WinSoundBtn}"
+                                        WindowChrome.IsHitTestVisibleInChrome="True"
                                         ToolTip="Предыдущий трек"
                                         Width="20" Height="22" Margin="0,0,2,0">
                                     <Path Style="{StaticResource IconPath}"
@@ -258,6 +256,7 @@
                                 <!-- Play/Pause -->
                                 <Button Command="{Binding TogglePlayPauseCommand}"
                                         Style="{StaticResource WinSoundBtn}"
+                                        WindowChrome.IsHitTestVisibleInChrome="True"
                                         ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Музыка: {0}'}"
                                         Width="20" Height="22" Margin="0,0,2,0">
                                     <Path Style="{StaticResource IconPath}"
@@ -270,6 +269,7 @@
                                 <!-- Next Track -->
                                 <Button Command="{Binding NextTrackCommand}"
                                         Style="{StaticResource WinSoundBtn}"
+                                        WindowChrome.IsHitTestVisibleInChrome="True"
                                         ToolTip="Следующий трек"
                                         Width="20" Height="22" Margin="0,0,6,0">
                                     <Path Style="{StaticResource IconPath}"
@@ -284,6 +284,7 @@
                                         Value="{Binding AnthemVolume, Mode=TwoWay}"
                                         Style="{StaticResource HeaderVolumeSlider}"
                                         Width="74"
+                                        WindowChrome.IsHitTestVisibleInChrome="True"
                                         ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Громкость: {0}% • {1}'}" />
                             </StackPanel>
                         </Border>
@@ -291,6 +292,7 @@
                         <!-- Sound Button -->
                         <Button Command="{Binding ToggleMuteCommand}"
                                 Style="{StaticResource WinSoundBtn}"
+                                WindowChrome.IsHitTestVisibleInChrome="True"
                                 ToolTip="Гимн: звук включён / выключен">
                             <Grid Width="16" Height="16">
                                 <!-- Sound On -->
@@ -317,9 +319,13 @@
                 </Grid>
 
                 <!-- Minimize, Maximize/Restore & Close Buttons -->
-                <Button Command="{Binding MinimizeWindowCommand}" Style="{StaticResource WinControlBtn}" Content="—" ToolTip="Свернуть" />
+                <Button Command="{Binding MinimizeWindowCommand}"
+                        Style="{StaticResource WinControlBtn}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        Content="—" ToolTip="Свернуть" />
                 <Button Command="{Binding ToggleMaximizeWindowCommand}"
                         Style="{StaticResource WinControlBtn}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
                         ToolTip="{Binding MaximizeRestoreToolTip}">
                     <Grid Width="11" Height="11">
                         <!-- State 1: In windowed mode -> Single square (Expand / Во весь экран) -->
@@ -338,7 +344,10 @@
                               Visibility="{Binding IsWindowMaximized, Converter={StaticResource BoolToVis}}" />
                     </Grid>
                 </Button>
-                <Button Command="{Binding CloseWindowCommand}" Style="{StaticResource WinCloseBtn}" ToolTip="Закрыть">
+                <Button Command="{Binding CloseWindowCommand}"
+                        Style="{StaticResource WinCloseBtn}"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        ToolTip="Закрыть">
                     <Path Style="{StaticResource IconPath}"
                           Data="{StaticResource IconClose}"
                           Width="10" Height="10"
