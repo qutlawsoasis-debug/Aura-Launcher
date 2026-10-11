@@ -159,7 +159,7 @@ public partial class StoriesCarousel : UserControl
     private void OnIndicator0MouseEnter(object sender, MouseEventArgs e)
     {
         AnimateBarHeight(Indicator0Track, 5.0);
-        ScheduleIndicatorPopup(IndicatorBtn0, "Скриншот");
+        ScheduleIndicatorPopup(IndicatorBtn0, "Скриншоты");
     }
 
     private void OnIndicator0MouseLeave(object sender, MouseEventArgs e)

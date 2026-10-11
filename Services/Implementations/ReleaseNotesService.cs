@@ -36,8 +36,21 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = currentUserFacing,
                 InternalVersion = currentInternal,
                 DateText = "11 октября 2026",
-                ShortTitle = "Профиль и приватность",
+                ShortTitle = "Скриншоты и новости",
                 IsCurrent = true,
+                Items = new List<ReleaseNoteItem>
+                {
+                    ReleaseNoteItem.Parse("[Улучшено] Отображение недавних скриншотов на главном экране"),
+                    ReleaseNoteItem.Parse("[Улучшено] Аккуратное расположение списка изменений в новостях")
+                }
+            },
+            new ReleaseNoteVersion
+            {
+                Version = "beta 1.0.77",
+                InternalVersion = "1.2.85",
+                DateText = "11 октября 2026",
+                ShortTitle = "Профиль и приватность",
+                IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
                     ReleaseNoteItem.Parse("[Исправлено] Сбой при запуске лаунчера после обновления"),

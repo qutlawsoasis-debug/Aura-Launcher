@@ -26,7 +26,7 @@
         </StackPanel>
 
         <!-- 3 главных пункта -->
-        <ItemsControl Grid.Row="1" ItemsSource="{Binding TopWhatsNewLines}" VerticalAlignment="Center">
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding TopWhatsNewLines}" VerticalAlignment="Top" Margin="0,6,0,0">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <Grid Margin="0,0,0,12">

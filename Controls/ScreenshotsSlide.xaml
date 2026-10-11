@@ -23,7 +23,7 @@
         <!-- 0. Заголовок -->
         <StackPanel Grid.Row="0" Margin="0,4,0,14">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                <TextBlock Text="ПОСЛЕДНИЙ СКРИНШОТ"
+                <TextBlock Text="СКРИНШОТЫ"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="22"
                            FontWeight="SemiBold"
@@ -67,60 +67,70 @@
                            TextWrapping="Wrap" />
             </StackPanel>
 
-            <!-- 1b. Карточка со скриншотом в реальных пропорциях без обрезки -->
-            <Button Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}"
-                    Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                    CommandParameter="{Binding LatestScreenshot}"
-                    Style="{StaticResource StoryBarBtn}"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Center"
-                    Cursor="Hand">
-                <Border Background="{DynamicResource StoriesCardGlass}"
-                        BorderBrush="{DynamicResource StoriesCardBorder}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        ClipToBounds="True">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+            <!-- 1b. Список скриншотов (начинается сверху, 16:9 картинки, 2-3 штуки) -->
+            <ScrollViewer Visibility="{Binding HasLatestScreenshot, Converter={StaticResource BoolToVis}}"
+                          Style="{StaticResource AuraScrollViewer}"
+                          VerticalAlignment="Top"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding RecentScreenshots}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.OpenOverviewScreenshotCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"
+                                    Style="{StaticResource StoryCardBtn}"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,0,0,10">
+                                <Border Background="{DynamicResource StoriesCardGlass}"
+                                        BorderBrush="{DynamicResource StoriesCardBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="3"
+                                        ClipToBounds="True">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
 
-                        <!-- Превью скриншота: режим Uniform гарантирует полное отображение 16:9 без обрезки -->
-                        <Border Grid.Row="0"
-                                Background="{DynamicResource MediaPlaceholder}"
-                                MinHeight="160"
-                                MaxHeight="320">
-                            <Image Source="{Binding FeedImage0}"
-                                   Stretch="Uniform"
-                                   RenderOptions.BitmapScalingMode="HighQuality"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center" />
-                        </Border>
+                                        <!-- 16:9 превью скриншота -->
+                                        <Border Grid.Row="0"
+                                                Height="114"
+                                                Background="{DynamicResource MediaPlaceholder}"
+                                                ClipToBounds="True">
+                                            <Image Source="{Binding Thumbnail}"
+                                                   Stretch="UniformToFill"
+                                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                        </Border>
 
-                        <!-- Инфо-полоса внизу карточки -->
-                        <Border Grid.Row="1"
-                                Background="{DynamicResource PanelRaised}"
-                                BorderBrush="{DynamicResource BorderSubtle}"
-                                BorderThickness="0,1,0,0"
-                                Padding="10,8">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Path Style="{StaticResource IconPath}"
-                                      Data="{StaticResource IconCamera}"
-                                      Width="12" Height="12"
-                                      Stroke="{StaticResource EmberBrush}"
-                                      Margin="0,0,6,0"
-                                      VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding LatestScreenshotDateText}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           Foreground="{DynamicResource Text90}"
-                                           VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </Border>
-            </Button>
+                                        <!-- Инфо-полоса внизу карточки -->
+                                        <Border Grid.Row="1"
+                                                Background="{DynamicResource PanelRaised}"
+                                                BorderBrush="{DynamicResource BorderSubtle}"
+                                                BorderThickness="0,1,0,0"
+                                                Padding="8,5">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Path Style="{StaticResource IconPath}"
+                                                      Data="{StaticResource IconCamera}"
+                                                      Width="11" Height="11"
+                                                      Stroke="{StaticResource EmberBrush}"
+                                                      Margin="0,0,6,0"
+                                                      VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding DateFormatted}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="11"
+                                                           Foreground="{DynamicResource Text90}"
+                                                           VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
         </Grid>
 
         <!-- 2. Кнопка действия снизу -->

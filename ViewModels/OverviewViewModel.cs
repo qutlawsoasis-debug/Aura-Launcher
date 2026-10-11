@@ -212,6 +212,8 @@ public class OverviewViewModel : ObservableObject
 
     private bool _hasRightFeed;
 
+    public ObservableCollection<ScreenshotItem> RecentScreenshots { get; } = new();
+
     public ScreenshotItem? LatestScreenshot
     {
         get => _latestScreenshot;
@@ -441,6 +443,7 @@ public class OverviewViewModel : ObservableObject
 
             if (!Directory.Exists(screensDir))
             {
+                RecentScreenshots.Clear();
                 LatestScreenshot = null;
                 LatestScreenshotDateText = string.Empty;
                 HasLatestScreenshot = false;
@@ -451,11 +454,12 @@ public class OverviewViewModel : ObservableObject
             var di = new DirectoryInfo(screensDir);
             var recentFiles = di.GetFiles("*.png")
                 .OrderByDescending(f => f.LastWriteTimeUtc)
-                .Take(1)
+                .Take(3)
                 .ToArray();
 
             if (recentFiles.Length == 0)
             {
+                RecentScreenshots.Clear();
                 LatestScreenshot = null;
                 LatestScreenshotDateText = string.Empty;
                 HasLatestScreenshot = false;
@@ -463,37 +467,74 @@ public class OverviewViewModel : ObservableObject
                 return;
             }
 
-            var latestFile = recentFiles[0];
-
-            if (LatestScreenshot == null ||
-                !string.Equals(LatestScreenshot.FullPath, latestFile.FullName, StringComparison.OrdinalIgnoreCase) ||
-                LatestScreenshot.CreatedDate != latestFile.LastWriteTime)
+            var newItems = new List<ScreenshotItem>();
+            foreach (var file in recentFiles)
             {
-                var bmp0 = TryLoadScreenshotBitmap(latestFile.FullName);
-                if (bmp0 == null)
-                {
-                    LatestScreenshot = null;
-                    LatestScreenshotDateText = string.Empty;
-                    HasLatestScreenshot = false;
-                    FeedImage0 = null;
-                    return;
-                }
+                var existing = RecentScreenshots.FirstOrDefault(s =>
+                    string.Equals(s.FullPath, file.FullName, StringComparison.OrdinalIgnoreCase) &&
+                    s.CreatedDate == file.LastWriteTime);
 
-                LatestScreenshot = new ScreenshotItem
+                if (existing != null)
                 {
-                    FileName = latestFile.Name,
-                    FullPath = latestFile.FullName,
-                    CreatedDate = latestFile.LastWriteTime,
-                    Thumbnail = bmp0
-                };
+                    newItems.Add(existing);
+                }
+                else
+                {
+                    var bmp = TryLoadScreenshotBitmap(file.FullName);
+                    if (bmp != null)
+                    {
+                        newItems.Add(new ScreenshotItem
+                        {
+                            FileName = file.Name,
+                            FullPath = file.FullName,
+                            CreatedDate = file.LastWriteTime,
+                            Thumbnail = bmp
+                        });
+                    }
+                }
             }
 
-            LatestScreenshotDateText = latestFile.LastWriteTime.ToString("dd.MM.yyyy HH:mm");
+            if (newItems.Count == 0)
+            {
+                RecentScreenshots.Clear();
+                LatestScreenshot = null;
+                LatestScreenshotDateText = string.Empty;
+                HasLatestScreenshot = false;
+                FeedImage0 = null;
+                return;
+            }
+
+            bool isSame = RecentScreenshots.Count == newItems.Count;
+            if (isSame)
+            {
+                for (int i = 0; i < newItems.Count; i++)
+                {
+                    if (RecentScreenshots[i].FullPath != newItems[i].FullPath ||
+                        RecentScreenshots[i].CreatedDate != newItems[i].CreatedDate)
+                    {
+                        isSame = false;
+                        break;
+                    }
+                }
+            }
+
+            if (!isSame)
+            {
+                RecentScreenshots.Clear();
+                foreach (var it in newItems)
+                {
+                    RecentScreenshots.Add(it);
+                }
+            }
+
+            LatestScreenshot = RecentScreenshots[0];
+            LatestScreenshotDateText = LatestScreenshot.CreatedDate.ToString("dd.MM.yyyy HH:mm");
             HasLatestScreenshot = true;
             FeedImage0 = LatestScreenshot.Thumbnail;
         }
         catch
         {
+            RecentScreenshots.Clear();
             LatestScreenshot = null;
             LatestScreenshotDateText = string.Empty;
             HasLatestScreenshot = false;

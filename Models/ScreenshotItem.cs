@@ -11,4 +11,6 @@ public class ScreenshotItem : ObservableObject
     public DateTime CreatedDate { get; set; } = DateTime.MinValue;
     public string SizeFormatted { get; set; } = string.Empty;
     public BitmapSource? Thumbnail { get; set; }
+
+    public string DateFormatted => CreatedDate != DateTime.MinValue ? CreatedDate.ToString("dd.MM.yyyy HH:mm") : string.Empty;
 }

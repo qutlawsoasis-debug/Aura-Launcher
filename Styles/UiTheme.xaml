@@ -575,6 +575,32 @@
         </Setter>
     </Style>
 
+    <!-- Story Card Button for carousel slides (full stretch, no fixed height) -->
+    <Style x:Key="StoryCardBtn" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Opacity" Value="0.88" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Bad / Destructive Link Button -->
     <Style x:Key="BadLinkBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
