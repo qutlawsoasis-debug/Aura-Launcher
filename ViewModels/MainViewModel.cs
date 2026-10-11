@@ -55,6 +55,7 @@ public class MainViewModel : ObservableObject
     private bool _hasUpdateDot;
     private bool _isToastDismissedForSession;
     private string? _pendingNewVersion;
+    private string? _lastNotifiedLauncherUpdateVersion;
     private readonly IFriendService? _friendService;
     private readonly INotificationService? _notificationService;
     private readonly IDiscordRpcService? _discordRpcService;
@@ -742,6 +743,7 @@ public class MainViewModel : ObservableObject
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
         _notificationService = notificationService;
+        _notificationService?.ClearUpdateNotifications();
         _discordRpcService = discordRpcService;
         _reportService = reportService ?? new ReportService(configService, notificationService ?? new NotificationService(configService));
         _achievementService = achievementService;
@@ -1147,12 +1149,14 @@ public class MainViewModel : ObservableObject
         {
             _isToastDismissedForSession = true;
             IsUpdateBannerVisible = false;
+            _notificationService?.ClearUpdateNotifications();
         });
 
         ApplyBannerUpdateCommand = new AsyncRelayCommand(async () =>
         {
             if (IsGameRunning) return;
             IsUpdateBannerVisible = false;
+            _notificationService?.ClearUpdateNotifications();
 
             if (_isLauncherUpdatePending)
             {
@@ -1780,8 +1784,11 @@ public class MainViewModel : ObservableObject
                     _pendingNewVersion = newVersion;
                     HasUpdateDot = true;
 
-                    if (!_isToastDismissedForSession && !IsGameRunning)
+                    if (!_isToastDismissedForSession && !IsGameRunning && !string.Equals(_lastNotifiedLauncherUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
                     {
+                        _lastNotifiedLauncherUpdateVersion = newVersion;
+                        _isToastDismissedForSession = true;
+
                         var parts = newVersion.Split('.');
                         string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
                             ? $"beta 1.0.{patch - 8}"
@@ -1791,6 +1798,18 @@ public class MainViewModel : ObservableObject
                         UpdateBannerButtonText = "Обновить";
                         OnPropertyChanged(nameof(UpdateBannerMessage));
                         IsUpdateBannerVisible = true;
+                    }
+                }
+                else
+                {
+                    _notificationService?.ClearUpdateNotifications();
+                    if (_isLauncherUpdatePending)
+                    {
+                        _isLauncherUpdatePending = false;
+                        _pendingNewVersion = null;
+                        _lastNotifiedLauncherUpdateVersion = null;
+                        IsUpdateBannerVisible = false;
+                        HasUpdateDot = false;
                     }
                 }
             }
@@ -1894,7 +1913,7 @@ public class MainViewModel : ObservableObject
         _backgroundUpdateTimer?.Stop();
         _backgroundUpdateTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMinutes(2)
+            Interval = TimeSpan.FromMinutes(20)
         };
         _backgroundUpdateTimer.Tick += async (s, e) =>
         {
@@ -1922,8 +1941,11 @@ public class MainViewModel : ObservableObject
                     _pendingNewVersion = newVersion;
                     HasUpdateDot = true;
 
-                    if (!_isToastDismissedForSession && !IsGameRunning)
+                    if (!_isToastDismissedForSession && !IsGameRunning && !string.Equals(_lastNotifiedLauncherUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
                     {
+                        _lastNotifiedLauncherUpdateVersion = newVersion;
+                        _isToastDismissedForSession = true;
+
                         var parts = newVersion.Split('.');
                         string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
                             ? $"beta 1.0.{patch - 8}"
@@ -1939,6 +1961,18 @@ public class MainViewModel : ObservableObject
                             "Нажмите, чтобы установить новую версию лаунчера.");
                     }
                     return;
+                }
+                else
+                {
+                    _notificationService?.ClearUpdateNotifications();
+                    if (_isLauncherUpdatePending)
+                    {
+                        _isLauncherUpdatePending = false;
+                        _pendingNewVersion = null;
+                        _lastNotifiedLauncherUpdateVersion = null;
+                        IsUpdateBannerVisible = false;
+                        HasUpdateDot = false;
+                    }
                 }
             }
 

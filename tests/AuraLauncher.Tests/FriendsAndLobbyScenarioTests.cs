@@ -685,6 +685,7 @@ public class FriendsAndLobbyScenarioTests
         public void NotifyGameCrash(int exitCode, string? reason = null) { }
         public void NotifyKickedFromLobby() { }
         public void NotifyUpdateAvailable(string updateTitle, string updateMessage) { }
+        public void ClearUpdateNotifications() { }
         public void NotifyIntegrityChecked(string statusText) { }
         public bool IsWindowVisibleAndFocused() => true;
         public void RegisterInAppToastHandler(Action<string, string, string, string?> showToast) { }

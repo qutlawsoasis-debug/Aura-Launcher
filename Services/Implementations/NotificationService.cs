@@ -154,7 +154,35 @@ public class NotificationService : INotificationService
 
         if (!IsWindowVisibleAndFocused() && (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true))
         {
-            ShowWindowsToast(updateTitle, updateMessage, "Overview");
+            try
+            {
+                new ToastContentBuilder()
+                    .AddText(updateTitle)
+                    .AddText(updateMessage)
+                    .AddArgument("action", "openTab")
+                    .AddArgument("tab", "Overview")
+                    .Show(toast =>
+                    {
+                        toast.Tag = "launcher-update";
+                        toast.Group = "updates";
+                    });
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[NOTIFICATION: WIN TOAST ERROR] {ex.Message}");
+            }
+        }
+    }
+
+    public void ClearUpdateNotifications()
+    {
+        try
+        {
+            ToastNotificationManagerCompat.History.Remove("launcher-update", "updates");
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[NOTIFICATION: CLEAR ERROR] {ex.Message}");
         }
     }
 

@@ -157,6 +157,14 @@ public class LauncherUpdateService : ILauncherUpdateService
             }
 
             var targetVersion = updateInfo.TargetFullRelease?.Version?.ToFullString() ?? "новая версия";
+            if (updateInfo.TargetFullRelease?.Version != null &&
+                SemanticVersion.TryParse(CurrentVersion, out var curSemVer) &&
+                updateInfo.TargetFullRelease.Version <= curSemVer)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Версия {targetVersion} не новее текущей {CurrentVersion}. Обновление не требуется.");
+                return null;
+            }
+
             FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE] Найдено обновление лаунчера: {targetVersion}");
             return targetVersion;
         }

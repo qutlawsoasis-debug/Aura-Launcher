@@ -36,8 +36,21 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = currentUserFacing,
                 InternalVersion = currentInternal,
                 DateText = "11 октября 2026",
-                ShortTitle = "Миры друзей",
+                ShortTitle = "Уведомления без спама",
                 IsCurrent = true,
+                Items = new List<ReleaseNoteItem>
+                {
+                    ReleaseNoteItem.Parse("[Исправлено] Спам уведомлениями об обновлении лаунчера в Windows"),
+                    ReleaseNoteItem.Parse("[Исправлено] Зависание старых уведомлений после завершения обновления")
+                }
+            },
+            new ReleaseNoteVersion
+            {
+                Version = "beta 1.0.79",
+                InternalVersion = "1.2.87",
+                DateText = "11 октября 2026",
+                ShortTitle = "Миры друзей",
+                IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
                     ReleaseNoteItem.Parse("[Улучшено] Миры в профиле теперь видны друзьям по умолчанию"),

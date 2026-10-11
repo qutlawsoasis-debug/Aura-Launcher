@@ -13,6 +13,7 @@ public interface INotificationService
     void NotifyGameCrash(int exitCode, string? reason = null);
     void NotifyKickedFromLobby();
     void NotifyUpdateAvailable(string updateTitle, string updateMessage);
+    void ClearUpdateNotifications();
     void NotifyIntegrityChecked(string statusText);
     bool IsWindowVisibleAndFocused();
     void RegisterInAppToastHandler(Action<string, string, string, string?> showToast);
