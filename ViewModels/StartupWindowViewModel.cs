@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Media;
 using AuraLauncher.Core;
 using AuraLauncher.Models;
+using AuraLauncher.Services.Implementations;
 using AuraLauncher.Services.Interfaces;
 
 namespace AuraLauncher.ViewModels;
@@ -218,7 +219,7 @@ public class StartupWindowViewModel : ObservableObject
             try
             {
                 using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeoutCts.CancelAfter(TimeSpan.FromSeconds(6));
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(10));
 
                 if (_launcherUpdateService.IsInstalled)
                 {
@@ -230,8 +231,9 @@ public class StartupWindowViewModel : ObservableObject
                     await Task.Delay(1200, timeoutCts.Token);
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                FabricGameLaunchService.LogLauncherEvent($"[LAUNCHER-UPDATE: ERROR] Ошибка проверки обновлений на стартовом экране: {ex.Message}");
                 checkSucceeded = false;
             }
 

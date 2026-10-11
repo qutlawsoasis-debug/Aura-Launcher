@@ -23,6 +23,23 @@ public class AuraDefaultsMod implements ModInitializer {
                 AuraDefaultsConfig.get().lockCheats);
 
         setupEmotes();
+        setupHostCommands();
+    }
+
+    private void setupHostCommands() {
+        net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            net.auramc.defaults.command.HostBanCommands.register(dispatcher);
+        });
+
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            try {
+                server.getPlayerManager().getUserBanList().load();
+                LOGGER.info("[aura-defaults] Loaded user ban list ({} entries)",
+                        server.getPlayerManager().getUserBanList().values().size());
+            } catch (Throwable t) {
+                LOGGER.warn("[aura-defaults] Could not load ban list: {}", t.getMessage());
+            }
+        });
     }
 
     private void setupEmotes() {

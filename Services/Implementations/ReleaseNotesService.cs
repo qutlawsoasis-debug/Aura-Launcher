@@ -35,14 +35,14 @@ public class ReleaseNotesService : IReleaseNotesService
             {
                 Version = currentUserFacing,
                 InternalVersion = currentInternal,
-                DateText = "10 октября 2026",
-                ShortTitle = "Обновление оформления",
+                DateText = "11 октября 2026",
+                ShortTitle = "Скриншоты и модерация",
                 IsCurrent = true,
                 Items = new List<ReleaseNoteItem>
                 {
-                    ReleaseNoteItem.Parse("[Новое] Полноэкранный просмотр заметок обновлений и руководство по оформлению релизов"),
-                    ReleaseNoteItem.Parse("[Улучшено] Приглушённые матовые оттенки и отсутствие просвечивания в окнах лаунчера"),
-                    ReleaseNoteItem.Parse("[Исправлено] Мгновенный отклик кнопок в заголовочной зоне и модальных окнах")
+                    ReleaseNoteItem.Parse("[Новое] Команды бана и кика для хоста мира"),
+                    ReleaseNoteItem.Parse("[Исправлено] Скриншоты в карусели больше не обрезаются по краям"),
+                    ReleaseNoteItem.Parse("[Улучшено] Стабильность проверки обновлений при запуске")
                 }
             },
             new ReleaseNoteVersion
