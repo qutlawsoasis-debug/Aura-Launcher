@@ -776,12 +776,13 @@ public class SettingsViewModel : ObservableObject
         try
         {
             var worlds = await _workshopService.GetWorldSavesAsync(_configService.CurrentConfig.GameDir);
-            var selectedSet = new HashSet<string>(_configService.CurrentConfig.SharedWorldFolderNames ?? new(), StringComparer.OrdinalIgnoreCase);
+            var hiddenSet = new HashSet<string>(_configService.CurrentConfig.HiddenWorldFolderNames ?? new(), StringComparer.OrdinalIgnoreCase);
 
             SharedWorlds.Clear();
             foreach (var w in worlds)
             {
-                SharedWorlds.Add(new SharedWorldItemViewModel(w, selectedSet.Contains(w.FolderName), OnWorldShareToggled));
+                bool isShared = !hiddenSet.Contains(w.FolderName);
+                SharedWorlds.Add(new SharedWorldItemViewModel(w, isShared, OnWorldShareToggled));
             }
         }
         catch { }
@@ -793,19 +794,19 @@ public class SettingsViewModel : ObservableObject
 
     private void OnWorldShareToggled(string folderName, bool isShared)
     {
-        var list = _configService.CurrentConfig.SharedWorldFolderNames ?? new List<string>();
+        var list = _configService.CurrentConfig.HiddenWorldFolderNames ?? new List<string>();
         if (isShared)
+        {
+            list.RemoveAll(x => string.Equals(x, folderName, StringComparison.OrdinalIgnoreCase));
+        }
+        else
         {
             if (!list.Contains(folderName, StringComparer.OrdinalIgnoreCase))
             {
                 list.Add(folderName);
             }
         }
-        else
-        {
-            list.RemoveAll(x => string.Equals(x, folderName, StringComparison.OrdinalIgnoreCase));
-        }
-        _configService.CurrentConfig.SharedWorldFolderNames = list;
+        _configService.CurrentConfig.HiddenWorldFolderNames = list;
         _ = SaveAndSyncSnapshotAsync();
     }
 

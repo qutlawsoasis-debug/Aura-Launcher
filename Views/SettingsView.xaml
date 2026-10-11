@@ -728,7 +728,7 @@
                                    FontSize="14"
                                    FontWeight="Medium"
                                    Foreground="{StaticResource InkBrush}" />
-                        <TextBlock Text="Только выбранные ниже миры будут видны вашим друзьям"
+                        <TextBlock Text="По умолчанию ваши одиночные миры видны друзьям в профиле"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
                                    Foreground="{StaticResource MuteBrush}"

@@ -323,7 +323,7 @@ public class FriendProfileViewModel : ObservableObject
             }
 
             // Worlds
-            bool showWorlds = profile.Privacy?.ShowWorlds ?? false;
+            bool showWorlds = profile.Privacy?.ShowWorlds ?? true;
             AreWorldsVisible = showWorlds;
 
             Worlds.Clear();

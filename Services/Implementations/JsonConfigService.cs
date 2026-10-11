@@ -281,6 +281,19 @@ public class JsonConfigService : IConfigService
             catch { }
         }
 
+        if (_currentConfig.HiddenWorldFolderNames == null)
+        {
+            _currentConfig.HiddenWorldFolderNames = new();
+        }
+
+        if (!_currentConfig.ShareWorldsWithFriends &&
+            (_currentConfig.HiddenWorldFolderNames.Count == 0) &&
+            (_currentConfig.SharedWorldFolderNames == null || _currentConfig.SharedWorldFolderNames.Count == 0))
+        {
+            _currentConfig.ShareWorldsWithFriends = true;
+            needSave = true;
+        }
+
         if (needSave)
         {
             try

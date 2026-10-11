@@ -233,6 +233,32 @@ public class NewFeaturesUnitTests
         }
     }
 
+    [Fact]
+    public void LauncherConfig_WorldSharing_DefaultsToTrueAndEmptyHiddenList()
+    {
+        var cfg = new LauncherConfig();
+        Assert.True(cfg.ShareWorldsWithFriends);
+        Assert.NotNull(cfg.HiddenWorldFolderNames);
+        Assert.Empty(cfg.HiddenWorldFolderNames);
+    }
+
+    [Fact]
+    public void JsonConfigService_MigratesUnconfiguredWorldSharingToTrue()
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"aura_test_cfg_{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(tempFile, @"{ ""Nickname"": ""Player1"", ""ShareWorldsWithFriends"": false, ""SharedWorldFolderNames"": [] }");
+            var svc = new JsonConfigService(tempFile);
+            Assert.True(svc.CurrentConfig.ShareWorldsWithFriends);
+            Assert.NotNull(svc.CurrentConfig.HiddenWorldFolderNames);
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
     private class MockSkinService : ISkinService
     {
         public SkinValidationResult ValidateSkinFile(string? filePath) => new(true);

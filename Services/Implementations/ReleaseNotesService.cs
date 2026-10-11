@@ -36,8 +36,21 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = currentUserFacing,
                 InternalVersion = currentInternal,
                 DateText = "11 октября 2026",
-                ShortTitle = "Скриншоты и новости",
+                ShortTitle = "Миры друзей",
                 IsCurrent = true,
+                Items = new List<ReleaseNoteItem>
+                {
+                    ReleaseNoteItem.Parse("[Улучшено] Миры в профиле теперь видны друзьям по умолчанию"),
+                    ReleaseNoteItem.Parse("[Улучшено] Управление видимостью отдельных одиночных миров в Настройках")
+                }
+            },
+            new ReleaseNoteVersion
+            {
+                Version = "beta 1.0.78",
+                InternalVersion = "1.2.86",
+                DateText = "11 октября 2026",
+                ShortTitle = "Скриншоты и новости",
+                IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
                     ReleaseNoteItem.Parse("[Улучшено] Отображение недавних скриншотов на главном экране"),

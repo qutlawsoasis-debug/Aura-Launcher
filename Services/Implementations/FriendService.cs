@@ -626,10 +626,10 @@ public class FriendService : IFriendService
                 try
                 {
                     var allWorlds = await _workshopService.GetWorldSavesAsync(cfg.GameDir);
-                    var sharedFolders = new HashSet<string>(cfg.SharedWorldFolderNames ?? new(), StringComparer.OrdinalIgnoreCase);
+                    var hiddenFolders = new HashSet<string>(cfg.HiddenWorldFolderNames ?? new(), StringComparer.OrdinalIgnoreCase);
                     foreach (var w in allWorlds)
                     {
-                        if (sharedFolders.Contains(w.FolderName))
+                        if (!hiddenFolders.Contains(w.FolderName))
                         {
                             long lp = w.LastPlayed != DateTime.MinValue
                                 ? new DateTimeOffset(w.LastPlayed).ToUnixTimeMilliseconds()

@@ -47,6 +47,7 @@ public class LauncherConfig
     public string? JvmArgs { get; set; }
     public bool ShareStatsWithFriends { get; set; } = true;
     public bool ShareAchievementsWithFriends { get; set; } = true;
-    public bool ShareWorldsWithFriends { get; set; } = false;
-    public System.Collections.Generic.List<string> SharedWorldFolderNames { get; set; } = new();
+    public bool ShareWorldsWithFriends { get; set; } = true;
+    public System.Collections.Generic.List<string> HiddenWorldFolderNames { get; set; } = new();
+    public System.Collections.Generic.List<string>? SharedWorldFolderNames { get; set; }
 }

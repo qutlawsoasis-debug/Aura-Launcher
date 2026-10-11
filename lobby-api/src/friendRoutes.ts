@@ -498,7 +498,7 @@ export async function handleSetProfile(req: any, res: any) {
     const privacy: UserPrivacySettings = {
       showStats: body.privacy?.showStats !== false,
       showAchievements: body.privacy?.showAchievements !== false,
-      showWorlds: Boolean(body.privacy?.showWorlds)
+      showWorlds: body.privacy?.showWorlds !== false
     };
 
     const snapshot: UserProfileSnapshot = {
@@ -595,7 +595,7 @@ export async function handleGetProfile(req: any, res: any) {
         gameLaunches: 0,
         achievements: [],
         worlds: [],
-        privacy: { showStats: true, showAchievements: true, showWorlds: false },
+        privacy: { showStats: true, showAchievements: true, showWorlds: true },
         updatedAt: targetUser.createdAt || 0
       };
     }
