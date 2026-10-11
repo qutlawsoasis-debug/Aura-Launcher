@@ -24,6 +24,25 @@ public class AuraDefaultsMod implements ModInitializer {
 
         setupEmotes();
         setupHostCommands();
+        setupMcaVillagerConversion();
+    }
+
+    private void setupMcaVillagerConversion() {
+        if (!FabricLoader.getInstance().isModLoaded("mca")) {
+            return;
+        }
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
+            if (entity.getClass() == net.minecraft.entity.passive.VillagerEntity.class) {
+                try {
+                    Class<?> sqClass = Class.forName("fabric.net.conczin.mca.server.SpawnQueue");
+                    Object sqInstance = sqClass.getMethod("getInstance").invoke(null);
+                    sqClass.getMethod("convert", net.minecraft.entity.passive.VillagerEntity.class)
+                            .invoke(sqInstance, (net.minecraft.entity.passive.VillagerEntity) entity);
+                } catch (Throwable t) {
+                    LOGGER.debug("[aura-defaults] MCA villager convert skipped: {}", t.getMessage());
+                }
+            }
+        });
     }
 
     private void setupHostCommands() {
