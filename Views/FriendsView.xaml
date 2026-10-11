@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:core="clr-namespace:AuraLauncher.Core"
              mc:Ignorable="d"
              Focusable="False"
              FocusVisualStyle="{x:Null}"
@@ -11,6 +12,7 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <core:IconKeyToGeometryConverter x:Key="IconKeyToGeom" />
 
         <Style x:Key="FriendCodeCellStyle" TargetType="Border">
             <Setter Property="Width" Value="36" />
@@ -34,10 +36,22 @@
     </UserControl.Resources>
 
     <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" /> <!-- Header & Code Section -->
-            <RowDefinition Height="*" />    <!-- Lists Section (Scrollable) -->
-        </Grid.RowDefinitions>
+        <!-- PANEL 1: СПИСОК ДРУЗЕЙ -->
+        <Grid x:Name="FriendsListContainer">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Visible" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsProfileViewActive}" Value="True">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" /> <!-- Header & Code Section -->
+                <RowDefinition Height="*" />    <!-- Lists Section (Scrollable) -->
+            </Grid.RowDefinitions>
 
         <!-- Top Header & Controls -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
@@ -322,10 +336,14 @@
                 <ItemsControl ItemsSource="{Binding Friends}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border BorderBrush="{StaticResource LineInkBrush}" BorderThickness="0,0,0,1"
+                            <Border Style="{StaticResource FriendRowBorder}"
+                                    BorderBrush="{StaticResource LineInkBrush}"
+                                    BorderThickness="0,0,0,1"
                                     Opacity="{Binding RowOpacity}"
-                                    Padding="0,10,0,10"
-                                    Background="Transparent">
+                                    Padding="8,10">
+                                <Border.InputBindings>
+                                    <MouseBinding MouseAction="LeftClick" Command="{Binding OpenProfileCommand}" />
+                                </Border.InputBindings>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" /> <!-- Avatar -->
@@ -433,5 +451,560 @@
                 </ItemsControl>
             </StackPanel>
         </ScrollViewer>
+        </Grid> <!-- end FriendsListContainer -->
+
+        <!-- PANEL 2: КАРТОЧКА ПРОФИЛЯ ДРУГА -->
+        <Grid x:Name="FriendProfileContainer">
+            <Grid.RenderTransform>
+                <TranslateTransform Y="0" />
+            </Grid.RenderTransform>
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Setter Property="Opacity" Value="0.0" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsProfileViewActive}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                            <DataTrigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                         From="0.0" To="1.0"
+                                                         Duration="0:0:0.35">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                         From="24.0" To="0.0"
+                                                         Duration="0:0:0.35">
+                                            <DoubleAnimation.EasingFunction>
+                                                <CubicEase EasingMode="EaseOut" />
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </DataTrigger.EnterActions>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" /> <!-- Кнопка Назад -->
+                <RowDefinition Height="*" />    <!-- Содержимое профиля -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. Верхняя панель: кнопка Назад -->
+            <StackPanel Grid.Row="0" Margin="0,6,0,16">
+                <Button Command="{Binding BackToListCommand}"
+                        Style="{StaticResource GhostBtn}"
+                        Height="32"
+                        Padding="8,0"
+                        HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Path Style="{StaticResource IconPath}"
+                              Data="{StaticResource IconArrowLeft}"
+                              Width="14" Height="14"
+                              Stroke="{StaticResource DimInkBrush}"
+                              Margin="0,0,8,0" />
+                        <TextBlock Text="Назад к друзьям"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- 2. Область содержимого профиля со скроллом -->
+            <ScrollViewer Grid.Row="1" Style="{StaticResource AuraScrollViewer}">
+                <Grid Margin="0,0,8,20">
+                    <!-- АККУРАТНЫЙ СКЕЛЕТОН (пока данные грузятся, без вращающихся колёс) -->
+                    <StackPanel Visibility="{Binding ActiveProfile.IsLoading, Converter={StaticResource BoolToVis}}">
+                        <!-- Шапка скелетона -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Width="64" Height="64" CornerRadius="3"
+                                    Background="{DynamicResource PanelRaised}"
+                                    BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
+                                    Margin="0,0,16,0" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <Border Width="180" Height="26" CornerRadius="3"
+                                        Background="{DynamicResource PanelRaised}"
+                                        HorizontalAlignment="Left" Margin="0,0,0,8" />
+                                <Border Width="100" Height="14" CornerRadius="3"
+                                        Background="{DynamicResource PanelRaised}"
+                                        HorizontalAlignment="Left" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Статистика скелетона -->
+                        <Border Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}"
+                                BorderThickness="1" CornerRadius="3"
+                                Padding="16,14" Margin="0,0,0,20">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Width="70" Height="36" CornerRadius="3" Background="{DynamicResource PanelRaised}" />
+                                <Border Grid.Column="1" Width="70" Height="36" CornerRadius="3" Background="{DynamicResource PanelRaised}" />
+                                <Border Grid.Column="2" Width="70" Height="36" CornerRadius="3" Background="{DynamicResource PanelRaised}" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Табы скелетона -->
+                        <Border Width="180" Height="32" CornerRadius="3"
+                                Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
+                                HorizontalAlignment="Left" Margin="0,0,0,16" />
+
+                        <!-- Карточки скелетона -->
+                        <Border Height="56" CornerRadius="3" Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Margin="0,0,0,8" />
+                        <Border Height="56" CornerRadius="3" Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Margin="0,0,0,8" />
+                        <Border Height="56" CornerRadius="3" Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1" Margin="0,0,0,8" />
+                    </StackPanel>
+
+                    <!-- ОШИБКА СЕТИ (Не удалось загрузить профиль + кнопка Повторить) -->
+                    <Border Background="{DynamicResource StoriesCardGlass}"
+                            BorderBrush="{DynamicResource BorderSubtle}"
+                            BorderThickness="1"
+                            CornerRadius="3"
+                            Padding="24,20"
+                            Visibility="{Binding ActiveProfile.HasError, Converter={StaticResource BoolToVis}}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="Не удалось загрузить профиль"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="15"
+                                       FontWeight="Medium"
+                                       Foreground="{DynamicResource Danger}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,14" />
+                            <Button Command="{Binding RetryLoadProfileCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="36"
+                                    Padding="24,0"
+                                    Content="Повторить"
+                                    HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ЗАГРУЖЕННЫЙ ПРОФИЛЬ -->
+                    <StackPanel Visibility="{Binding ActiveProfile.IsContentVisible, Converter={StaticResource BoolToVis}}">
+                        <!-- 1. Шапка: скин-голова 64px, ник (Oswald, крупно), статус -->
+                        <Grid Margin="0,0,0,20">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Скин-голова 64px -->
+                            <Border Grid.Column="0" Width="64" Height="64" CornerRadius="3"
+                                    ClipToBounds="True" Background="{DynamicResource PanelRaised}"
+                                    BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1"
+                                    Margin="0,0,16,0" VerticalAlignment="Center">
+                                <Image Source="{Binding ActiveProfile.Avatar}"
+                                       Width="64" Height="64"
+                                       RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                       RenderOptions.EdgeMode="Aliased"
+                                       Stretch="UniformToFill" />
+                            </Border>
+
+                            <!-- Ник и статус -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ActiveProfile.Nick}"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="32"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextWhite}"
+                                           LineHeight="36" />
+
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,4,0,0">
+                                    <!-- Точка статуса -->
+                                    <Border Width="6" Height="6" CornerRadius="3" Margin="0,0,6,0" VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{StaticResource MuteBrush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding ActiveProfile.IsOnline}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource OkBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding ActiveProfile.Status}" Value="lobby">
+                                                        <Setter Property="Background" Value="{StaticResource EmberBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                    </Border>
+
+                                    <!-- Текст статуса -->
+                                    <TextBlock Text="{Binding ActiveProfile.StatusText}"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="13"
+                                               Foreground="{StaticResource DimInkBrush}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 2. Под ней три цифры в ряд: В игре, Запусков, Достижения (скрывается если друг скрыл статистику) -->
+                        <Border Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="16,12"
+                                Margin="0,0,0,20"
+                                Visibility="{Binding ActiveProfile.IsStatsVisible, Converter={StaticResource BoolToVis}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="1" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- В игре -->
+                                <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding ActiveProfile.PlayTimeFormatted}"
+                                               FontFamily="{StaticResource HeadingFont}"
+                                               FontSize="24"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource Accent}"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock Text="В игре"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource DimInkBrush}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <Border Grid.Column="1" Background="{StaticResource LineInkBrush}" Width="1" Margin="0,4" />
+
+                                <!-- Запусков -->
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding ActiveProfile.GameLaunchesFormatted}"
+                                               FontFamily="{StaticResource HeadingFont}"
+                                               FontSize="24"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextWhite}"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock Text="Запусков"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource DimInkBrush}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+
+                                <Border Grid.Column="3" Background="{StaticResource LineInkBrush}" Width="1" Margin="0,4" />
+
+                                <!-- Достижения -->
+                                <StackPanel Grid.Column="4" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding ActiveProfile.AchievementsSummaryText}"
+                                               FontFamily="{StaticResource HeadingFont}"
+                                               FontSize="24"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextWhite}"
+                                               HorizontalAlignment="Center" />
+                                    <TextBlock Text="Достижения"
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="12"
+                                               Foreground="{StaticResource DimInkBrush}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- 3. Переключатель разделов: Достижения и Миры (стеклянный переключатель) -->
+                        <Border Background="{DynamicResource StoriesCardGlass}"
+                                BorderBrush="{DynamicResource BorderSubtle}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,16">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="Достижения"
+                                             IsChecked="{Binding ActiveProfile.IsAchievementsTabSelected, Mode=TwoWay}"
+                                             Style="{StaticResource SubNavPillRadio}" />
+                                <RadioButton Content="Миры"
+                                             IsChecked="{Binding ActiveProfile.IsWorldsTabSelected, Mode=TwoWay}"
+                                             Style="{StaticResource SubNavPillRadio}" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 4. РАЗДЕЛ "ДОСТИЖЕНИЯ" -->
+                        <StackPanel Visibility="{Binding ActiveProfile.IsAchievementsTabSelected, Converter={StaticResource BoolToVis}}">
+                            <!-- Если друг скрыл достижения -->
+                            <Border Background="{DynamicResource StoriesCardGlass}"
+                                    BorderBrush="{DynamicResource BorderSubtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="16,14"
+                                    Visibility="{Binding ActiveProfile.AreAchievementsHiddenByFriend, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Друг скрыл достижения"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="14"
+                                           Foreground="{StaticResource MuteBrush}" />
+                            </Border>
+
+                            <!-- Если достижения открыты -->
+                            <StackPanel Visibility="{Binding ActiveProfile.AreAchievementsVisible, Converter={StaticResource BoolToVis}}">
+                                <!-- Заголовок и прогресс-трек -->
+                                <TextBlock Text="{Binding ActiveProfile.AchievementsHeaderText}"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextWhite}"
+                                           Margin="0,0,0,8" />
+
+                                <Border Height="3"
+                                        Background="{DynamicResource StoriesTrack}"
+                                        CornerRadius="1.5"
+                                        Margin="0,0,0,14">
+                                    <Border Background="{StaticResource Accent}"
+                                            CornerRadius="1.5"
+                                            RenderTransformOrigin="0,0">
+                                        <Border.RenderTransform>
+                                            <ScaleTransform ScaleX="{Binding ActiveProfile.AchievementsProgressRatio, FallbackValue=0.0}" ScaleY="1" />
+                                        </Border.RenderTransform>
+                                    </Border>
+                                </Border>
+
+                                <!-- Полученные достижения (сверху) -->
+                                <ItemsControl ItemsSource="{Binding ActiveProfile.UnlockedAchievements}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10,8"
+                                                    Background="{DynamicResource StoriesCardGlass}"
+                                                    BorderBrush="{DynamicResource BorderSubtle}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="3">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="44" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- 44px Icon Tile: AchievementGoldBrush + Dark icon -->
+                                                    <Border Grid.Column="0"
+                                                            Width="44" Height="44"
+                                                            CornerRadius="3"
+                                                            Background="{DynamicResource AchievementGoldBrush}"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Center">
+                                                        <Path Style="{StaticResource IconPath}"
+                                                              Width="20" Height="20"
+                                                              Stroke="{DynamicResource PrimaryActionText}"
+                                                              Data="{Binding IconKey, Converter={StaticResource IconKeyToGeom}}"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center" />
+                                                    </Border>
+
+                                                    <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <Grid Grid.Row="0">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontFamily="{StaticResource HeadingFont}"
+                                                                       FontSize="15"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{StaticResource TextWhite}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Margin="0,0,70,0" />
+                                                            <TextBlock Text="{Binding StatusText}"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource Text70}"
+                                                                       HorizontalAlignment="Right"
+                                                                       VerticalAlignment="Center" />
+                                                        </Grid>
+
+                                                        <TextBlock Grid.Row="1"
+                                                                   Text="{Binding Description}"
+                                                                   FontFamily="{StaticResource MainFont}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource Text70}"
+                                                                   TextWrapping="Wrap"
+                                                                   Margin="0,3,0,0" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Неполученные достижения (приглушены) -->
+                                <TextBlock Text="НЕ ПОЛУЧЕНЫ"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Text55}"
+                                           Margin="0,6,0,8" />
+
+                                <ItemsControl ItemsSource="{Binding ActiveProfile.LockedAchievements}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,8"
+                                                    Padding="10,8"
+                                                    Background="{DynamicResource StoriesCardGlass}"
+                                                    BorderBrush="{DynamicResource BorderSubtle}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="3"
+                                                    Opacity="0.55">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="44" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- 44px Icon Tile: Muted PanelCard background + Mute icon -->
+                                                    <Border Grid.Column="0"
+                                                            Width="44" Height="44"
+                                                            CornerRadius="3"
+                                                            Background="{DynamicResource PanelCard}"
+                                                            HorizontalAlignment="Left"
+                                                            VerticalAlignment="Center">
+                                                        <Path Style="{StaticResource IconPath}"
+                                                              Width="20" Height="20"
+                                                              Stroke="{StaticResource MuteBrush}"
+                                                              Data="{Binding IconKey, Converter={StaticResource IconKeyToGeom}}"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center" />
+                                                    </Border>
+
+                                                    <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+
+                                                        <Grid Grid.Row="0">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontFamily="{StaticResource HeadingFont}"
+                                                                       FontSize="15"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource Text70}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       Margin="0,0,70,0" />
+                                                            <TextBlock Text="{Binding StatusText}"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="11"
+                                                                       Foreground="{DynamicResource Text55}"
+                                                                       HorizontalAlignment="Right"
+                                                                       VerticalAlignment="Center" />
+                                                        </Grid>
+
+                                                        <TextBlock Grid.Row="1"
+                                                                   Text="{Binding Description}"
+                                                                   FontFamily="{StaticResource MainFont}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource Text55}"
+                                                                   TextWrapping="Wrap"
+                                                                   Margin="0,3,0,0" />
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- 5. РАЗДЕЛ "МИРЫ" -->
+                        <StackPanel Visibility="{Binding ActiveProfile.IsWorldsTabSelected, Converter={StaticResource BoolToVis}}">
+                            <!-- Если друг пока не делится мирами или миров нет -->
+                            <Border Background="{DynamicResource StoriesCardGlass}"
+                                    BorderBrush="{DynamicResource BorderSubtle}"
+                                    BorderThickness="1"
+                                    CornerRadius="3"
+                                    Padding="16,14"
+                                    Visibility="{Binding ActiveProfile.HasNoSharedWorlds, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Друг пока не делится мирами"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="14"
+                                           Foreground="{StaticResource MuteBrush}" />
+                            </Border>
+
+                            <!-- Список строк миров: название, последняя игра, размер (без кнопок действий) -->
+                            <ItemsControl ItemsSource="{Binding ActiveProfile.Worlds}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8"
+                                                Padding="12,10"
+                                                Background="{DynamicResource StoriesCardGlass}"
+                                                BorderBrush="{DynamicResource BorderSubtle}"
+                                                BorderThickness="1"
+                                                CornerRadius="3">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" /> <!-- World icon -->
+                                                    <ColumnDefinition Width="*" />    <!-- Name and last played -->
+                                                    <ColumnDefinition Width="Auto" /> <!-- Size -->
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- 40px Icon -->
+                                                <Border Grid.Column="0" Width="40" Height="40" CornerRadius="3"
+                                                        Background="{DynamicResource PanelRaised}"
+                                                        BorderBrush="{StaticResource LineInkBrush}"
+                                                        BorderThickness="1"
+                                                        Margin="0,0,12,0"
+                                                        VerticalAlignment="Center">
+                                                    <Path Style="{StaticResource IconPath}"
+                                                          Data="{StaticResource IconWorld}"
+                                                          Width="18" Height="18"
+                                                          Stroke="{StaticResource Accent}"
+                                                          HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center" />
+                                                </Border>
+
+                                                <!-- Name & Last played -->
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontFamily="{StaticResource HeadingFont}"
+                                                               FontSize="16"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource InkBrush}" />
+                                                    <TextBlock Text="{Binding LastPlayedFormatted, StringFormat='Последняя игра: {0}'}"
+                                                               FontFamily="{StaticResource MainFont}"
+                                                               FontSize="12"
+                                                               Foreground="{StaticResource DimInkBrush}"
+                                                               Margin="0,2,0,0" />
+                                                </StackPanel>
+
+                                                <!-- Size on right -->
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding SizeFormatted}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="13"
+                                                           FontWeight="Medium"
+                                                           Foreground="{StaticResource DimInkBrush}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="12,0,4,0" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>

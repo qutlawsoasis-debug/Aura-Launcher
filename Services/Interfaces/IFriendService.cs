@@ -36,4 +36,6 @@ public interface IFriendService : IDisposable
     Task<(bool Success, string? ErrorMessage)> ChangeNicknameAsync(string newNick, CancellationToken cancellationToken = default);
     Task<(bool Success, string? LobbyCode, string? ErrorMessage)> RespondInviteAsync(string inviteId, bool accept, CancellationToken cancellationToken = default);
     Task ReportOfflineAsync(CancellationToken cancellationToken = default);
+    Task SendProfileSnapshotAsync(CancellationToken cancellationToken = default);
+    Task<UserProfileSnapshotDto?> GetFriendProfileAsync(string friendId, CancellationToken cancellationToken = default);
 }

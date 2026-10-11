@@ -43,6 +43,7 @@ public class WorldSaveItem : ObservableObject
     public string DisplayName { get; set; } = string.Empty;
     public string FolderPath { get; set; } = string.Empty;
     public DateTime LastPlayed { get; set; } = DateTime.MinValue;
+    public long SizeBytes { get; set; }
     public string SizeFormatted { get; set; } = string.Empty;
     public ImageSource? IconSource { get; set; }
     public string GameMode { get; set; } = "Выживание";

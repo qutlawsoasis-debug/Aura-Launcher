@@ -204,8 +204,14 @@ public class FriendItemViewModel : ObservableObject
     public RelayCommand StartDeleteCommand { get; }
     public RelayCommand ConfirmDeleteCommand { get; }
     public RelayCommand CancelDeleteCommand { get; }
+    public RelayCommand OpenProfileCommand { get; }
 
-    public FriendItemViewModel(FriendPresenceItem item, Action<FriendItemViewModel> onInvite, Action<FriendItemViewModel> onRemove, Action<FriendItemViewModel>? onJoin = null)
+    public FriendItemViewModel(
+        FriendPresenceItem item,
+        Action<FriendItemViewModel> onInvite,
+        Action<FriendItemViewModel> onRemove,
+        Action<FriendItemViewModel>? onJoin = null,
+        Action<FriendItemViewModel>? onOpenProfile = null)
     {
         Id = item.Id;
         Nick = item.Nick;
@@ -226,6 +232,7 @@ public class FriendItemViewModel : ObservableObject
             _onRemove(this);
         });
         CancelDeleteCommand = new RelayCommand(_ => IsConfirmingDelete = false);
+        OpenProfileCommand = new RelayCommand(_ => onOpenProfile?.Invoke(this));
     }
 
     public bool UpdateFromPresence(FriendPresenceItem item)
@@ -266,6 +273,7 @@ public class FriendsViewModel : ObservableObject
     private readonly ISkinService _skinService;
     private readonly LobbyViewModel _lobbyViewModel;
     private readonly INotificationService? _notificationService;
+    private readonly IAchievementService? _achievementService;
     private readonly SemaphoreSlim _inviteLock = new(1, 1);
     private readonly HashSet<string> _inFlightInviteFriendIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _dismissedSentInviteIds = new(StringComparer.OrdinalIgnoreCase);
@@ -278,6 +286,24 @@ public class FriendsViewModel : ObservableObject
 
     public ObservableCollection<FriendItemViewModel> Friends { get; } = new();
     public ObservableCollection<FriendRequestItemViewModel> IncomingRequests { get; } = new();
+
+    private bool _isProfileViewActive;
+    public bool IsProfileViewActive
+    {
+        get => _isProfileViewActive;
+        set => SetProperty(ref _isProfileViewActive, value);
+    }
+
+    private FriendProfileViewModel? _activeProfile;
+    public FriendProfileViewModel? ActiveProfile
+    {
+        get => _activeProfile;
+        private set => SetProperty(ref _activeProfile, value);
+    }
+
+    public RelayCommand OpenFriendProfileCommand { get; }
+    public RelayCommand BackToListCommand { get; }
+    public RelayCommand RetryLoadProfileCommand { get; }
 
     private string _addCodeInput = string.Empty;
     public string AddCodeInput
@@ -400,18 +426,23 @@ public class FriendsViewModel : ObservableObject
         ILobbyService lobbyService,
         ISkinService skinService,
         LobbyViewModel lobbyViewModel,
-        INotificationService? notificationService = null)
+        INotificationService? notificationService = null,
+        IAchievementService? achievementService = null)
     {
         _friendService = friendService ?? throw new ArgumentNullException(nameof(friendService));
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _lobbyViewModel = lobbyViewModel ?? throw new ArgumentNullException(nameof(lobbyViewModel));
         _notificationService = notificationService;
+        _achievementService = achievementService ?? (App.Services?.GetService(typeof(IAchievementService)) as IAchievementService);
 
         CopyCodeCommand = new RelayCommand(_ => CopyCode());
         CopyLinkCommand = new RelayCommand(_ => CopyFriendLink());
         AddFriendCommand = new RelayCommand(async _ => await AddFriendAsync(), _ => CanAddFriend);
         OpenLobbyCommand = new RelayCommand(_ => OpenLobbyRequested?.Invoke());
+        OpenFriendProfileCommand = new RelayCommand(p => OpenFriendProfile(p as FriendItemViewModel));
+        BackToListCommand = new RelayCommand(_ => BackToList());
+        RetryLoadProfileCommand = new RelayCommand(_ => RetryLoadProfile());
 
         _friendService.SyncUpdated += OnSyncUpdated;
         _lobbyService.StatusChanged += _ => Dispatch(RefreshLobbyStateForFriends);
@@ -426,6 +457,24 @@ public class FriendsViewModel : ObservableObject
             }
         };
         _lobbyViewModel.LobbyPlayers.CollectionChanged += (_, _) => Dispatch(RefreshLobbyStateForFriends);
+    }
+
+    public void OpenFriendProfile(FriendItemViewModel? friend)
+    {
+        if (friend == null) return;
+        ActiveProfile = new FriendProfileViewModel(friend, _friendService, _skinService, _achievementService);
+        IsProfileViewActive = true;
+        _ = ActiveProfile.LoadProfileAsync();
+    }
+
+    private void BackToList()
+    {
+        IsProfileViewActive = false;
+    }
+
+    private void RetryLoadProfile()
+    {
+        _ = ActiveProfile?.LoadProfileAsync();
     }
 
     private bool ComputeIsFriendInMyLobby(string friendNick, string? friendStatus, string? friendLobbyCode)
@@ -685,7 +734,7 @@ public class FriendsViewModel : ObservableObject
                     }
                     else
                     {
-                        vm = new FriendItemViewModel(item, OnInviteFriend, OnRemoveFriend, OnJoinFriend);
+                        vm = new FriendItemViewModel(item, OnInviteFriend, OnRemoveFriend, OnJoinFriend, OpenFriendProfile);
                         _ = LoadAvatarAsync(vm);
                     }
 

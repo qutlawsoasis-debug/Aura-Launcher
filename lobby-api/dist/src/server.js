@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import url from 'url';
 import { getStore, computeLobbyModSync, computeModManifestHash } from './store.js';
 import { validatePngSkin, isValidNickname, getClientIp } from './skinUtils.js';
-import { handleRegister, handleSync, handleFriendRequest, handleFriendRespond, handleFriendRemove, handleInvite, handleInviteRespond, handleUserNick } from './friendRoutes.js';
+import { handleRegister, handleSync, handleFriendRequest, handleFriendRespond, handleFriendRemove, handleInvite, handleInviteRespond, handleUserNick, handleUserProfile } from './friendRoutes.js';
 import handleReport from '../api/report.js';
 import { generateLandingHtml } from './landing.js';
 function parseBody(req) {
@@ -102,6 +102,9 @@ export const server = http.createServer(async (req, res) => {
         }
         if (pathname === '/api/report') {
             return await handleReport(req, res);
+        }
+        if (pathname === '/api/user/profile' || pathname === '/api/profile') {
+            return await handleUserProfile(req, res);
         }
         // 0. GET /api/tunnel-config
         if (req.method === 'GET' && pathname === '/api/tunnel-config') {

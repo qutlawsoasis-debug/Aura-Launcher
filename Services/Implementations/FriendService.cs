@@ -71,6 +71,9 @@ public class FriendService : IFriendService
 
     public string? CurrentHostToken { get; set; }
 
+    private readonly IAchievementService? _achievementService;
+    private readonly IWorkshopService? _workshopService;
+
     private bool _isGameRunning;
     public bool IsGameRunning
     {
@@ -79,8 +82,13 @@ public class FriendService : IFriendService
         {
             if (_isGameRunning != value)
             {
+                bool wasRunning = _isGameRunning;
                 _isGameRunning = value;
                 _ = SyncNowAsync();
+                if (wasRunning && !value)
+                {
+                    _ = SendProfileSnapshotAsync();
+                }
             }
         }
     }
@@ -91,8 +99,20 @@ public class FriendService : IFriendService
     public event Action<FriendRequestItem>? FriendRequestReceived;
 
     public FriendService(IConfigService configService, HttpClient? httpClient = null, string baseUrl = "https://lobby-api.vercel.app")
+        : this(configService, null, null, httpClient, baseUrl)
+    {
+    }
+
+    public FriendService(
+        IConfigService configService,
+        IAchievementService? achievementService,
+        IWorkshopService? workshopService,
+        HttpClient? httpClient = null,
+        string baseUrl = "https://lobby-api.vercel.app")
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
+        _achievementService = achievementService;
+        _workshopService = workshopService;
         _httpClient = httpClient ?? new HttpClient();
         _defaultBaseUrl = baseUrl.TrimEnd('/') + "/";
     }
@@ -517,6 +537,7 @@ public class FriendService : IFriendService
             }
 
             await SyncNowAsync(token);
+            _ = SendProfileSnapshotAsync(token);
 
             while (!token.IsCancellationRequested)
             {
@@ -563,6 +584,134 @@ public class FriendService : IFriendService
         {
             _loopCts = null;
             _loopTask = null;
+        }
+    }
+
+    public async Task SendProfileSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (!IsRegistered || string.IsNullOrWhiteSpace(GetDecryptedToken()))
+            {
+                await EnsureRegisteredAsync(cancellationToken);
+            }
+
+            var cfg = _configService.CurrentConfig;
+            if (cfg == null || string.IsNullOrWhiteSpace(CurrentUserId)) return;
+
+            // Achievements
+            var achievements = new List<ProfileAchievementDto>();
+            if (_achievementService != null)
+            {
+                foreach (var kvp in _achievementService.Progress)
+                {
+                    if (kvp.Value.Unlocked)
+                    {
+                        long unlockedAtMs = kvp.Value.UnlockedAtUtc.HasValue
+                            ? new DateTimeOffset(kvp.Value.UnlockedAtUtc.Value).ToUnixTimeMilliseconds()
+                            : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                        achievements.Add(new ProfileAchievementDto
+                        {
+                            Id = kvp.Key,
+                            UnlockedAt = unlockedAtMs
+                        });
+                    }
+                }
+            }
+
+            // Worlds
+            var worlds = new List<ProfileWorldDto>();
+            if (cfg.ShareWorldsWithFriends && _workshopService != null)
+            {
+                try
+                {
+                    var allWorlds = await _workshopService.GetWorldSavesAsync(cfg.GameDir);
+                    var sharedFolders = new HashSet<string>(cfg.SharedWorldFolderNames ?? new(), StringComparer.OrdinalIgnoreCase);
+                    foreach (var w in allWorlds)
+                    {
+                        if (sharedFolders.Contains(w.FolderName))
+                        {
+                            long lp = w.LastPlayed != DateTime.MinValue
+                                ? new DateTimeOffset(w.LastPlayed).ToUnixTimeMilliseconds()
+                                : 0;
+                            worlds.Add(new ProfileWorldDto
+                            {
+                                Name = w.DisplayName,
+                                LastPlayed = lp,
+                                SizeBytes = w.SizeBytes
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[FRIEND-PROFILE: WARN] Error scanning worlds: {ex.Message}");
+                }
+            }
+
+            var snapshot = new UserProfileSnapshotDto
+            {
+                UserId = CurrentUserId,
+                Nick = cfg.Nickname,
+                SkinModel = cfg.SkinModel,
+                PlayTimeSeconds = cfg.TotalPlayTimeSeconds,
+                GameLaunches = cfg.TotalGameLaunches,
+                Achievements = achievements,
+                Worlds = worlds,
+                Privacy = new UserPrivacySettingsDto
+                {
+                    ShowStats = cfg.ShareStatsWithFriends,
+                    ShowAchievements = cfg.ShareAchievementsWithFriends,
+                    ShowWorlds = cfg.ShareWorldsWithFriends
+                },
+                UpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+
+            using var req = CreateAuthenticatedRequest(HttpMethod.Post, "api/user/profile", snapshot);
+            var resp = await _httpClient.SendAsync(req, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync(cancellationToken);
+                FabricGameLaunchService.LogLauncherEvent($"[FRIEND-PROFILE: WARN] Save snapshot failed HTTP {(int)resp.StatusCode}: {err}");
+            }
+            else
+            {
+                FabricGameLaunchService.LogLauncherEvent("[FRIEND-PROFILE] Profile snapshot synced successfully");
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[FRIEND-PROFILE: ERROR] SendProfileSnapshotAsync: {ex.Message}");
+        }
+    }
+
+    public async Task<UserProfileSnapshotDto?> GetFriendProfileAsync(string friendId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(friendId)) return null;
+
+        try
+        {
+            if (!IsRegistered)
+            {
+                await EnsureRegisteredAsync(cancellationToken);
+            }
+
+            using var req = CreateAuthenticatedRequest(HttpMethod.Get, $"api/user/profile?friendId={Uri.EscapeDataString(friendId)}");
+            var resp = await _httpClient.SendAsync(req, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync(cancellationToken);
+                FabricGameLaunchService.LogLauncherEvent($"[FRIEND-PROFILE: WARN] GetFriendProfileAsync HTTP {(int)resp.StatusCode}: {err}");
+                return null;
+            }
+
+            var json = await resp.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<UserProfileSnapshotDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[FRIEND-PROFILE: ERROR] GetFriendProfileAsync: {ex.Message}");
+            return null;
         }
     }
 

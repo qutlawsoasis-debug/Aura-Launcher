@@ -654,7 +654,179 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Группа 3: Поддержка -->
+                <!-- Группа 3: Приватность -->
+                <TextBlock Text="Приватность"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="22"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource InkBrush}"
+                           Margin="0,16,0,6" />
+                <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,6" />
+
+                <!-- 3.1 "Показывать друзьям: статистику" -->
+                <Grid Height="56" Margin="0,2,0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Показывать друзьям: статистику"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Общее время в игре и количество проведенных игровых сессий"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding ShareStatsWithFriends, Mode=TwoWay}"
+                              Style="{StaticResource AuraCheckBox}"
+                              VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- 3.2 "Показывать друзьям: достижения" -->
+                <Grid Height="56" Margin="0,2,0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Показывать друзьям: достижения"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Список полученных наград и даты их разблокировки"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding ShareAchievementsWithFriends, Mode=TwoWay}"
+                              Style="{StaticResource AuraCheckBox}"
+                              VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- 3.3 "Показывать друзьям: миры" -->
+                <Grid Height="56" Margin="0,2,0,2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Показывать друзьям: миры"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Только выбранные ниже миры будут видны вашим друзьям"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <CheckBox Grid.Column="1"
+                              IsChecked="{Binding ShareWorldsWithFriends, Mode=TwoWay}"
+                              Style="{StaticResource AuraCheckBox}"
+                              VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Список локальных миров с чекбоксами (когда показ миров включен) -->
+                <Border Visibility="{Binding IsSharedWorldsListVisible, Converter={StaticResource BoolToVis}}"
+                        Background="{StaticResource PanelGlassBrush}"
+                        BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3"
+                        Padding="14,12"
+                        Margin="0,4,0,12">
+                    <StackPanel>
+                        <TextBlock Text="Локальные миры, видимые друзьям"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   Margin="0,0,0,8" />
+
+                        <!-- Пустой список -->
+                        <TextBlock Text="Локальные миры не найдены в папке saves"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource DimInkBrush}"
+                                   Margin="0,4,0,4">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SharedWorlds.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <ItemsControl ItemsSource="{Binding SharedWorlds}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,5,0,5">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding DisplayName}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="13"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource InkBrush}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding LastPlayedFormatted}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource DimInkBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12,0,12,0" />
+
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding SizeFormatted}"
+                                                   FontFamily="{StaticResource MainFont}"
+                                                   FontSize="12"
+                                                   Foreground="{StaticResource DimInkBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,16,0" />
+
+                                        <CheckBox Grid.Column="3"
+                                                  Content="Видно друзьям"
+                                                  IsChecked="{Binding IsShared, Mode=TwoWay}"
+                                                  Style="{StaticResource AuraCheckBox}"
+                                                  FontFamily="{StaticResource MainFont}"
+                                                  FontSize="12"
+                                                  Foreground="{StaticResource InkBrush}"
+                                                  VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Группа 4: Поддержка -->
                 <TextBlock Text="Поддержка"
                            FontFamily="{StaticResource HeadingFont}"
                            FontSize="22"

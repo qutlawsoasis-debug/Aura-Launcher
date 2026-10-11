@@ -372,3 +372,210 @@ export async function handleUserNick(req, res) {
     await store.updateUserNick(user.id, newNick);
     sendJson(res, 200, { success: true, nick: newNick });
 }
+// 9. Profile Snapshot: POST /api/user/profile (Save own profile snapshot)
+export async function handleSetProfile(req, res) {
+    try {
+        if (req.method !== 'POST')
+            return sendJson(res, 405, { error: 'Method Not Allowed' });
+        const store = getStore();
+        const user = await authenticate(req, res, store);
+        if (!user)
+            return;
+        const allowed = await store.checkRateLimit(`profile_set:${user.id}`, 30, 60);
+        if (!allowed) {
+            return sendJson(res, 429, { error: 'Слишком много запросов на обновление профиля (максимум 30 в минуту)' });
+        }
+        const body = await parseJson(req);
+        // Validate playTimeSeconds (>= 0, <= 100_000_000)
+        const playTimeSeconds = Math.max(0, Math.min(100_000_000, Math.floor(Number(body.playTimeSeconds) || 0)));
+        const gameLaunches = Math.max(0, Math.min(10_000_000, Math.floor(Number(body.gameLaunches) || 0)));
+        // Skin info
+        let skinModel = body.skinModel === 'slim' ? 'slim' : 'default';
+        let skinSha1 = undefined;
+        if (typeof body.skinSha1 === 'string' && /^[a-fA-F0-9]{40}$/.test(body.skinSha1.trim())) {
+            skinSha1 = body.skinSha1.trim().toLowerCase();
+        }
+        // Fallback to store's skin if not specified
+        if (!skinSha1) {
+            try {
+                const existingSkin = await store.getSkin(user.nick.toLowerCase());
+                if (existingSkin) {
+                    skinSha1 = existingSkin.sha1;
+                    skinModel = existingSkin.model;
+                }
+            }
+            catch { }
+        }
+        // Validate achievements (max 100)
+        const rawAchievements = Array.isArray(body.achievements) ? body.achievements : [];
+        const cleanAchievements = rawAchievements
+            .slice(0, 100)
+            .filter((a) => a && typeof a.id === 'string' && a.id.trim().length > 0)
+            .map((a) => ({
+            id: String(a.id).trim().slice(0, 64),
+            unlockedAt: Math.max(0, Number(a.unlockedAt) || Date.now())
+        }));
+        // Validate worlds (max 50) - display name, lastPlayed, sizeBytes. NO paths or files!
+        const rawWorlds = Array.isArray(body.worlds) ? body.worlds : [];
+        const cleanWorlds = rawWorlds
+            .slice(0, 50)
+            .filter((w) => w && typeof w.name === 'string' && w.name.trim().length > 0)
+            .map((w) => ({
+            name: String(w.name).replace(/[\\/]/g, '').trim().slice(0, 64),
+            lastPlayed: Math.max(0, Number(w.lastPlayed) || 0),
+            sizeBytes: Math.max(0, Math.min(100_000_000_000, Number(w.sizeBytes) || 0))
+        }));
+        // Validate privacy settings
+        const privacy = {
+            showStats: body.privacy?.showStats !== false,
+            showAchievements: body.privacy?.showAchievements !== false,
+            showWorlds: Boolean(body.privacy?.showWorlds)
+        };
+        const snapshot = {
+            userId: user.id,
+            nick: user.nick,
+            skinModel,
+            skinSha1,
+            playTimeSeconds,
+            gameLaunches,
+            achievements: cleanAchievements,
+            worlds: cleanWorlds,
+            privacy,
+            updatedAt: Date.now()
+        };
+        await store.setUserProfile(snapshot);
+        sendJson(res, 200, {
+            success: true,
+            updatedAt: snapshot.updatedAt
+        });
+    }
+    catch (err) {
+        console.error('[lobby-api] Error in handleSetProfile:', err);
+        sendJson(res, 500, { error: 'Внутренняя ошибка сохранения профиля' });
+    }
+}
+// 10. Profile Snapshot: GET /api/user/profile?friendId=... (Read friend's profile with server-side privacy truncation)
+export async function handleGetProfile(req, res) {
+    try {
+        const store = getStore();
+        const user = await authenticate(req, res, store);
+        if (!user)
+            return;
+        const allowed = await store.checkRateLimit(`profile_get:${user.id}`, 60, 60);
+        if (!allowed) {
+            return sendJson(res, 429, { error: 'Слишком много запросов (максимум 60 в минуту)' });
+        }
+        // friendId or userId from query / body
+        let targetId = '';
+        if (req.url) {
+            try {
+                const q = new URL(req.url, 'http://localhost').searchParams;
+                targetId = q.get('friendId') || q.get('userId') || '';
+            }
+            catch { }
+        }
+        if (!targetId && req.query) {
+            targetId = req.query.friendId || req.query.userId || '';
+        }
+        if (!targetId && req.method === 'POST') {
+            const body = await parseJson(req);
+            targetId = body.friendId || body.userId || '';
+        }
+        targetId = targetId.trim();
+        if (!targetId) {
+            return sendJson(res, 400, { error: 'Параметр friendId обязателен' });
+        }
+        // If requesting another user's profile, verify friendship on server!
+        const isSelf = targetId.toLowerCase() === user.id.toLowerCase();
+        if (!isSelf) {
+            const isFriend = await store.isFriend(user.id, targetId);
+            if (!isFriend) {
+                return sendJson(res, 403, { error: 'Доступ запрещён: пользователь не в списке друзей' });
+            }
+        }
+        let profile = await store.getUserProfile(targetId);
+        if (!profile) {
+            // If user exists, provide fallback with basic info
+            const targetUser = await store.getUser(targetId);
+            if (!targetUser) {
+                return sendJson(res, 404, { error: 'Пользователь не найден' });
+            }
+            let skinSha1 = undefined;
+            let skinModel = 'default';
+            try {
+                const s = await store.getSkin(targetUser.nick.toLowerCase());
+                if (s) {
+                    skinSha1 = s.sha1;
+                    skinModel = s.model;
+                }
+            }
+            catch { }
+            profile = {
+                userId: targetUser.id,
+                nick: targetUser.nick,
+                skinModel,
+                skinSha1,
+                playTimeSeconds: 0,
+                gameLaunches: 0,
+                achievements: [],
+                worlds: [],
+                privacy: { showStats: true, showAchievements: true, showWorlds: false },
+                updatedAt: targetUser.createdAt || 0
+            };
+        }
+        // If skinSha1 is missing in profile, try to enrich from skin store
+        if (!profile.skinSha1) {
+            try {
+                const s = await store.getSkin(profile.nick.toLowerCase());
+                if (s) {
+                    profile.skinSha1 = s.sha1;
+                    profile.skinModel = s.model;
+                }
+            }
+            catch { }
+        }
+        // If requesting self, return everything
+        if (isSelf) {
+            return sendJson(res, 200, profile);
+        }
+        // SERVER-SIDE PRIVACY TRUNCATION - DO NOT TRUST CLIENT
+        const filtered = {
+            userId: profile.userId,
+            nick: profile.nick,
+            skinModel: profile.skinModel || 'default',
+            skinSha1: profile.skinSha1,
+            privacy: profile.privacy,
+            updatedAt: profile.updatedAt
+        };
+        if (profile.privacy.showStats) {
+            filtered.playTimeSeconds = profile.playTimeSeconds;
+            filtered.gameLaunches = profile.gameLaunches;
+        }
+        if (profile.privacy.showAchievements) {
+            filtered.achievements = profile.achievements;
+        }
+        if (profile.privacy.showWorlds) {
+            filtered.worlds = profile.worlds;
+        }
+        sendJson(res, 200, filtered);
+    }
+    catch (err) {
+        console.error('[lobby-api] Error in handleGetProfile:', err);
+        sendJson(res, 500, { error: 'Внутренняя ошибка загрузки профиля' });
+    }
+}
+export async function handleUserProfile(req, res) {
+    try {
+        if (req.method === 'GET') {
+            return await handleGetProfile(req, res);
+        }
+        if (req.method === 'POST') {
+            return await handleSetProfile(req, res);
+        }
+        sendJson(res, 405, { error: 'Method Not Allowed' });
+    }
+    catch (err) {
+        console.error('[lobby-api] Uncaught error in handleUserProfile dispatcher:', err);
+        sendJson(res, 500, { error: 'Внутренняя ошибка обработчика профиля' });
+    }
+}

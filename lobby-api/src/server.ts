@@ -11,7 +11,8 @@ import {
   handleFriendRemove,
   handleInvite,
   handleInviteRespond,
-  handleUserNick
+  handleUserNick,
+  handleUserProfile
 } from './friendRoutes.js';
 import handleReport from '../api/report.js';
 import { generateLandingHtml } from './landing.js';
@@ -115,6 +116,9 @@ export const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/report') {
       return await handleReport(req, res);
+    }
+    if (pathname === '/api/user/profile' || pathname === '/api/profile') {
+      return await handleUserProfile(req, res);
     }
 
     // 0. GET /api/tunnel-config

@@ -254,6 +254,36 @@ export interface SyncResult {
   sentInvites: SentInviteInfo[];
 }
 
+export interface UserAchievementItem {
+  id: string;
+  unlockedAt: number;
+}
+
+export interface UserWorldItem {
+  name: string;
+  lastPlayed: number;
+  sizeBytes: number;
+}
+
+export interface UserPrivacySettings {
+  showStats: boolean;
+  showAchievements: boolean;
+  showWorlds: boolean;
+}
+
+export interface UserProfileSnapshot {
+  userId: string;
+  nick: string;
+  skinModel?: 'default' | 'slim';
+  skinSha1?: string;
+  playTimeSeconds: number;
+  gameLaunches: number;
+  achievements: UserAchievementItem[];
+  worlds: UserWorldItem[];
+  privacy: UserPrivacySettings;
+  updatedAt: number;
+}
+
 export interface LobbyStore {
   // Lobbies
   get(code: string): Promise<Lobby | null>;
@@ -300,6 +330,10 @@ export interface LobbyStore {
   removeInvite(toId: string, inviteId: string): Promise<void>;
   updateSentInvite(fromId: string, inviteId: string, state: 'accepted' | 'declined' | 'expired'): Promise<void>;
 
+  // Profile Snapshot
+  setUserProfile(profile: UserProfileSnapshot): Promise<void>;
+  getUserProfile(userId: string): Promise<UserProfileSnapshot | null>;
+
   // Unified Sync
   sync(userId: string, presence: UserPresence): Promise<SyncResult>;
 }
@@ -321,6 +355,7 @@ export class InMemoryStore implements LobbyStore {
   private reqOut = new Map<string, Set<string>>();
   private invites = new Map<string, Map<string, InviteRecord>>(); // toId -> (inviteId -> invite)
   private sentInvites = new Map<string, Map<string, SentInviteRecord>>(); // fromId -> (inviteId -> sentInvite)
+  private userProfiles = new Map<string, UserProfileSnapshot>();
 
   async get(code: string): Promise<Lobby | null> {
     const entry = this.lobbies.get(code);
@@ -549,6 +584,14 @@ export class InMemoryStore implements LobbyStore {
       sent.state = state;
       sent.expiresAt = Date.now() + 60_000;
     }
+  }
+
+  async setUserProfile(profile: UserProfileSnapshot): Promise<void> {
+    this.userProfiles.set(profile.userId, profile);
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfileSnapshot | null> {
+    return this.userProfiles.get(userId) || null;
   }
 
   async sync(userId: string, presence: UserPresence): Promise<SyncResult> {
@@ -970,6 +1013,20 @@ export class UpstashStore implements LobbyStore {
     }
   }
 
+  async setUserProfile(profile: UserProfileSnapshot): Promise<void> {
+    await this.fetchCommand(['SET', `profile:${profile.userId}`, JSON.stringify(profile)]);
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfileSnapshot | null> {
+    const raw = await this.fetchCommand(['GET', `profile:${userId}`]);
+    if (!raw) return null;
+    try {
+      return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch {
+      return null;
+    }
+  }
+
   async sync(userId: string, presence: UserPresence): Promise<SyncResult> {
     const now = Date.now();
 
@@ -1179,6 +1236,7 @@ export class MongoStore implements LobbyStore {
             this.db.collection('invites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
             this.db.collection('sent_invites').createIndex({ fromId: 1 }),
             this.db.collection('sent_invites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            this.db.collection('user_profiles').createIndex({ userId: 1 }),
             this.db.collection('rate_limits').createIndex({ resetAt: 1 }, { expireAfterSeconds: 0 })
           ]);
           this.initialized = true;
@@ -1519,6 +1577,33 @@ export class MongoStore implements LobbyStore {
         { $set: { sentInvite: sent, expiresAt } }
       );
     }
+  }
+
+  async setUserProfile(profile: UserProfileSnapshot): Promise<void> {
+    await this.ensureInit();
+    await this.db.collection('user_profiles').updateOne(
+      { _id: profile.userId as any },
+      { $set: profile },
+      { upsert: true }
+    );
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfileSnapshot | null> {
+    await this.ensureInit();
+    const doc = await this.db.collection('user_profiles').findOne({ _id: userId as any });
+    if (!doc) return null;
+    return {
+      userId: doc.userId || String(doc._id),
+      nick: doc.nick,
+      skinModel: doc.skinModel,
+      skinSha1: doc.skinSha1,
+      playTimeSeconds: typeof doc.playTimeSeconds === 'number' ? doc.playTimeSeconds : 0,
+      gameLaunches: typeof doc.gameLaunches === 'number' ? doc.gameLaunches : 0,
+      achievements: Array.isArray(doc.achievements) ? doc.achievements : [],
+      worlds: Array.isArray(doc.worlds) ? doc.worlds : [],
+      privacy: doc.privacy || { showStats: true, showAchievements: true, showWorlds: false },
+      updatedAt: doc.updatedAt || 0
+    };
   }
 
   async sync(userId: string, presence: UserPresence): Promise<SyncResult> {

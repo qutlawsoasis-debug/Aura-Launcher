@@ -613,6 +613,19 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Friend list row item border (FriendsView) -->
+    <Style x:Key="FriendRowBorder" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource StoriesCardGlass}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- Lobby conditional action buttons (LobbyView) -->
     <Style x:Key="LobbyGuestConnectBtn" TargetType="Button" BasedOn="{StaticResource PrimaryNeonBtn}">
         <Setter Property="Visibility" Value="Collapsed" />

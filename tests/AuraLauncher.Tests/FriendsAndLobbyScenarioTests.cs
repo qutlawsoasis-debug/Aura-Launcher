@@ -210,6 +210,9 @@ public class FriendsAndLobbyScenarioTests
         }
 
         public Task ReportOfflineAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task SendProfileSnapshotAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<UserProfileSnapshotDto?> GetFriendProfileAsync(string friendId, CancellationToken cancellationToken = default) => Task.FromResult<UserProfileSnapshotDto?>(null);
     }
 
     private sealed class ScenarioSkinService : ISkinService

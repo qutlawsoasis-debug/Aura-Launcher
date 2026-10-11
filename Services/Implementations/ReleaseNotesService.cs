@@ -36,8 +36,21 @@ public class ReleaseNotesService : IReleaseNotesService
                 Version = currentUserFacing,
                 InternalVersion = currentInternal,
                 DateText = "11 октября 2026",
-                ShortTitle = "Скриншоты и модерация",
+                ShortTitle = "Профиль и приватность",
                 IsCurrent = true,
+                Items = new List<ReleaseNoteItem>
+                {
+                    ReleaseNoteItem.Parse("[Новое] Профиль друга: клик по другу открывает его статистику, достижения и миры"),
+                    ReleaseNoteItem.Parse("[Новое] Приватность в Настройках: что показывать друзьям (статистика и достижения видны друзьям по умолчанию)")
+                }
+            },
+            new ReleaseNoteVersion
+            {
+                Version = "beta 1.0.75",
+                InternalVersion = "1.2.83",
+                DateText = "11 октября 2026",
+                ShortTitle = "Скриншоты и модерация",
+                IsCurrent = false,
                 Items = new List<ReleaseNoteItem>
                 {
                     ReleaseNoteItem.Parse("[Новое] Команды бана и кика для хоста мира"),

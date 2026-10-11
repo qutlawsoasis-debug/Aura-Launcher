@@ -141,6 +141,7 @@ export class InMemoryStore {
     reqOut = new Map();
     invites = new Map(); // toId -> (inviteId -> invite)
     sentInvites = new Map(); // fromId -> (inviteId -> sentInvite)
+    userProfiles = new Map();
     async get(code) {
         const entry = this.lobbies.get(code);
         if (!entry)
@@ -350,6 +351,12 @@ export class InMemoryStore {
             sent.state = state;
             sent.expiresAt = Date.now() + 60_000;
         }
+    }
+    async setUserProfile(profile) {
+        this.userProfiles.set(profile.userId, profile);
+    }
+    async getUserProfile(userId) {
+        return this.userProfiles.get(userId) || null;
     }
     async sync(userId, presence) {
         const now = Date.now();
@@ -747,6 +754,20 @@ export class UpstashStore {
             catch { }
         }
     }
+    async setUserProfile(profile) {
+        await this.fetchCommand(['SET', `profile:${profile.userId}`, JSON.stringify(profile)]);
+    }
+    async getUserProfile(userId) {
+        const raw = await this.fetchCommand(['GET', `profile:${userId}`]);
+        if (!raw)
+            return null;
+        try {
+            return typeof raw === 'string' ? JSON.parse(raw) : raw;
+        }
+        catch {
+            return null;
+        }
+    }
     async sync(userId, presence) {
         const now = Date.now();
         // Пайплайн 1: обновление присутствия + получение всех связей и хешей
@@ -946,6 +967,7 @@ export class MongoStore {
                         this.db.collection('invites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
                         this.db.collection('sent_invites').createIndex({ fromId: 1 }),
                         this.db.collection('sent_invites').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+                        this.db.collection('user_profiles').createIndex({ userId: 1 }),
                         this.db.collection('rate_limits').createIndex({ resetAt: 1 }, { expireAfterSeconds: 0 })
                     ]);
                     this.initialized = true;
@@ -1220,6 +1242,28 @@ export class MongoStore {
             sent.expiresAt = expiresAt.getTime();
             await this.db.collection('sent_invites').updateOne({ _id: key }, { $set: { sentInvite: sent, expiresAt } });
         }
+    }
+    async setUserProfile(profile) {
+        await this.ensureInit();
+        await this.db.collection('user_profiles').updateOne({ _id: profile.userId }, { $set: profile }, { upsert: true });
+    }
+    async getUserProfile(userId) {
+        await this.ensureInit();
+        const doc = await this.db.collection('user_profiles').findOne({ _id: userId });
+        if (!doc)
+            return null;
+        return {
+            userId: doc.userId || String(doc._id),
+            nick: doc.nick,
+            skinModel: doc.skinModel,
+            skinSha1: doc.skinSha1,
+            playTimeSeconds: typeof doc.playTimeSeconds === 'number' ? doc.playTimeSeconds : 0,
+            gameLaunches: typeof doc.gameLaunches === 'number' ? doc.gameLaunches : 0,
+            achievements: Array.isArray(doc.achievements) ? doc.achievements : [],
+            worlds: Array.isArray(doc.worlds) ? doc.worlds : [],
+            privacy: doc.privacy || { showStats: true, showAchievements: true, showWorlds: false },
+            updatedAt: doc.updatedAt || 0
+        };
     }
     async sync(userId, presence) {
         await this.ensureInit();

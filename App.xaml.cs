@@ -628,13 +628,16 @@ public partial class App : Application
             sp.GetRequiredService<IGameLaunchService>()));
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();
         services.AddSingleton<IAnthemService, AnthemService>();
-        services.AddSingleton<IFriendService, FriendService>();
+        services.AddSingleton<IWorkshopService, WorkshopService>();
+        services.AddSingleton<IAchievementService, AchievementService>();
+        services.AddSingleton<IFriendService>(sp => new FriendService(
+            sp.GetRequiredService<IConfigService>(),
+            sp.GetService<IAchievementService>(),
+            sp.GetService<IWorkshopService>()));
         services.AddSingleton<INotificationService, NotificationService>();
         services.AddSingleton<IDiscordRpcService, DiscordRpcService>();
         services.AddSingleton<IReportService, ReportService>();
         services.AddSingleton<IBackgroundService, BackgroundService>();
-        services.AddSingleton<IWorkshopService, WorkshopService>();
-        services.AddSingleton<IAchievementService, AchievementService>();
         services.AddSingleton<IMinecraftPingService, MinecraftPingService>();
         services.AddSingleton<IScreenshotWatcherService, ScreenshotWatcherService>();
         services.AddSingleton<IReleaseNotesService, ReleaseNotesService>();

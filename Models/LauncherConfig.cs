@@ -45,4 +45,8 @@ public class LauncherConfig
     public bool AutoRotateBackgrounds { get; set; } = true;
     public string GraphicsPreset { get; set; } = "Balanced";
     public string? JvmArgs { get; set; }
+    public bool ShareStatsWithFriends { get; set; } = true;
+    public bool ShareAchievementsWithFriends { get; set; } = true;
+    public bool ShareWorldsWithFriends { get; set; } = false;
+    public System.Collections.Generic.List<string> SharedWorldFolderNames { get; set; } = new();
 }

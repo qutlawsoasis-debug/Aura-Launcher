@@ -232,6 +232,7 @@ public class WorkshopService : IWorkshopService
                         FolderPath = d,
                         LastPlayed = lastPlayed,
                         GameMode = gameMode,
+                        SizeBytes = totalBytes,
                         SizeFormatted = FormatFileSize(totalBytes),
                         IconSource = icon,
                         PlaytimeFormatted = playtimeFormatted,

@@ -131,3 +131,72 @@ public class InviteRespondResponse
     [JsonPropertyName("error")]
     public string? Error { get; set; }
 }
+
+public class UserPrivacySettingsDto
+{
+    [JsonPropertyName("showStats")]
+    public bool ShowStats { get; set; } = true;
+
+    [JsonPropertyName("showAchievements")]
+    public bool ShowAchievements { get; set; } = true;
+
+    [JsonPropertyName("showWorlds")]
+    public bool ShowWorlds { get; set; } = false;
+}
+
+public class ProfileAchievementDto
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("unlockedAt")]
+    public long UnlockedAt { get; set; }
+}
+
+public class ProfileWorldDto
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("lastPlayed")]
+    public long LastPlayed { get; set; }
+
+    [JsonPropertyName("sizeBytes")]
+    public long SizeBytes { get; set; }
+}
+
+public class UserProfileSnapshotDto
+{
+    [JsonPropertyName("userId")]
+    public string UserId { get; set; } = string.Empty;
+
+    [JsonPropertyName("nick")]
+    public string Nick { get; set; } = string.Empty;
+
+    [JsonPropertyName("skinModel")]
+    public string? SkinModel { get; set; }
+
+    [JsonPropertyName("skinSha1")]
+    public string? SkinSha1 { get; set; }
+
+    [JsonPropertyName("playTimeSeconds")]
+    public long? PlayTimeSeconds { get; set; }
+
+    [JsonPropertyName("gameLaunches")]
+    public int? GameLaunches { get; set; }
+
+    [JsonPropertyName("achievements")]
+    public System.Collections.Generic.List<ProfileAchievementDto>? Achievements { get; set; }
+
+    [JsonPropertyName("worlds")]
+    public System.Collections.Generic.List<ProfileWorldDto>? Worlds { get; set; }
+
+    [JsonPropertyName("privacy")]
+    public UserPrivacySettingsDto Privacy { get; set; } = new();
+
+    [JsonPropertyName("updatedAt")]
+    public long UpdatedAt { get; set; }
+
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
+}

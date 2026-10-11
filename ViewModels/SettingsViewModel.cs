@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32;
@@ -573,6 +576,8 @@ public class SettingsViewModel : ObservableObject
             _nicknameErrorText = GetNicknameErrorMessage(initialResult.Error);
         }
 
+        _ = LoadSharedWorldsAsync();
+
         SelectGameFolderCommand = new RelayCommand(_ =>
         {
             var dialog = new OpenFolderDialog
@@ -704,5 +709,142 @@ public class SettingsViewModel : ObservableObject
         {
             IsCheckingIntegrity = false;
         }
+    }
+
+    public bool ShareStatsWithFriends
+    {
+        get => _configService.CurrentConfig.ShareStatsWithFriends;
+        set
+        {
+            if (_configService.CurrentConfig.ShareStatsWithFriends != value)
+            {
+                _configService.CurrentConfig.ShareStatsWithFriends = value;
+                OnPropertyChanged();
+                _ = SaveAndSyncSnapshotAsync();
+            }
+        }
+    }
+
+    public bool ShareAchievementsWithFriends
+    {
+        get => _configService.CurrentConfig.ShareAchievementsWithFriends;
+        set
+        {
+            if (_configService.CurrentConfig.ShareAchievementsWithFriends != value)
+            {
+                _configService.CurrentConfig.ShareAchievementsWithFriends = value;
+                OnPropertyChanged();
+                _ = SaveAndSyncSnapshotAsync();
+            }
+        }
+    }
+
+    public bool ShareWorldsWithFriends
+    {
+        get => _configService.CurrentConfig.ShareWorldsWithFriends;
+        set
+        {
+            if (_configService.CurrentConfig.ShareWorldsWithFriends != value)
+            {
+                _configService.CurrentConfig.ShareWorldsWithFriends = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsSharedWorldsListVisible));
+                if (value)
+                {
+                    _ = LoadSharedWorldsAsync();
+                }
+                _ = SaveAndSyncSnapshotAsync();
+            }
+        }
+    }
+
+    public bool IsSharedWorldsListVisible => ShareWorldsWithFriends;
+
+    public ObservableCollection<SharedWorldItemViewModel> SharedWorlds { get; } = new();
+
+    private bool _isLoadingWorlds;
+    public bool IsLoadingWorlds
+    {
+        get => _isLoadingWorlds;
+        private set => SetProperty(ref _isLoadingWorlds, value);
+    }
+
+    public async Task LoadSharedWorldsAsync()
+    {
+        if (IsLoadingWorlds) return;
+        IsLoadingWorlds = true;
+        try
+        {
+            var worlds = await _workshopService.GetWorldSavesAsync(_configService.CurrentConfig.GameDir);
+            var selectedSet = new HashSet<string>(_configService.CurrentConfig.SharedWorldFolderNames ?? new(), StringComparer.OrdinalIgnoreCase);
+
+            SharedWorlds.Clear();
+            foreach (var w in worlds)
+            {
+                SharedWorlds.Add(new SharedWorldItemViewModel(w, selectedSet.Contains(w.FolderName), OnWorldShareToggled));
+            }
+        }
+        catch { }
+        finally
+        {
+            IsLoadingWorlds = false;
+        }
+    }
+
+    private void OnWorldShareToggled(string folderName, bool isShared)
+    {
+        var list = _configService.CurrentConfig.SharedWorldFolderNames ?? new List<string>();
+        if (isShared)
+        {
+            if (!list.Contains(folderName, StringComparer.OrdinalIgnoreCase))
+            {
+                list.Add(folderName);
+            }
+        }
+        else
+        {
+            list.RemoveAll(x => string.Equals(x, folderName, StringComparison.OrdinalIgnoreCase));
+        }
+        _configService.CurrentConfig.SharedWorldFolderNames = list;
+        _ = SaveAndSyncSnapshotAsync();
+    }
+
+    private async Task SaveAndSyncSnapshotAsync()
+    {
+        await SaveImmediatelyAsync();
+        _ = _friendService?.SendProfileSnapshotAsync();
+    }
+}
+
+public class SharedWorldItemViewModel : ObservableObject
+{
+    private readonly Action<string, bool> _onToggled;
+    private bool _isShared;
+
+    public string FolderName { get; }
+    public string DisplayName { get; }
+    public string LastPlayedFormatted { get; }
+    public string SizeFormatted { get; }
+
+    public bool IsShared
+    {
+        get => _isShared;
+        set
+        {
+            if (SetProperty(ref _isShared, value))
+            {
+                _onToggled(FolderName, value);
+            }
+        }
+    }
+
+    public SharedWorldItemViewModel(WorldSaveItem item, bool isShared, Action<string, bool> onToggled)
+    {
+        FolderName = item.FolderName;
+        DisplayName = item.DisplayName;
+        LastPlayedFormatted = item.LastPlayedFormatted;
+        SizeFormatted = item.SizeFormatted;
+        _isShared = isShared;
+        _onToggled = onToggled;
     }
 }

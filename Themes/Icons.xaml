@@ -2,6 +2,7 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Lucide Vector Icons (Geometry, 24x24 viewBox) -->
+    <StreamGeometry x:Key="IconArrowLeft">M19,12 H5 M12,19 L5,12 L12,5</StreamGeometry>
     <StreamGeometry x:Key="IconMap">M3,6 L9,3 L15,6 L21,3 L21,18 L15,21 L9,18 L3,21 Z M9,3 L9,18 M15,6 L15,21</StreamGeometry>
     <StreamGeometry x:Key="IconWorld">M3,6 L9,3 L15,6 L21,3 L21,18 L15,21 L9,18 L3,21 Z M9,3 L9,18 M15,6 L15,21</StreamGeometry>
     <StreamGeometry x:Key="IconPuzzle">M14,2 V4.5 A1.5,1.5 0 0,0 15.5,6 H18 A2,2 0 0,1 20,8 V10.5 A1.5,1.5 0 0,0 21.5,12 H22 A2,2 0 0,1 22,16 H21.5 A1.5,1.5 0 0,0 20,17.5 V18 A2,2 0 0,1 18,20 H15.5 A1.5,1.5 0 0,0 14,21.5 V22 A2,2 0 0,1 10,22 V21.5 A1.5,1.5 0 0,0 8.5,20 H6 A2,2 0 0,1 4,18 V15.5 A1.5,1.5 0 0,0 2.5,14 H2 A2,2 0 0,1 2,10 H2.5 A1.5,1.5 0 0,0 4,8.5 V6 A2,2 0 0,1 6,4 H8.5 A1.5,1.5 0 0,0 10,2.5 V2 A2,2 0 0,1 14,2 Z</StreamGeometry>
