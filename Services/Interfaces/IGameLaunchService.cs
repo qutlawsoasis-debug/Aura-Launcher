@@ -48,6 +48,11 @@ public interface IGameLaunchService
     event EventHandler<int>? GameExited;
 
     /// <summary>
+    /// Корректно завершает запущенный процесс игры (CloseMainWindow, затем при необходимости Kill).
+    /// </summary>
+    Task<bool> StopGameProcessAsync(int timeoutMs = 6000);
+
+    /// <summary>
     /// Проверка и автоустановка окружения (Vanilla 1.20.1, Java 17, Fabric, библиотеки, ассеты).
     /// </summary>
     Task EnsureInstalledAsync(

@@ -18,6 +18,7 @@ public class TestLaunchService : IGameLaunchService
     public Process? CurrentGameProcess => null;
 
     public event EventHandler<int>? GameExited { add { } remove { } }
+    public Task<bool> StopGameProcessAsync(int timeoutMs = 6000) => Task.FromResult(true);
 
     public string ResolveMinecraftDirectory(string? customPath = null) => customPath ?? "C:\\AuraTest";
     public string? ResolveJavaRuntime(string gameDir) => null;
@@ -145,5 +146,54 @@ public class LauncherUpdateServiceTests
         // Assert
         Assert.False(string.IsNullOrWhiteSpace(version));
         Assert.Matches(@"^\d+\.\d+\.\d+", version);
+    }
+
+    [Fact]
+    public async Task StopGameProcessAsync_WhenCalledOnTestService_ReturnsTrue()
+    {
+        var launchService = new TestLaunchService { IsGameRunning = true };
+        bool stopped = await launchService.StopGameProcessAsync(1000);
+        Assert.True(stopped);
+    }
+
+    [Fact]
+    public void UpdateNotice_SerializationAndDeserialization_MatchesExpectedContract()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "aura_notice_test_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var noticePath = Path.Combine(tempDir, "update-notice.json");
+            var noticeData = new
+            {
+                type = "pack",
+                version = "20261011.1758",
+                message = "Вышло обновление сборки Aura! Пожалуйста, сохраните игру и перезапустите клиент.",
+                forceRestart = true,
+                restartCountdownSeconds = 3,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(noticeData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(noticePath, json, System.Text.Encoding.UTF8);
+
+            Assert.True(File.Exists(noticePath));
+            var readContent = File.ReadAllText(noticePath, System.Text.Encoding.UTF8);
+            using var doc = System.Text.Json.JsonDocument.Parse(readContent);
+            var root = doc.RootElement;
+
+            Assert.Equal("pack", root.GetProperty("type").GetString());
+            Assert.Equal("20261011.1758", root.GetProperty("version").GetString());
+            Assert.True(root.GetProperty("forceRestart").GetBoolean());
+            Assert.Equal(3, root.GetProperty("restartCountdownSeconds").GetInt32());
+            Assert.True(root.GetProperty("timestamp").GetInt64() > 0);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
     }
 }

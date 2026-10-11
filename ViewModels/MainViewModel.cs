@@ -56,6 +56,7 @@ public class MainViewModel : ObservableObject
     private bool _isToastDismissedForSession;
     private string? _pendingNewVersion;
     private string? _lastNotifiedLauncherUpdateVersion;
+    private string? _lastNotifiedPackUpdateVersion;
     private readonly IFriendService? _friendService;
     private readonly INotificationService? _notificationService;
     private readonly IDiscordRpcService? _discordRpcService;
@@ -550,6 +551,7 @@ public class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(AllocatedRamText));
                 OnPropertyChanged(nameof(CanApplyUpdate));
                 OnPropertyChanged(nameof(UpdateBannerMessage));
+                OnPropertyChanged(nameof(UpdateBannerButtonText));
                 LaunchOrCancelCommand.RaiseCanExecuteChanged();
                 LaunchGameCommand.RaiseCanExecuteChanged();
                 ApplyBannerUpdateCommand?.RaiseCanExecuteChanged();
@@ -616,7 +618,9 @@ public class MainViewModel : ObservableObject
         {
             if (IsGameRunning)
             {
-                return "Обновление скачается и лаунчер перезапустится. Сначала закройте игру";
+                return _isLauncherUpdatePending
+                    ? "Доступно обновление лаунчера. Нажмите для перезапуска игры и обновления."
+                    : "Доступны новые моды или файлы сборки. Нажмите для перезапуска игры и установки.";
             }
             if (LobbyVM != null && LobbyVM.IsLobbyCreated)
             {
@@ -631,7 +635,14 @@ public class MainViewModel : ObservableObject
 
     public string UpdateBannerButtonText
     {
-        get => !string.IsNullOrWhiteSpace(_updateBannerButtonText) ? _updateBannerButtonText : "Обновить";
+        get
+        {
+            if (IsGameRunning)
+            {
+                return "ПЕРЕЗАПУСТИТЬ И ОБНОВИТЬ";
+            }
+            return !string.IsNullOrWhiteSpace(_updateBannerButtonText) ? _updateBannerButtonText : "Обновить";
+        }
         set => SetProperty(ref _updateBannerButtonText, value);
     }
 
@@ -641,7 +652,7 @@ public class MainViewModel : ObservableObject
         set => SetProperty(ref _hasUpdateDot, value);
     }
 
-    public bool CanApplyUpdate => !IsGameRunning;
+    public bool CanApplyUpdate => !IsBusy;
 
     public string LauncherVersionText => LauncherUpdateService.ResolveVersions(_launcherUpdateService.CurrentVersion).UserFacingVersion;
 
@@ -1150,25 +1161,47 @@ public class MainViewModel : ObservableObject
             _isToastDismissedForSession = true;
             IsUpdateBannerVisible = false;
             _notificationService?.ClearUpdateNotifications();
+            ClearUpdateNotice();
         });
 
         ApplyBannerUpdateCommand = new AsyncRelayCommand(async () =>
         {
-            if (IsGameRunning) return;
+            if (IsBusy) return;
+
+            bool wasRunningBefore = IsGameRunning;
             IsUpdateBannerVisible = false;
             _notificationService?.ClearUpdateNotifications();
 
+            if (IsGameRunning)
+            {
+                WriteUpdateNotice(
+                    _isLauncherUpdatePending ? "launcher" : "pack",
+                    _pendingNewVersion ?? (_lastNotifiedPackUpdateVersion ?? "update"),
+                    "Перезапуск игры через 3 сек для установки обновления...",
+                    forceRestart: true,
+                    restartCountdownSeconds: 3);
+
+                SetLauncherState(LauncherState.Checking, "Остановка игры для установки обновления...");
+                await Task.Delay(1500);
+
+                await _launchService.StopGameProcessAsync(timeoutMs: 6000);
+            }
+
             if (_isLauncherUpdatePending)
             {
-                // Открываем отдельное окно обновления лаунчера (StartupWindow)
                 OpenStartupWindow();
             }
             else
             {
-                // Для сборки запускаем скачивание новых модов
                 await CheckUpdatesAsync(isStartup: false);
+                ClearUpdateNotice();
+
+                if (wasRunningBefore && !IsBusy && !IsGameRunning && !_isLaunching && NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid)
+                {
+                    await LaunchGameAsync(null);
+                }
             }
-        }, () => !IsBusy && !IsGameRunning);
+        }, () => !IsBusy);
 
         UpdateAvatar();
 
@@ -1770,6 +1803,54 @@ public class MainViewModel : ObservableObject
         }
     }
 
+    private void WriteUpdateNotice(string updateType, string version, string message, bool forceRestart = false, int restartCountdownSeconds = 0)
+    {
+        try
+        {
+            var config = _configService?.CurrentConfig;
+            var gameDir = _launchService.ResolveMinecraftDirectory(config?.GameDir);
+            if (!Directory.Exists(gameDir)) return;
+
+            var noticePath = Path.Combine(gameDir, "update-notice.json");
+            var noticeData = new
+            {
+                type = updateType,
+                version = version,
+                message = message,
+                forceRestart = forceRestart,
+                restartCountdownSeconds = restartCountdownSeconds,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+
+            var json = System.Text.Json.JsonSerializer.Serialize(noticeData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(noticePath, json, System.Text.Encoding.UTF8);
+            FabricGameLaunchService.LogLauncherEvent($"[UPDATE-NOTICE] Записан файл уведомления: {noticePath}");
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[UPDATE-NOTICE: ERROR] {ex.Message}");
+        }
+    }
+
+    private void ClearUpdateNotice()
+    {
+        try
+        {
+            var config = _configService?.CurrentConfig;
+            var gameDir = _launchService.ResolveMinecraftDirectory(config?.GameDir);
+            var noticePath = Path.Combine(gameDir, "update-notice.json");
+            if (File.Exists(noticePath))
+            {
+                File.Delete(noticePath);
+                FabricGameLaunchService.LogLauncherEvent($"[UPDATE-NOTICE] Удален файл уведомления: {noticePath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[UPDATE-NOTICE: CLEAR ERROR] {ex.Message}");
+        }
+    }
+
     private async Task CheckUpdatesAsync(bool isStartup = false)
     {
         // 1. Сначала обновление лаунчера через Velopack
@@ -1784,10 +1865,10 @@ public class MainViewModel : ObservableObject
                     _pendingNewVersion = newVersion;
                     HasUpdateDot = true;
 
-                    if (!_isToastDismissedForSession && !IsGameRunning && !string.Equals(_lastNotifiedLauncherUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(_lastNotifiedLauncherUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
                     {
                         _lastNotifiedLauncherUpdateVersion = newVersion;
-                        _isToastDismissedForSession = true;
+                        _isToastDismissedForSession = false;
 
                         var parts = newVersion.Split('.');
                         string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
@@ -1795,9 +1876,17 @@ public class MainViewModel : ObservableObject
                             : newVersion;
 
                         UpdateBannerTitle = $"Вышло обновление {displayVer}";
-                        UpdateBannerButtonText = "Обновить";
+                        UpdateBannerButtonText = IsGameRunning ? "ПЕРЕЗАПУСТИТЬ И ОБНОВИТЬ" : "Обновить";
                         OnPropertyChanged(nameof(UpdateBannerMessage));
                         IsUpdateBannerVisible = true;
+
+                        WriteUpdateNotice("launcher", displayVer, $"Вышло обновление лаунчера Aura ({displayVer}). Перезапустите лаунчер и игру.");
+
+                        _notificationService?.NotifyUpdateAvailable(
+                            $"Вышло обновление {displayVer}",
+                            IsGameRunning
+                                ? "Доступна новая версия лаунчера. Перезапустите игру и лаунчер для применения."
+                                : "Нажмите, чтобы установить новую версию лаунчера.");
                     }
                 }
                 else
@@ -1810,6 +1899,7 @@ public class MainViewModel : ObservableObject
                         _lastNotifiedLauncherUpdateVersion = null;
                         IsUpdateBannerVisible = false;
                         HasUpdateDot = false;
+                        ClearUpdateNotice();
                     }
                 }
             }
@@ -1862,6 +1952,8 @@ public class MainViewModel : ObservableObject
                     {
                         StatusText = result.Message;
                     }
+                    ClearUpdateNotice();
+                    _lastNotifiedPackUpdateVersion = null;
                 }
             }
             else
@@ -1873,6 +1965,8 @@ public class MainViewModel : ObservableObject
                 else
                 {
                     SetLauncherState(LauncherState.Ready, result.Message);
+                    ClearUpdateNotice();
+                    _lastNotifiedPackUpdateVersion = null;
                 }
             }
         }
@@ -1913,7 +2007,7 @@ public class MainViewModel : ObservableObject
         _backgroundUpdateTimer?.Stop();
         _backgroundUpdateTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromMinutes(20)
+            Interval = TimeSpan.FromMinutes(3)
         };
         _backgroundUpdateTimer.Tick += async (s, e) =>
         {
@@ -1941,24 +2035,28 @@ public class MainViewModel : ObservableObject
                     _pendingNewVersion = newVersion;
                     HasUpdateDot = true;
 
-                    if (!_isToastDismissedForSession && !IsGameRunning && !string.Equals(_lastNotifiedLauncherUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
+                    var parts = newVersion.Split('.');
+                    string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
+                        ? $"beta 1.0.{patch - 8}"
+                        : newVersion;
+
+                    UpdateBannerTitle = $"Вышло обновление {displayVer}";
+                    UpdateBannerButtonText = IsGameRunning ? "ПЕРЕЗАПУСТИТЬ И ОБНОВИТЬ" : "Обновить";
+                    OnPropertyChanged(nameof(UpdateBannerMessage));
+                    IsUpdateBannerVisible = true;
+
+                    WriteUpdateNotice("launcher", displayVer, $"Вышло обновление лаунчера Aura ({displayVer}). Перезапустите лаунчер и игру.");
+
+                    if (!string.Equals(_lastNotifiedLauncherUpdateVersion, newVersion, StringComparison.OrdinalIgnoreCase))
                     {
                         _lastNotifiedLauncherUpdateVersion = newVersion;
-                        _isToastDismissedForSession = true;
-
-                        var parts = newVersion.Split('.');
-                        string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
-                            ? $"beta 1.0.{patch - 8}"
-                            : newVersion;
-
-                        UpdateBannerTitle = $"Вышло обновление {displayVer}";
-                        UpdateBannerButtonText = "Обновить";
-                        OnPropertyChanged(nameof(UpdateBannerMessage));
-                        IsUpdateBannerVisible = true;
+                        _isToastDismissedForSession = false;
 
                         _notificationService?.NotifyUpdateAvailable(
                             $"Вышло обновление {displayVer}",
-                            "Нажмите, чтобы установить новую версию лаунчера.");
+                            IsGameRunning
+                                ? "Доступна новая версия лаунчера. Перезапустите игру и лаунчер для применения."
+                                : "Нажмите, чтобы установить новую версию лаунчера.");
                     }
                     return;
                 }
@@ -1972,13 +2070,14 @@ public class MainViewModel : ObservableObject
                         _lastNotifiedLauncherUpdateVersion = null;
                         IsUpdateBannerVisible = false;
                         HasUpdateDot = false;
+                        ClearUpdateNotice();
                     }
                 }
             }
 
             // 2. Проверяем обновление сборки (манифеста)
             var config = _configService.CurrentConfig;
-            var gameDir = config.GameDir;
+            var gameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
             if (!string.IsNullOrWhiteSpace(gameDir))
             {
                 var currentState = PackState.LoadValidState(gameDir);
@@ -2002,8 +2101,29 @@ public class MainViewModel : ObservableObject
                                 _isLauncherUpdatePending = false;
                                 UpdateBannerTitle = "Обновление сборки";
                                 UpdateBannerMessage = $"Доступны новые моды или файлы сборки ({remoteVersion}).";
-                                UpdateBannerButtonText = "ОБНОВИТЬ";
+                                UpdateBannerButtonText = IsGameRunning ? "ПЕРЕЗАПУСТИТЬ И ОБНОВИТЬ" : "ОБНОВИТЬ";
+                                OnPropertyChanged(nameof(UpdateBannerMessage));
                                 IsUpdateBannerVisible = true;
+
+                                WriteUpdateNotice("pack", remoteVersion, $"Вышло обновление сборки Aura ({remoteVersion})! Сохраните игру и перезапустите клиент.");
+
+                                if (!string.Equals(_lastNotifiedPackUpdateVersion, remoteVersion, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    _lastNotifiedPackUpdateVersion = remoteVersion;
+                                    _notificationService?.NotifyUpdateAvailable(
+                                        "Обновление сборки Aura",
+                                        IsGameRunning
+                                            ? $"Вышла новая версия сборки ({remoteVersion}). Перезапустите игру для применения."
+                                            : $"Доступны новые моды или файлы сборки ({remoteVersion}). Нажмите ОБНОВИТЬ.");
+                                }
+                            }
+                            else
+                            {
+                                if (!IsUpdateBannerVisible && !_isLauncherUpdatePending)
+                                {
+                                    ClearUpdateNotice();
+                                    _lastNotifiedPackUpdateVersion = null;
+                                }
                             }
                         }
                     }

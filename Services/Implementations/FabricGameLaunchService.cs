@@ -158,6 +158,52 @@ public class FabricGameLaunchService : IGameLaunchService
     }
 
     /// <summary>
+    /// Корректно завершает запущенный процесс игры:
+    /// Сначала вызывает CloseMainWindow (дает игре шанс сохранить мир и закрыться),
+    /// при превышении таймаута принудительно убивает процесс.
+    /// </summary>
+    public async Task<bool> StopGameProcessAsync(int timeoutMs = 6000)
+    {
+        var proc = _gameProcess;
+        if (proc == null || proc.HasExited)
+        {
+            return true;
+        }
+
+        try
+        {
+            LogLauncherEvent($"[STOP-GAME] Запрос корректного завершения процесса игры (PID {proc.Id})...");
+            if (proc.CloseMainWindow())
+            {
+                using var cts = new CancellationTokenSource(timeoutMs);
+                try
+                {
+                    await proc.WaitForExitAsync(cts.Token);
+                    LogLauncherEvent($"[STOP-GAME] Процесс игры (PID {proc.Id}) успешно завершён через CloseMainWindow");
+                    return true;
+                }
+                catch (OperationCanceledException)
+                {
+                    LogLauncherEvent($"[STOP-GAME] Процесс игры не завершился за {timeoutMs} мс после CloseMainWindow, выполняем принудительное завершение.");
+                }
+            }
+
+            if (!proc.HasExited)
+            {
+                proc.Kill();
+                await proc.WaitForExitAsync();
+                LogLauncherEvent($"[STOP-GAME] Процесс игры принудительно завершён (Kill)");
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[STOP-GAME: ERROR] Ошибка при остановке процесса игры: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Если перед первым запуском в GameDir нет options.txt, создает его с дефолтными настройками.
     /// Не перезаписывает, если файл уже существует.
     /// </summary>
