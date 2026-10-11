@@ -40,8 +40,9 @@ public class ReleaseNotesService : IReleaseNotesService
                 IsCurrent = true,
                 Items = new List<ReleaseNoteItem>
                 {
+                    ReleaseNoteItem.Parse("[Исправлено] Сбой при запуске лаунчера после обновления"),
                     ReleaseNoteItem.Parse("[Новое] Профиль друга: клик по другу открывает его статистику, достижения и миры"),
-                    ReleaseNoteItem.Parse("[Новое] Приватность в Настройках: что показывать друзьям (статистика и достижения видны друзьям по умолчанию)")
+                    ReleaseNoteItem.Parse("[Новое] Приватность в Настройках: что показывать друзьям")
                 }
             },
             new ReleaseNoteVersion

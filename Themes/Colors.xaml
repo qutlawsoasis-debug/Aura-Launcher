@@ -71,6 +71,7 @@
     <SolidColorBrush x:Key="PanelCard" Color="{StaticResource ColorPanelCard}" po:Freeze="True" />
     <SolidColorBrush x:Key="PanelInput" Color="{StaticResource ColorPanelInput}" po:Freeze="True" />
     <SolidColorBrush x:Key="PanelGlass" Color="{StaticResource ColorPanelGlass}" po:Freeze="True" />
+    <SolidColorBrush x:Key="PanelGlassBrush" Color="{StaticResource ColorPanelGlass}" po:Freeze="True" />
     <SolidColorBrush x:Key="PrimaryActionText" Color="{StaticResource ColorPrimaryActionText}" po:Freeze="True" />
     <SolidColorBrush x:Key="Night" Color="{StaticResource ColorNight}" po:Freeze="True" />
     <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource ColorTextPrimary}" po:Freeze="True" />

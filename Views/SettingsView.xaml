@@ -743,7 +743,7 @@
 
                 <!-- Список локальных миров с чекбоксами (когда показ миров включен) -->
                 <Border Visibility="{Binding IsSharedWorldsListVisible, Converter={StaticResource BoolToVis}}"
-                        Background="{StaticResource PanelGlassBrush}"
+                        Background="{StaticResource StoriesCardGlass}"
                         BorderBrush="{StaticResource LineInkBrush}"
                         BorderThickness="1"
                         CornerRadius="3"
