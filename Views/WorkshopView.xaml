@@ -571,36 +571,13 @@
                                 </Style>
                             </Border.Style>
                             <Grid>
-                                <!-- Watermark -->
-                                <TextBlock Text="Поиск мода по названию..."
-                                           FontFamily="{StaticResource MainFont}" FontSize="14"
-                                           Foreground="{StaticResource MuteBrush}"
-                                           VerticalAlignment="Center" Margin="24,0,0,0"
-                                           IsHitTestVisible="False">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding SearchModText.Length}" Value="0">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding SearchModText}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
                                 <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSearch}"
                                       Width="14" Height="14" HorizontalAlignment="Left" VerticalAlignment="Center"
                                       Stroke="{StaticResource MuteBrush}" IsHitTestVisible="False" />
-                                <TextBox Text="{Binding SearchModText, UpdateSourceTrigger=PropertyChanged}"
-                                         FontFamily="{StaticResource MainFont}" FontSize="14"
-                                         Foreground="{DynamicResource TextPrimary}"
-                                         CaretBrush="{DynamicResource Accent}"
-                                         Background="Transparent" BorderThickness="0"
-                                         Padding="24,6,6,6" VerticalAlignment="Center"
-                                         FocusVisualStyle="{x:Null}" />
+                                <TextBox Style="{StaticResource AuraEmbeddedTextBox}"
+                                         Text="{Binding SearchModText, UpdateSourceTrigger=PropertyChanged}"
+                                         Tag="Поиск модов..."
+                                         Padding="24,6,6,6" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
 

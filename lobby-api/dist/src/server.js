@@ -336,7 +336,7 @@ export const server = http.createServer(async (req, res) => {
             if (playerName) {
                 lobby.playerHeartbeats[playerName.toLowerCase()] = now;
             }
-            // Авто-очистка неактивных гостей (> 25 сек)
+            // Авто-очистка неактивных гостей (> 60 сек)
             const hostLower = lobby.hostName.toLowerCase();
             let playersChanged = false;
             const activePlayers = lobby.players.filter(p => {
@@ -344,7 +344,7 @@ export const server = http.createServer(async (req, res) => {
                 if (pLower === hostLower)
                     return true;
                 const lastBeat = lobby.playerHeartbeats[pLower] || lobby.createdAt;
-                if (now - lastBeat > 25000) {
+                if (now - lastBeat > 60000) {
                     playersChanged = true;
                     delete lobby.playerHeartbeats[pLower];
                     if (lobby.manifests)

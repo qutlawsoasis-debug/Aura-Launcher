@@ -86,6 +86,7 @@
     <SolidColorBrush x:Key="Border" Color="{StaticResource ColorBorder}" po:Freeze="True" />
     <SolidColorBrush x:Key="BorderStrong" Color="{StaticResource ColorBorderStrong}" po:Freeze="True" />
     <SolidColorBrush x:Key="BorderSubtle" Color="{StaticResource ColorBorderSubtle}" po:Freeze="True" />
+    <SolidColorBrush x:Key="BorderHoverBrush" Color="#28FFFFFF" po:Freeze="True" />
     <SolidColorBrush x:Key="TrackSubtle" Color="{StaticResource ColorTrackSubtle}" po:Freeze="True" />
     <SolidColorBrush x:Key="BarSubtle" Color="{StaticResource ColorBarSubtle}" po:Freeze="True" />
     <SolidColorBrush x:Key="Shade" Color="{StaticResource ColorShade}" po:Freeze="True" />

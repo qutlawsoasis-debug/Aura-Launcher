@@ -47,7 +47,7 @@ export default async function handler(req: any, res: any) {
       lobby.playerHeartbeats[playerName.toLowerCase()] = now;
     }
 
-    // 3. Авто-очистка гостей, от которых нет пульса более 25 секунд
+    // 3. Авто-очистка гостей, от которых нет пульса более 60 секунд
     const hostLower = lobby.hostName.toLowerCase();
     let playersChanged = false;
 
@@ -59,7 +59,7 @@ export default async function handler(req: any, res: any) {
         playersChanged = true;
       }
       const lastBeat = lobby.playerHeartbeats![pLower];
-      if (now - lastBeat > 25000) {
+      if (now - lastBeat > 60000) {
         playersChanged = true;
         delete lobby.playerHeartbeats![pLower];
         if (lobby.manifests) delete lobby.manifests[p];

@@ -260,8 +260,14 @@ public class FriendItemViewModel : ObservableObject
         var diff = DateTime.Now - dt;
         if (diff.TotalMinutes < 1) return "только что";
         if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes} мин. назад";
-        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours} ч. назад";
-        if (diff.TotalDays < 2) return "вчера";
+        if (diff.TotalHours < 4) return $"{(int)diff.TotalHours} ч. назад";
+
+        var today = DateTime.Today;
+        if (dt.Date == today)
+            return $"сегодня в {dt:HH:mm}";
+        if (dt.Date == today.AddDays(-1))
+            return $"вчера в {dt:HH:mm}";
+
         return dt.ToString("dd.MM.yyyy");
     }
 }
@@ -513,10 +519,10 @@ public class FriendsViewModel : ObservableObject
 
     private void RefreshLobbyStateForFriends()
     {
-        bool isHostLobbyNow = _lobbyViewModel.IsInLobby && _lobbyService.IsHost;
+        bool isInLobbyNow = _lobbyViewModel.IsInLobby;
         string? currentCode = _lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode;
 
-        if (!isHostLobbyNow)
+        if (!isInLobbyNow)
         {
             if (_wasInHostLobby || _knownSentInviteIds.Count > 0)
             {
@@ -544,7 +550,7 @@ public class FriendsViewModel : ObservableObject
             bool nowInMyLobby = ComputeIsFriendInMyLobby(friend.Nick, friend.Status, friend.LobbyCode);
             friend.IsInMyLobby = nowInMyLobby;
 
-            if (!isHostLobbyNow)
+            if (!isInLobbyNow)
             {
                 if (!_inFlightInviteFriendIds.Contains(friend.Id))
                 {
@@ -897,16 +903,16 @@ public class FriendsViewModel : ObservableObject
             await _inviteLock.WaitAsync();
             try
             {
-                string? lobbyCode = _lobbyService.CurrentLobbyCode;
+                string? lobbyCode = _lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode;
                 string? hostToken = _lobbyService.CurrentHostToken;
 
-                if (!_lobbyViewModel.IsInLobby || !_lobbyService.IsHost || string.IsNullOrWhiteSpace(lobbyCode) || string.IsNullOrWhiteSpace(hostToken))
+                if (!_lobbyViewModel.IsInLobby || string.IsNullOrWhiteSpace(lobbyCode))
                 {
                     lobbyCode = await _lobbyViewModel.CreateLobbyAsync();
                     hostToken = _lobbyService.CurrentHostToken;
                 }
 
-                if (!_lobbyViewModel.IsInLobby || !_lobbyService.IsHost || string.IsNullOrWhiteSpace(lobbyCode) || string.IsNullOrWhiteSpace(hostToken))
+                if (!_lobbyViewModel.IsInLobby || string.IsNullOrWhiteSpace(lobbyCode))
                 {
                     Dispatch(() =>
                     {
@@ -943,7 +949,7 @@ public class FriendsViewModel : ObservableObject
                         _latestSentInviteIdByFriend[friend.Id] = inviteId;
                     }
                     _inFlightInviteFriendIds.Remove(friend.Id);
-                    if (_lobbyViewModel.IsInLobby && _lobbyService.IsHost && string.Equals(_lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode, lobbyCode, StringComparison.OrdinalIgnoreCase))
+                    if (_lobbyViewModel.IsInLobby && string.Equals(_lobbyViewModel.LobbyCode ?? _lobbyService.CurrentLobbyCode, lobbyCode, StringComparison.OrdinalIgnoreCase))
                     {
                         friend.InviteState = "pending";
                     }

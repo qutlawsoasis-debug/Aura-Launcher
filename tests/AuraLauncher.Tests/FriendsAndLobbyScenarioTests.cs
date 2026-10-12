@@ -137,7 +137,7 @@ public class FriendsAndLobbyScenarioTests
         }
 
         public int SendInviteCallCount;
-        public List<(string FriendId, string LobbyCode, string HostToken)> SentInvitesLog { get; } = new();
+        public List<(string FriendId, string LobbyCode, string? HostToken)> SentInvitesLog { get; } = new();
         public Dictionary<string, string> InviteAcceptLobbyCodeByInviteId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public event Action<SyncResponse>? SyncUpdated;
@@ -180,7 +180,7 @@ public class FriendsAndLobbyScenarioTests
         public Task<bool> RemoveFriendAsync(string friendId, CancellationToken cancellationToken = default)
             => Task.FromResult(true);
 
-        public Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string hostToken, CancellationToken cancellationToken = default)
+        public Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string? hostToken, CancellationToken cancellationToken = default)
         {
             int num = Interlocked.Increment(ref SendInviteCallCount);
             lock (SentInvitesLog)

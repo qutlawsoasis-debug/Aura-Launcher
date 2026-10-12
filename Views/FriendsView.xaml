@@ -234,14 +234,7 @@
                          FontFamily="{StaticResource HeadingFont}"
                          FontSize="22"
                          FontWeight="SemiBold"
-                         Foreground="{StaticResource InkBrush}"
-                         Background="{DynamicResource Border}"
-                         BorderBrush="{StaticResource LineInkBrush}"
-                         BorderThickness="1"
-                         CaretBrush="{StaticResource EmberBrush}"
-                         SelectionBrush="{DynamicResource AccentFaint}"
-                         VerticalContentAlignment="Center"
-                         Padding="10,0"
+                         Tag="Код друга"
                          Margin="0,0,12,0" />
 
                 <Button Command="{Binding AddFriendCommand}"

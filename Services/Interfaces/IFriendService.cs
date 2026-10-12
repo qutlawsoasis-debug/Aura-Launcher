@@ -32,7 +32,7 @@ public interface IFriendService : IDisposable
     Task<(bool Success, string? ErrorMessage)> SendFriendRequestAsync(string friendCode, CancellationToken cancellationToken = default);
     Task<bool> RespondFriendRequestAsync(string fromId, bool accept, CancellationToken cancellationToken = default);
     Task<bool> RemoveFriendAsync(string friendId, CancellationToken cancellationToken = default);
-    Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string hostToken, CancellationToken cancellationToken = default);
+    Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string? hostToken, CancellationToken cancellationToken = default);
     Task<(bool Success, string? ErrorMessage)> ChangeNicknameAsync(string newNick, CancellationToken cancellationToken = default);
     Task<(bool Success, string? LobbyCode, string? ErrorMessage)> RespondInviteAsync(string inviteId, bool accept, CancellationToken cancellationToken = default);
     Task ReportOfflineAsync(CancellationToken cancellationToken = default);

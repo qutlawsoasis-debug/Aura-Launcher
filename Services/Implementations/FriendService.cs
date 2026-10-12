@@ -411,13 +411,13 @@ public class FriendService : IFriendService
         }
     }
 
-    public async Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string hostToken, CancellationToken cancellationToken = default)
+    public async Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string? hostToken, CancellationToken cancellationToken = default)
     {
         if (!IsRegistered) await EnsureRegisteredAsync(cancellationToken);
 
         try
         {
-            using var req = CreateAuthenticatedRequest(HttpMethod.Post, "api/invite", new { friendId, lobbyCode, hostToken });
+            using var req = CreateAuthenticatedRequest(HttpMethod.Post, "api/invite", new { friendId, lobbyCode, hostToken = hostToken ?? string.Empty });
             using var resp = await _httpClient.SendAsync(req, cancellationToken);
             var json = await resp.Content.ReadAsStringAsync(cancellationToken);
 

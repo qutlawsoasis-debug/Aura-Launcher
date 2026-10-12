@@ -252,8 +252,8 @@ export async function handleInvite(req, res) {
     const friendId = typeof body.friendId === 'string' ? body.friendId.trim() : '';
     const lobbyCode = typeof body.lobbyCode === 'string' ? body.lobbyCode.trim().toUpperCase() : '';
     const hostToken = typeof body.hostToken === 'string' ? body.hostToken.trim() : '';
-    if (!friendId || !lobbyCode || !hostToken) {
-        return sendJson(res, 400, { error: 'Не все поля заполнены (friendId, lobbyCode, hostToken)' });
+    if (!friendId || !lobbyCode) {
+        return sendJson(res, 400, { error: 'Не все поля заполнены (friendId, lobbyCode)' });
     }
     // 1. Проверить, что друг в друзьях (иначе 403)
     const isFriend = await store.isFriend(user.id, friendId);
@@ -265,9 +265,12 @@ export async function handleInvite(req, res) {
     if (!lobby || lobby.status === 'closed') {
         return sendJson(res, 404, { error: 'Лобби не найдено' });
     }
-    // 3. hostToken совпадает с токеном хоста
-    if (lobby.hostToken !== hostToken) {
-        return sendJson(res, 403, { error: 'Неверный токен хоста' });
+    // 3. Проверить полномочия: отправитель должен быть либо хостом (с валидным hostToken),
+    // либо участником лобби (user.nick есть в lobby.players)
+    const isHost = Boolean(hostToken && lobby.hostToken === hostToken);
+    const isMember = Boolean(user.nick && lobby.players && lobby.players.some((p) => p.toLowerCase() === user.nick.toLowerCase()));
+    if (!isHost && !isMember) {
+        return sendJson(res, 403, { error: 'Вы должны быть хостом или участником лобби, чтобы приглашать игроков' });
     }
     // 4. Приглашение живёт 120 с
     const inviteId = crypto.randomUUID();

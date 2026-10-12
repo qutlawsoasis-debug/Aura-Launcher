@@ -324,9 +324,19 @@ public class LobbyService : ILobbyService, IDisposable
                 if (status.Players != null && !string.IsNullOrWhiteSpace(_currentGuestPlayerName) &&
                     !System.Linq.Enumerable.Any(status.Players, p => string.Equals(p, _currentGuestPlayerName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    LeaveLobby();
-                    KickedFromLobby?.Invoke();
-                    return null;
+                    PlayitTunnelProvider.LogTunnel($"[GUEST-POLL] Гость {_currentGuestPlayerName} временно не в списке players лобби {code}. Восстанавливаем регистрацию в лобби...");
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var manifest = _manifestService.BuildModManifest(GetGameDir());
+                            await _apiClient.JoinLobbyAsync(code, _currentGuestPlayerName, manifest);
+                        }
+                        catch (Exception ex)
+                        {
+                            PlayitTunnelProvider.LogTunnel($"[GUEST-POLL: WARN] Re-join failed: {ex.Message}");
+                        }
+                    });
                 }
             }
             if (!IsHost && status.LastHeartbeat > 0)
