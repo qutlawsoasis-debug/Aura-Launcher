@@ -17,7 +17,7 @@
         <!-- Заголовок + плашка версии -->
         <StackPanel Grid.Row="0" Margin="0,4,0,14">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
-                <TextBlock Text="ЧТО НОВОГО" FontFamily="{StaticResource HeadingFont}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextWhite}" VerticalAlignment="Center" />
+                <TextBlock Text="ЧТО НОВОГО" FontFamily="{StaticResource HeadingFont}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextWhite}" VerticalAlignment="Center" />
                 <Border Background="{StaticResource EmberBrush}" CornerRadius="3" Padding="8,2" Margin="10,0,0,0" VerticalAlignment="Center">
                     <TextBlock Text="{Binding WhatsNewVersion}" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource PrimaryActionText}" />
                 </Border>

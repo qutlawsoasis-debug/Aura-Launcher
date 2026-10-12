@@ -68,10 +68,10 @@
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource ColorMute}" po:Freeze="True" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ColorBad}" po:Freeze="True" />
 
-    <!-- Typography: Oswald (Headings & Menu) & Onest (Body) -->
-    <FontFamily x:Key="HeadingFont">pack://application:,,,/Resources/Fonts/#Oswald, Segoe UI, sans-serif</FontFamily>
-    <FontFamily x:Key="MainFont">pack://application:,,,/Resources/Fonts/#Onest, Segoe UI, sans-serif</FontFamily>
-    <FontFamily x:Key="PixelFont">pack://application:,,,/Resources/Fonts/#Oswald, Segoe UI, sans-serif</FontFamily>
+    <!-- Typography: Manrope (Static weights Regular 400, Medium 500, SemiBold 600, Bold 700, ExtraBold 800) -->
+    <FontFamily x:Key="HeadingFont">pack://application:,,,/Resources/Fonts/#Manrope, Segoe UI, sans-serif</FontFamily>
+    <FontFamily x:Key="MainFont">pack://application:,,,/Resources/Fonts/#Manrope, Segoe UI, sans-serif</FontFamily>
+    <FontFamily x:Key="PixelFont">pack://application:,,,/Resources/Fonts/#Manrope, Segoe UI, sans-serif</FontFamily>
 
     <!-- WORLD BACKGROUND IMAGE -->
     <BitmapImage x:Key="WorldBackgroundBitmap"
@@ -100,6 +100,8 @@
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="Focusable" Value="False" />
         <Setter Property="ClipToBounds" Value="False" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
     </Style>
 
     <Style TargetType="{x:Type ContentControl}">
@@ -204,8 +206,8 @@
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Height" Value="48" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="15" />
         <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
         <Setter Property="Padding" Value="24,0" />
         <Setter Property="Template">
@@ -331,8 +333,8 @@
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Height" Value="48" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="FontSize" Value="18" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontSize" Value="15" />
         <Setter Property="Foreground" Value="#1C1106" />
         <Setter Property="Padding" Value="24,0" />
         <Setter Property="Template">
@@ -457,15 +459,15 @@
         </Setter>
     </Style>
 
-    <!-- Large Play Button (260x70, font 28, radius 3px, no glow or sheen) -->
+    <!-- Large Play Button (260x70, font 22, radius 3px, no glow or sheen) -->
     <Style x:Key="OverviewPlayBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource EmberKeyboardFocusVisual}" />
         <Setter Property="Width" Value="260" />
         <Setter Property="Height" Value="70" />
         <Setter Property="FontFamily" Value="{StaticResource HeadingFont}" />
-        <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontWeight" Value="ExtraBold" />
+        <Setter Property="FontSize" Value="22" />
         <Setter Property="Foreground" Value="#1C1106" />
         <Setter Property="Template">
             <Setter.Value>

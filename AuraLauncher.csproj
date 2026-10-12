@@ -24,6 +24,7 @@
     <Resource Include="bg_world.png" />
     <Resource Include="Resources\Backgrounds\*.jpg" />
     <Resource Include="steve.png" />
+    <Resource Include="Resources\Fonts\Manrope-*.ttf" />
     <Resource Include="Resources\Fonts\Oswald.ttf" />
     <Resource Include="Resources\Fonts\Onest.ttf" />
     <Resource Include="Resources\Audio\anthem.mp3" />

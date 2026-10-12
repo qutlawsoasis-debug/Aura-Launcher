@@ -24,40 +24,6 @@ public class AuraDefaultsMod implements ModInitializer {
 
         setupEmotes();
         setupHostCommands();
-        setupMcaVillagerConversion();
-    }
-
-    private void setupMcaVillagerConversion() {
-        if (!FabricLoader.getInstance().isModLoaded("mca")) {
-            return;
-        }
-        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
-            String className = entity.getClass().getName();
-            if (entity.getClass() == net.minecraft.entity.passive.VillagerEntity.class) {
-                try {
-                    Class<?> sqClass = Class.forName("fabric.net.conczin.mca.server.SpawnQueue");
-                    Object sqInstance = sqClass.getMethod("getInstance").invoke(null);
-                    sqClass.getMethod("convert", net.minecraft.entity.passive.VillagerEntity.class)
-                            .invoke(sqInstance, (net.minecraft.entity.passive.VillagerEntity) entity);
-                } catch (Throwable t) {
-                    LOGGER.debug("[aura-defaults] MCA villager convert skipped: {}", t.getMessage());
-                }
-            } else if ("fabric.net.conczin.mca.entity.VillagerEntityMCA".equals(className)) {
-                try {
-                    Object genetics = entity.getClass().getMethod("getGenetics").invoke(entity);
-                    Class<?> geneticsClass = Class.forName("fabric.net.conczin.mca.entity.ai.Genetics");
-                    Object voiceGene = geneticsClass.getField("VOICE").get(null);
-                    for (java.lang.reflect.Method m : geneticsClass.getMethods()) {
-                        if ("setGene".equals(m.getName()) && m.getParameterCount() == 2) {
-                            m.invoke(genetics, voiceGene, 0.5f);
-                            break;
-                        }
-                    }
-                } catch (Throwable t) {
-                    LOGGER.debug("[aura-defaults] MCA voice gene normalize skipped: {}", t.getMessage());
-                }
-            }
-        });
     }
 
     private void setupHostCommands() {

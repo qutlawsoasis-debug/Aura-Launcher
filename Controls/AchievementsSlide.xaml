@@ -24,12 +24,12 @@
         <Grid Grid.Row="0">
             <TextBlock Text="{Binding AchievementsHeaderText, FallbackValue='ДОСТИЖЕНИЯ 3 ИЗ 14'}"
                        FontFamily="{StaticResource HeadingFont}"
-                       FontSize="16"
-                       FontWeight="SemiBold"
+                       FontSize="14"
+                       FontWeight="Bold"
                        Foreground="{StaticResource TextWhite}"
                        VerticalAlignment="Center" />
 
-            <!-- Кнопка переключения режимов: стеклянная, высота 28px, текст Onest 12px обычный -->
+            <!-- Кнопка переключения режимов: стеклянная, высота 28px, текст 12px -->
             <Button x:Name="ViewModeBtn"
                     Click="OnToggleViewModeClick"
                     Style="{StaticResource StoryBarBtn}"
@@ -53,7 +53,7 @@
                                    Text="Сетка"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="12"
-                                   FontWeight="Normal"
+                                   FontWeight="Medium"
                                    Foreground="{DynamicResource TextPrimary}"
                                    VerticalAlignment="Center" />
                     </StackPanel>
@@ -92,7 +92,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:AchievementDisplayItem}">
                                 <Border Margin="0,0,0,8"
-                                        Padding="10,8"
+                                        Padding="10,9"
                                         Background="{DynamicResource StoriesCardGlass}"
                                         BorderBrush="{DynamicResource StoriesCardBorder}"
                                         BorderThickness="1"
@@ -125,29 +125,36 @@
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
 
-                                            <!-- Название (Oswald 15, белый) + дата получения справа -->
+                                            <!-- Название (Manrope 14 Bold, белый) + дата получения справа -->
                                             <Grid Grid.Row="0">
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontFamily="{StaticResource HeadingFont}"
-                                                           FontSize="15"
-                                                           FontWeight="SemiBold"
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Title}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="14"
+                                                           FontWeight="Bold"
                                                            Foreground="{StaticResource TextWhite}"
                                                            TextTrimming="CharacterEllipsis"
-                                                           Margin="0,0,60,0" />
-                                                <TextBlock Text="{Binding StatusText}"
+                                                           Margin="0,0,8,0" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding StatusText}"
                                                            FontFamily="{StaticResource MainFont}"
                                                            FontSize="11"
+                                                           FontWeight="Medium"
                                                            Foreground="{DynamicResource Text70}"
                                                            HorizontalAlignment="Right"
                                                            VerticalAlignment="Center" />
                                             </Grid>
 
-                                            <!-- Описание (Onest 12, Text70) -->
+                                            <!-- Описание (Manrope 12, Text85) -->
                                             <TextBlock Grid.Row="1"
                                                        Text="{Binding Description}"
                                                        FontFamily="{StaticResource MainFont}"
                                                        FontSize="12"
-                                                       Foreground="{DynamicResource Text70}"
+                                                       Foreground="{DynamicResource Text85}"
                                                        TextWrapping="Wrap"
                                                        Margin="0,3,0,0" />
                                         </Grid>
@@ -160,17 +167,17 @@
                     <!-- 2. Заголовок "Не получены" -->
                     <TextBlock Text="НЕ ПОЛУЧЕНЫ"
                                FontFamily="{StaticResource HeadingFont}"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource Text55}"
-                               Margin="0,4,0,8" />
+                               FontSize="11"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource Text70}"
+                               Margin="0,6,0,8" />
 
                     <!-- 3. Неполученные достижения с полоской прогресса и статусом -->
                     <ItemsControl ItemsSource="{Binding LockedAchievements}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type models:AchievementDisplayItem}">
                                 <Border Margin="0,0,0,8"
-                                        Padding="10,8"
+                                        Padding="10,9"
                                         Background="{DynamicResource StoriesCardGlass}"
                                         BorderBrush="{DynamicResource StoriesCardBorder}"
                                         BorderThickness="1"
@@ -204,31 +211,38 @@
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
 
-                                            <!-- Название (Oswald 15, белый) + прогресс "2 из 5" -->
+                                            <!-- Название (Manrope 14 Bold, белый) + прогресс "2 из 5" -->
                                             <Grid Grid.Row="0">
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontFamily="{StaticResource HeadingFont}"
-                                                           FontSize="15"
-                                                           FontWeight="SemiBold"
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Title}"
+                                                           FontFamily="{StaticResource MainFont}"
+                                                           FontSize="14"
+                                                           FontWeight="Bold"
                                                            Foreground="{StaticResource TextWhite}"
                                                            TextTrimming="CharacterEllipsis"
-                                                           Margin="0,0,60,0" />
-                                                <TextBlock Text="{Binding StatusText}"
+                                                           Margin="0,0,8,0" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding StatusText}"
                                                            FontFamily="{StaticResource MainFont}"
                                                            FontSize="11"
+                                                           FontWeight="Medium"
                                                            Foreground="{DynamicResource Text70}"
                                                            HorizontalAlignment="Right"
                                                            VerticalAlignment="Center" />
                                             </Grid>
 
-                                            <!-- Описание (Onest 12, Text70) -->
+                                            <!-- Описание (Manrope 12, Text85) -->
                                             <TextBlock Grid.Row="1"
                                                        Text="{Binding Description}"
                                                        FontFamily="{StaticResource MainFont}"
                                                        FontSize="12"
-                                                       Foreground="{DynamicResource Text70}"
+                                                       Foreground="{DynamicResource Text85}"
                                                        TextWrapping="Wrap"
-                                                       Margin="0,2,0,5" />
+                                                       Margin="0,3,0,6" />
 
                                             <!-- Полоска прогресса 3px -->
                                             <Border Grid.Row="2"

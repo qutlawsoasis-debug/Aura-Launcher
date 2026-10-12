@@ -25,8 +25,8 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
                 <TextBlock Text="СКРИНШОТЫ"
                            FontFamily="{StaticResource HeadingFont}"
-                           FontSize="22"
-                           FontWeight="SemiBold"
+                           FontSize="15"
+                           FontWeight="Bold"
                            Foreground="{StaticResource TextWhite}"
                            VerticalAlignment="Center" />
             </StackPanel>
@@ -53,8 +53,8 @@
                 </Border>
                 <TextBlock Text="НЕТ СКРИНШОТОВ"
                            FontFamily="{StaticResource HeadingFont}"
-                           FontSize="18"
-                           FontWeight="SemiBold"
+                           FontSize="15"
+                           FontWeight="Bold"
                            Foreground="{StaticResource TextWhite}"
                            HorizontalAlignment="Center"
                            Margin="0,0,0,6" />

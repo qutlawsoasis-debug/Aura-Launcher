@@ -64,14 +64,14 @@ foreach ($file in $files) {
         }
 
         # -----------------------------------------------------------------
-        # Правило 3: FontFamily, отличный от Oswald и Onest; любое упоминание Inter
+        # Правило 3: FontFamily, отличный от Manrope/Oswald/Onest; любое упоминание Inter
         # -----------------------------------------------------------------
         if ($line -match '\bInter\b') {
             $rule3Count++
             $allFindings.Add("${relPath}:${lineNum}: Правило 3: Inter")
         } elseif ($line -match 'FontFamily\s*=\s*["'']([^"'']+)["'']') {
             $val = $matches[1]
-            if ($val -notmatch 'Oswald' -and $val -notmatch 'Onest' -and $val -notmatch 'HeadingFont' -and $val -notmatch 'MainFont') {
+            if ($val -notmatch 'Manrope' -and $val -notmatch 'Oswald' -and $val -notmatch 'Onest' -and $val -notmatch 'HeadingFont' -and $val -notmatch 'MainFont') {
                 $rule3Count++
                 $allFindings.Add("${relPath}:${lineNum}: Правило 3: FontFamily=""$val""")
             }
