@@ -48,11 +48,11 @@ public class GraphicsPresetService : IGraphicsPresetService
 
         var searchPaths = new[]
         {
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "presets.json"),
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "presets.json"),
             Path.Combine(Directory.GetCurrentDirectory(), "Data", "presets.json"),
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Data", "presets.json"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Data", "presets.json"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "presets.json")
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Data", "presets.json")
         };
 
         foreach (var path in searchPaths)
@@ -173,26 +173,25 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=16M"
             },
-            ShaderPack = "photon_v1.3b.zip",
+            ShaderPack = "ComplementaryReimagined_r5.9.3.zip",
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["profile"] = "high",
-                ["INFO"] = "2",
-                ["shadowMapResolution"] = "2048",
-                ["SHADOW_PCF"] = "true",
-                ["SHADOW_COLOR"] = "true",
-                ["SHADOW_VPS"] = "true",
-                ["ENTITY_SHADOWS"] = "true",
-                ["BLOCK_ENTITY_SHADOWS"] = "false",
-                ["ENVIRONMENT_REFLECTIONS"] = "true",
-                ["GTAO"] = "true",
-                ["VL"] = "true",
-                ["AIR_FOG_COLORED_LIGHT_SHAFTS"] = "false",
-                ["WATER_CAUSTICS"] = "false",
-                ["WATER_PARALLAX"] = "true",
-                ["COLORED_LIGHTS"] = "false",
-                ["SHADOW_SSRT"] = "true"
+                ["profile"] = "ULTRA",
+                ["SHADOW_QUALITY"] = "2",
+                ["shadowDistance"] = "224.0",
+                ["WATER_REFLECT_QUALITY"] = "2",
+                ["BLOCK_REFLECT_QUALITY"] = "3",
+                ["LIGHTSHAFT_QUALI_DEFINE"] = "2",
+                ["SSAO_QUALI_DEFINE"] = "2",
+                ["FXAA_DEFINE"] = "1",
+                ["DETAIL_QUALITY"] = "3",
+                ["CLOUD_QUALITY"] = "3",
+                ["ANISOTROPIC_FILTER"] = "8",
+                ["COLORED_LIGHTING"] = "256",
+                ["WORLD_SPACE_REFLECTIONS"] = "1",
+                ["ENTITY_SHADOW"] = "1",
+                ["RAIN_PUDDLES"] = "2"
             }
         };
 
@@ -219,20 +218,46 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=32M"
             },
-            ShaderPack = "ComplementaryReimagined_r5.9.3.zip",
+            ShaderPack = "DERCODE_2.2.zip",
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["profile"] = "ULTRA"
+                ["profile"] = "DER25",
+                ["PARALLAX"] = "true",
+                ["PARALLAX_SHADOW"] = "true",
+                ["PARALLAX_QUALITY"] = "32",
+                ["PARALLAX_DEPTH"] = "0.2",
+                ["PARALLAX_SAMPLES"] = "60",
+                ["PARALLAX_REFINEMENT"] = "true",
+                ["SPECULAR_MAP"] = "true",
+                ["IPBR_ENABLED"] = "true",
+                ["IPBR_FORCE_REFLECTIONS"] = "true",
+                ["IPBR_RESOLUTION"] = "32",
+                ["MOD_BLOCK_SUPPORT"] = "true",
+                ["GI_ENABLED"] = "true",
+                ["GI_SPECULAR"] = "true",
+                ["VOLUMETRIC_CLOUDS"] = "true",
+                ["VOLUMETRIC_FOG"] = "true",
+                ["FORCE_WET_EFFECT"] = "true",
+                ["WATER_PARALLAX"] = "true",
+                ["WATER_CAUSTICS"] = "true",
+                ["WATER_STYLE"] = "4",
+                ["shadowMapResolution"] = "2048",
+                ["shadowDistance"] = "192.0"
             }
         };
     }
 
-    public IReadOnlyDictionary<string, GraphicsPresetModel> GetPresets() => _presets;
+    public IReadOnlyDictionary<string, GraphicsPresetModel> GetPresets()
+    {
+        LoadPresets();
+        return _presets;
+    }
 
     public GraphicsPresetModel? GetPreset(string presetKey)
     {
         if (string.IsNullOrWhiteSpace(presetKey)) return null;
+        LoadPresets();
         return _presets.TryGetValue(presetKey.Trim(), out var p) ? p : null;
     }
 
@@ -369,6 +394,31 @@ public class GraphicsPresetService : IGraphicsPresetService
 
             string graphicsVal = preset.Graphics.Equals("fast", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
 
+            var rpDir = Path.Combine(gameDir, "resourcepacks");
+            var activePacks = new List<string> { "\"fabric\"" };
+            string[] candidatePacks = presetKey.Equals("Ultra", StringComparison.OrdinalIgnoreCase)
+                ? new[]
+                {
+                    "Sodium_Russian_Translation.zip",
+                    "Patrix_1.20_models.zip",
+                    "Patrix_1.20_32x_basic.zip",
+                    "Patrix_1.20_32x_addon.zip",
+                    "Patrix_1.20_32x_bonus.zip",
+                    "Better-Leaves-9.6.zip",
+                    "FreshAnimations_v1.10.4.zip"
+                }
+                : presetKey.Equals("Low", StringComparison.OrdinalIgnoreCase)
+                    ? new[] { "Sodium_Russian_Translation.zip" }
+                    : new[] { "Sodium_Russian_Translation.zip", "FreshAnimations_v1.10.4.zip" };
+
+            foreach (var cp in candidatePacks)
+            {
+                if (File.Exists(Path.Combine(rpDir, cp)))
+                {
+                    activePacks.Add($"\"file/{cp}\"");
+                }
+            }
+
             var targetValues = new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["renderDistance"] = preset.RenderDistance.ToString(CultureInfo.InvariantCulture),
@@ -379,7 +429,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 ["entityDistanceScaling"] = preset.EntityDistanceScaling.ToString("0.##", CultureInfo.InvariantCulture),
                 ["biomeBlendRadius"] = preset.BiomeBlendRadius.ToString(CultureInfo.InvariantCulture),
                 ["mipmapLevels"] = preset.MipmapLevels.ToString(CultureInfo.InvariantCulture),
-                ["ao"] = preset.Ao.ToString(CultureInfo.InvariantCulture)
+                ["ao"] = preset.Ao.ToString(CultureInfo.InvariantCulture),
+                ["resourcePacks"] = $"[{string.Join(",", activePacks)}]"
             };
             result.WrittenOptions = targetValues;
 

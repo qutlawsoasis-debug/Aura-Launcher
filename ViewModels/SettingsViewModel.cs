@@ -312,6 +312,10 @@ public class SettingsViewModel : ObservableObject
             if (preset != null)
             {
                 string shaderInfo = preset.EnableShaders ? preset.ShaderPack.Replace(".zip", "") : "выкл";
+                if (IsPresetUltra)
+                {
+                    shaderInfo += " + текстуры Patrix 32x";
+                }
                 int ramGb = (int)Math.Round(preset.RamMb / 1024.0);
                 return $"Прорисовка {preset.RenderDistance}/{preset.SimulationDistance} чанков, память {ramGb} ГБ, шейдерпак {shaderInfo}";
             }
@@ -324,8 +328,8 @@ public class SettingsViewModel : ObservableObject
     {
         "low" => "Прорисовка 12 чанков, быстрая графика, легкие шейдеры",
         "medium" => "Прорисовка 16 чанков, оптимальный баланс FPS и качества",
-        "high" => "Прорисовка 24 чанка, высокая детализация и шейдеры Photon",
-        "ultra" => "Прорисовка 32 чанка, максимум деталей и Complementary + Euphoria Patches",
+        "high" => "Прорисовка 24 чанка, высокая детализация и шейдеры Complementary Reimagined",
+        "ultra" => "Прорисовка 32 чанка, фотореализм: 3D PBR-текстуры Patrix 32x + шейдер DERCODE (POM & GI)",
         _ => "Пользовательский профиль настроек"
     };
 

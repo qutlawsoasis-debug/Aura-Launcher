@@ -257,35 +257,31 @@ public class WorkshopServiceTests : IDisposable
     {
         string dirHigh = Path.Combine(_tempDir, "game_high");
         Directory.CreateDirectory(Path.Combine(dirHigh, "shaderpacks"));
-        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "photon_v1.3b.zip"), "dummy photon");
+        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip"), "dummy complementary");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirHigh, "High");
 
         Assert.True(File.Exists(Path.Combine(dirHigh, "options.txt")));
-        Assert.True(File.Exists(Path.Combine(dirHigh, "shaderpacks", "photon_v1.3b.zip.txt")));
+        Assert.True(File.Exists(Path.Combine(dirHigh, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip.txt")));
         string highOptions = File.ReadAllText(Path.Combine(dirHigh, "options.txt"));
-        string highShaderTxt = File.ReadAllText(Path.Combine(dirHigh, "shaderpacks", "photon_v1.3b.zip.txt"));
+        string highShaderTxt = File.ReadAllText(Path.Combine(dirHigh, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip.txt"));
         Assert.Contains("renderDistance:24", highOptions);
         Assert.Contains("simulationDistance:10", highOptions);
-        Assert.Contains("profile=high", highShaderTxt);
+        Assert.Contains("profile=ULTRA", highShaderTxt);
 
         string dirUltra = Path.Combine(_tempDir, "game_ultra");
         Directory.CreateDirectory(Path.Combine(dirUltra, "shaderpacks"));
-        File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip"), "dummy complementary");
+        File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "DERCODE_2.2.zip"), "dummy dercode");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirUltra, "Ultra");
 
         Assert.True(File.Exists(Path.Combine(dirUltra, "options.txt")));
-        Assert.True(File.Exists(Path.Combine(dirUltra, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip.txt")));
+        Assert.True(File.Exists(Path.Combine(dirUltra, "shaderpacks", "DERCODE_2.2.zip.txt")));
         string ultraOptions = File.ReadAllText(Path.Combine(dirUltra, "options.txt"));
-        string ultraShaderTxt = File.ReadAllText(Path.Combine(dirUltra, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip.txt"));
+        string ultraShaderTxt = File.ReadAllText(Path.Combine(dirUltra, "shaderpacks", "DERCODE_2.2.zip.txt"));
         Assert.Contains("renderDistance:32", ultraOptions);
         Assert.Contains("simulationDistance:12", ultraOptions);
-        Assert.Contains("profile=ULTRA", ultraShaderTxt);
-        Assert.DoesNotContain("EUPHORIA_PATCHES_MOD_INSTALLED", ultraShaderTxt);
-
-        string dump = $"=== HIGH OPTIONS ===\n{highOptions}\n=== HIGH SHADER TXT ===\n{highShaderTxt}\n=== ULTRA OPTIONS ===\n{ultraOptions}\n=== ULTRA SHADER TXT ===\n{ultraShaderTxt}\n=== HIGH LOG ===\n{File.ReadAllText(Path.Combine(dirHigh, "logs", "launcher-game.log"))}\n=== ULTRA LOG ===\n{File.ReadAllText(Path.Combine(dirUltra, "logs", "launcher-game.log"))}\n";
-        File.WriteAllText(Path.Combine(_tempDir, "dump.txt"), dump);
-        File.WriteAllText("ApplyPreset_Dump.txt", dump);
+        Assert.Contains("profile=DER25", ultraShaderTxt);
+        Assert.Contains("PARALLAX=true", ultraShaderTxt);
     }
 }
