@@ -8,8 +8,7 @@
     "IntegratedServerMixin",
     "LevelPropertiesMixin",
     "PlayerManagerMixin",
-    "ServerConfigEntryAccessor",
-    "VillagerVoiceMixin"
+    "ServerConfigEntryAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
