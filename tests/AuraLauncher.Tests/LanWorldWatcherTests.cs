@@ -236,6 +236,22 @@ public class LanWorldWatcherTests
         }
     }
 
+    [Theory]
+    [InlineData("[19:46:00] [Render thread/INFO]: Connecting to broker.e4mc.link")]
+    [InlineData("[19:46:00] [Render thread/INFO]: Broker: broker.e4mc.link")]
+    [InlineData("[19:46:00] [Render thread/INFO]: [CHAT] Connecting to broker: broker.e4mc.link")]
+    public void ProcessLine_BrokerAddress_DoesNotTriggerDomainAssigned(string logLine)
+    {
+        using var watcher = new LanWorldWatcher();
+        string? domain = null;
+        watcher.DomainAssigned += d => domain = d;
+
+        watcher.ProcessLine(logLine);
+
+        Assert.Null(watcher.CurrentDomain);
+        Assert.Null(domain);
+    }
+
     [Fact]
     public void ProcessLine_StoppingServer_ResetsCurrentDomain()
     {

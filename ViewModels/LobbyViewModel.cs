@@ -856,8 +856,9 @@ public class LobbyViewModel : ObservableObject
                         var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig?.GameDir);
                         var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
                         _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-                        _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: true);
-                        if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
+                        bool isRunning = _launchService.IsGameRunning;
+                        _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: isRunning);
+                        if (isRunning && !string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
                         {
                             _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
                             _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain);
@@ -982,10 +983,11 @@ public class LobbyViewModel : ObservableObject
             var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
             
             _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: true);
+            bool isGameRunning = _launchService.IsGameRunning;
+            _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: isGameRunning);
 
             // Если в watcher уже был перехвачен домен:
-            if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
+            if (isGameRunning && !string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
             {
                 _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
                 _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain);

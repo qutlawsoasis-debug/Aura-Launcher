@@ -31,7 +31,7 @@ public class LanWorldWatcher : ILanWorldWatcher
     // Local game hosted on domain [quick-fox-42.e4mc.link]
     // Локальный сервер размещен на домене [quick-fox-42.eu.e4mc.link]
     private static readonly Regex DomainAssignedRegex = new(
-        @"(?:Domain assigned:\s*|e4all: Domain assigned:\s*|hosted on domain\s*\[|размещен на домене\s*\[|размещена на домене\s*\[|домене\s*\[)\s*(?<domain>[a-zA-Z0-9\.\-_]+)|(?<domain>[a-zA-Z0-9\.\-_]+\.e4mc\.link)",
+        @"(?:Domain assigned:\s*|e4all: Domain assigned:\s*|домен[еа]?\s*\[|domain\s*\[)\s*(?<domain>[a-zA-Z0-9\.\-_]+)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly object _stateLock = new();
@@ -178,7 +178,10 @@ public class LanWorldWatcher : ILanWorldWatcher
         if (domainMatch.Success)
         {
             var domain = domainMatch.Groups["domain"].Value.Trim();
-            if (!string.IsNullOrWhiteSpace(domain))
+            if (!string.IsNullOrWhiteSpace(domain) &&
+                !string.Equals(domain, "broker.e4mc.link", StringComparison.OrdinalIgnoreCase) &&
+                !domain.StartsWith("broker.", StringComparison.OrdinalIgnoreCase) &&
+                domain.Contains('.'))
             {
                 CurrentDomain = domain;
                 try
