@@ -284,12 +284,29 @@ public class LobbyViewModel : ObservableObject
 
     public bool CanReconnect => !IsBusy && !_lobbyService.IsHost && (CanGuestConnect || !string.IsNullOrWhiteSpace(_lastTunnelAddress));
 
+    private bool _hasPersonalTunnel;
+    public bool HasPersonalTunnel
+    {
+        get => _hasPersonalTunnel;
+        private set
+        {
+            if (SetProperty(ref _hasPersonalTunnel, value))
+            {
+                OnPropertyChanged(nameof(CanClaimPersonalTunnel));
+                OnPropertyChanged(nameof(HostActionHintText));
+            }
+        }
+    }
+
+    public bool CanClaimPersonalTunnel => IsHost && !HasPersonalTunnel && !IsWorldOpen;
+
     public AsyncRelayCommand CreateLobbyCommand { get; }
     public AsyncRelayCommand JoinLobbyCommand { get; }
     public RelayCommand CopyCodeCommand { get; }
     public AsyncRelayCommand ConnectToGameCommand { get; }
     public AsyncRelayCommand ReconnectCommand { get; }
     public AsyncRelayCommand OpenWorldCommand { get; }
+    public AsyncRelayCommand ClaimPersonalTunnelCommand { get; }
     public RelayCommand LeaveLobbyCommand { get; }
     public RelayCommand CopyTunnelLogCommand { get; }
     public RelayCommand SendReportCommand { get; }
@@ -335,6 +352,7 @@ public class LobbyViewModel : ObservableObject
         ConnectToGameCommand = new AsyncRelayCommand(ConnectToGameAsync, () => !IsBusy && CanGuestConnect);
         ReconnectCommand = new AsyncRelayCommand(ReconnectAsync, () => CanReconnect);
         OpenWorldCommand = new AsyncRelayCommand(OpenWorldAsHostAsync, () => !IsBusy && IsLobbyCreated && IsHost);
+        ClaimPersonalTunnelCommand = new AsyncRelayCommand(ClaimPersonalTunnelAsync, () => !IsBusy && CanClaimPersonalTunnel);
         LeaveLobbyCommand = new RelayCommand(_ => LeaveLobby(), _ => IsInLobby);
         FixAndProceedCommand = new AsyncRelayCommand(FixAndProceedAsync, () => CanFixAny && !IsGameRunningWarning);
         JoinAsIsCommand = new RelayCommand(_ => JoinAsIs());
@@ -746,27 +764,36 @@ public class LobbyViewModel : ObservableObject
                         playit = new PlayitTunnelProvider(null, toolsDir);
                     }
 
-                    StatusText = "Получение конфигурации сервера...";
-                    PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api...");
+                    HasPersonalTunnel = playit.HasPersonalSecret;
 
-                    var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
-                    var cfg = await client.GetTunnelConfigAsync();
-
-                    if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
+                    if (playit.HasPersonalSecret)
                     {
-                        PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
-                        playit.SetSecret(cfg.Secret);
-                        if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
-                        if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
+                        PlayitTunnelProvider.LogTunnel("[LOBBY] У хоста есть персональный туннель playit (сессия изолирована, нет коллизий).");
                     }
                     else
                     {
-                        PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
-                        StatusText = "Ошибка получения конфигурации туннеля";
-                        StatusIcon = string.Empty;
-                        ShowTunnelFailedLogButton = true;
-                        TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
-                        return null;
+                        StatusText = "Получение конфигурации сервера...";
+                        PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api (fallback)...");
+
+                        var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+                        var cfg = await client.GetTunnelConfigAsync();
+
+                        if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
+                        {
+                            PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
+                            playit.SetSecret(cfg.Secret);
+                            if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
+                            if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
+                        }
+                        else
+                        {
+                            PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
+                            StatusText = "Ошибка получения конфигурации туннеля";
+                            StatusIcon = string.Empty;
+                            ShowTunnelFailedLogButton = true;
+                            TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
+                            return null;
+                        }
                     }
                 }
 
@@ -841,6 +868,50 @@ public class LobbyViewModel : ObservableObject
         finally
         {
             _lobbyOpLock.Release();
+        }
+    }
+
+    private async Task ClaimPersonalTunnelAsync()
+    {
+        var playit = _tunnelProvider as PlayitTunnelProvider;
+        if (playit == null)
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var toolsDir = System.IO.Path.Combine(appData, ".aura", "tools");
+            playit = new PlayitTunnelProvider(null, toolsDir);
+        }
+
+        try
+        {
+            IsBusy = true;
+            StatusText = "Открываем браузер: подтвердите привязку туннеля...";
+            PlayitTunnelProvider.LogTunnel("[CLAIM] Запуск привязки персонального туннеля хоста...");
+
+            var secret = await playit.ClaimTunnelAsync(url =>
+            {
+                Dispatch(() =>
+                {
+                    StatusText = "Подтвердите привязку в браузере (кнопка Add agent)...";
+                });
+            });
+
+            if (!string.IsNullOrWhiteSpace(secret))
+            {
+                HasPersonalTunnel = true;
+                StatusText = "Личный туннель успешно привязан! Ваши миры изолированы.";
+                _notificationService?.Notify("Туннель привязан", "Личный туннель настроен! Ваши миры больше не будут пересекаться.", "Lobby");
+                PlayitTunnelProvider.LogTunnel("[CLAIM] Персональный туннель успешно привязан.");
+            }
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[CLAIM: ERROR] {ex.Message}");
+            StatusText = $"Ошибка привязки: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+            ClaimPersonalTunnelCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -2097,6 +2168,8 @@ public class LobbyViewModel : ObservableObject
         ConnectToGameCommand.RaiseCanExecuteChanged();
         ReconnectCommand?.RaiseCanExecuteChanged();
         OpenWorldCommand.RaiseCanExecuteChanged();
+        ClaimPersonalTunnelCommand?.RaiseCanExecuteChanged();
+        OnPropertyChanged(nameof(CanClaimPersonalTunnel));
         LeaveLobbyCommand.RaiseCanExecuteChanged();
         CopyCodeCommand.RaiseCanExecuteChanged();
         CopyLinkCommand.RaiseCanExecuteChanged();

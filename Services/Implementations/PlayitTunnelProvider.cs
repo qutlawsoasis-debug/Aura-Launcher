@@ -146,12 +146,13 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public static void PurgeLegacyLocalSecrets()
     {
+        // Не удаляем личные секреты пользователей playit.secret.enc.
+        // Очищаем только незашифрованные временные файлы.
         try
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             var targets = new List<string>
             {
-                Path.Combine(appData, ".aura", "tools", "playit.secret.enc"),
                 Path.Combine(appData, ".aura", "tools", "playit.secret")
             };
 
@@ -160,7 +161,6 @@ public class PlayitTunnelProvider : ITunnelProvider
             {
                 foreach (var dir in Directory.GetDirectories(profilesDir))
                 {
-                    targets.Add(Path.Combine(dir, "tools", "playit.secret.enc"));
                     targets.Add(Path.Combine(dir, "tools", "playit.secret"));
                 }
             }
@@ -169,21 +169,80 @@ public class PlayitTunnelProvider : ITunnelProvider
             {
                 if (File.Exists(target))
                 {
-                    try
-                    {
-                        File.Delete(target);
-                        LogTunnel($"[CLEANUP] Deleted legacy local secret: {target}");
-                    }
-                    catch (Exception ex)
-                    {
-                        LogTunnel($"[CLEANUP: WARN] Failed to delete legacy secret {target}: {ex.Message}");
-                    }
+                    try { File.Delete(target); } catch { }
+                }
+            }
+        }
+        catch { }
+    }
+
+    public bool HasPersonalSecret => !string.IsNullOrWhiteSpace(LoadPersonalSecret());
+
+    public void SavePersonalSecret(string rawSecret)
+    {
+        try
+        {
+            var clean = rawSecret.Trim('\uFEFF', '\u200B', ' ', '\r', '\n', '\t');
+            if (string.IsNullOrWhiteSpace(clean)) return;
+
+            Directory.CreateDirectory(_toolsDir);
+            var encPath = Path.Combine(_toolsDir, "playit.secret.enc");
+            var plainBytes = Encoding.UTF8.GetBytes(clean);
+            var encBytes = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(encPath, encBytes);
+            InMemorySecret = clean;
+            LogTunnel($"[SECRET] Личный туннель playit сохранен с DPAPI: {encPath}");
+        }
+        catch (Exception ex)
+        {
+            LogTunnel($"[SECRET: ERROR] Ошибка сохранения личного туннеля DPAPI: {ex.Message}");
+        }
+    }
+
+    public string? LoadPersonalSecret()
+    {
+        try
+        {
+            var encPath = Path.Combine(_toolsDir, "playit.secret.enc");
+            if (File.Exists(encPath))
+            {
+                var encBytes = File.ReadAllBytes(encPath);
+                var plainBytes = ProtectedData.Unprotect(encBytes, null, DataProtectionScope.CurrentUser);
+                var sec = Encoding.UTF8.GetString(plainBytes).Trim('\uFEFF', '\u200B', ' ', '\r', '\n', '\t');
+                if (!string.IsNullOrWhiteSpace(sec)) return sec;
+            }
+
+            var plainPath = Path.Combine(_toolsDir, "playit.secret");
+            if (File.Exists(plainPath))
+            {
+                var sec = File.ReadAllText(plainPath).Trim('\uFEFF', '\u200B', ' ', '\r', '\n', '\t');
+                if (!string.IsNullOrWhiteSpace(sec))
+                {
+                    SavePersonalSecret(sec);
+                    try { File.Delete(plainPath); } catch { }
+                    return sec;
                 }
             }
         }
         catch (Exception ex)
         {
-            LogTunnel($"[CLEANUP: ERROR] PurgeLegacyLocalSecrets: {ex.Message}");
+            LogTunnel($"[SECRET: WARN] Ошибка чтения личного туннеля DPAPI: {ex.Message}");
+        }
+        return null;
+    }
+
+    public void ResetPersonalSecret()
+    {
+        try
+        {
+            var encPath = Path.Combine(_toolsDir, "playit.secret.enc");
+            if (File.Exists(encPath)) File.Delete(encPath);
+            InMemorySecret = null;
+            LogTunnel("[SECRET] Личный туннель playit сброшен.");
+        }
+        catch (Exception ex)
+        {
+            LogTunnel($"[SECRET: ERROR] ResetPersonalSecret: {ex.Message}");
         }
     }
 
@@ -194,12 +253,12 @@ public class PlayitTunnelProvider : ITunnelProvider
 
     public void SaveSecret(string rawSecret)
     {
-        SetSecret(rawSecret);
+        SavePersonalSecret(rawSecret);
     }
 
     public string? LoadSecret()
     {
-        return InMemorySecret;
+        return LoadPersonalSecret() ?? InMemorySecret;
     }
 
     public static void LogTunnel(string message)
@@ -391,8 +450,10 @@ public class PlayitTunnelProvider : ITunnelProvider
                         if (!string.IsNullOrWhiteSpace(sec))
                         {
                             LogTunnel("Found playit.secret file! Encrypting with DPAPI and saving...");
-                            SaveSecret(sec);
-                            LogTunnel("Secret saved with DPAPI successfully.");
+                            SavePersonalSecret(sec);
+                            try { File.Delete(_secretFilePath); } catch { }
+                            await PrepareMinecraftTunnelAsync(sec, ct);
+                            LogTunnel("Personal tunnel claimed, prepared and saved successfully.");
                             return sec;
                         }
                     }
@@ -425,14 +486,17 @@ public class PlayitTunnelProvider : ITunnelProvider
         }
     }
 
-    public async Task<(string? Host, int? Port)> ResolveTunnelAddressAsync(CancellationToken ct = default)
+    public async Task PrepareMinecraftTunnelAsync(string secret, CancellationToken ct = default)
     {
         try
         {
+            var tempSecret = Path.Combine(Path.GetTempPath(), $"playit_{Guid.NewGuid():N}.secret");
+            File.WriteAllText(tempSecret, secret, new UTF8Encoding(false));
+
             var psi = new ProcessStartInfo
             {
                 FileName = _playitExePath,
-                Arguments = $"--secret_path \"{_secretFilePath}\" tunnels list",
+                Arguments = $"--secret_path \"{tempSecret}\" tunnels prepare tcp 1 --type minecraft-java",
                 WorkingDirectory = _toolsDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -441,41 +505,101 @@ public class PlayitTunnelProvider : ITunnelProvider
             };
 
             using var proc = Process.Start(psi);
-            if (proc == null) return (null, null);
-
-            string stdout = await proc.StandardOutput.ReadToEndAsync(ct);
-            await proc.WaitForExitAsync(ct);
-
-            using var doc = System.Text.Json.JsonDocument.Parse(stdout);
-            if (doc.RootElement.TryGetProperty("tunnels", out var tunnels) && tunnels.GetArrayLength() > 0)
+            if (proc != null)
             {
-                var first = tunnels[0];
-                if (first.TryGetProperty("alloc", out var alloc) &&
-                    alloc.TryGetProperty("data", out var data))
+                await proc.WaitForExitAsync(ct);
+                LogTunnel($"[PLAYIT] tunnels prepare exited with code {proc.ExitCode}");
+            }
+
+            try { File.Delete(tempSecret); } catch { }
+        }
+        catch (Exception ex)
+        {
+            LogTunnel($"[PLAYIT: WARN] PrepareMinecraftTunnelAsync: {ex.Message}");
+        }
+    }
+
+    public async Task<(string? Host, int? Port)> ResolveTunnelAddressAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var secret = LoadSecret();
+            if (string.IsNullOrWhiteSpace(secret)) return (null, null);
+
+            var secretFile = _activeTempSecretFile;
+            bool createdTemp = false;
+            if (string.IsNullOrWhiteSpace(secretFile) || !File.Exists(secretFile))
+            {
+                secretFile = Path.Combine(Path.GetTempPath(), $"playit_{Guid.NewGuid():N}.secret");
+                File.WriteAllText(secretFile, secret, new UTF8Encoding(false));
+                createdTemp = true;
+            }
+
+            try
+            {
+                var psi = new ProcessStartInfo
                 {
-                    string? host = null;
-                    if (data.TryGetProperty("assigned_domain", out var domElem) && !string.IsNullOrWhiteSpace(domElem.GetString()))
-                    {
-                        host = domElem.GetString();
-                    }
-                    else if (data.TryGetProperty("ip_hostname", out var ipElem))
-                    {
-                        host = ipElem.GetString();
-                    }
+                    FileName = _playitExePath,
+                    Arguments = $"--secret_path \"{secretFile}\" tunnels list",
+                    WorkingDirectory = _toolsDir,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
 
-                    int? port = null;
-                    if (data.TryGetProperty("port_start", out var portElem))
-                    {
-                        port = portElem.GetInt32();
-                    }
+                using var proc = Process.Start(psi);
+                if (proc == null) return (null, null);
 
-                    return (host, port);
+                string stdout = await proc.StandardOutput.ReadToEndAsync(ct);
+                await proc.WaitForExitAsync(ct);
+
+                using var doc = System.Text.Json.JsonDocument.Parse(stdout);
+                if (doc.RootElement.TryGetProperty("tunnels", out var tunnels) && tunnels.GetArrayLength() > 0)
+                {
+                    foreach (var t in tunnels.EnumerateArray())
+                    {
+                        if (t.TryGetProperty("active", out var actElem) && !actElem.GetBoolean()) continue;
+
+                        if (t.TryGetProperty("alloc", out var alloc) &&
+                            alloc.TryGetProperty("data", out var data))
+                        {
+                            string? host = null;
+                            if (data.TryGetProperty("assigned_domain", out var domElem) && !string.IsNullOrWhiteSpace(domElem.GetString()))
+                            {
+                                host = domElem.GetString();
+                            }
+                            else if (data.TryGetProperty("ip_hostname", out var ipElem))
+                            {
+                                host = ipElem.GetString();
+                            }
+
+                            int? port = null;
+                            if (data.TryGetProperty("port_start", out var portElem))
+                            {
+                                port = portElem.GetInt32();
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(host) && port.HasValue)
+                            {
+                                LogTunnel($"[PLAYIT: RESOLVED] Active tunnel address: {host}:{port.Value}");
+                                return (host, port);
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (createdTemp && File.Exists(secretFile))
+                {
+                    try { File.Delete(secretFile); } catch { }
                 }
             }
         }
         catch (Exception ex)
         {
-            App.Log($"[PLAYIT: RESOLVE ERROR] {ex.Message}");
+            LogTunnel($"[PLAYIT: RESOLVE ERROR] {ex.Message}");
         }
 
         return (null, null);
@@ -670,8 +794,23 @@ public class PlayitTunnelProvider : ITunnelProvider
                 return _currentInfo;
             }
 
-            var publicHost = PublicHost;
-            var publicPort = PublicPort;
+            // Динамически определяем фактический уникальный адрес туннеля через ResolveTunnelAddressAsync
+            var resolved = await ResolveTunnelAddressAsync(ct);
+            string publicHost;
+            int publicPort;
+
+            if (!string.IsNullOrWhiteSpace(resolved.Host) && resolved.Port.HasValue)
+            {
+                publicHost = resolved.Host;
+                publicPort = resolved.Port.Value;
+                LogTunnel($"[PLAYIT] Использован динамический адрес туннеля: {publicHost}:{publicPort}");
+            }
+            else
+            {
+                publicHost = PublicHost;
+                publicPort = PublicPort;
+                LogTunnel($"[PLAYIT: WARN] Не удалось определить динамический адрес, используется fallback: {publicHost}:{publicPort}");
+            }
 
             _runtimeRestartCount = 0;
             _currentInfo = new TunnelInfo(publicHost, publicPort, TunnelStatus.Active);

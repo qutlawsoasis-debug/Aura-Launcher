@@ -803,6 +803,15 @@
                             Margin="6,0"
                             Visibility="{Binding IsHost, Converter={StaticResource BoolToVis}}" />
 
+                    <!-- Host: "Привязать личный туннель" (для полной изоляции миров) -->
+                    <Button Command="{Binding ClaimPersonalTunnelCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Height="44"
+                            Content="Привязать личный туннель"
+                            ToolTip="Привязать персональный туннель Playit (1 клик), чтобы ваши миры не пересекались"
+                            Margin="6,0"
+                            Visibility="{Binding CanClaimPersonalTunnel, Converter={StaticResource BoolToVis}}" />
+
                     <!-- Guest: "Подключиться к игре" -->
                     <Button Command="{Binding ConnectToGameCommand}"
                             Style="{StaticResource LobbyGuestConnectBtn}"
