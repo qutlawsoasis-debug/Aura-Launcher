@@ -685,16 +685,11 @@
 
                                         <!-- Бейдж синхронизации модов под ником у друга -->
                                         <Button Command="{Binding OpenMismatchDialogCommand}"
-                                                Cursor="Hand"
+                                                Style="{StaticResource LobbyModSyncBadgeBtn}"
                                                 HorizontalAlignment="Center"
                                                 Margin="0,3,0,0"
                                                 ToolTip="{Binding ModSyncTooltip}"
                                                 Visibility="{Binding IsGuest, Converter={StaticResource BoolToVis}}">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <ContentPresenter />
-                                                </ControlTemplate>
-                                            </Button.Template>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal"
                                                             Visibility="{Binding IsModSyncSynced, Converter={StaticResource BoolToVis}}">

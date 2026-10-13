@@ -402,10 +402,7 @@ public static class SceneDiagnostics
             string initialShot = Path.Combine(shotsDir, "clean_host_lobby_initial.png");
             CaptureWindowToPng(window, initialShot);
             App.Log($"[LIVE-TEST-LOBBY] Captured initial lobby UI: {initialShot}");
-            if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
-            {
-                try { File.Copy(initialShot, Path.Combine(artifactDir, "clean_host_lobby_initial.png"), true); } catch { }
-            }
+            TryCopyShot(initialShot, artifactDir, "clean_host_lobby_initial.png");
 
             // 1. Create lobby (quietly fetches tunnel-config, saves DPAPI secret, creates lobby)
             App.Log("[LIVE-TEST-LOBBY] Triggering CreateLobbyCommand...");
@@ -423,10 +420,7 @@ public static class SceneDiagnostics
             string createdShot = Path.Combine(shotsDir, "clean_host_lobby_created.png");
             CaptureWindowToPng(window, createdShot);
             App.Log($"[LIVE-TEST-LOBBY] Captured lobby created UI: {createdShot}");
-            if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
-            {
-                try { File.Copy(createdShot, Path.Combine(artifactDir, "clean_host_lobby_created.png"), true); } catch { }
-            }
+            TryCopyShot(createdShot, artifactDir, "clean_host_lobby_created.png");
 
             // 2. Open World (localPort 25565 with a fake listener simulating Minecraft LAN)
             listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 25565);
@@ -442,10 +436,7 @@ public static class SceneDiagnostics
             string openShot = Path.Combine(shotsDir, "clean_host_lobby_open.png");
             CaptureWindowToPng(window, openShot);
             App.Log($"[LIVE-TEST-LOBBY] Captured lobby open UI: {openShot}");
-            if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
-            {
-                try { File.Copy(openShot, Path.Combine(artifactDir, "clean_host_lobby_open.png"), true); } catch { }
-            }
+            TryCopyShot(openShot, artifactDir, "clean_host_lobby_open.png");
 
             return opened;
         }
@@ -833,20 +824,15 @@ public static class SceneDiagnostics
             string shotsDir = ResolveShotsDir();
             var artifactDir = ResolveArtifactDir();
             var repoShotsDir = ResolveRepoShotsDir();
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+            Directory.CreateDirectory(repoShotsDir);
+            EnsureDirectoryExists(artifactDir);
 
             void SaveShot(string fileName)
             {
                 string path = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(window, path);
-                if (!string.IsNullOrWhiteSpace(artifactDir) && Directory.Exists(artifactDir))
-                {
-                    try { File.Copy(path, Path.Combine(artifactDir, fileName), true); } catch { }
-                }
-                if (!string.IsNullOrWhiteSpace(repoShotsDir) && Directory.Exists(repoShotsDir))
-                {
-                    try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                }
+                TryCopyShot(path, artifactDir, fileName);
+                TryCopyShot(path, repoShotsDir, fileName);
             }
 
             // 1. ИГРАТЬ обычный
@@ -1133,7 +1119,8 @@ public static class SceneDiagnostics
             string shotsDir = ResolveShotsDir();
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+            Directory.CreateDirectory(repoShotsDir);
+            EnsureDirectoryExists(brainDir);
 
             var frameBitmaps = new List<RenderTargetBitmap>();
             var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
@@ -1218,8 +1205,8 @@ public static class SceneDiagnostics
                 encoder.Save(fs);
             });
 
-            try { File.Copy(targetPath, Path.Combine(repoShotsDir, gifFileName), true); } catch { }
-            try { File.Copy(targetPath, Path.Combine(brainDir, gifFileName), true); } catch { }
+            TryCopyShot(targetPath, repoShotsDir, gifFileName);
+            TryCopyShot(targetPath, brainDir, gifFileName);
 
             App.Log($"[RECORDING] Saved menu & transitions recording to {targetPath}");
             return true;
@@ -1231,14 +1218,35 @@ public static class SceneDiagnostics
         }
     }
 
-        private static string? ResolveArtifactDir()
+    private static void EnsureDirectoryExists(string? dir)
+    {
+        if (!string.IsNullOrWhiteSpace(dir))
+        {
+            try { Directory.CreateDirectory(dir); } catch { }
+        }
+    }
+
+    private static void TryCopyShot(string sourcePath, string? targetDir, string fileName)
+    {
+        if (!string.IsNullOrWhiteSpace(targetDir))
+        {
+            try
+            {
+                Directory.CreateDirectory(targetDir);
+                File.Copy(sourcePath, Path.Combine(targetDir, fileName), true);
+            }
+            catch { }
+        }
+    }
+
+    private static string? ResolveArtifactDir()
     {
         var env = Environment.GetEnvironmentVariable("AURA_ARTIFACT_DIR");
         if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
         return null;
     }
 
-    private static string? ResolveRepoShotsDir()
+    private static string ResolveRepoShotsDir()
     {
         var env = Environment.GetEnvironmentVariable("AURA_REPO_SHOTS_DIR");
         if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
@@ -1252,10 +1260,10 @@ public static class SceneDiagnostics
         {
             try { if (Directory.Exists(c)) return Path.GetFullPath(c); } catch { }
         }
-        return null;
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shots");
     }
 
-    private static string? ResolveArtifactsScreensDir()
+    private static string ResolveArtifactsScreensDir()
     {
         var env = Environment.GetEnvironmentVariable("AURA_ARTIFACTS_SCREENS_DIR");
         if (!string.IsNullOrWhiteSpace(env) && Directory.Exists(env)) return env;
@@ -1269,7 +1277,7 @@ public static class SceneDiagnostics
         {
             try { if (Directory.Exists(c)) return Path.GetFullPath(c); } catch { }
         }
-        return null;
+        return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "artifacts_screens");
     }
 
     private static string ResolveShotsDir()
@@ -1353,7 +1361,8 @@ public static class SceneDiagnostics
         string shotsDir = ResolveShotsDir();
         var repoShotsDir = ResolveRepoShotsDir();
         var brainDir = ResolveArtifactDir();
-        try { Directory.CreateDirectory(repoShotsDir); } catch { }
+        Directory.CreateDirectory(repoShotsDir);
+        EnsureDirectoryExists(brainDir);
 
         var mainVm = window.Dispatcher.Invoke(() => window.DataContext as MainViewModel);
         if (mainVm == null) return false;
@@ -1362,16 +1371,16 @@ public static class SceneDiagnostics
         {
             string path = Path.Combine(shotsDir, fileName);
             CaptureWindowToPng(window, path);
-            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
-            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+            TryCopyShot(path, repoShotsDir, fileName);
+            TryCopyShot(path, brainDir, fileName);
         }
 
         void SaveWindowShot(Window targetWin, string fileName)
         {
             string path = Path.Combine(shotsDir, fileName);
             CaptureWindowToPng(targetWin, path);
-            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
-            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+            TryCopyShot(path, repoShotsDir, fileName);
+            TryCopyShot(path, brainDir, fileName);
         }
 
         if (mode.Equals("toast", StringComparison.OrdinalIgnoreCase))
@@ -1585,8 +1594,8 @@ public static class SceneDiagnostics
                 {
                     pngEncoder.Save(fs);
                 }
-                try { File.Copy(Path.Combine(shotsDir, name), Path.Combine(repoShotsDir, name), true); } catch { }
-                try { File.Copy(Path.Combine(shotsDir, name), Path.Combine(brainDir, name), true); } catch { }
+                TryCopyShot(Path.Combine(shotsDir, name), repoShotsDir, name);
+                TryCopyShot(Path.Combine(shotsDir, name), brainDir, name);
                 gifEncoder.Frames.Add(BitmapFrame.Create(bmp));
             }
 
@@ -1595,8 +1604,8 @@ public static class SceneDiagnostics
             {
                 gifEncoder.Save(fs);
             }
-            try { File.Copy(gifPath, Path.Combine(repoShotsDir, "update_sequence.gif"), true); } catch { }
-            try { File.Copy(gifPath, Path.Combine(brainDir, "update_sequence.gif"), true); } catch { }
+            TryCopyShot(gifPath, repoShotsDir, "update_sequence.gif");
+            TryCopyShot(gifPath, brainDir, "update_sequence.gif");
 
             App.Log("[UPDATE-SEQUENCE] Successfully saved 6-frame sequence and update_sequence.gif");
         }
@@ -1613,7 +1622,8 @@ public static class SceneDiagnostics
             string shotsDir = ResolveShotsDir();
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+            Directory.CreateDirectory(repoShotsDir);
+            EnsureDirectoryExists(brainDir);
 
             var frameBitmaps = new List<RenderTargetBitmap>();
 
@@ -1636,8 +1646,8 @@ public static class SceneDiagnostics
                 encoder.Save(fs);
             });
 
-            try { File.Copy(targetPath, Path.Combine(repoShotsDir, gifFileName), true); } catch { }
-            try { File.Copy(targetPath, Path.Combine(brainDir, gifFileName), true); } catch { }
+            TryCopyShot(targetPath, repoShotsDir, gifFileName);
+            TryCopyShot(targetPath, brainDir, gifFileName);
 
             App.Log($"[RECORDING] Saved update logo animation to {targetPath}");
             return true;
@@ -1744,12 +1754,13 @@ public static class SceneDiagnostics
             string shotsDir = ResolveShotsDir();
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
+            Directory.CreateDirectory(repoShotsDir);
+            EnsureDirectoryExists(brainDir);
 
             string shotPath = Path.Combine(shotsDir, "beta112_settings_hide_toggle.png");
             CaptureWindowToPng(mainWindow, shotPath);
-            try { File.Copy(shotPath, Path.Combine(repoShotsDir, "beta112_settings_hide_toggle.png"), true); } catch { }
-            try { File.Copy(shotPath, Path.Combine(brainDir, "beta112_settings_hide_toggle.png"), true); } catch { }
+            TryCopyShot(shotPath, repoShotsDir, "beta112_settings_hide_toggle.png");
+            TryCopyShot(shotPath, brainDir, "beta112_settings_hide_toggle.png");
 
             App.Log("=== [TEST: HIDE LAUNCHER WHILE PLAYING & TRAY] PASSED ===");
             return true;
@@ -1799,6 +1810,7 @@ public static class SceneDiagnostics
             string userBNick = "PlayerB";
 
             // Настройка Profile A
+            if (configService.CurrentConfig == null) return false;
             configService.CurrentConfig.Nickname = userANick;
             configService.CurrentConfig.UserId = userAId;
             configService.CurrentConfig.FriendCode = userACode;
@@ -1838,14 +1850,14 @@ public static class SceneDiagnostics
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(repoShotsDir);
-            Directory.CreateDirectory(brainDir);
+            EnsureDirectoryExists(brainDir);
 
             void SaveShot(string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(mainWindow, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
             }
 
             // ШАГ 1: Пустой список друзей
@@ -1959,8 +1971,10 @@ public static class SceneDiagnostics
             LogStep("[Profile A] /sync updated sentInvites state to 'accepted'. Screen 5 captured: 'Принял'");
 
             // Сохраняем лог цепочки в файл
-            string logFilePath = Path.Combine(brainDir, "invite_chain.log");
-            File.WriteAllText(logFilePath, logBuilder.ToString(), Encoding.UTF8);
+            if (!string.IsNullOrWhiteSpace(brainDir))
+            {
+                try { File.WriteAllText(Path.Combine(brainDir, "invite_chain.log"), logBuilder.ToString(), Encoding.UTF8); } catch { }
+            }
             try { File.WriteAllText(Path.Combine(repoShotsDir, "invite_chain.log"), logBuilder.ToString(), Encoding.UTF8); } catch { }
 
             App.Log("=== RAW INVITE CHAIN LOG ===");
@@ -1992,14 +2006,14 @@ public static class SceneDiagnostics
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(repoShotsDir);
-            Directory.CreateDirectory(brainDir);
+            EnsureDirectoryExists(brainDir);
 
             void SaveShot(string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(mainWindow, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
             }
 
             // 1. Verify registry
@@ -2065,17 +2079,17 @@ public static class SceneDiagnostics
             string baseDir = AppContext.BaseDirectory;
             string shotsDir = Path.Combine(baseDir, "artifacts_screens");
             string repoShotsDir = ResolveArtifactsScreensDir();
-            string brainDir = ResolveArtifactDir();
+            var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(shotsDir);
             Directory.CreateDirectory(repoShotsDir);
-            Directory.CreateDirectory(brainDir);
+            EnsureDirectoryExists(brainDir);
 
             void SaveShot(string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(mainWindow, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
             }
 
             // 1. Switch to Settings view and take screenshot of report button and toggles
@@ -2188,23 +2202,23 @@ public static class SceneDiagnostics
             string shotsDir = ResolveShotsDir();
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
-            try { Directory.CreateDirectory(brainDir); } catch { }
+            Directory.CreateDirectory(repoShotsDir);
+            EnsureDirectoryExists(brainDir);
 
             void SaveShot(string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(window, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
             }
 
             void SaveWindowShot(Window targetWin, string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(targetWin, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
             }
 
             // 1. Lobby
@@ -2265,8 +2279,8 @@ public static class SceneDiagnostics
             string shotsDir = ResolveShotsDir();
             var repoShotsDir = ResolveRepoShotsDir();
             var brainDir = ResolveArtifactDir();
-            try { Directory.CreateDirectory(repoShotsDir); } catch { }
-            try { Directory.CreateDirectory(brainDir); } catch { }
+            Directory.CreateDirectory(repoShotsDir);
+            EnsureDirectoryExists(brainDir);
 
             // Ensure window is precisely 1920x1080 for the test
             window.Dispatcher.Invoke(() =>
@@ -2282,8 +2296,8 @@ public static class SceneDiagnostics
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(window, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
             }
 
             // 1. Overview (Maximized / 1080p)
@@ -2314,7 +2328,7 @@ public static class SceneDiagnostics
         }
     }
 
-    public static async Task<bool> RunIconSelfTestAsync(MainWindow mainWindow)
+    public static Task<bool> RunIconSelfTestAsync(MainWindow mainWindow)
     {
         try
         {
@@ -2323,17 +2337,17 @@ public static class SceneDiagnostics
             string baseDir = AppContext.BaseDirectory;
             string shotsDir = Path.Combine(baseDir, "artifacts_screens");
             string repoShotsDir = ResolveArtifactsScreensDir();
-            string brainDir = ResolveArtifactDir();
+            var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(shotsDir);
             Directory.CreateDirectory(repoShotsDir);
-            Directory.CreateDirectory(brainDir);
+            EnsureDirectoryExists(brainDir);
 
             void SaveRendered(FrameworkElement elem, string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 RenderElementToPng(elem, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
                 App.Log($"[TEST: ICON] Saved {fileName}");
             }
 
@@ -2716,12 +2730,12 @@ public static class SceneDiagnostics
             });
 
             App.Log("=== [TEST: ICON SELF-TEST] ALL 5 SCREENS PASSED ===");
-            return true;
+            return Task.FromResult(true);
         }
         catch (Exception ex)
         {
             App.Log($"[TEST: ICON SELF-TEST ERROR] {ex}");
-            return false;
+            return Task.FromResult(false);
         }
     }
 
@@ -2748,10 +2762,7 @@ public static class SceneDiagnostics
                 string path = Path.Combine(shotsDir, $"{name}.png");
                 CaptureWindowToPng(window, path);
                 Console.WriteLine($"[SCREENSHOT] Captured: {name}.png");
-                if (!string.IsNullOrWhiteSpace(brainDir) && Directory.Exists(brainDir))
-                {
-                    try { File.Copy(path, Path.Combine(brainDir, $"{name}.png"), true); } catch { }
-                }
+                TryCopyShot(path, brainDir, $"{name}.png");
             }
 
             var screenStates = new (string TabName, string StateName, Action PrepareState, FrameworkElement ViewElement)[]
@@ -3131,17 +3142,17 @@ public static class SceneDiagnostics
             string baseDir = AppContext.BaseDirectory;
             string shotsDir = Path.Combine(baseDir, "artifacts_screens");
             string repoShotsDir = ResolveArtifactsScreensDir();
-            string brainDir = ResolveArtifactDir();
+            var brainDir = ResolveArtifactDir();
             Directory.CreateDirectory(shotsDir);
             Directory.CreateDirectory(repoShotsDir);
-            Directory.CreateDirectory(brainDir);
+            EnsureDirectoryExists(brainDir);
 
             void SaveShot(string fileName)
             {
                 string localPath = Path.Combine(shotsDir, fileName);
                 CaptureWindowToPng(mainWindow, localPath);
-                try { File.Copy(localPath, Path.Combine(repoShotsDir, fileName), true); } catch { }
-                try { File.Copy(localPath, Path.Combine(brainDir, fileName), true); } catch { }
+                TryCopyShot(localPath, repoShotsDir, fileName);
+                TryCopyShot(localPath, brainDir, fileName);
                 Console.WriteLine($"[TEST: REPORT] Screenshot saved: {fileName}");
                 App.Log($"[TEST: REPORT] Screenshot saved: {fileName}");
             }
@@ -3229,22 +3240,23 @@ public static class SceneDiagnostics
         string shotsDir = ResolveShotsDir();
         var repoShotsDir = ResolveRepoShotsDir();
         var brainDir = ResolveArtifactDir();
-        try { Directory.CreateDirectory(repoShotsDir); } catch { }
+        Directory.CreateDirectory(repoShotsDir);
+        EnsureDirectoryExists(brainDir);
 
         void SaveWindowShot(Window targetWin, string fileName)
         {
             string path = Path.Combine(shotsDir, fileName);
             CaptureWindowToPng(targetWin, path);
-            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
-            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+            TryCopyShot(path, repoShotsDir, fileName);
+            TryCopyShot(path, brainDir, fileName);
         }
 
         void SaveMainWindowShot(string fileName)
         {
             string path = Path.Combine(shotsDir, fileName);
             CaptureWindowToPng(mainWindow, path);
-            try { File.Copy(path, Path.Combine(repoShotsDir, fileName), true); } catch { }
-            try { File.Copy(path, Path.Combine(brainDir, fileName), true); } catch { }
+            TryCopyShot(path, repoShotsDir, fileName);
+            TryCopyShot(path, brainDir, fileName);
         }
 
         try

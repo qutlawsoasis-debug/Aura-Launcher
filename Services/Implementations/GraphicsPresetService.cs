@@ -468,7 +468,7 @@ public class GraphicsPresetService : IGraphicsPresetService
             _configService.SaveConfigAsync(config).ConfigureAwait(false);
 
             // 5. Логирование в launcher-game.log и launcher.log
-            string shaderOptsDesc = preset.ShaderOptions.Count > 0
+            string shaderOptsDesc = (preset.ShaderOptions?.Count > 0)
                 ? string.Join(", ", preset.ShaderOptions.Select(kv => $"{kv.Key}={kv.Value}"))
                 : "нет";
 

@@ -78,6 +78,7 @@ public class MainViewModel : ObservableObject
 
     // Свойства диалога ошибки отправки (предложение сохранить на рабочий стол)
     private bool _isReportFailedPromptVisible;
+    private string _reportFailureReason = string.Empty;
 
     private bool _isInviteToastVisible;
     private string _inviteToastTitle = string.Empty;
@@ -354,6 +355,20 @@ public class MainViewModel : ObservableObject
         get => _isReportFailedPromptVisible;
         set => SetProperty(ref _isReportFailedPromptVisible, value);
     }
+
+    public string ReportFailureReason
+    {
+        get => _reportFailureReason;
+        set
+        {
+            if (SetProperty(ref _reportFailureReason, value))
+            {
+                OnPropertyChanged(nameof(HasReportFailureReason));
+            }
+        }
+    }
+
+    public bool HasReportFailureReason => !string.IsNullOrWhiteSpace(_reportFailureReason);
 
     public RelayCommand OpenSendReportCommand { get; }
     public RelayCommand CancelSendReportCommand { get; }
@@ -771,7 +786,7 @@ public class MainViewModel : ObservableObject
             {
                 ShowInfoToast("Скриншот скопирован в буфер", fileName, type: "screenshot", targetTab: "Workshop");
             }
-            _ = WorkshopVM.RefreshAllAsync();
+            _ = WorkshopVM?.RefreshAllAsync();
         };
         AnthemService = anthemService;
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
@@ -998,6 +1013,7 @@ public class MainViewModel : ObservableObject
 
             IsSubmittingReport = true;
             ReportSubmitErrorMessage = string.Empty;
+            ReportFailureReason = string.Empty;
 
             try
             {
@@ -1012,12 +1028,15 @@ public class MainViewModel : ObservableObject
                 else
                 {
                     IsSendReportModalVisible = false;
+                    ReportFailureReason = "Сервер отклонил отправку отчёта.";
                     IsReportFailedPromptVisible = true;
                 }
             }
             catch (Exception ex)
             {
+                FabricGameLaunchService.LogLauncherEvent($"[REPORT: ERROR] Submit report failed: {ex.Message}");
                 IsSendReportModalVisible = false;
+                ReportFailureReason = ex.Message;
                 IsReportFailedPromptVisible = true;
             }
             finally

@@ -117,6 +117,7 @@ public partial class App : Application
         bool isScaleCrispTest = Array.Exists(args, a => a.Equals("--selftest-scale-crisp", StringComparison.OrdinalIgnoreCase));
         bool isSplashTest = Array.Exists(args, a => a.Equals("--selftest-splash", StringComparison.OrdinalIgnoreCase));
         bool isSelfTest = !string.IsNullOrWhiteSpace(captureShotsPrefix) || !string.IsNullOrWhiteSpace(fakeUpdateUiMode) || isKillPlayitTest || isLobbyTest || isLifecycleTest || isAnthemTest || isRapidNavTest || isTrayTest || isFriendsTest || isProtocolTest || isNotificationsReportTest || isIconTest || isReportTest || isLayoutAudit || isColorsTest || isScaleCrispTest || isSplashTest || Array.Exists(args, a => a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) || a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase));
+        bool exitAfterTest = Array.Exists(args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase));
         
         string? profileArg = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
         if (string.IsNullOrWhiteSpace(profileArg))
@@ -162,7 +163,7 @@ public partial class App : Application
         base.OnStartup(e);
 
         // Инициализация DI-контейнера
-        bool useFakeTunnel = Array.Exists(e.Args, a => a.Equals("--fake-tunnel", StringComparison.OrdinalIgnoreCase)) ||
+        bool useFakeTunnel = (e.Args is { Length: > 0 } && Array.Exists(e.Args, a => a.Equals("--fake-tunnel", StringComparison.OrdinalIgnoreCase))) ||
                              string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
 
@@ -393,7 +394,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunFakeUpdateUiAsync(mainWindow, fakeUpdateUiMode);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -405,7 +406,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.CaptureAllScreenshotsAsync(mainWindow, captureShotsPrefix);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -417,7 +418,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.LiveTestKillPlayitAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -429,7 +430,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunLobbyLifecycleTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -441,7 +442,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.LiveTestLobbyAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -453,7 +454,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunAnthemTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -465,7 +466,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunRapidTabSwitchStressTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -477,7 +478,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunTrayAndHideLauncherTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -489,7 +490,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunFriendsSelfTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -501,7 +502,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunProtocolSelfTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -513,7 +514,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunNotificationsAndReportTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -525,7 +526,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunIconSelfTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -537,7 +538,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunReportSelfTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -557,7 +558,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunScalingCrispnessTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -569,7 +570,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunColorsTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);
@@ -581,7 +582,7 @@ public partial class App : Application
             _ = Task.Run(async () =>
             {
                 bool success = await Core.SceneDiagnostics.RunSplashSelfTestAsync(mainWindow);
-                if (Array.Exists(e.Args, a => a.Equals("--exit-after-test", StringComparison.OrdinalIgnoreCase)))
+                if (exitAfterTest)
                 {
                     await Task.Delay(1000);
                     Environment.Exit(success ? 0 : 1);

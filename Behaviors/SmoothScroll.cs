@@ -261,7 +261,7 @@ public static class SmoothScroll
         StepScrollViewer(scrollViewer, state, Math.Clamp(dtSeconds, 0.001, 0.05));
     }
 
-    private static bool HasNestedScrollableViewer(DependencyObject current, ScrollViewer rootViewer, int wheelDelta)
+    private static bool HasNestedScrollableViewer(DependencyObject? current, ScrollViewer rootViewer, int wheelDelta)
     {
         while (current != null && !ReferenceEquals(current, rootViewer))
         {

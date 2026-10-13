@@ -168,44 +168,18 @@
                     <BitmapCache EnableClearType="False" RenderAtScale="1" SnapsToDevicePixels="True" />
                 </Grid.CacheMode>
                 <!-- Top-to-bottom header gradient: rgba(5,12,16,.55) -> 0, height 90px (window icons visible on sky) -->
-                <Border Height="90" VerticalAlignment="Top">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
-                            <GradientStop Color="#8C050C10" Offset="0.0" />
-                            <GradientStop Color="#00050C10" Offset="1.0" />
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
+                <Border Height="90" VerticalAlignment="Top" Background="{StaticResource OverviewHeaderGradient}" />
 
                 <!-- Left-to-right gradient -->
-                <Border>
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0" po:Freeze="True">
-                            <GradientStop Color="#EB050C10" Offset="0.0" />  <!-- 92% at 0 -->
-                            <GradientStop Color="#B8050C10" Offset="0.30" /> <!-- 72% at 30% -->
-                            <GradientStop Color="#1F050C10" Offset="0.62" /> <!-- 12% at 62% -->
-                            <GradientStop Color="#00050C10" Offset="0.80" /> <!-- 0 at 80% -->
-                            <GradientStop Color="#00050C10" Offset="1.0" />
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
+                <Border Background="{StaticResource OverviewLeftGradient}" />
 
                 <!-- Bottom-to-top gradient up to 55% height -->
-                <Border>
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0,1" EndPoint="0,0" po:Freeze="True">
-                            <GradientStop Color="#CC050C10" Offset="0.0" />  <!-- 80% at 0 -->
-                            <GradientStop Color="#66050C10" Offset="0.25" />
-                            <GradientStop Color="#00050C10" Offset="0.55" /> <!-- 0 at 55% -->
-                            <GradientStop Color="#00050C10" Offset="1.0" />
-                        </LinearGradientBrush>
-                    </Border.Background>
-                </Border>
+                <Border Background="{StaticResource OverviewBottomGradient}" />
             </Grid>
 
             <!-- OTHER SCREENS OVERLAY (rgba(6,14,18,0.66) fade-in 300ms) -->
             <Border x:Name="OtherScreensOverlay"
-                    Background="#A8060E12"
+                    Background="{StaticResource OtherScreensOverlay}"
                     Opacity="0"
                     IsHitTestVisible="False" />
 
@@ -370,7 +344,7 @@
                                IsHitTestVisible="False"
                                Visibility="{Binding IsOverviewActive, Converter={StaticResource BoolToVis}}">
                         <TextBlock.Effect>
-                            <DropShadowEffect Color="#000000" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
+                            <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="12" Opacity="0.7" Direction="0" ShadowDepth="0" />
                         </TextBlock.Effect>
                     </TextBlock>
 
@@ -549,7 +523,7 @@
                         Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource BoolToVis}}"
                         RenderTransformOrigin="0.5,0.5">
                     <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                        <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
                     </Border.Effect>
                     <Border.RenderTransform>
                         <TranslateTransform x:Name="ToastTransform" X="0" />
@@ -598,7 +572,7 @@
                         Visibility="{Binding IsInviteToastVisible, Converter={StaticResource BoolToVis}}"
                         RenderTransformOrigin="0.5,0.5">
                     <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                        <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
                     </Border.Effect>
                     <Border.RenderTransform>
                         <TranslateTransform x:Name="InviteToastTransform" X="0" />
@@ -645,7 +619,7 @@
                         Margin="0,0,0,8"
                         Visibility="{Binding IsProtocolPromptVisible, Converter={StaticResource BoolToVis}}">
                     <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                        <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
                     </Border.Effect>
                     <StackPanel Margin="12,10,12,10">
                         <TextBlock Text="{Binding ProtocolPromptTitle}"
@@ -690,7 +664,7 @@
                         Visibility="{Binding IsInfoToastVisible, Converter={StaticResource BoolToVis}}"
                         RenderTransformOrigin="0.5,0.5">
                     <Border.Effect>
-                        <DropShadowEffect Color="#000000" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
+                        <DropShadowEffect Color="{StaticResource ColorShade}" BlurRadius="16" Opacity="0.65" Direction="270" ShadowDepth="4" />
                     </Border.Effect>
                     <Border.RenderTransform>
                         <TranslateTransform x:Name="InfoToastTransform" X="0" />
@@ -914,7 +888,7 @@
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                                         <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
-                                                                        <Setter Property="Background" Value="#0FFFFFFF" />
+                                                                        <Setter Property="Background" Value="{StaticResource SelectedItemBackground}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
@@ -1246,7 +1220,15 @@
                                    FontSize="13"
                                    Foreground="{StaticResource InkBrush}"
                                    TextWrapping="Wrap"
-                                   Margin="0,0,0,16" />
+                                   Margin="0,0,0,8" />
+
+                        <TextBlock Text="{Binding ReportFailureReason}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,16"
+                                   Visibility="{Binding HasReportFailureReason, Converter={StaticResource BoolToVis}}" />
 
                         <Grid>
                             <Button Command="{Binding DismissReportFailedPromptCommand}"

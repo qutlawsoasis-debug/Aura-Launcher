@@ -55,7 +55,10 @@ public class ScreenshotWatcherService : IScreenshotWatcherService
                 _watcher.EnableRaisingEvents = false;
                 _watcher.Dispose();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SCREENSHOT WATCHER: ERROR] Ошибка остановки наблюдателя: {ex.Message}");
+            }
             _watcher = null;
         }
     }
@@ -99,9 +102,10 @@ public class ScreenshotWatcherService : IScreenshotWatcherService
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
                     // Файл ещё занят игрой
+                    FabricGameLaunchService.LogLauncherEvent($"[SCREENSHOT WATCHER] Ожидание освобождения файла: {ex.Message}");
                 }
             }
 
@@ -135,8 +139,9 @@ public class ScreenshotWatcherService : IScreenshotWatcherService
                                 Clipboard.SetDataObject(dataObject, true);
                                 break;
                             }
-                            catch
+                            catch (Exception ex)
                             {
+                                FabricGameLaunchService.LogLauncherEvent($"[SCREENSHOT WATCHER] Попытка записи в буфер не удалась: {ex.Message}");
                                 System.Threading.Thread.Sleep(80);
                             }
                         }

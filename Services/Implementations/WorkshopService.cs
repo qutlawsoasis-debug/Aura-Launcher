@@ -99,7 +99,10 @@ public class WorkshopService : IWorkshopService
                                             playerNbt.LoadFromFile(latestFile.FullName);
                                             playerCompound = playerNbt.RootTag;
                                         }
-                                        catch { }
+                                        catch (Exception ex)
+                                        {
+                                            FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN PlayerDataNbt] {ex.Message}");
+                                        }
                                     }
                                 }
                             }
@@ -127,7 +130,10 @@ public class WorkshopService : IWorkshopService
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN LevelDat] {ex.Message}");
+                    }
 
                     long totalBytes = 0;
                     try
@@ -137,7 +143,10 @@ public class WorkshopService : IWorkshopService
                             totalBytes += new FileInfo(f).Length;
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN DirSize] {ex.Message}");
+                    }
 
                     BitmapImage? icon = null;
                     string iconPath = Path.Combine(d, "icon.png");
@@ -154,7 +163,10 @@ public class WorkshopService : IWorkshopService
                             bmp.Freeze();
                             icon = bmp;
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN WorldIcon] {ex.Message}");
+                        }
                     }
 
                     string playtimeFormatted = string.Empty;
@@ -184,7 +196,10 @@ public class WorkshopService : IWorkshopService
                             }
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN Stats] {ex.Message}");
+                    }
 
                     var backupsList = new List<WorldBackupItem>();
                     string backupDir = Path.Combine(gameDir, "backups", "AuraBackups");
@@ -246,7 +261,10 @@ public class WorkshopService : IWorkshopService
                         Backups = backupsList
                     });
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN WorldScan] {ex.Message}");
+                }
             }
 
             return result.OrderByDescending(w => w.LastPlayed).ToList();
@@ -304,7 +322,11 @@ public class WorkshopService : IWorkshopService
             {
                 if (File.Exists(tmpZip))
                 {
-                    try { File.Delete(tmpZip); } catch { }
+                    try { File.Delete(tmpZip); }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: WARN CleanupTmpZip] {ex.Message}");
+                    }
                 }
             }
         });

@@ -2189,7 +2189,7 @@ public class LobbyViewModel : ObservableObject
                 string newSig = info.Status switch
                 {
                     "synced" => "synced",
-                    "mismatch" => "mismatch:" + ComputeMismatchSignature(info.Mismatches),
+                    "mismatch" => "mismatch:" + ComputeMismatchSignature(info.Mismatches ?? Enumerable.Empty<ModMismatchItem>()),
                     _ => "unverified"
                 };
 
@@ -2203,7 +2203,7 @@ public class LobbyViewModel : ObservableObject
                         }
                         else if (newSig.StartsWith("mismatch:"))
                         {
-                            var first = info.Mismatches.FirstOrDefault();
+                            var first = info.Mismatches?.FirstOrDefault();
                             if (first != null)
                             {
                                 string action = first.Type switch
@@ -2214,7 +2214,8 @@ public class LobbyViewModel : ObservableObject
                                     "version" => "другая версия мода",
                                     _ => "расходится мод"
                                 };
-                                string suffix = info.Mismatches.Count > 1 ? $" и ещё {info.Mismatches.Count - 1}" : "";
+                                int mismatchCount = info.Mismatches?.Count ?? 0;
+                                string suffix = mismatchCount > 1 ? $" и ещё {mismatchCount - 1}" : "";
                                 ShowSyncNotice($"У {p.Nickname} {action} «{first.ModName}»{suffix}");
                             }
                         }

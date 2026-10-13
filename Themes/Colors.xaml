@@ -32,6 +32,8 @@
     <Color x:Key="ColorMediaPlaceholder">#060E12</Color>
     <Color x:Key="ColorBgBaseFadeStart">#E0071017</Color>
     <Color x:Key="ColorBgBaseFadeEnd">#8C071017</Color>
+    <Color x:Key="ColorScreensOverlay">#A8060E12</Color>
+    <Color x:Key="ColorSelectedItemBackground">#0FFFFFFF</Color>
 
     <Color x:Key="ColorStoriesShadeBottom">#CC091015</Color>
     <Color x:Key="ColorStoriesShadeTransparent">#00091015</Color>
@@ -94,6 +96,9 @@
     <SolidColorBrush x:Key="ShadeOverlay" Color="{StaticResource ColorShadeOverlay}" po:Freeze="True" />
     <SolidColorBrush x:Key="ModalBackdrop" Color="{StaticResource ColorModalBackdrop}" po:Freeze="True" />
     <SolidColorBrush x:Key="DialogBackdrop" Color="{StaticResource ColorDialogBackdrop}" po:Freeze="True" />
+    <SolidColorBrush x:Key="ScreensOverlay" Color="{StaticResource ColorScreensOverlay}" po:Freeze="True" />
+    <SolidColorBrush x:Key="OtherScreensOverlay" Color="{StaticResource ColorScreensOverlay}" po:Freeze="True" />
+    <SolidColorBrush x:Key="SelectedItemBackground" Color="{StaticResource ColorSelectedItemBackground}" po:Freeze="True" />
     <SolidColorBrush x:Key="MediaPlaceholder" Color="{StaticResource ColorMediaPlaceholder}" po:Freeze="True" />
     <SolidColorBrush x:Key="StoriesDim55" Color="{StaticResource ColorStoriesDim55}" po:Freeze="True" />
     <SolidColorBrush x:Key="StoriesTrack" Color="{StaticResource ColorStoriesTrack}" po:Freeze="True" />
@@ -129,6 +134,27 @@
     <LinearGradientBrush x:Key="AchievementGoldBrush" StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
         <GradientStop Color="{StaticResource ColorAchievementGoldStart}" Offset="0.0" />
         <GradientStop Color="{StaticResource ColorAchievementGoldEnd}" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <!-- Overview Screen Gradient Overlays (Frozen for GPU performance) -->
+    <LinearGradientBrush x:Key="OverviewHeaderGradient" StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
+        <GradientStop Color="#8C050C10" Offset="0.0" />
+        <GradientStop Color="#00050C10" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="OverviewLeftGradient" StartPoint="0,0" EndPoint="1,0" po:Freeze="True">
+        <GradientStop Color="#EB050C10" Offset="0.0" />
+        <GradientStop Color="#B8050C10" Offset="0.30" />
+        <GradientStop Color="#1F050C10" Offset="0.62" />
+        <GradientStop Color="#00050C10" Offset="0.80" />
+        <GradientStop Color="#00050C10" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="OverviewBottomGradient" StartPoint="0,1" EndPoint="0,0" po:Freeze="True">
+        <GradientStop Color="#CC050C10" Offset="0.0" />
+        <GradientStop Color="#66050C10" Offset="0.25" />
+        <GradientStop Color="#00050C10" Offset="0.55" />
+        <GradientStop Color="#00050C10" Offset="1.0" />
     </LinearGradientBrush>
 </ResourceDictionary>
 

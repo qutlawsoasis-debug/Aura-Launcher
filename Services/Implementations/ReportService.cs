@@ -81,74 +81,77 @@ public class ReportService : IReportService
 
     public async Task<byte[]> GenerateReportBytesAsync(string? errorText = null, string? userComment = null)
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var auraAppData = Path.Combine(appData, "Aura");
-        var dotAuraDir = Path.Combine(appData, ".aura");
-
-        using var memoryStream = new MemoryStream();
-        using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
+        return await Task.Run(() =>
         {
-            // 1. config.json с замаскированными секретами и путями
-            string maskedConfig = GetMaskedConfigJson(auraAppData);
-            AddStringToZip(archive, "config.json", maskedConfig);
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var auraAppData = Path.Combine(appData, "Aura");
+            var dotAuraDir = Path.Combine(appData, ".aura");
 
-            // 2. versions.txt
-            string versionsContent = BuildVersionsInfo();
-            AddStringToZip(archive, "versions.txt", versionsContent);
-
-            // 3. Последние 3 launcher.log (tail до 1500 строк каждого)
-            var launcherLogs = FindRecentLauncherLogs(auraAppData, 3);
-            for (int i = 0; i < launcherLogs.Count; i++)
+            using var memoryStream = new MemoryStream();
+            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, leaveOpen: true))
             {
-                var filePath = launcherLogs[i];
-                string entryName = (i == 0) ? "launcher.log" : $"launcher.{i}.log";
-                string content = ReadTailAndMaskTextFile(filePath, 1500);
-                AddStringToZip(archive, entryName, content);
-            }
+                // 1. config.json с замаскированными секретами и путями
+                string maskedConfig = GetMaskedConfigJson(auraAppData);
+                AddStringToZip(archive, "config.json", maskedConfig);
 
-            // 4. tunnel.log (tail до 1500 строк)
-            string? tunnelLogPath = FindFirstExistingFile(
-                Path.Combine(dotAuraDir, "logs", "tunnel.log"),
-                Path.Combine(auraAppData, "logs", "tunnel.log"),
-                Path.Combine(dotAuraDir, "tunnel.log")
-            );
-            string tunnelContent = tunnelLogPath != null ? ReadTailAndMaskTextFile(tunnelLogPath, 1500) : "[tunnel.log not found]";
-            AddStringToZip(archive, "tunnel.log", tunnelContent);
+                // 2. versions.txt
+                string versionsContent = BuildVersionsInfo();
+                AddStringToZip(archive, "versions.txt", versionsContent);
 
-            // 5. latest.log игры (tail до 1500 строк)
-            string? latestLogPath = FindFirstExistingFile(
-                Path.Combine(dotAuraDir, "logs", "latest.log"),
-                Path.Combine(auraAppData, "logs", "latest.log")
-            );
-            string latestContent = latestLogPath != null ? ReadTailAndMaskTextFile(latestLogPath, 1500) : "[latest.log not found]";
-            AddStringToZip(archive, "latest.log", latestContent);
-
-            // 6. Последний crash-report игры
-            string? crashReportPath = FindLatestCrashReport(dotAuraDir, auraAppData);
-            if (crashReportPath != null)
-            {
-                string crashContent = ReadTailAndMaskTextFile(crashReportPath, 1500);
-                AddStringToZip(archive, Path.GetFileName(crashReportPath), crashContent);
-            }
-
-            // 7. Пользовательский комментарий и текст ошибки если есть
-            if (!string.IsNullOrWhiteSpace(errorText) || !string.IsNullOrWhiteSpace(userComment))
-            {
-                var sb = new StringBuilder();
-                if (!string.IsNullOrWhiteSpace(userComment))
+                // 3. Последние 3 launcher.log (tail до 1500 строк каждого)
+                var launcherLogs = FindRecentLauncherLogs(auraAppData, 3);
+                for (int i = 0; i < launcherLogs.Count; i++)
                 {
-                    sb.AppendLine($"User Comment:\n{userComment}\n");
+                    var filePath = launcherLogs[i];
+                    string entryName = (i == 0) ? "launcher.log" : $"launcher.{i}.log";
+                    string content = ReadTailAndMaskTextFile(filePath, 1500);
+                    AddStringToZip(archive, entryName, content);
                 }
-                if (!string.IsNullOrWhiteSpace(errorText))
-                {
-                    sb.AppendLine($"Error Details:\n{errorText}\n");
-                }
-                AddStringToZip(archive, "report_info.txt", MaskSecretsInText(sb.ToString()));
-            }
-        }
 
-        memoryStream.Position = 0;
-        return memoryStream.ToArray();
+                // 4. tunnel.log (tail до 1500 строк)
+                string? tunnelLogPath = FindFirstExistingFile(
+                    Path.Combine(dotAuraDir, "logs", "tunnel.log"),
+                    Path.Combine(auraAppData, "logs", "tunnel.log"),
+                    Path.Combine(dotAuraDir, "tunnel.log")
+                );
+                string tunnelContent = tunnelLogPath != null ? ReadTailAndMaskTextFile(tunnelLogPath, 1500) : "[tunnel.log not found]";
+                AddStringToZip(archive, "tunnel.log", tunnelContent);
+
+                // 5. latest.log игры (tail до 1500 строк)
+                string? latestLogPath = FindFirstExistingFile(
+                    Path.Combine(dotAuraDir, "logs", "latest.log"),
+                    Path.Combine(auraAppData, "logs", "latest.log")
+                );
+                string latestContent = latestLogPath != null ? ReadTailAndMaskTextFile(latestLogPath, 1500) : "[latest.log not found]";
+                AddStringToZip(archive, "latest.log", latestContent);
+
+                // 6. Последний crash-report игры
+                string? crashReportPath = FindLatestCrashReport(dotAuraDir, auraAppData);
+                if (crashReportPath != null)
+                {
+                    string crashContent = ReadTailAndMaskTextFile(crashReportPath, 1500);
+                    AddStringToZip(archive, Path.GetFileName(crashReportPath), crashContent);
+                }
+
+                // 7. Пользовательский комментарий и текст ошибки если есть
+                if (!string.IsNullOrWhiteSpace(errorText) || !string.IsNullOrWhiteSpace(userComment))
+                {
+                    var sb = new StringBuilder();
+                    if (!string.IsNullOrWhiteSpace(userComment))
+                    {
+                        sb.AppendLine($"User Comment:\n{userComment}\n");
+                    }
+                    if (!string.IsNullOrWhiteSpace(errorText))
+                    {
+                        sb.AppendLine($"Error Details:\n{errorText}\n");
+                    }
+                    AddStringToZip(archive, "report_info.txt", MaskSecretsInText(sb.ToString()));
+                }
+            }
+
+            memoryStream.Position = 0;
+            return memoryStream.ToArray();
+        });
     }
 
     public async Task<SendReportResult> SendReportAsync(string? errorText = null, string? userComment = null)

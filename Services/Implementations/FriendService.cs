@@ -144,9 +144,12 @@ public class FriendService : IFriendService
 
     private void SetAndEncryptToken(string plainToken)
     {
+        var cfg = _configService.CurrentConfig;
+        if (cfg == null) return;
+
         if (string.IsNullOrWhiteSpace(plainToken))
         {
-            _configService.CurrentConfig.UserTokenEncrypted = null;
+            cfg.UserTokenEncrypted = null;
             return;
         }
 
@@ -154,12 +157,12 @@ public class FriendService : IFriendService
         {
             var plainBytes = Encoding.UTF8.GetBytes(plainToken);
             var cipherBytes = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
-            _configService.CurrentConfig.UserTokenEncrypted = Convert.ToBase64String(cipherBytes);
+            cfg.UserTokenEncrypted = Convert.ToBase64String(cipherBytes);
         }
         catch
         {
             // Fallback (если DPAPI недоступен по какой-то причине)
-            _configService.CurrentConfig.UserTokenEncrypted = plainToken;
+            cfg.UserTokenEncrypted = plainToken;
         }
     }
 
@@ -268,8 +271,12 @@ public class FriendService : IFriendService
             if (resp.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 FabricGameLaunchService.LogLauncherEvent("[FRIEND] Sync returned 401. Re-registering user...");
-                _configService.CurrentConfig.UserId = null;
-                _configService.CurrentConfig.UserTokenEncrypted = null;
+                var cfg = _configService.CurrentConfig;
+                if (cfg != null)
+                {
+                    cfg.UserId = null;
+                    cfg.UserTokenEncrypted = null;
+                }
                 await EnsureRegisteredAsync(cancellationToken);
                 return null;
             }

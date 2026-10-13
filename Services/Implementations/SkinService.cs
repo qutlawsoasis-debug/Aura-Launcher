@@ -89,7 +89,10 @@ public class SkinService : ISkinService
                     sourceBmp = bmp;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка загрузки скина: {ex.Message}");
+            }
         }
 
         if (sourceBmp == null)
@@ -126,8 +129,9 @@ public class SkinService : ISkinService
 
             return ExtractHeadAvatarDirect(skinBmp);
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка извлечения аватара головы: {ex.Message}");
             return LoadDefaultSteveHead();
         }
     }
@@ -180,8 +184,9 @@ public class SkinService : ISkinService
             if (rtb.CanFreeze) rtb.Freeze();
             return rtb;
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка генерации превью (вид спереди): {ex.Message}");
             var fallback = new WriteableBitmap(16, 32, 96, 96, PixelFormats.Bgra32, null);
             if (fallback.CanFreeze) fallback.Freeze();
             return fallback;
@@ -241,8 +246,9 @@ public class SkinService : ISkinService
             if (rtb.CanFreeze) rtb.Freeze();
             return rtb;
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка генерации превью (вид сзади): {ex.Message}");
             var fallback = new WriteableBitmap(16, 32, 96, 96, PixelFormats.Bgra32, null);
             if (fallback.CanFreeze) fallback.Freeze();
             return fallback;
@@ -271,8 +277,9 @@ public class SkinService : ISkinService
             }
             return true;
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка детекции slim-модели: {ex.Message}");
             return false;
         }
     }
@@ -288,7 +295,10 @@ public class SkinService : ISkinService
                 var cropped = new CroppedBitmap(source, crop);
                 dc.DrawImage(cropped, dest);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка отрисовки подпрямоугольника: {ex.Message}");
+            }
         }
     }
 
@@ -334,7 +344,10 @@ public class SkinService : ISkinService
                 written = true;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка извлечения ресурса steve.png: {ex.Message}");
+        }
 
         if (!written)
         {
@@ -371,7 +384,10 @@ public class SkinService : ISkinService
                 return bmp;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка загрузки pack uri steve.png: {ex.Message}");
+        }
 
         try
         {
@@ -388,7 +404,10 @@ public class SkinService : ISkinService
                 return bmp;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка загрузки локального steve.png: {ex.Message}");
+        }
 
         // Fallback: 64x64 пустой битмап
         var fallback = new WriteableBitmap(64, 64, 96, 96, PixelFormats.Bgra32, null);
@@ -486,8 +505,9 @@ public class SkinService : ISkinService
             if (result.CanFreeze) result.Freeze();
             return result;
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка создания битмапа головы: {ex.Message}");
             return LoadDefaultSteveBitmap();
         }
     }
@@ -524,8 +544,9 @@ public class SkinService : ISkinService
             if (rtb.CanFreeze) rtb.Freeze();
             return rtb;
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка конвертации скина 64x32 в 64x64: {ex.Message}");
             return source32;
         }
     }
@@ -644,7 +665,10 @@ public class SkinService : ISkinService
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка извлечения учетных данных из config.json: {ex.Message}");
+            }
 
             using var response = await _httpClient.SendAsync(req, cancellationToken);
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -670,7 +694,10 @@ public class SkinService : ISkinService
                             retryOwnerToken = tokenElem.GetString();
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка парсинга ownerToken при повторной попытке: {ex.Message}");
+                    }
                     InvalidateMemoryCache(nickname);
                     return new SkinUploadResult(true, retryOwnerToken, null);
                 }
@@ -692,7 +719,10 @@ public class SkinService : ISkinService
                         err = errElem.GetString() ?? err;
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка парсинга сообщения об ошибке: {ex.Message}");
+                }
                 return new SkinUploadResult(false, null, err);
             }
 
@@ -705,7 +735,10 @@ public class SkinService : ISkinService
                     newOwnerToken = tokenElem.GetString();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка парсинга нового ownerToken: {ex.Message}");
+            }
             InvalidateMemoryCache(nickname);
             return new SkinUploadResult(true, newOwnerToken, null);
         }
@@ -786,7 +819,11 @@ public class SkinService : ISkinService
                 var files = Directory.GetFiles(cachesDir, "*", SearchOption.AllDirectories);
                 foreach (var f in files)
                 {
-                    try { File.Delete(f); } catch { }
+                    try { File.Delete(f); }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[CSL-CACHE: WARN] Ошибка удаления файла кэша {f}: {ex.Message}");
+                    }
                 }
                 FabricGameLaunchService.LogLauncherEvent($"[CSL-CACHE] Очищен кэш CustomSkinLoader: {cachesDir}");
             }
@@ -911,8 +948,9 @@ public class SkinService : ISkinService
                 }
             }
         }
-        catch
+        catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка получения текстуры скина: {ex.Message}");
         }
 
         if (cachedSkin.SkinTexture != null)
