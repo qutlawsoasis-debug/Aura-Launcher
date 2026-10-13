@@ -368,4 +368,43 @@ public class LobbyViewModelTests
         Assert.True(vm.CanGuestConnect);
         Assert.Contains("Мир открыт", vm.GuestActionHintText);
     }
+
+    [Fact]
+    public async Task Host_CanClaimPersonalTunnel_AlwaysFalse()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        var launchService = new TestLaunchService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService);
+
+        await vm.CreateLobbyCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsHost);
+        Assert.False(vm.CanClaimPersonalTunnel);
+        Assert.False(vm.ClaimPersonalTunnelCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Host_DomainAssigned_OpensWorldWithAssignedDomain()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        var launchService = new TestLaunchService();
+        var watcher = new LanWorldWatcher();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService, worldWatcher: watcher);
+
+        await vm.CreateLobbyCommand.ExecuteAsync(null);
+        Assert.False(vm.IsWorldOpen);
+
+        // Симулируем события latest.log из Minecraft + e4all
+        watcher.ProcessLine("[19:45:47] [Render thread/INFO]: Started serving on 49152");
+        watcher.ProcessLine("[19:46:00] [Server thread/INFO]: e4all: Domain assigned: test-p2p.e4mc.link");
+
+        await Task.Delay(150);
+
+        Assert.True(vm.IsWorldOpen);
+        Assert.Equal("test-p2p.e4mc.link", mockLobby.CurrentTunnelAddress);
+        Assert.Contains("test-p2p.e4mc.link", vm.StatusText);
+    }
 }
+

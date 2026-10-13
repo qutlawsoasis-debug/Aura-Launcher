@@ -48,6 +48,8 @@ public class LobbyViewModel : ObservableObject
     private string _lastSelfMismatchSignature = string.Empty;
     private bool _previousWorldIsOpen;
     private string _lastLocalSkinSignature = string.Empty;
+    private TaskCompletionSource<string>? _domainTcs;
+    private readonly SemaphoreSlim _hostOpenGate = new(1, 1);
 
     public event Action? LobbyCreated;
     public event Action<int>? PlayerCountChanged;
@@ -298,7 +300,7 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
-    public bool CanClaimPersonalTunnel => IsHost && !HasPersonalTunnel && !IsWorldOpen;
+    public bool CanClaimPersonalTunnel => false;
 
     public AsyncRelayCommand CreateLobbyCommand { get; }
     public AsyncRelayCommand JoinLobbyCommand { get; }
@@ -412,6 +414,7 @@ public class LobbyViewModel : ObservableObject
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
         _worldWatcher.WorldClosed += OnLanWorldClosed;
+        _worldWatcher.DomainAssigned += OnLanDomainAssigned;
 
         // Подписка на изменение статуса туннеля
         if (_tunnelProvider != null)
@@ -752,6 +755,10 @@ public class LobbyViewModel : ObservableObject
 
             try
             {
+                _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                /*
+                // Playit tunnel configuration archived in favor of P2P (e4all/e4mc):
                 if (_lobbyService is LobbyService || _lobbyApiClient != null || _tunnelProvider is PlayitTunnelProvider)
                 {
                     PlayitTunnelProvider.PurgeLegacyLocalSecrets();
@@ -796,6 +803,7 @@ public class LobbyViewModel : ObservableObject
                         }
                     }
                 }
+                */
 
                 var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
 
@@ -917,8 +925,8 @@ public class LobbyViewModel : ObservableObject
 
     /// <summary>
     /// Хост нажимает «ОТКРЫТЬ МИР»: если игра не запущена, запускает клиент игры хоста,
-    /// запускает наблюдение за latest.log и ожидает открытия LAN-мира ("Started serving on N").
-    /// Если включен демо-режим UseFakeTunnel, открывает мир немедленно на порту 25565.
+    /// запускает наблюдение за latest.log и ожидает открытия LAN-мира и назначения домена e4mc/e4all.
+    /// Если включен демо-режим UseFakeTunnel, открывает мир немедленно на fake-домене.
     /// </summary>
     private async Task OpenWorldAsHostAsync()
     {
@@ -932,7 +940,7 @@ public class LobbyViewModel : ObservableObject
 
             if (isFakeTunnel)
             {
-                var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565);
+                var success = await _lobbyService.HostOpenWorldAsync(customTunnelAddress: "fake-test.e4mc.link", localPort: 25565);
                 if (success)
                 {
                     IsWorldOpen = true;
@@ -953,29 +961,24 @@ public class LobbyViewModel : ObservableObject
 
             var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
             
+            _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             _worldWatcher.Start(logPath);
 
-            if (_launchService.IsGameRunning)
+            // Если в watcher уже был перехвачен домен:
+            if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
             {
-                // Проверяем, возможно мир уже был открыт для сети на порту 25565
-                bool alreadyListening = await PlayitTunnelProvider.TestTcpConnectAsync("127.0.0.1", 25565, 500, CancellationToken.None);
-                if (alreadyListening)
-                {
-                    OnLanWorldOpened(25565);
-                    return;
-                }
-
-                HostStatusText = "Ожидание открытия мира...";
-                StatusText = "Игра запущена. Зайдите в мир и откройте сеть (Esc → Открыть для сети)";
-                StatusIcon = string.Empty;
-                OnPropertyChanged(nameof(HostActionHintText));
+                _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
+                _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain);
+                return;
             }
-            else
-            {
-                HostStatusText = "Запуск игры...";
-                StatusText = "Подготовка и запуск Minecraft...";
-                StatusIcon = string.Empty;
 
+            HostStatusText = "Ожидание открытия мира...";
+            StatusText = "Игра запущена. Зайдите в мир и откройте сеть (Esc → Открыть для сети)";
+            StatusIcon = string.Empty;
+            OnPropertyChanged(nameof(HostActionHintText));
+
+            if (!_launchService.IsGameRunning)
+            {
                 // Запускаем игру хоста через MainViewModel
                 HostLaunchRequested?.Invoke(this, EventArgs.Empty);
             }
@@ -992,82 +995,63 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
+    private void OnLanDomainAssigned(string domain)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        _domainTcs?.TrySetResult(domain);
+
+        if (_lobbyService.IsHost && IsInLobby && !IsWorldOpen)
+        {
+            _ = CompleteHostOpenWorldAsync(domain);
+        }
+    }
+
     private void OnLanWorldOpened(int port)
     {
+        if (!_lobbyService.IsHost || !IsInLobby) return;
+
         _ = Task.Run(async () =>
         {
             try
             {
-                if (port != 25565)
-                {
-                    var msg = $"Мир открыт на порту {port}, а нужен 25565";
-                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
-                    Dispatch(() =>
-                    {
-                        HostStatusText = $"Ошибка: порт {port}";
-                        StatusText = msg;
-                        StatusIcon = string.Empty;
-                        ShowTunnelFailedLogButton = true;
-                        TunnelFailureReason = msg;
-                    });
-                    return;
-                }
+                if (IsWorldOpen) return;
 
-                // Проверяем, что java реально слушает 25565
-                bool javaListening = false;
-                for (int attempt = 0; attempt < 5; attempt++)
-                {
-                    javaListening = await PlayitTunnelProvider.TestTcpConnectAsync("127.0.0.1", 25565, 1000, CancellationToken.None);
-                    if (javaListening) break;
-                    await Task.Delay(300);
-                }
-
-                if (!javaListening)
-                {
-                    var msg = "Игра не слушает локальный порт 25565";
-                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg} (TCP connect failed).");
-                    Dispatch(() =>
-                    {
-                        HostStatusText = "Порт 25565 недоступен";
-                        StatusText = msg;
-                        StatusIcon = string.Empty;
-                        ShowTunnelFailedLogButton = true;
-                        TunnelFailureReason = msg;
-                    });
-                    return;
-                }
-
-                Dispatch(() =>
-                {
-                    HostStatusText = "Мир открыт на порту 25565! Подключение туннеля...";
-                });
-
-                var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565);
-                if (success)
+                string? domain = _worldWatcher.CurrentDomain;
+                if (string.IsNullOrWhiteSpace(domain) && _domainTcs != null)
                 {
                     Dispatch(() =>
                     {
-                        IsWorldOpen = true;
-                        HostStatusText = "Лобби открыто!";
-                        StatusText = "Мир готов, друзья могут подключаться";
-                        StatusIcon = string.Empty;
-                        ShowTunnelFailedLogButton = false;
-                        TunnelFailureReason = null;
-                        OnPropertyChanged(nameof(HostActionHintText));
-                        _notificationService?.Notify("Мир открыт для друзей", "Туннель запущен. Друзья могут подключаться!", "Lobby");
+                        HostStatusText = "Ожидание адреса e4mc...";
+                        StatusText = "Мир открыт в сети. Ожидание назначения P2P-адреса...";
                     });
+
+                    var completedTask = await Task.WhenAny(_domainTcs.Task, Task.Delay(TimeSpan.FromSeconds(15)));
+                    if (completedTask == _domainTcs.Task)
+                    {
+                        domain = await _domainTcs.Task;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(domain))
+                {
+                    domain = _worldWatcher.CurrentDomain;
+                }
+
+                if (!string.IsNullOrWhiteSpace(domain))
+                {
+                    await CompleteHostOpenWorldAsync(domain, port);
                 }
                 else
                 {
-                    var reason = _tunnelProvider?.CurrentInfo.ErrorMessage ?? "Туннель playit не смог запуститься или подтвердить подключение.";
-                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] HostOpenWorldAsync returned false: {reason}");
+                    var msg = "Не удалось получить адрес e4mc из лога игры за 15 секунд. Убедитесь, что мод e4all установлен.";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
                     Dispatch(() =>
                     {
-                        HostStatusText = "Ошибка туннеля";
-                        StatusText = $"Туннель не поднялся: {reason}";
+                        HostStatusText = "Ошибка e4mc";
+                        StatusText = msg;
                         StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = true;
-                        TunnelFailureReason = reason;
+                        TunnelFailureReason = msg;
                     });
                 }
             }
@@ -1076,14 +1060,78 @@ public class LobbyViewModel : ObservableObject
                 PlayitTunnelProvider.LogTunnel($"[EXCEPTION] OnLanWorldOpened failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
                 Dispatch(() =>
                 {
-                    HostStatusText = "Ошибка туннеля";
-                    StatusText = $"Ошибка туннеля: {ex.Message}";
+                    HostStatusText = "Ошибка лобби";
+                    StatusText = $"Ошибка: {ex.Message}";
                     StatusIcon = string.Empty;
                     ShowTunnelFailedLogButton = true;
                     TunnelFailureReason = ex.Message;
                 });
             }
         });
+    }
+
+    private async Task CompleteHostOpenWorldAsync(string domain, int? port = null)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        if (!_lobbyService.IsHost || !IsInLobby) return;
+
+        await _hostOpenGate.WaitAsync();
+        try
+        {
+            if (IsWorldOpen) return;
+
+            Dispatch(() =>
+            {
+                HostStatusText = "Регистрация лобби...";
+                StatusText = $"Получен адрес {domain}. Регистрация...";
+            });
+
+            int localPort = port ?? _worldWatcher.CurrentPort ?? 25565;
+            var success = await _lobbyService.HostOpenWorldAsync(customTunnelAddress: domain, localPort: localPort);
+            if (success)
+            {
+                Dispatch(() =>
+                {
+                    IsWorldOpen = true;
+                    HostStatusText = "Лобби открыто!";
+                    StatusText = $"Мир открыт ({domain}), друзья могут подключиться";
+                    StatusIcon = string.Empty;
+                    ShowTunnelFailedLogButton = false;
+                    TunnelFailureReason = null;
+                    OnPropertyChanged(nameof(HostActionHintText));
+                    _notificationService?.Notify("Мир открыт для друзей", $"P2P-туннель активен ({domain}). Друзья могут подключаться!", "Lobby");
+                });
+            }
+            else
+            {
+                var reason = "Не удалось зарегистрировать адрес лобби на сервере.";
+                PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] HostOpenWorldAsync returned false: {reason}");
+                Dispatch(() =>
+                {
+                    HostStatusText = "Ошибка лобби";
+                    StatusText = reason;
+                    StatusIcon = string.Empty;
+                    ShowTunnelFailedLogButton = true;
+                    TunnelFailureReason = reason;
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CompleteHostOpenWorldAsync failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            Dispatch(() =>
+            {
+                HostStatusText = "Ошибка лобби";
+                StatusText = $"Ошибка: {ex.Message}";
+                StatusIcon = string.Empty;
+                ShowTunnelFailedLogButton = true;
+                TunnelFailureReason = ex.Message;
+            });
+        }
+        finally
+        {
+            _hostOpenGate.Release();
+        }
     }
 
     private void OnLanWorldClosed()
@@ -1166,13 +1214,8 @@ public class LobbyViewModel : ObservableObject
 
             if (IsWorldOpen && _tunnelProvider != null)
             {
-                Dispatch(() =>
-                {
-                    HostStatusText = "Переподключение туннеля...";
-                    StatusText = "Связь с туннелем прервалась, переподключаем...";
-                    StatusIcon = string.Empty;
-                });
-
+                /*
+                // Playit tunnel reconnect archived in favor of P2P (e4all/e4mc):
                 _ = Task.Run(async () =>
                 {
                     for (int retry = 1; retry <= 10; retry++)
@@ -1203,16 +1246,8 @@ public class LobbyViewModel : ObservableObject
                             PlayitTunnelProvider.LogTunnel($"[EXCEPTION] Background tunnel reconnect failed: {ex.Message}");
                         }
                     }
-
-                    Dispatch(() =>
-                    {
-                        HostStatusText = "Ошибка туннеля";
-                        StatusText = $"Ошибка туннеля: {reason}";
-                        StatusIcon = string.Empty;
-                        ShowTunnelFailedLogButton = true;
-                        TunnelFailureReason = reason;
-                    });
                 });
+                */
                 return;
             }
 
@@ -1637,6 +1672,7 @@ public class LobbyViewModel : ObservableObject
         _discordRpcService?.SetInLauncher();
         _knownPlayerNicks.Clear();
         _previousWorldIsOpen = false;
+        _domainTcs = null;
 
         LobbyPlayers.Clear();
         _lastPlayerMismatchSignatures.Clear();

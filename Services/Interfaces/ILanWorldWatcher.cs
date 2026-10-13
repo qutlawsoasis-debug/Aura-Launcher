@@ -18,6 +18,11 @@ public interface ILanWorldWatcher : IDisposable
     event Action? WorldClosed;
 
     /// <summary>
+    /// Вызывается при назначении публичного P2P-домена e4mc / e4all.
+    /// </summary>
+    event Action<string>? DomainAssigned;
+
+    /// <summary>
     /// Открыт ли мир для сети в данный момент.
     /// </summary>
     bool IsWorldOpen { get; }
@@ -26,6 +31,11 @@ public interface ILanWorldWatcher : IDisposable
     /// Текущий активный локальный порт LAN-мира или null, если мир не открыт.
     /// </summary>
     int? CurrentPort { get; }
+
+    /// <summary>
+    /// Текущий публичный домен e4mc / e4all или null, если не назначен.
+    /// </summary>
+    string? CurrentDomain { get; }
 
     /// <summary>
     /// Запустить мониторинг указанного файла latest.log.

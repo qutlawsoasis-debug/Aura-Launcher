@@ -123,23 +123,21 @@ public class LobbyService : ILobbyService, IDisposable
             bool isFakeTunnel = string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
                                 string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
 
-            if (!isFakeTunnel)
-            {
-                bool tcpOk = await CheckLocalTcpPortAsync("127.0.0.1", localPort, timeoutMs: 3000, cancellationToken);
-                if (!tcpOk)
-                {
-                    PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] Local TCP connect to 127.0.0.1:{localPort} failed. World is not open or not accepting connections.");
-                    return false;
-                }
-            }
-
             string tunnelAddr;
             if (!string.IsNullOrWhiteSpace(customTunnelAddress))
             {
                 tunnelAddr = customTunnelAddress;
             }
+            else if (isFakeTunnel)
+            {
+                tunnelAddr = $"fake-host-{CurrentLobbyCode}.e4mc.link";
+            }
             else
             {
+                PlayitTunnelProvider.LogTunnel("[HOST-OPEN: ERROR] P2P tunnel address (e4mc/e4all) is required. Playit flow is disabled.");
+                return false;
+                /*
+                // Playit tunnel provider branch archived in favor of P2P (e4all/e4mc):
                 var tunnelResult = await _tunnelProvider.StartAsync(localPort, cancellationToken);
                 if (tunnelResult.Status != TunnelStatus.Active || string.IsNullOrWhiteSpace(tunnelResult.PublicAddress))
                 {
@@ -156,6 +154,7 @@ public class LobbyService : ILobbyService, IDisposable
                 tunnelAddr = tunnelResult.PublicPort.HasValue 
                     ? $"{tunnelResult.PublicAddress}:{tunnelResult.PublicPort.Value}" 
                     : tunnelResult.PublicAddress;
+                */
             }
 
             PlayitTunnelProvider.LogTunnel($"[HOST-OPEN] Registering tunnel address '{tunnelAddr}' in lobby-api for code {CurrentLobbyCode}...");

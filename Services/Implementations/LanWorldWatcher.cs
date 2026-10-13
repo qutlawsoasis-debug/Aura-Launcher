@@ -25,6 +25,14 @@ public class LanWorldWatcher : ILanWorldWatcher
         @"Stopping singleplayer server|Stopping server|Stopping!",
         RegexOptions.Compiled);
 
+    // Строки назначения домена e4mc / e4all:
+    // [Server thread/INFO]: e4all: Domain assigned: quick-fox-42.e4mc.link
+    // Domain assigned: quick-fox-42.e4mc.link
+    // Local game hosted on domain [quick-fox-42.e4mc.link]
+    private static readonly Regex DomainAssignedRegex = new(
+        @"(?:Domain assigned:|e4all: Domain assigned:|Local game hosted on domain \[)\s*(?<domain>[a-zA-Z0-9\.\-_]+)",
+        RegexOptions.Compiled);
+
     private readonly object _stateLock = new();
     private string? _logFilePath;
     private Timer? _pollTimer;
@@ -34,9 +42,11 @@ public class LanWorldWatcher : ILanWorldWatcher
 
     public event Action<int>? WorldOpened;
     public event Action? WorldClosed;
+    public event Action<string>? DomainAssigned;
 
     public bool IsWorldOpen { get; private set; }
     public int? CurrentPort { get; private set; }
+    public string? CurrentDomain { get; private set; }
 
     public void Start(string logFilePath, bool readFromEnd = true)
     {
@@ -51,6 +61,7 @@ public class LanWorldWatcher : ILanWorldWatcher
             _lineBuffer.Clear();
             IsWorldOpen = false;
             CurrentPort = null;
+            CurrentDomain = null;
 
             PollLogFile();
 
@@ -71,6 +82,7 @@ public class LanWorldWatcher : ILanWorldWatcher
         _pollTimer?.Dispose();
         _pollTimer = null;
         _lineBuffer.Clear();
+        CurrentDomain = null;
         if (IsWorldOpen)
         {
             IsWorldOpen = false;
@@ -98,6 +110,7 @@ public class LanWorldWatcher : ILanWorldWatcher
                 {
                     _lastPosition = 0;
                     _lineBuffer.Clear();
+                    CurrentDomain = null;
                     if (IsWorldOpen)
                     {
                         IsWorldOpen = false;
@@ -151,6 +164,24 @@ public class LanWorldWatcher : ILanWorldWatcher
     {
         if (string.IsNullOrWhiteSpace(line)) return;
 
+        var domainMatch = DomainAssignedRegex.Match(line);
+        if (domainMatch.Success)
+        {
+            var domain = domainMatch.Groups["domain"].Value.Trim();
+            if (!string.IsNullOrWhiteSpace(domain))
+            {
+                CurrentDomain = domain;
+                try
+                {
+                    DomainAssigned?.Invoke(domain);
+                }
+                catch (Exception ex)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[EXCEPTION] LanWorldWatcher DomainAssigned event: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                }
+            }
+        }
+
         var startMatch = StartedServingRegex.Match(line);
         if (startMatch.Success)
         {
@@ -172,6 +203,7 @@ public class LanWorldWatcher : ILanWorldWatcher
 
         if (StoppingServerRegex.IsMatch(line))
         {
+            CurrentDomain = null;
             if (IsWorldOpen)
             {
                 IsWorldOpen = false;

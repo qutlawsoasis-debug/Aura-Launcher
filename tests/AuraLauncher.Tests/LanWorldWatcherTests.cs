@@ -186,5 +186,37 @@ public class LanWorldWatcherTests
             if (File.Exists(tempFile)) File.Delete(tempFile);
         }
     }
+
+    [Theory]
+    [InlineData("[19:46:00] [Server thread/INFO]: e4all: Domain assigned: quick-fox-42.e4mc.link", "quick-fox-42.e4mc.link")]
+    [InlineData("[19:46:00] [Server thread/INFO]: Domain assigned: swift-bear-12.e4mc.link", "swift-bear-12.e4mc.link")]
+    [InlineData("[19:46:00] [Render thread/INFO]: [CHAT] Local game hosted on domain [happy-panda-99.e4mc.link]", "happy-panda-99.e4mc.link")]
+    public void ProcessLine_DomainAssigned_SetsCurrentDomainAndFiresEvent(string logLine, string expectedDomain)
+    {
+        using var watcher = new LanWorldWatcher();
+        string? assignedDomain = null;
+        watcher.DomainAssigned += d => assignedDomain = d;
+
+        watcher.ProcessLine(logLine);
+
+        Assert.Equal(expectedDomain, watcher.CurrentDomain);
+        Assert.Equal(expectedDomain, assignedDomain);
+    }
+
+    [Fact]
+    public void ProcessLine_StoppingServer_ResetsCurrentDomain()
+    {
+        using var watcher = new LanWorldWatcher();
+        watcher.ProcessLine("[19:45:47] [Render thread/INFO]: Started serving on 49152");
+        watcher.ProcessLine("[19:46:00] [Server thread/INFO]: e4all: Domain assigned: quick-fox-42.e4mc.link");
+
+        Assert.True(watcher.IsWorldOpen);
+        Assert.Equal("quick-fox-42.e4mc.link", watcher.CurrentDomain);
+
+        watcher.ProcessLine("[19:48:51] [Server thread/INFO]: Stopping server");
+
+        Assert.False(watcher.IsWorldOpen);
+        Assert.Null(watcher.CurrentDomain);
+    }
 }
 
