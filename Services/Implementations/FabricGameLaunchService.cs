@@ -321,6 +321,12 @@ public class FabricGameLaunchService : IGameLaunchService
     {
         try
         {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var flagPath = Path.Combine(appData, ".aura", "dialtone.on");
+            bool dialtoneEnabled = File.Exists(flagPath);
+            var dialtoneTag = dialtoneEnabled ? "dialtone=ON (flag)" : "dialtone=OFF (default)";
+            LogLauncherEvent($"[CONFIG] Настройка e4all: {dialtoneTag}");
+
             var e4allDirs = new[] { configDir, Path.Combine(configDir, "e4all") };
             foreach (var dir in e4allDirs)
             {
@@ -336,15 +342,31 @@ public class FabricGameLaunchService : IGameLaunchService
                         text = text.Replace("offlineMode = false", "offlineMode = true");
                         changed = true;
                     }
-                    if (text.Contains("dialtoneHostEnabled = true"))
+                    if (dialtoneEnabled)
                     {
-                        text = text.Replace("dialtoneHostEnabled = true", "dialtoneHostEnabled = false");
-                        changed = true;
+                        if (text.Contains("dialtoneHostEnabled = false"))
+                        {
+                            text = text.Replace("dialtoneHostEnabled = false", "dialtoneHostEnabled = true");
+                            changed = true;
+                        }
+                        if (text.Contains("dialtonePlayerEnabled = false"))
+                        {
+                            text = text.Replace("dialtonePlayerEnabled = false", "dialtonePlayerEnabled = true");
+                            changed = true;
+                        }
                     }
-                    if (text.Contains("dialtonePlayerEnabled = true"))
+                    else
                     {
-                        text = text.Replace("dialtonePlayerEnabled = true", "dialtonePlayerEnabled = false");
-                        changed = true;
+                        if (text.Contains("dialtoneHostEnabled = true"))
+                        {
+                            text = text.Replace("dialtoneHostEnabled = true", "dialtoneHostEnabled = false");
+                            changed = true;
+                        }
+                        if (text.Contains("dialtonePlayerEnabled = true"))
+                        {
+                            text = text.Replace("dialtonePlayerEnabled = true", "dialtonePlayerEnabled = false");
+                            changed = true;
+                        }
                     }
                     if (text.Contains("voiceP2PEnabled = true"))
                     {
@@ -360,7 +382,7 @@ public class FabricGameLaunchService : IGameLaunchService
                     if (changed)
                     {
                         File.WriteAllText(tomlPath, text, new UTF8Encoding(false));
-                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, dialtone=false, voice=false, timeout=45s)");
+                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, {dialtoneTag}, voice=false, timeout=45s)");
                     }
                 }
             }
