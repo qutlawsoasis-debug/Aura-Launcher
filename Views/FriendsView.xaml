@@ -223,26 +223,96 @@
             <TextBlock Text="Добавить друга"
                        FontFamily="{StaticResource MainFont}"
                        FontSize="13"
-                       Foreground="{StaticResource MuteBrush}"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"
                        Margin="0,0,0,8" />
 
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
-                <TextBox Style="{StaticResource AuraTextBox}"
-                         Text="{Binding AddCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                         MaxLength="8"
-                         Width="180" Height="40"
-                         FontSize="14"
-                         FontWeight="Medium"
-                         Tag="Код друга"
-                         Margin="0,0,12,0" />
+            <!-- Интегрированная панель ввода кода друга -->
+            <Border x:Name="AddFriendBar"
+                    Width="380" Height="42"
+                    HorizontalAlignment="Left"
+                    Background="{DynamicResource MediaPlaceholder}"
+                    BorderBrush="{DynamicResource BorderSubtle}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    SnapsToDevicePixels="True"
+                    Margin="0,0,0,4">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                                <Setter Property="Background" Value="{DynamicResource Panel}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                                <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                <Button Command="{Binding AddFriendCommand}"
-                        IsEnabled="{Binding CanAddFriend}"
-                        Style="{StaticResource PrimaryNeonBtn}"
-                        Height="40"
-                        Padding="20,0"
-                        Content="Добавить" />
-            </StackPanel>
+                    <!-- Иконка пользователя -->
+                    <Path Grid.Column="0"
+                          Style="{StaticResource IconPath}"
+                          Data="{StaticResource IconUser}"
+                          Width="14" Height="14"
+                          Stroke="{DynamicResource StoriesTextSecondary}"
+                          Margin="12,0,8,0"
+                          VerticalAlignment="Center"
+                          IsHitTestVisible="False" />
+
+                    <!-- Встроенное поле ввода кода -->
+                    <TextBox Grid.Column="1"
+                             x:Name="AddFriendCodeBox"
+                             Style="{StaticResource AuraEmbeddedTextBox}"
+                             Text="{Binding AddCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             MaxLength="8"
+                             FontFamily="{StaticResource HeadingFont}"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             Foreground="{DynamicResource TextPrimary}"
+                             CaretBrush="{DynamicResource Accent}"
+                             Tag="Код друга (8 знаков)"
+                             VerticalAlignment="Center"
+                             KeyDown="OnAddFriendCodeKeyDown" />
+
+                    <!-- Интегрированная кнопка Добавить -->
+                    <Button Grid.Column="2"
+                            Command="{Binding AddFriendCommand}"
+                            IsEnabled="{Binding CanAddFriend}"
+                            Style="{StaticResource FriendAddActionBtn}"
+                            Content="Добавить"
+                            Margin="0,0,5,0"
+                            VerticalAlignment="Center" />
+
+                    <!-- Нижний акцентный штрих при фокусе панели -->
+                    <Border Grid.ColumnSpan="3"
+                            Height="2"
+                            Background="{DynamicResource Accent}"
+                            VerticalAlignment="Bottom"
+                            HorizontalAlignment="Stretch"
+                            CornerRadius="0,0,3,3"
+                            SnapsToDevicePixels="True">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Opacity" Value="0.0" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=AddFriendBar}" Value="True">
+                                        <Setter Property="Opacity" Value="1.0" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
+                </Grid>
+            </Border>
 
             <!-- Error under add friend field -->
             <TextBlock Text="{Binding AddFriendErrorMessage}"
