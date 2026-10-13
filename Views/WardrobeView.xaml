@@ -79,6 +79,30 @@
                            Foreground="{StaticResource MuteBrush}"
                            HorizontalAlignment="Center"
                            Margin="0,8,0,0" />
+
+                <!-- Quick rotation buttons -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+                    <Button Click="OnRotateFrontClick"
+                            Style="{StaticResource GhostBtn}"
+                            Content="Спереди"
+                            FontSize="11"
+                            Height="26"
+                            Padding="8,0"
+                            Margin="0,0,4,0" />
+                    <Button Click="OnRotateSideClick"
+                            Style="{StaticResource GhostBtn}"
+                            Content="Сбоку"
+                            FontSize="11"
+                            Height="26"
+                            Padding="8,0"
+                            Margin="0,0,4,0" />
+                    <Button Click="OnRotateBackClick"
+                            Style="{StaticResource GhostBtn}"
+                            Content="Сзади"
+                            FontSize="11"
+                            Height="26"
+                            Padding="8,0" />
+                </StackPanel>
             </StackPanel>
 
             <!-- Right: Nickname, Profile ID, Skin controls -->

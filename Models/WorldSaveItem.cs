@@ -92,4 +92,11 @@ public class WorldSaveItem : ObservableObject
         get => _backupStatusText;
         set => SetProperty(ref _backupStatusText, value);
     }
+
+    private bool _isConfirmingDelete;
+    public bool IsConfirmingDelete
+    {
+        get => _isConfirmingDelete;
+        set => SetProperty(ref _isConfirmingDelete, value);
+    }
 }

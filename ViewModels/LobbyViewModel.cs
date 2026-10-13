@@ -1498,6 +1498,7 @@ public class LobbyViewModel : ObservableObject
             {
                 Clipboard.SetText(LobbyCode);
                 CodeCopied = true;
+                _notificationService?.Notify("Код скопирован", $"Код {LobbyCode} помещён в буфер обмена", "Lobby", "info");
 
                 _ = Task.Delay(1600).ContinueWith(_ =>
                 {
@@ -1517,6 +1518,7 @@ public class LobbyViewModel : ObservableObject
                 string url = $"https://lobby-api.vercel.app/j/{LobbyCode}";
                 Clipboard.SetText(url);
                 IsLinkCopied = true;
+                _notificationService?.Notify("Ссылка скопирована", "Ссылка для входа помещена в буфер обмена", "Lobby", "info");
                 _ = Task.Delay(2000).ContinueWith(_ =>
                 {
                     Application.Current?.Dispatcher?.InvokeAsync(() => IsLinkCopied = false);
@@ -1790,7 +1792,7 @@ public class LobbyViewModel : ObservableObject
             }
         }
 
-        if (_lobbyService.IsHost && status.Players != null)
+        if (IsInLobby && status.Players != null)
         {
             var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
             foreach (var p in status.Players)
@@ -1798,6 +1800,7 @@ public class LobbyViewModel : ObservableObject
                 if (!string.Equals(p, myNick, StringComparison.OrdinalIgnoreCase) && _knownPlayerNicks.Add(p))
                 {
                     _notificationService?.NotifyPlayerJoinedLobby(p);
+                    try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
                 }
             }
         }

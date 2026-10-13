@@ -65,6 +65,7 @@ public class SettingsViewModel : ObservableObject
     }
 
     public RelayCommand NextBackgroundCommand { get; }
+    public RelayCommand OpenBackgroundsFolderCommand { get; }
 
     public string Nickname
     {
@@ -533,10 +534,26 @@ public class SettingsViewModel : ObservableObject
 
     public bool HasIntegrityStatus => !string.IsNullOrWhiteSpace(_integrityStatusText);
 
+    private string _cleanupStatusText = string.Empty;
+    public string CleanupStatusText
+    {
+        get => _cleanupStatusText;
+        set
+        {
+            if (SetProperty(ref _cleanupStatusText, value))
+            {
+                OnPropertyChanged(nameof(HasCleanupStatus));
+            }
+        }
+    }
+
+    public bool HasCleanupStatus => !string.IsNullOrWhiteSpace(_cleanupStatusText);
+
     public RelayCommand SelectGameFolderCommand { get; }
     public AsyncRelayCommand GenerateReportCommand { get; }
     public RelayCommand OpenSendReportCommand { get; }
     public AsyncRelayCommand CheckIntegrityCommand { get; }
+    public AsyncRelayCommand CleanupCacheCommand { get; }
 
     public event Action<string?>? SendReportRequested;
 
@@ -571,7 +588,7 @@ public class SettingsViewModel : ObservableObject
             _isChangingBackground = true;
             try
             {
-                await Task.Delay(1000);
+                await Task.Delay(500);
                 _backgroundService?.NextBackground();
                 await Task.Delay(1200);
             }
@@ -584,6 +601,25 @@ public class SettingsViewModel : ObservableObject
             }
         });
 
+        OpenBackgroundsFolderCommand = new RelayCommand(_ =>
+        {
+            try
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var customDir = Path.Combine(appData, ".aura", "backgrounds");
+                if (!Directory.Exists(customDir))
+                {
+                    Directory.CreateDirectory(customDir);
+                }
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = customDir,
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        });
+
         OpenSendReportCommand = new RelayCommand(_ =>
         {
             SendReportRequested?.Invoke(null);
@@ -594,6 +630,58 @@ public class SettingsViewModel : ObservableObject
             if (_reportService != null)
             {
                 await _reportService.GenerateReportZipAsync();
+            }
+        });
+
+        CleanupCacheCommand = new AsyncRelayCommand(async () =>
+        {
+            try
+            {
+                CleanupStatusText = "Очистка...";
+                long bytesFreed = await Task.Run(() =>
+                {
+                    long total = 0;
+                    var gameDir = GameDir;
+                    var logsDir = Path.Combine(gameDir, "logs");
+                    if (Directory.Exists(logsDir))
+                    {
+                        foreach (var f in Directory.GetFiles(logsDir, "*.log.gz"))
+                        {
+                            try { var len = new FileInfo(f).Length; File.Delete(f); total += len; } catch { }
+                        }
+                    }
+                    var crashDir = Path.Combine(gameDir, "crash-reports");
+                    if (Directory.Exists(crashDir))
+                    {
+                        foreach (var f in Directory.GetFiles(crashDir, "*.*"))
+                        {
+                            try
+                            {
+                                var fi = new FileInfo(f);
+                                if (fi.LastWriteTimeUtc < DateTime.UtcNow.AddDays(-7))
+                                {
+                                    total += fi.Length;
+                                    fi.Delete();
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    return total;
+                });
+
+                double mb = bytesFreed / (1024.0 * 1024.0);
+                CleanupStatusText = mb > 0.05 ? $"Освобождено {mb:F1} МБ" : "Временные файлы не найдены";
+                _notificationService?.Notify("Очистка завершена", CleanupStatusText, "Settings", "info");
+
+                _ = Task.Delay(4000).ContinueWith(_ =>
+                {
+                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() => CleanupStatusText = string.Empty);
+                });
+            }
+            catch
+            {
+                CleanupStatusText = "Ошибка очистки";
             }
         });
 

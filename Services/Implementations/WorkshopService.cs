@@ -488,6 +488,27 @@ public class WorkshopService : IWorkshopService
         });
     }
 
+    public Task<bool> DeleteWorldAsync(WorldSaveItem world)
+    {
+        return Task.Run(() =>
+        {
+            try
+            {
+                if (world != null && Directory.Exists(world.FolderPath))
+                {
+                    Directory.Delete(world.FolderPath, true);
+                    return true;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[WORKSHOP: ERROR DeleteWorld] {ex.Message}");
+                return false;
+            }
+        });
+    }
+
     public Task<List<ModItem>> GetModsAsync(string gameDir)
     {
         return Task.Run(() =>

@@ -14,6 +14,7 @@ public interface IWorkshopService
     Task CreateAutoBackupLatestWorldAsync(string gameDir, int maxAutoBackupsPerWorld = 3);
     Task RestoreWorldBackupAsync(WorldSaveItem world, WorldBackupItem backup);
     Task DeleteWorldBackupAsync(WorldBackupItem backup);
+    Task<bool> DeleteWorldAsync(WorldSaveItem world);
     Task<List<ModItem>> GetModsAsync(string gameDir);
     bool ToggleMod(ModItem mod, bool enable);
     Task<List<ShaderPackItem>> GetShaderPacksAsync(string gameDir);

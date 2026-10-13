@@ -163,4 +163,8 @@ public partial class WardrobeView : UserControl
     public void RotateToFront() => RotateTo(0, 0);
     public void RotateToSide() => RotateTo(90, 0);
     public void RotateToBack() => RotateTo(180, 0);
+
+    private void OnRotateFrontClick(object sender, RoutedEventArgs e) => RotateToFront();
+    private void OnRotateSideClick(object sender, RoutedEventArgs e) => RotateToSide();
+    private void OnRotateBackClick(object sender, RoutedEventArgs e) => RotateToBack();
 }

@@ -187,6 +187,9 @@ public class WorkshopViewModel : ObservableObject
     public AsyncRelayCommand ExportWorldCommand { get; }
     public AsyncRelayCommand ImportWorldCommand { get; }
     public RelayCommand OpenWorldFolderCommand { get; }
+    public RelayCommand PromptDeleteWorldCommand { get; }
+    public RelayCommand CancelDeleteWorldCommand { get; }
+    public AsyncRelayCommand ConfirmDeleteWorldCommand { get; }
     public RelayCommand OpenBackupsFolderCommand { get; }
 
     public RelayCommand ToggleModCommand { get; }
@@ -351,6 +354,35 @@ public class WorkshopViewModel : ObservableObject
                     Process.Start(new ProcessStartInfo { FileName = world.FolderPath, UseShellExecute = true });
                 }
                 catch { }
+            }
+        });
+
+        PromptDeleteWorldCommand = new RelayCommand(p =>
+        {
+            var world = p as WorldSaveItem ?? FeaturedWorld;
+            if (world != null)
+            {
+                world.IsConfirmingDelete = true;
+            }
+        });
+
+        CancelDeleteWorldCommand = new RelayCommand(p =>
+        {
+            var world = p as WorldSaveItem ?? FeaturedWorld;
+            if (world != null)
+            {
+                world.IsConfirmingDelete = false;
+            }
+        });
+
+        ConfirmDeleteWorldCommand = new AsyncRelayCommand(async p =>
+        {
+            var world = p as WorldSaveItem ?? FeaturedWorld;
+            if (world != null)
+            {
+                world.IsConfirmingDelete = false;
+                await _workshopService.DeleteWorldAsync(world);
+                await RefreshAllAsync();
             }
         });
 

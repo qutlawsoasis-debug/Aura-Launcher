@@ -643,6 +643,11 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Command="{Binding OpenBackgroundsFolderCommand}"
+                                Content="Папка с фонами"
+                                Style="{StaticResource SettingsActionBtn}"
+                                Height="32" Padding="12,0" FontSize="12"
+                                Margin="0,0,8,0" />
                         <Button Command="{Binding NextBackgroundCommand}"
                                 Content="Сменить фон"
                                 Style="{StaticResource SettingsActionBtn}"
@@ -873,6 +878,48 @@
                                 Padding="16,0"
                                 FontSize="13"
                                 Content="Сохранить на рабочий стол"
+                                VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- 3.2 "Очистка кэша и логов" -->
+                <Grid Margin="0,4,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,24,0">
+                        <TextBlock Text="Очистка кэша и старых логов"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="Удаление архивных логов Minecraft (.log.gz) и старых отчётов о вылетах"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding CleanupStatusText}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource EmberBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,12,0"
+                                   Visibility="{Binding HasCleanupStatus, Converter={StaticResource BoolToVis}}" />
+
+                        <Button Command="{Binding CleanupCacheCommand}"
+                                Style="{StaticResource SettingsActionBtn}"
+                                Height="40"
+                                Padding="16,0"
+                                FontSize="13"
+                                Content="Очистить кэш"
                                 VerticalAlignment="Center" />
                     </StackPanel>
                 </Grid>

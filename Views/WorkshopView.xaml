@@ -420,6 +420,33 @@
                                             </StackPanel>
                                         </Button>
 
+                                        <!-- Text Link «Удалить» -->
+                                        <Button Command="{Binding DataContext.PromptDeleteWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource GhostBtn}"
+                                                Margin="0,0,10,6" Padding="6,6" FocusVisualStyle="{x:Null}"
+                                                Visibility="{Binding IsConfirmingDelete, Converter={StaticResource InverseBoolToVis}}">
+                                            <TextBlock Text="Удалить" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource Danger}" />
+                                        </Button>
+
+                                        <!-- Delete Confirmation -->
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,6"
+                                                    Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="Удалить мир? " FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" />
+                                            <Button Command="{Binding DataContext.ConfirmDeleteWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource GhostBtn}"
+                                                    Padding="6,3" Margin="0,0,4,0" FocusVisualStyle="{x:Null}">
+                                                <TextBlock Text="Да" FontFamily="{StaticResource MainFont}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource Danger}" />
+                                            </Button>
+                                            <Button Command="{Binding DataContext.CancelDeleteWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource GhostBtn}"
+                                                    Padding="6,3" FocusVisualStyle="{x:Null}">
+                                                <TextBlock Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="13" Foreground="{StaticResource MuteBrush}" />
+                                            </Button>
+                                        </StackPanel>
+
                                         <!-- In-progress backup text -->
                                         <TextBlock Text="{Binding BackupStatusText}"
                                                    FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="Medium"
@@ -529,9 +556,34 @@
                                                         <Button Command="{Binding DataContext.OpenWorldFolderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
                                                                 Style="{StaticResource GhostBtn}"
-                                                                Padding="8,6" FocusVisualStyle="{x:Null}">
+                                                                Padding="8,6" Margin="0,0,8,0" FocusVisualStyle="{x:Null}">
                                                             <TextBlock Text="Папка" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource TextPrimary}" />
                                                         </Button>
+
+                                                        <Button Command="{Binding DataContext.PromptDeleteWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                Padding="8,6" Margin="0,0,8,0" FocusVisualStyle="{x:Null}"
+                                                                Visibility="{Binding IsConfirmingDelete, Converter={StaticResource InverseBoolToVis}}">
+                                                            <TextBlock Text="Удалить" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource Danger}" />
+                                                        </Button>
+
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                                    Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="Удалить? " FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" />
+                                                            <Button Command="{Binding DataContext.ConfirmDeleteWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource GhostBtn}"
+                                                                    Padding="6,3" Margin="0,0,4,0" FocusVisualStyle="{x:Null}">
+                                                                <TextBlock Text="Да" FontFamily="{StaticResource MainFont}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Danger}" />
+                                                            </Button>
+                                                            <Button Command="{Binding DataContext.CancelDeleteWorldCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Style="{StaticResource GhostBtn}"
+                                                                    Padding="6,3" FocusVisualStyle="{x:Null}">
+                                                                <TextBlock Text="Отмена" FontFamily="{StaticResource MainFont}" FontSize="12" Foreground="{StaticResource MuteBrush}" />
+                                                            </Button>
+                                                        </StackPanel>
                                                     </StackPanel>
                                                 </Grid>
                                             </Border>
