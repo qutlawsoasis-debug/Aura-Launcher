@@ -679,7 +679,7 @@ public class FriendsAndLobbyScenarioTests
             => Notifications.Add((title, message, targetTab, type));
         public void NotifyLobbyInvite(string fromNick, string inviteId = "", string lobbyCode = "") { }
         public void NotifyFriendRequest(string fromNick, string fromId = "", string friendCode = "") { }
-        public void NotifyPlayerJoinedLobby(string playerNick) { }
+        public void NotifyPlayerJoinedLobby(string playerNick, bool isHost = true) { }
         public void NotifyHostOpenedWorld() { }
         public void NotifyScreenshotTaken(string filePath, string fileName) { }
         public void NotifyGameCrash(int exitCode, string? reason = null) { }

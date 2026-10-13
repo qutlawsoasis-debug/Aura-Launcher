@@ -49,11 +49,11 @@ public class GraphicsPresetService : IGraphicsPresetService
 
         var searchPaths = new[]
         {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "presets.json"),
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "presets.json"),
             Path.Combine(Directory.GetCurrentDirectory(), "Data", "presets.json"),
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Data", "presets.json"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Data", "presets.json")
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Data", "presets.json"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "presets.json")
         };
 
         foreach (var path in searchPaths)
@@ -81,6 +81,34 @@ public class GraphicsPresetService : IGraphicsPresetService
                     {
                         _presets[kvp.Key] = kvp.Value;
                     }
+
+                    // Миграция устаревшего/проблемного шейдера DERCODE на стабильный Complementary Unbound ULTRA
+                    foreach (var p in _presets.Values)
+                    {
+                        if (p.ShaderPack.Contains("DERCODE", StringComparison.OrdinalIgnoreCase))
+                        {
+                            p.ShaderPack = "ComplementaryUnbound_r5.9.3.zip";
+                            p.ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["profile"] = "ULTRA",
+                                ["SHADOW_QUALITY"] = "2",
+                                ["shadowDistance"] = "224.0",
+                                ["WATER_REFLECT_QUALITY"] = "2",
+                                ["BLOCK_REFLECT_QUALITY"] = "3",
+                                ["LIGHTSHAFT_QUALI_DEFINE"] = "2",
+                                ["SSAO_QUALI_DEFINE"] = "2",
+                                ["FXAA_DEFINE"] = "1",
+                                ["DETAIL_QUALITY"] = "3",
+                                ["CLOUD_QUALITY"] = "3",
+                                ["ANISOTROPIC_FILTER"] = "8",
+                                ["COLORED_LIGHTING"] = "256",
+                                ["WORLD_SPACE_REFLECTIONS"] = "1",
+                                ["ENTITY_SHADOW"] = "1",
+                                ["RAIN_PUDDLES"] = "2"
+                            };
+                        }
+                    }
+
                     return;
                 }
             }

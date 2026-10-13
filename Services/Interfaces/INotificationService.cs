@@ -7,7 +7,7 @@ public interface INotificationService
     void Notify(string title, string message, string targetTab = "Overview", string type = "info");
     void NotifyLobbyInvite(string fromNick, string inviteId = "", string lobbyCode = "");
     void NotifyFriendRequest(string fromNick, string fromId = "", string friendCode = "");
-    void NotifyPlayerJoinedLobby(string playerNick);
+    void NotifyPlayerJoinedLobby(string playerNick, bool isHost = true);
     void NotifyHostOpenedWorld();
     void NotifyScreenshotTaken(string filePath, string fileName);
     void NotifyGameCrash(int exitCode, string? reason = null);

@@ -271,18 +271,17 @@ public class WorkshopServiceTests : IDisposable
 
         string dirUltra = Path.Combine(_tempDir, "game_ultra");
         Directory.CreateDirectory(Path.Combine(dirUltra, "shaderpacks"));
-        File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "DERCODE_2.2.zip"), "dummy dercode");
+        File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "ComplementaryUnbound_r5.9.3.zip"), "dummy complementary unbound");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirUltra, "Ultra");
 
         Assert.True(File.Exists(Path.Combine(dirUltra, "options.txt")));
-        Assert.True(File.Exists(Path.Combine(dirUltra, "shaderpacks", "DERCODE_2.2.zip.txt")));
+        Assert.True(File.Exists(Path.Combine(dirUltra, "shaderpacks", "ComplementaryUnbound_r5.9.3.zip.txt")));
         string ultraOptions = File.ReadAllText(Path.Combine(dirUltra, "options.txt"));
-        string ultraShaderTxt = File.ReadAllText(Path.Combine(dirUltra, "shaderpacks", "DERCODE_2.2.zip.txt"));
+        string ultraShaderTxt = File.ReadAllText(Path.Combine(dirUltra, "shaderpacks", "ComplementaryUnbound_r5.9.3.zip.txt"));
         Assert.Contains("renderDistance:32", ultraOptions);
         Assert.Contains("simulationDistance:12", ultraOptions);
-        Assert.Contains("profile=DER25", ultraShaderTxt);
-        Assert.Contains("PARALLAX=true", ultraShaderTxt);
+        Assert.Contains("profile=ULTRA", ultraShaderTxt);
     }
 
     [Fact]

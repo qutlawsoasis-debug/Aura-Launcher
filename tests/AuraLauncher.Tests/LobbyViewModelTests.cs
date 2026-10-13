@@ -88,6 +88,11 @@ public class LobbyViewModelTests
             StatusChanged?.Invoke(CurrentStatus);
             TunnelAddressReady?.Invoke(tunnelAddress);
         }
+
+        public void SimulateStatusUpdate(LobbyStatusResponse status)
+        {
+            LobbyStatusUpdated?.Invoke(status);
+        }
     }
 
     [Fact]
@@ -405,6 +410,77 @@ public class LobbyViewModelTests
         Assert.True(vm.IsWorldOpen);
         Assert.Equal("test-p2p.e4mc.link", mockLobby.CurrentTunnelAddress);
         Assert.Contains("test-p2p.e4mc.link", vm.StatusText);
+    }
+
+    [Fact]
+    public async Task Guest_InitialJoin_DoesNotNotifyExistingHost_AndNotifiesNewJoinersAsNonHost()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        configService.CurrentConfig.Nickname = "GuestPlayer";
+        var launchService = new TestLaunchService();
+        var notifService = new TestNotificationService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService, notificationService: notifService);
+
+        vm.GuestCodeInput = "TEST01";
+        await vm.JoinLobbyCommand.ExecuteAsync(null);
+
+        // Первый статус лобби при подключении гостя: хост и гость уже в списке
+        mockLobby.SimulateStatusUpdate(new LobbyStatusResponse("TEST01", "waiting", null, 2, 0,
+            Players: new[] { "HostPlayer", "GuestPlayer" }, HostName: "HostPlayer"));
+
+        // Не должно быть уведомлений о хосте
+        Assert.Empty(notifService.JoinedNotifications);
+
+        // Подключается третий игрок
+        mockLobby.SimulateStatusUpdate(new LobbyStatusResponse("TEST01", "waiting", null, 3, 0,
+            Players: new[] { "HostPlayer", "GuestPlayer", "NewPlayer" }, HostName: "HostPlayer"));
+
+        // Должно прийти уведомление для гостя (isHost: false)
+        Assert.Single(notifService.JoinedNotifications);
+        Assert.Equal("NewPlayer", notifService.JoinedNotifications[0].Nick);
+        Assert.False(notifService.JoinedNotifications[0].IsHost);
+    }
+
+    [Fact]
+    public async Task Host_NewPlayerJoins_NotifiesWithIsHostTrue()
+    {
+        var mockLobby = new MockLobbyService();
+        var configService = new TestConfigService(System.IO.Path.GetTempPath());
+        configService.CurrentConfig.Nickname = "HostPlayer";
+        var launchService = new TestLaunchService();
+        var notifService = new TestNotificationService();
+        var vm = new LobbyViewModel(mockLobby, launchService, configService, notificationService: notifService);
+
+        await vm.CreateLobbyCommand.ExecuteAsync(null);
+
+        // Подключается гость
+        mockLobby.SimulateStatusUpdate(new LobbyStatusResponse("TEST01", "waiting", null, 2, 0,
+            Players: new[] { "HostPlayer", "GuestPlayer" }, HostName: "HostPlayer"));
+
+        Assert.Single(notifService.JoinedNotifications);
+        Assert.Equal("GuestPlayer", notifService.JoinedNotifications[0].Nick);
+        Assert.True(notifService.JoinedNotifications[0].IsHost);
+    }
+
+    private sealed class TestNotificationService : INotificationService
+    {
+        public List<(string Nick, bool IsHost)> JoinedNotifications { get; } = new();
+
+        public void Notify(string title, string message, string targetTab = "Overview", string type = "info") { }
+        public void NotifyLobbyInvite(string fromNick, string inviteId = "", string lobbyCode = "") { }
+        public void NotifyFriendRequest(string fromNick, string fromId = "", string friendCode = "") { }
+        public void NotifyPlayerJoinedLobby(string playerNick, bool isHost = true) => JoinedNotifications.Add((playerNick, isHost));
+        public void NotifyHostOpenedWorld() { }
+        public void NotifyScreenshotTaken(string filePath, string fileName) { }
+        public void NotifyGameCrash(int exitCode, string? reason = null) { }
+        public void NotifyKickedFromLobby() { }
+        public void NotifyUpdateAvailable(string updateTitle, string updateMessage) { }
+        public void ClearUpdateNotifications() { }
+        public void NotifyIntegrityChecked(string statusText) { }
+        public bool IsWindowVisibleAndFocused() => true;
+        public void RegisterInAppToastHandler(Action<string, string, string, string?> showToast) { }
+        public void RegisterInAppToastHandler(Action<string, string> showToast) { }
     }
 }
 

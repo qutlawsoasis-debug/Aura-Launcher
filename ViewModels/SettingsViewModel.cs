@@ -332,7 +332,7 @@ public class SettingsViewModel : ObservableObject
         "low" => "Прорисовка 12 чанков, быстрая графика, легкие шейдеры",
         "medium" => "Прорисовка 16 чанков, оптимальный баланс FPS и качества",
         "high" => "Прорисовка 24 чанка, высокая детализация и шейдеры Complementary Reimagined",
-        "ultra" => "Прорисовка 32 чанка, фотореализм: 3D PBR-текстуры Patrix 32x + шейдер DERCODE (POM & GI)",
+        "ultra" => "Прорисовка 32 чанка, ультра-графика: 3D PBR-текстуры Patrix 32x + шейдер Complementary Unbound (ULTRA)",
         _ => "Пользовательский профиль настроек"
     };
 

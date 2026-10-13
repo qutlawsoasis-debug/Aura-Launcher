@@ -38,6 +38,7 @@ public class LobbyViewModel : ObservableObject
     private string? _currentPingAddress;
     private CancellationTokenSource? _pingLoopCts;
     private readonly HashSet<string> _knownPlayerNicks = new(StringComparer.OrdinalIgnoreCase);
+    private bool _suppressJoinNotifications;
     private readonly Dictionary<string, string> _lastPlayerMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _ignoredMismatchSignatures = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _lobbyOpLock = new(1, 1);
@@ -834,6 +835,7 @@ public class LobbyViewModel : ObservableObject
                     RefreshLocalPlayerModel();
                     _knownPlayerNicks.Clear();
                     _knownPlayerNicks.Add(hostName);
+                    _suppressJoinNotifications = false;
                     _discordRpcService?.SetInLobby(1);
                     Dispatch(() =>
                     {
@@ -1308,6 +1310,9 @@ public class LobbyViewModel : ObservableObject
 
                     if (joinedMock)
                     {
+                        _knownPlayerNicks.Clear();
+                        _knownPlayerNicks.Add(playerNameMock);
+                        _suppressJoinNotifications = true;
                         LobbyCode = !string.IsNullOrWhiteSpace(_lobbyService.CurrentLobbyCode) ? _lobbyService.CurrentLobbyCode : cleanCode;
                         IsLobbyCreated = false;
                         IsWorldOpen = false;
@@ -1378,6 +1383,17 @@ public class LobbyViewModel : ObservableObject
 
                 if (joined)
                 {
+                    _knownPlayerNicks.Clear();
+                    if (!string.IsNullOrWhiteSpace(playerName))
+                    {
+                        _knownPlayerNicks.Add(playerName);
+                    }
+                    if (!string.IsNullOrWhiteSpace(statusResp?.HostName))
+                    {
+                        _knownPlayerNicks.Add(statusResp.HostName);
+                    }
+                    _suppressJoinNotifications = true;
+
                     Dispatch(() =>
                     {
                         LobbyCode = !string.IsNullOrWhiteSpace(_lobbyService.CurrentLobbyCode) ? _lobbyService.CurrentLobbyCode : cleanCode;
@@ -1671,6 +1687,7 @@ public class LobbyViewModel : ObservableObject
 
         _discordRpcService?.SetInLauncher();
         _knownPlayerNicks.Clear();
+        _suppressJoinNotifications = false;
         _previousWorldIsOpen = false;
         _domainTcs = null;
 
@@ -1902,12 +1919,26 @@ public class LobbyViewModel : ObservableObject
         if (IsInLobby && status.Players != null)
         {
             var myNick = _configService.CurrentConfig?.Nickname ?? string.Empty;
-            foreach (var p in status.Players)
+            if (_suppressJoinNotifications)
             {
-                if (!string.Equals(p, myNick, StringComparison.OrdinalIgnoreCase) && _knownPlayerNicks.Add(p))
+                foreach (var p in status.Players)
                 {
-                    _notificationService?.NotifyPlayerJoinedLobby(p);
-                    try { System.Media.SystemSounds.Asterisk.Play(); } catch { }
+                    _knownPlayerNicks.Add(p);
+                }
+                _suppressJoinNotifications = false;
+            }
+            else
+            {
+                _knownPlayerNicks.RemoveWhere(nick => !status.Players.Contains(nick, StringComparer.OrdinalIgnoreCase)
+                                                   && !string.Equals(nick, myNick, StringComparison.OrdinalIgnoreCase)
+                                                   && !string.Equals(nick, HostName, StringComparison.OrdinalIgnoreCase));
+
+                foreach (var p in status.Players)
+                {
+                    if (!string.Equals(p, myNick, StringComparison.OrdinalIgnoreCase) && _knownPlayerNicks.Add(p))
+                    {
+                        _notificationService?.NotifyPlayerJoinedLobby(p, isHost: IsHost);
+                    }
                 }
             }
         }

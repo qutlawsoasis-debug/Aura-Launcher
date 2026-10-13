@@ -83,13 +83,14 @@ public class NotificationService : INotificationService
         }
     }
 
-    public void NotifyPlayerJoinedLobby(string playerNick)
+    public void NotifyPlayerJoinedLobby(string playerNick, bool isHost = true)
     {
-        _showInAppToastCallback?.Invoke("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "lobby", "Lobby");
+        var message = isHost ? $"{playerNick} зашёл в ваше лобби" : $"{playerNick} подключился к лобби";
+        _showInAppToastCallback?.Invoke("Игрок в лобби", message, "lobby", "Lobby");
 
         if (_configService.CurrentConfig?.WindowsNotificationsEnabled ?? true)
         {
-            ShowWindowsToast("Игрок в лобби", $"{playerNick} зашёл в ваше лобби", "Lobby");
+            ShowWindowsToast("Игрок в лобби", message, "Lobby");
         }
 
         try

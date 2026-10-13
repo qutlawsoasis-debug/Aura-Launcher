@@ -329,11 +329,33 @@ public class FabricGameLaunchService : IGameLaunchService
                 if (File.Exists(tomlPath))
                 {
                     var text = File.ReadAllText(tomlPath);
+                    bool changed = false;
+
                     if (text.Contains("offlineMode = false"))
                     {
                         text = text.Replace("offlineMode = false", "offlineMode = true");
+                        changed = true;
+                    }
+                    if (text.Contains("dialtoneHostEnabled = true"))
+                    {
+                        text = text.Replace("dialtoneHostEnabled = true", "dialtoneHostEnabled = false");
+                        changed = true;
+                    }
+                    if (text.Contains("dialtonePlayerEnabled = true"))
+                    {
+                        text = text.Replace("dialtonePlayerEnabled = true", "dialtonePlayerEnabled = false");
+                        changed = true;
+                    }
+                    if (text.Contains("loginReadyTimeoutMs = 15000"))
+                    {
+                        text = text.Replace("loginReadyTimeoutMs = 15000", "loginReadyTimeoutMs = 45000");
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
                         File.WriteAllText(tomlPath, text, new UTF8Encoding(false));
-                        LogLauncherEvent($"[CONFIG] Обновлен {tomlPath}: offlineMode = true");
+                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, dialtone=false, timeout=45s)");
                     }
                 }
             }
