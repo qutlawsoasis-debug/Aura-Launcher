@@ -284,32 +284,61 @@ public class FabricGameLaunchService : IGameLaunchService
             else
             {
                 var existingText = File.ReadAllText(lspPath);
-                if (!existingText.Contains("\"defaultPort\": 25565") || !existingText.Contains("\"enablePreference\": true"))
+                try
                 {
-                    try
+                    var doc = System.Text.Json.Nodes.JsonNode.Parse(existingText)?.AsObject();
+                    if (doc != null)
                     {
-                        var doc = System.Text.Json.Nodes.JsonNode.Parse(existingText)?.AsObject();
-                        if (doc != null)
+                        bool changed = false;
+                        if (doc["enablePreference"]?.GetValue<bool>() != true) { doc["enablePreference"] = true; changed = true; }
+                        if (doc["defaultPort"]?.GetValue<int>() != 25565) { doc["defaultPort"] = 25565; changed = true; }
+                        if (doc["onlineMode"]?.GetValue<bool>() != false) { doc["onlineMode"] = false; changed = true; }
+
+                        if (changed)
                         {
-                            doc["enablePreference"] = true;
-                            doc["defaultPort"] = 25565;
                             File.WriteAllText(lspPath, doc.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
-                            LogLauncherEvent($"[CONFIG] Обновлен lsp.json для принудительного порта 25565: {lspPath}");
+                            LogLauncherEvent($"[CONFIG] Обновлен lsp.json (onlineMode: false, port 25565): {lspPath}");
                         }
                     }
-                    catch
-                    {
-                        var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
-                        File.WriteAllText(lspPath, content, new UTF8Encoding(false));
-                        LogLauncherEvent($"[CONFIG] Перезаписан поврежденный lsp.json: {lspPath}");
-                    }
+                }
+                catch
+                {
+                    var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
+                    File.WriteAllText(lspPath, content, new UTF8Encoding(false));
+                    LogLauncherEvent($"[CONFIG] Перезаписан поврежденный lsp.json: {lspPath}");
                 }
             }
+
+            EnsureE4allConfig(configDir);
         }
         catch (Exception ex)
         {
             LogLauncherEvent($"[CONFIG: ERROR] Ошибка создания lsp.json: {ex.Message}");
         }
+    }
+
+    private static void EnsureE4allConfig(string configDir)
+    {
+        try
+        {
+            var e4allDirs = new[] { configDir, Path.Combine(configDir, "e4all") };
+            foreach (var dir in e4allDirs)
+            {
+                Directory.CreateDirectory(dir);
+                var tomlPath = Path.Combine(dir, "e4all.toml");
+                if (File.Exists(tomlPath))
+                {
+                    var text = File.ReadAllText(tomlPath);
+                    if (text.Contains("offlineMode = false"))
+                    {
+                        text = text.Replace("offlineMode = false", "offlineMode = true");
+                        File.WriteAllText(tomlPath, text, new UTF8Encoding(false));
+                        LogLauncherEvent($"[CONFIG] Обновлен {tomlPath}: offlineMode = true");
+                    }
+                }
+            }
+        }
+        catch { }
     }
 
     /// <summary>

@@ -219,32 +219,25 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=32M"
             },
-            ShaderPack = "DERCODE_2.2.zip",
+            ShaderPack = "ComplementaryUnbound_r5.9.3.zip",
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["profile"] = "DER25",
-                ["PARALLAX"] = "true",
-                ["PARALLAX_SHADOW"] = "true",
-                ["PARALLAX_QUALITY"] = "32",
-                ["PARALLAX_DEPTH"] = "0.2",
-                ["PARALLAX_SAMPLES"] = "60",
-                ["PARALLAX_REFINEMENT"] = "true",
-                ["SPECULAR_MAP"] = "true",
-                ["IPBR_ENABLED"] = "true",
-                ["IPBR_FORCE_REFLECTIONS"] = "true",
-                ["IPBR_RESOLUTION"] = "32",
-                ["MOD_BLOCK_SUPPORT"] = "true",
-                ["GI_ENABLED"] = "true",
-                ["GI_SPECULAR"] = "true",
-                ["VOLUMETRIC_CLOUDS"] = "true",
-                ["VOLUMETRIC_FOG"] = "true",
-                ["FORCE_WET_EFFECT"] = "true",
-                ["WATER_PARALLAX"] = "true",
-                ["WATER_CAUSTICS"] = "true",
-                ["WATER_STYLE"] = "4",
-                ["shadowMapResolution"] = "2048",
-                ["shadowDistance"] = "192.0"
+                ["profile"] = "ULTRA",
+                ["SHADOW_QUALITY"] = "2",
+                ["shadowDistance"] = "224.0",
+                ["WATER_REFLECT_QUALITY"] = "2",
+                ["BLOCK_REFLECT_QUALITY"] = "3",
+                ["LIGHTSHAFT_QUALI_DEFINE"] = "2",
+                ["SSAO_QUALI_DEFINE"] = "2",
+                ["FXAA_DEFINE"] = "1",
+                ["DETAIL_QUALITY"] = "3",
+                ["CLOUD_QUALITY"] = "3",
+                ["ANISOTROPIC_FILTER"] = "8",
+                ["COLORED_LIGHTING"] = "256",
+                ["WORLD_SPACE_REFLECTIONS"] = "1",
+                ["ENTITY_SHADOW"] = "1",
+                ["RAIN_PUDDLES"] = "2"
             }
         };
     }
