@@ -336,14 +336,19 @@ public class FabricGameLaunchService : IGameLaunchService
                         text = text.Replace("offlineMode = false", "offlineMode = true");
                         changed = true;
                     }
-                    if (text.Contains("dialtoneHostEnabled = false"))
+                    if (text.Contains("dialtoneHostEnabled = true"))
                     {
-                        text = text.Replace("dialtoneHostEnabled = false", "dialtoneHostEnabled = true");
+                        text = text.Replace("dialtoneHostEnabled = true", "dialtoneHostEnabled = false");
                         changed = true;
                     }
-                    if (text.Contains("dialtonePlayerEnabled = false"))
+                    if (text.Contains("dialtonePlayerEnabled = true"))
                     {
-                        text = text.Replace("dialtonePlayerEnabled = false", "dialtonePlayerEnabled = true");
+                        text = text.Replace("dialtonePlayerEnabled = true", "dialtonePlayerEnabled = false");
+                        changed = true;
+                    }
+                    if (text.Contains("voiceP2PEnabled = true"))
+                    {
+                        text = text.Replace("voiceP2PEnabled = true", "voiceP2PEnabled = false");
                         changed = true;
                     }
                     if (text.Contains("loginReadyTimeoutMs = 15000"))
@@ -355,7 +360,7 @@ public class FabricGameLaunchService : IGameLaunchService
                     if (changed)
                     {
                         File.WriteAllText(tomlPath, text, new UTF8Encoding(false));
-                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, dialtone=true, timeout=45s)");
+                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, dialtone=false, voice=false, timeout=45s)");
                     }
                 }
             }
