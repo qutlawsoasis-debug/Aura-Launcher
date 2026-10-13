@@ -319,6 +319,11 @@ public class FabricGameLaunchService : IGameLaunchService
 
     private static void EnsureE4allConfig(string configDir)
     {
+        if (!LobbyService.UseE4allTunnel)
+        {
+            return;
+        }
+
         try
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);

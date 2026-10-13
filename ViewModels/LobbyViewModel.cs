@@ -415,7 +415,10 @@ public class LobbyViewModel : ObservableObject
         // Подписка на события лога игры хоста
         _worldWatcher.WorldOpened += OnLanWorldOpened;
         _worldWatcher.WorldClosed += OnLanWorldClosed;
-        _worldWatcher.DomainAssigned += OnLanDomainAssigned;
+        if (LobbyService.UseE4allTunnel)
+        {
+            _worldWatcher.DomainAssigned += OnLanDomainAssigned;
+        }
 
         // Подписка на изменение статуса туннеля
         if (_tunnelProvider != null)
@@ -758,9 +761,7 @@ public class LobbyViewModel : ObservableObject
             {
                 _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-                /*
-                // Playit tunnel configuration archived in favor of P2P (e4all/e4mc):
-                if (_lobbyService is LobbyService || _lobbyApiClient != null || _tunnelProvider is PlayitTunnelProvider)
+                if (!LobbyService.UseE4allTunnel)
                 {
                     PlayitTunnelProvider.PurgeLegacyLocalSecrets();
 
@@ -772,39 +773,31 @@ public class LobbyViewModel : ObservableObject
                         playit = new PlayitTunnelProvider(null, toolsDir);
                     }
 
-                    HasPersonalTunnel = playit.HasPersonalSecret;
+                    HasPersonalTunnel = false;
 
-                    if (playit.HasPersonalSecret)
+                    StatusText = "Получение конфигурации сервера...";
+                    PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api...");
+
+                    var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
+                    var cfg = await client.GetTunnelConfigAsync();
+
+                    if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
                     {
-                        PlayitTunnelProvider.LogTunnel("[LOBBY] У хоста есть персональный туннель playit (сессия изолирована, нет коллизий).");
+                        PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
+                        playit.SetSecret(cfg.Secret);
+                        if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
+                        if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
                     }
                     else
                     {
-                        StatusText = "Получение конфигурации сервера...";
-                        PlayitTunnelProvider.LogTunnel("Requesting /api/tunnel-config from lobby-api (fallback)...");
-
-                        var client = _lobbyApiClient ?? new LobbyApiClient(null, _configService.CurrentConfig?.LobbyApiBaseUrl ?? "https://lobby-api.vercel.app", _configService);
-                        var cfg = await client.GetTunnelConfigAsync();
-
-                        if (cfg != null && !string.IsNullOrWhiteSpace(cfg.Secret))
-                        {
-                            PlayitTunnelProvider.LogTunnel("Tunnel configuration received from /api/tunnel-config.");
-                            playit.SetSecret(cfg.Secret);
-                            if (!string.IsNullOrWhiteSpace(cfg.PublicAddress)) playit.PublicHost = cfg.PublicAddress;
-                            if (cfg.PublicPort.HasValue) playit.PublicPort = cfg.PublicPort.Value;
-                        }
-                        else
-                        {
-                            PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
-                            StatusText = "Ошибка получения конфигурации туннеля";
-                            StatusIcon = string.Empty;
-                            ShowTunnelFailedLogButton = true;
-                            TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
-                            return null;
-                        }
+                        PlayitTunnelProvider.LogTunnel("[ERROR] Failed to fetch tunnel configuration from server (GET /api/tunnel-config).");
+                        StatusText = "Ошибка получения конфигурации туннеля";
+                        StatusIcon = string.Empty;
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = "Не удалось получить конфигурацию туннеля с сервера (GET /api/tunnel-config).";
+                        return null;
                     }
                 }
-                */
 
                 var hostName = _configService.CurrentConfig?.Nickname ?? "Player";
 
@@ -986,12 +979,28 @@ public class LobbyViewModel : ObservableObject
             bool isGameRunning = _launchService.IsGameRunning;
             _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: isGameRunning);
 
-            // Если в watcher уже был перехвачен домен:
-            if (isGameRunning && !string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
+            if (isGameRunning)
             {
-                _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
-                _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain);
-                return;
+                if (LobbyService.UseE4allTunnel)
+                {
+                    // Если в watcher уже был перехвачен домен:
+                    if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
+                    {
+                        _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
+                        _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain);
+                        return;
+                    }
+                }
+                else
+                {
+                    // Проверяем, возможно мир уже был открыт для сети на порту 25565
+                    bool alreadyListening = await PlayitTunnelProvider.TestTcpConnectAsync("127.0.0.1", 25565, 500, CancellationToken.None);
+                    if (alreadyListening)
+                    {
+                        OnLanWorldOpened(25565);
+                        return;
+                    }
+                }
             }
 
             HostStatusText = "Ожидание открытия мира...";
@@ -1019,6 +1028,7 @@ public class LobbyViewModel : ObservableObject
 
     private void OnLanDomainAssigned(string domain)
     {
+        if (!LobbyService.UseE4allTunnel) return;
         if (string.IsNullOrWhiteSpace(domain)) return;
         _domainTcs?.TrySetResult(domain);
 
@@ -1038,42 +1048,96 @@ public class LobbyViewModel : ObservableObject
             {
                 if (IsWorldOpen) return;
 
-                string? domain = _worldWatcher.CurrentDomain;
-                if (string.IsNullOrWhiteSpace(domain) && _domainTcs != null)
+                if (port != 25565)
                 {
-                    Dispatch(() =>
-                    {
-                        HostStatusText = "Ожидание адреса e4mc...";
-                        StatusText = "Мир открыт в сети. Ожидание назначения P2P-адреса...";
-                    });
-
-                    var completedTask = await Task.WhenAny(_domainTcs.Task, Task.Delay(TimeSpan.FromSeconds(15)));
-                    if (completedTask == _domainTcs.Task)
-                    {
-                        domain = await _domainTcs.Task;
-                    }
-                }
-
-                if (string.IsNullOrWhiteSpace(domain))
-                {
-                    domain = _worldWatcher.CurrentDomain;
-                }
-
-                if (!string.IsNullOrWhiteSpace(domain))
-                {
-                    await CompleteHostOpenWorldAsync(domain, port);
-                }
-                else
-                {
-                    var msg = "Не удалось получить адрес e4mc из лога игры за 15 секунд. Убедитесь, что мод e4all установлен.";
+                    var msg = $"Мир открыт на порту {port}, а нужен 25565";
                     PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
                     Dispatch(() =>
                     {
-                        HostStatusText = "Ошибка e4mc";
+                        HostStatusText = "Неверный порт мира";
                         StatusText = msg;
                         StatusIcon = string.Empty;
                         ShowTunnelFailedLogButton = true;
                         TunnelFailureReason = msg;
+                    });
+                    return;
+                }
+
+                if (LobbyService.UseE4allTunnel)
+                {
+                    string? domain = _worldWatcher.CurrentDomain;
+                    if (string.IsNullOrWhiteSpace(domain) && _domainTcs != null)
+                    {
+                        Dispatch(() =>
+                        {
+                            HostStatusText = "Ожидание адреса e4mc...";
+                            StatusText = "Мир открыт в сети. Ожидание назначения P2P-адреса...";
+                        });
+
+                        var completedTask = await Task.WhenAny(_domainTcs.Task, Task.Delay(TimeSpan.FromSeconds(15)));
+                        if (completedTask == _domainTcs.Task)
+                        {
+                            domain = await _domainTcs.Task;
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(domain))
+                    {
+                        domain = _worldWatcher.CurrentDomain;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(domain))
+                    {
+                        await CompleteHostOpenWorldAsync(domain, port);
+                    }
+                    else
+                    {
+                        var msg = "Не удалось получить адрес e4mc из лога игры за 15 секунд. Убедитесь, что мод e4all установлен.";
+                        PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
+                        Dispatch(() =>
+                        {
+                            HostStatusText = "Ошибка e4mc";
+                            StatusText = msg;
+                            StatusIcon = string.Empty;
+                            ShowTunnelFailedLogButton = true;
+                            TunnelFailureReason = msg;
+                        });
+                    }
+                    return;
+                }
+
+                // Playit tunnel flow (v1.2.103):
+                Dispatch(() =>
+                {
+                    HostStatusText = "Мир открыт на порту 25565! Подключение туннеля...";
+                });
+
+                var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565);
+                if (success)
+                {
+                    Dispatch(() =>
+                    {
+                        IsWorldOpen = true;
+                        HostStatusText = "Лобби открыто!";
+                        StatusText = "Мир готов, друзья могут подключаться";
+                        StatusIcon = string.Empty;
+                        ShowTunnelFailedLogButton = false;
+                        TunnelFailureReason = null;
+                        OnPropertyChanged(nameof(HostActionHintText));
+                        _notificationService?.Notify("Мир открыт для друзей", "Туннель запущен. Друзья могут подключаться!", "Lobby");
+                    });
+                }
+                else
+                {
+                    var reason = _tunnelProvider?.CurrentInfo.ErrorMessage ?? "Туннель playit не смог запуститься или подтвердить подключение.";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] HostOpenWorldAsync returned false: {reason}");
+                    Dispatch(() =>
+                    {
+                        HostStatusText = "Ошибка туннеля";
+                        StatusText = $"Туннель не поднялся: {reason}";
+                        StatusIcon = string.Empty;
+                        ShowTunnelFailedLogButton = true;
+                        TunnelFailureReason = reason;
                     });
                 }
             }
@@ -1237,40 +1301,40 @@ public class LobbyViewModel : ObservableObject
 
             if (IsWorldOpen && _tunnelProvider != null)
             {
-                /*
-                // Playit tunnel reconnect archived in favor of P2P (e4all/e4mc):
-                _ = Task.Run(async () =>
+                if (!LobbyService.UseE4allTunnel)
                 {
-                    for (int retry = 1; retry <= 10; retry++)
+                    _ = Task.Run(async () =>
                     {
-                        await Task.Delay(4000);
-                        if (!_lobbyService.IsHost || !IsInLobby || !IsWorldOpen || _tunnelProvider == null) return;
-                        if (_tunnelProvider.CurrentInfo.Status == TunnelStatus.Active) return;
-
-                        try
+                        for (int retry = 1; retry <= 10; retry++)
                         {
-                            PlayitTunnelProvider.LogTunnel($"[LOBBY] Background tunnel reconnect attempt {retry}/10...");
-                            var res = await _tunnelProvider.StartAsync(25565, CancellationToken.None);
-                            if (res.Status == TunnelStatus.Active)
+                            await Task.Delay(4000);
+                            if (!_lobbyService.IsHost || !IsInLobby || !IsWorldOpen || _tunnelProvider == null) return;
+                            if (_tunnelProvider.CurrentInfo.Status == TunnelStatus.Active) return;
+
+                            try
                             {
-                                Dispatch(() =>
+                                PlayitTunnelProvider.LogTunnel($"[LOBBY] Background tunnel reconnect attempt {retry}/10...");
+                                var res = await _tunnelProvider.StartAsync(25565, CancellationToken.None);
+                                if (res.Status == TunnelStatus.Active)
                                 {
-                                    HostStatusText = "Лобби открыто!";
-                                    StatusText = "Мир готов, друзья могут подключаться";
-                                    StatusIcon = string.Empty;
-                                    ShowTunnelFailedLogButton = false;
-                                    TunnelFailureReason = null;
-                                });
-                                return;
+                                    Dispatch(() =>
+                                    {
+                                        HostStatusText = "Лобби открыто!";
+                                        StatusText = "Мир готов, друзья могут подключаться";
+                                        StatusIcon = string.Empty;
+                                        ShowTunnelFailedLogButton = false;
+                                        TunnelFailureReason = null;
+                                    });
+                                    return;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] Background tunnel reconnect failed: {ex.Message}");
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            PlayitTunnelProvider.LogTunnel($"[EXCEPTION] Background tunnel reconnect failed: {ex.Message}");
-                        }
-                    }
-                });
-                */
+                    });
+                }
                 return;
             }
 

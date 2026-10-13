@@ -256,9 +256,18 @@ public class PlayitTunnelProvider : ITunnelProvider
         SavePersonalSecret(rawSecret);
     }
 
+    /// <summary>
+    /// Флаг разрешения личной привязки playit. По умолчанию false (серверный секрет из /api/tunnel-config, как в v1.2.103).
+    /// </summary>
+    public static bool AllowPersonalTunnel { get; set; } = false;
+
     public string? LoadSecret()
     {
-        return LoadPersonalSecret() ?? InMemorySecret;
+        if (AllowPersonalTunnel)
+        {
+            return LoadPersonalSecret() ?? InMemorySecret;
+        }
+        return InMemorySecret;
     }
 
     public static void LogTunnel(string message)
@@ -794,22 +803,29 @@ public class PlayitTunnelProvider : ITunnelProvider
                 return _currentInfo;
             }
 
-            // Динамически определяем фактический уникальный адрес туннеля через ResolveTunnelAddressAsync
-            var resolved = await ResolveTunnelAddressAsync(ct);
             string publicHost;
             int publicPort;
 
-            if (!string.IsNullOrWhiteSpace(resolved.Host) && resolved.Port.HasValue)
+            if (AllowPersonalTunnel)
             {
-                publicHost = resolved.Host;
-                publicPort = resolved.Port.Value;
-                LogTunnel($"[PLAYIT] Использован динамический адрес туннеля: {publicHost}:{publicPort}");
+                var resolved = await ResolveTunnelAddressAsync(ct);
+                if (!string.IsNullOrWhiteSpace(resolved.Host) && resolved.Port.HasValue)
+                {
+                    publicHost = resolved.Host;
+                    publicPort = resolved.Port.Value;
+                    LogTunnel($"[PLAYIT] Использован динамический адрес туннеля: {publicHost}:{publicPort}");
+                }
+                else
+                {
+                    publicHost = PublicHost;
+                    publicPort = PublicPort;
+                    LogTunnel($"[PLAYIT: WARN] Не удалось определить динамический адрес, используется fallback: {publicHost}:{publicPort}");
+                }
             }
             else
             {
                 publicHost = PublicHost;
                 publicPort = PublicPort;
-                LogTunnel($"[PLAYIT: WARN] Не удалось определить динамический адрес, используется fallback: {publicHost}:{publicPort}");
             }
 
             _runtimeRestartCount = 0;

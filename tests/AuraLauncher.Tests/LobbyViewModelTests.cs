@@ -392,6 +392,38 @@ public class LobbyViewModelTests
     [Fact]
     public async Task Host_DomainAssigned_OpensWorldWithAssignedDomain()
     {
+        LobbyService.UseE4allTunnel = true;
+        try
+        {
+            var mockLobby = new MockLobbyService();
+            var configService = new TestConfigService(System.IO.Path.GetTempPath());
+            var launchService = new TestLaunchService();
+            var watcher = new LanWorldWatcher();
+            var vm = new LobbyViewModel(mockLobby, launchService, configService, worldWatcher: watcher);
+
+            await vm.CreateLobbyCommand.ExecuteAsync(null);
+            Assert.False(vm.IsWorldOpen);
+
+            // Симулируем события latest.log из Minecraft + e4all
+            watcher.ProcessLine("[19:45:47] [Render thread/INFO]: Started serving on 49152");
+            watcher.ProcessLine("[19:46:00] [Server thread/INFO]: e4all: Domain assigned: test-p2p.e4mc.link");
+
+            await Task.Delay(150);
+
+            Assert.True(vm.IsWorldOpen);
+            Assert.Equal("test-p2p.e4mc.link", mockLobby.CurrentTunnelAddress);
+            Assert.Contains("test-p2p.e4mc.link", vm.StatusText);
+        }
+        finally
+        {
+            LobbyService.UseE4allTunnel = false;
+        }
+    }
+
+    [Fact]
+    public async Task Host_DomainAssigned_WhenUseE4allTunnelFalse_DoesNothing()
+    {
+        LobbyService.UseE4allTunnel = false;
         var mockLobby = new MockLobbyService();
         var configService = new TestConfigService(System.IO.Path.GetTempPath());
         var launchService = new TestLaunchService();
@@ -401,15 +433,11 @@ public class LobbyViewModelTests
         await vm.CreateLobbyCommand.ExecuteAsync(null);
         Assert.False(vm.IsWorldOpen);
 
-        // Симулируем события latest.log из Minecraft + e4all
-        watcher.ProcessLine("[19:45:47] [Render thread/INFO]: Started serving on 49152");
         watcher.ProcessLine("[19:46:00] [Server thread/INFO]: e4all: Domain assigned: test-p2p.e4mc.link");
-
         await Task.Delay(150);
 
-        Assert.True(vm.IsWorldOpen);
-        Assert.Equal("test-p2p.e4mc.link", mockLobby.CurrentTunnelAddress);
-        Assert.Contains("test-p2p.e4mc.link", vm.StatusText);
+        Assert.False(vm.IsWorldOpen);
+        Assert.Null(mockLobby.CurrentTunnelAddress);
     }
 
     [Fact]

@@ -110,6 +110,12 @@ public class LobbyService : ILobbyService, IDisposable
         return CurrentLobbyCode;
     }
 
+    /// <summary>
+    /// Флаг использования P2P туннеля e4all/e4mc вместо официального PlayitTunnelProvider.
+    /// По умолчанию выключен (false): используется стабильный Playit 0.15.26.
+    /// </summary>
+    public static bool UseE4allTunnel { get; set; } = false;
+
     public async Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, int localPort = 25565, CancellationToken cancellationToken = default)
     {
         if (!IsHost || string.IsNullOrWhiteSpace(CurrentLobbyCode) || string.IsNullOrWhiteSpace(CurrentHostToken))
@@ -124,7 +130,7 @@ public class LobbyService : ILobbyService, IDisposable
                                 string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
 
             string tunnelAddr;
-            if (!string.IsNullOrWhiteSpace(customTunnelAddress))
+            if (UseE4allTunnel && !string.IsNullOrWhiteSpace(customTunnelAddress))
             {
                 tunnelAddr = customTunnelAddress;
             }
@@ -134,10 +140,13 @@ public class LobbyService : ILobbyService, IDisposable
             }
             else
             {
-                PlayitTunnelProvider.LogTunnel("[HOST-OPEN: ERROR] P2P tunnel address (e4mc/e4all) is required. Playit flow is disabled.");
-                return false;
-                /*
-                // Playit tunnel provider branch archived in favor of P2P (e4all/e4mc):
+                bool tcpOk = await CheckLocalTcpPortAsync("127.0.0.1", localPort, timeoutMs: 3000, cancellationToken);
+                if (!tcpOk)
+                {
+                    PlayitTunnelProvider.LogTunnel($"[HOST-OPEN: ERROR] Local TCP connect to 127.0.0.1:{localPort} failed. World is not open or not accepting connections.");
+                    return false;
+                }
+
                 var tunnelResult = await _tunnelProvider.StartAsync(localPort, cancellationToken);
                 if (tunnelResult.Status != TunnelStatus.Active || string.IsNullOrWhiteSpace(tunnelResult.PublicAddress))
                 {
@@ -154,7 +163,6 @@ public class LobbyService : ILobbyService, IDisposable
                 tunnelAddr = tunnelResult.PublicPort.HasValue 
                     ? $"{tunnelResult.PublicAddress}:{tunnelResult.PublicPort.Value}" 
                     : tunnelResult.PublicAddress;
-                */
             }
 
             PlayitTunnelProvider.LogTunnel($"[HOST-OPEN] Registering tunnel address '{tunnelAddr}' in lobby-api for code {CurrentLobbyCode}...");
