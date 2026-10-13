@@ -1041,8 +1041,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        BgImageNext.Source = nextImage;
+        BgImageNext.BeginAnimation(UIElement.OpacityProperty, null);
         BgImageNext.Opacity = 0.0;
+        BgImageNext.Source = nextImage;
 
         var anim = new DoubleAnimation
         {
@@ -1055,6 +1056,7 @@ public partial class MainWindow : Window
         anim.Completed += (s, e) =>
         {
             BgImageCurrent.Source = nextImage;
+            BgImageNext.BeginAnimation(UIElement.OpacityProperty, null);
             BgImageNext.Opacity = 0.0;
             BgImageNext.Source = null;
         };

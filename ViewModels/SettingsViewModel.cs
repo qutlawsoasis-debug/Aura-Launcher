@@ -35,9 +35,7 @@ public class SettingsViewModel : ObservableObject
     private bool _isCheckingIntegrity;
     private string _integrityStatusText = string.Empty;
     private CancellationTokenSource? _debounceCts;
-    // Cooldown for background change to prevent rapid spamming
-    private readonly TimeSpan _backgroundSwitchCooldown = TimeSpan.FromMilliseconds(300);
-    private DateTime _lastBackgroundSwitch = DateTime.MinValue;
+    private bool _isChangingBackground;
     private string _errorMessage = string.Empty;
     private string _nickname = string.Empty;
     private string _nicknameErrorText = string.Empty;
@@ -66,7 +64,7 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
-    public AsyncRelayCommand NextBackgroundCommand { get; }
+    public RelayCommand NextBackgroundCommand { get; }
 
     public string Nickname
     {
@@ -567,12 +565,23 @@ public class SettingsViewModel : ObservableObject
 
         CheckIntegrityCommand = new AsyncRelayCommand(CheckIntegrityAsync, () => !IsCheckingIntegrity);
 
-        NextBackgroundCommand = new AsyncRelayCommand(async () =>
+        NextBackgroundCommand = new RelayCommand(async () =>
         {
-            var now = DateTime.UtcNow;
-            if (now - _lastBackgroundSwitch < _backgroundSwitchCooldown) return;
-            _lastBackgroundSwitch = now;
-            _backgroundService?.NextBackground();
+            if (_isChangingBackground) return;
+            _isChangingBackground = true;
+            try
+            {
+                await Task.Delay(1000);
+                _backgroundService?.NextBackground();
+                await Task.Delay(1200);
+            }
+            catch
+            {
+            }
+            finally
+            {
+                _isChangingBackground = false;
+            }
         });
 
         OpenSendReportCommand = new RelayCommand(_ =>
