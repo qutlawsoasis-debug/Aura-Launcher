@@ -2087,6 +2087,7 @@ public class MainViewModel : ObservableObject
                     using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
                     using var client = new HttpClient();
                     client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("AuraLauncher", "1.0"));
+                    client.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
                     string manifestUrl = $"https://raw.githubusercontent.com/{repo}/{PackUpdateService.DefaultBranch}/manifest.json?t={DateTime.UtcNow.Ticks}";
                     var resp = await client.GetAsync(manifestUrl, cts.Token);
                     if (resp.IsSuccessStatusCode)
@@ -2096,8 +2097,30 @@ public class MainViewModel : ObservableObject
                         if (doc.RootElement.TryGetProperty("packVersion", out var pvElem))
                         {
                             var remoteVersion = pvElem.GetString();
-                            if (!string.IsNullOrWhiteSpace(remoteVersion) && !string.Equals(remoteVersion, currentState.PackVersion, StringComparison.Ordinal))
+                            if (!string.IsNullOrWhiteSpace(remoteVersion) &&
+                                string.CompareOrdinal(remoteVersion, currentState.PackVersion) > 0)
                             {
+                                var remoteManifest = PackUpdateService.ParseAndValidateManifest(json, gameDir);
+                                if (AreManifestFilesAlreadySynced(gameDir, remoteManifest))
+                                {
+                                    PackState.SaveState(new PackState
+                                    {
+                                        PackVersion = remoteManifest.PackVersion,
+                                        GameDir = Path.GetFullPath(gameDir),
+                                        Minecraft = remoteManifest.Minecraft,
+                                        FabricLoader = remoteManifest.FabricLoader,
+                                        InstalledAtUtc = DateTime.UtcNow,
+                                        ManagedServers = currentState.ManagedServers ?? new System.Collections.Generic.List<string>()
+                                    });
+                                    OverviewVM.RefreshStats();
+                                    if (!IsUpdateBannerVisible && !_isLauncherUpdatePending)
+                                    {
+                                        ClearUpdateNotice();
+                                        _lastNotifiedPackUpdateVersion = null;
+                                    }
+                                    return;
+                                }
+
                                 _isLauncherUpdatePending = false;
                                 UpdateBannerTitle = "Обновление сборки";
                                 UpdateBannerMessage = $"Доступны новые моды или файлы сборки ({remoteVersion}).";
@@ -2133,6 +2156,48 @@ public class MainViewModel : ObservableObject
         catch
         {
             // Фоновая проверка не должна мешать пользователю
+        }
+    }
+
+    private static bool AreManifestFilesAlreadySynced(string gameDir, ManifestModel manifest)
+    {
+        try
+        {
+            var normalizedGameDir = Path.GetFullPath(gameDir);
+            foreach (var file in manifest.Files)
+            {
+                var localPath = Path.Combine(normalizedGameDir, file.Path.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(localPath)) return false;
+                if (file.Mode == "sync")
+                {
+                    var fi = new FileInfo(localPath);
+                    if (fi.Length != file.Size) return false;
+                }
+            }
+
+            var modsDir = Path.Combine(normalizedGameDir, "mods");
+            if (Directory.Exists(modsDir))
+            {
+                var manifestJars = new System.Collections.Generic.HashSet<string>(
+                    manifest.Files
+                        .Where(f => f.Path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase) && f.Path.EndsWith(".jar", StringComparison.OrdinalIgnoreCase))
+                        .Select(f => Path.GetFileName(f.Path)),
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var jar in Directory.GetFiles(modsDir, "*.jar", SearchOption.TopDirectoryOnly))
+                {
+                    if (!manifestJars.Contains(Path.GetFileName(jar)))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

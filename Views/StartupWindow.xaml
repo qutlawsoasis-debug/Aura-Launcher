@@ -57,8 +57,7 @@
             <Image Source="{StaticResource WorldBackgroundBitmap}"
                    Stretch="UniformToFill"
                    HorizontalAlignment="Center"
-                   VerticalAlignment="Top"
-                   Height="280"
+                   VerticalAlignment="Stretch"
                    Opacity="0.45"
                    RenderOptions.BitmapScalingMode="HighQuality" />
 

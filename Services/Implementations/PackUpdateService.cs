@@ -138,6 +138,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Get, manifestUrl);
+            req.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
             using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ctsManifest.Token).ConfigureAwait(false);
 
             if (resp.StatusCode == HttpStatusCode.NotFound)
@@ -269,6 +270,21 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 Status = PackUpdateStatus.Failed,
                 Message = "Сборка для другой версии Minecraft",
                 Duration = sw.Elapsed
+            };
+        }
+
+        // Защита от отката при возврате устаревшего кеша CDN (raw.githubusercontent.com)
+        if (isInstalled && !forceFullCheck && currentState != null &&
+            !string.IsNullOrWhiteSpace(currentState.PackVersion) &&
+            string.CompareOrdinal(manifest.PackVersion, currentState.PackVersion) < 0)
+        {
+            return new PackUpdateResult
+            {
+                Status = PackUpdateStatus.UpToDate,
+                Message = "Установлена последняя версия сборки",
+                FilesChanged = 0,
+                Duration = sw.Elapsed,
+                Servers = manifest.Servers
             };
         }
 

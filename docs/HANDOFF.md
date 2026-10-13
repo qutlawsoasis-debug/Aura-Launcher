@@ -10,7 +10,7 @@
   - Хранилище: Upstash Redis (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) + `PLAYIT_SECRET` для playit.gg туннеля.
 - **Сборка модов (`Aura-Pack`)**: `C:\Users\magne\Documents\GitHub\Aura-Pack`
   - GitHub: `https://github.com/qutlawsoasis-debug/Aura-Pack`
-  - Текущий `packVersion` в `manifest.json`: **`20261009.1806`** (Minecraft 1.20.1, Fabric 0.19.5).
+  - Текущий `packVersion` в `manifest.json`: **`20261013.0148`** (Minecraft 1.20.1, Fabric 0.19.5).
 
 ---
 

@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Win32;
 using AuraLauncher.Core;
 using AuraLauncher.Models;
+
 using AuraLauncher.Services.Interfaces;
 
 namespace AuraLauncher.ViewModels;
@@ -34,6 +35,9 @@ public class SettingsViewModel : ObservableObject
     private bool _isCheckingIntegrity;
     private string _integrityStatusText = string.Empty;
     private CancellationTokenSource? _debounceCts;
+    // Cooldown for background change to prevent rapid spamming
+    private readonly TimeSpan _backgroundSwitchCooldown = TimeSpan.FromMilliseconds(300);
+    private DateTime _lastBackgroundSwitch = DateTime.MinValue;
     private string _errorMessage = string.Empty;
     private string _nickname = string.Empty;
     private string _nicknameErrorText = string.Empty;
@@ -62,7 +66,7 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
-    public RelayCommand NextBackgroundCommand { get; }
+    public AsyncRelayCommand NextBackgroundCommand { get; }
 
     public string Nickname
     {
@@ -478,8 +482,16 @@ public class SettingsViewModel : ObservableObject
     {
         get
         {
-            var state = PackState.LoadValidState(_configService.CurrentConfig.GameDir);
-            return !string.IsNullOrWhiteSpace(state?.PackVersion) ? state.PackVersion : "—";
+            // Show the launcher (product) version – read from version.json next to the exe
+            var exePath = System.IO.Path.GetDirectoryName(System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName);
+            var jsonPath = System.IO.Path.Combine(exePath ?? string.Empty, "version.json");
+            if (System.IO.File.Exists(jsonPath))
+            {
+                var doc = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(jsonPath));
+                if (doc.RootElement.TryGetProperty("userFacingVersion", out var uv))
+                    return uv.GetString() ?? "—";
+            }
+            return "—";
         }
     }
 
@@ -555,8 +567,11 @@ public class SettingsViewModel : ObservableObject
 
         CheckIntegrityCommand = new AsyncRelayCommand(CheckIntegrityAsync, () => !IsCheckingIntegrity);
 
-        NextBackgroundCommand = new RelayCommand(_ =>
+        NextBackgroundCommand = new AsyncRelayCommand(async () =>
         {
+            var now = DateTime.UtcNow;
+            if (now - _lastBackgroundSwitch < _backgroundSwitchCooldown) return;
+            _lastBackgroundSwitch = now;
             _backgroundService?.NextBackground();
         });
 
