@@ -40,7 +40,7 @@ public interface ILanWorldWatcher : IDisposable
     /// <summary>
     /// Запустить мониторинг указанного файла latest.log.
     /// </summary>
-    void Start(string logFilePath, bool readFromEnd = true);
+    void Start(string logFilePath, bool readFromEnd = true, bool scanRecentTail = false);
 
     /// <summary>
     /// Остановить мониторинг.

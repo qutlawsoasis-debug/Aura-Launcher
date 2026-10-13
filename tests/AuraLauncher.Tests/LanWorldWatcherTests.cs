@@ -191,6 +191,9 @@ public class LanWorldWatcherTests
     [InlineData("[19:46:00] [Server thread/INFO]: e4all: Domain assigned: quick-fox-42.e4mc.link", "quick-fox-42.e4mc.link")]
     [InlineData("[19:46:00] [Server thread/INFO]: Domain assigned: swift-bear-12.e4mc.link", "swift-bear-12.e4mc.link")]
     [InlineData("[19:46:00] [Render thread/INFO]: [CHAT] Local game hosted on domain [happy-panda-99.e4mc.link]", "happy-panda-99.e4mc.link")]
+    [InlineData("[19:46:00] [Render thread/INFO]: [System] [CHAT] Локальный сервер размещен на домене [margin-amusement.eu.e4mc.link]", "margin-amusement.eu.e4mc.link")]
+    [InlineData("[17:08:40] [Render thread/INFO]: [CHAT] Локальная игра размещена на домене [shabby-concierge.eu.e4mc.link]", "shabby-concierge.eu.e4mc.link")]
+    [InlineData("[17:40:51] [Render thread/INFO]: [CHAT] Сервер размещен на домене [name-chess.eu.e4mc.link]", "name-chess.eu.e4mc.link")]
     public void ProcessLine_DomainAssigned_SetsCurrentDomainAndFiresEvent(string logLine, string expectedDomain)
     {
         using var watcher = new LanWorldWatcher();
@@ -201,6 +204,36 @@ public class LanWorldWatcherTests
 
         Assert.Equal(expectedDomain, watcher.CurrentDomain);
         Assert.Equal(expectedDomain, assignedDomain);
+    }
+
+    [Fact]
+    public void Start_WithScanRecentTail_DetectsPreExistingWorldAndDomain()
+    {
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(tempFile, 
+                "[10:00:00] [Render thread/INFO]: Started serving on 25565\n" +
+                "[10:00:01] [Render thread/INFO]: [System] [CHAT] Локальный сервер размещен на домене [pre-open.eu.e4mc.link]\n");
+
+            using var watcher = new LanWorldWatcher();
+            int openedPort = 0;
+            string? domain = null;
+            watcher.WorldOpened += p => openedPort = p;
+            watcher.DomainAssigned += d => domain = d;
+
+            watcher.Start(tempFile, readFromEnd: true, scanRecentTail: true);
+
+            Assert.True(watcher.IsWorldOpen);
+            Assert.Equal(25565, watcher.CurrentPort);
+            Assert.Equal(25565, openedPort);
+            Assert.Equal("pre-open.eu.e4mc.link", watcher.CurrentDomain);
+            Assert.Equal("pre-open.eu.e4mc.link", domain);
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
     }
 
     [Fact]

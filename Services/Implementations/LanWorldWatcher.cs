@@ -25,13 +25,14 @@ public class LanWorldWatcher : ILanWorldWatcher
         @"Stopping singleplayer server|Stopping server|Stopping!",
         RegexOptions.Compiled);
 
-    // Строки назначения домена e4mc / e4all:
+    // Строки назначения домена e4mc / e4all (на английском и русском):
     // [Server thread/INFO]: e4all: Domain assigned: quick-fox-42.e4mc.link
     // Domain assigned: quick-fox-42.e4mc.link
     // Local game hosted on domain [quick-fox-42.e4mc.link]
+    // Локальный сервер размещен на домене [quick-fox-42.eu.e4mc.link]
     private static readonly Regex DomainAssignedRegex = new(
-        @"(?:Domain assigned:|e4all: Domain assigned:|Local game hosted on domain \[)\s*(?<domain>[a-zA-Z0-9\.\-_]+)",
-        RegexOptions.Compiled);
+        @"(?:Domain assigned:\s*|e4all: Domain assigned:\s*|hosted on domain\s*\[|размещен на домене\s*\[|размещена на домене\s*\[|домене\s*\[)\s*(?<domain>[a-zA-Z0-9\.\-_]+)|(?<domain>[a-zA-Z0-9\.\-_]+\.e4mc\.link)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private readonly object _stateLock = new();
     private string? _logFilePath;
@@ -48,7 +49,7 @@ public class LanWorldWatcher : ILanWorldWatcher
     public int? CurrentPort { get; private set; }
     public string? CurrentDomain { get; private set; }
 
-    public void Start(string logFilePath, bool readFromEnd = true)
+    public void Start(string logFilePath, bool readFromEnd = true, bool scanRecentTail = false)
     {
         if (string.IsNullOrWhiteSpace(logFilePath))
             throw new ArgumentNullException(nameof(logFilePath));
@@ -57,13 +58,22 @@ public class LanWorldWatcher : ILanWorldWatcher
         {
             StopInternal();
             _logFilePath = logFilePath;
-            _lastPosition = (readFromEnd && File.Exists(logFilePath)) ? new FileInfo(logFilePath).Length : 0;
             _lineBuffer.Clear();
             IsWorldOpen = false;
             CurrentPort = null;
             CurrentDomain = null;
 
-            PollLogFile();
+            if (scanRecentTail && File.Exists(logFilePath))
+            {
+                var fi = new FileInfo(logFilePath);
+                _lastPosition = Math.Max(0, fi.Length - 64 * 1024);
+                PollLogFile();
+            }
+            else
+            {
+                _lastPosition = (readFromEnd && File.Exists(logFilePath)) ? new FileInfo(logFilePath).Length : 0;
+                PollLogFile();
+            }
 
             _pollTimer = new Timer(_ => PollLogFile(), null, TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(250));
         }

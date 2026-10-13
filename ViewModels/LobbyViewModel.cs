@@ -850,6 +850,24 @@ public class LobbyViewModel : ObservableObject
                         UpdateStagePositions();
                     });
                     LobbyCreated?.Invoke();
+
+                    try
+                    {
+                        var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig?.GameDir);
+                        var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
+                        _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+                        _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: true);
+                        if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
+                        {
+                            _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
+                            _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        PlayitTunnelProvider.LogTunnel($"[WORLD-WATCHER] Failed to start log watcher upon lobby creation: {ex.Message}");
+                    }
+
                     return code;
                 }
                 else
@@ -964,7 +982,7 @@ public class LobbyViewModel : ObservableObject
             var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
             
             _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-            _worldWatcher.Start(logPath);
+            _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: true);
 
             // Если в watcher уже был перехвачен домен:
             if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
@@ -1080,7 +1098,7 @@ public class LobbyViewModel : ObservableObject
         await _hostOpenGate.WaitAsync();
         try
         {
-            if (IsWorldOpen) return;
+            if (IsWorldOpen && string.Equals(_lastTunnelAddress, domain, StringComparison.OrdinalIgnoreCase)) return;
 
             Dispatch(() =>
             {
@@ -1092,6 +1110,7 @@ public class LobbyViewModel : ObservableObject
             var success = await _lobbyService.HostOpenWorldAsync(customTunnelAddress: domain, localPort: localPort);
             if (success)
             {
+                _lastTunnelAddress = domain;
                 Dispatch(() =>
                 {
                     IsWorldOpen = true;
@@ -1671,6 +1690,8 @@ public class LobbyViewModel : ObservableObject
             _ = _serverListSyncService.RemoveActiveLobbyServerAsync(GetGameDir());
         }
 
+        _worldWatcher.Stop();
+        _lastTunnelAddress = null;
         IsLobbyCreated = false;
         IsWorldOpen = false;
         IsGuestJoined = false;
@@ -1684,6 +1705,7 @@ public class LobbyViewModel : ObservableObject
         GuestStatusText = "Введите 6-значный код лобби";
         StatusText = "Создайте лобби или введите код друга";
         StatusIcon = string.Empty;
+        OnPropertyChanged(nameof(HostActionHintText));
 
         _discordRpcService?.SetInLauncher();
         _knownPlayerNicks.Clear();
@@ -1814,11 +1836,14 @@ public class LobbyViewModel : ObservableObject
                 {
                     case "waiting":
                         HostStatusText = "Ожидание мира...";
+                        IsWorldOpen = false;
+                        OnPropertyChanged(nameof(HostActionHintText));
                         break;
                     case "open":
                         HostStatusText = "Лобби открыто!";
                         IsWorldOpen = true;
                         StatusIcon = string.Empty;
+                        OnPropertyChanged(nameof(HostActionHintText));
                         break;
                     case "closed":
                         HostStatusText = "Лобби закрыто";
