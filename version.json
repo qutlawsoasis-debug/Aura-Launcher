@@ -1,7 +1,7 @@
 {
-    "internalVersion": "1.2.112",
-    "userFacingVersion": "beta 1.0.104",
+    "internalVersion": "1.2.113",
+    "userFacingVersion": "beta 1.0.105",
     "changelog": [
-        "[Улучшено] Внутренние улучшения сети"
+        "[Исправлено] Лобби: возвращён прежний способ подключения"
     ]
 }
