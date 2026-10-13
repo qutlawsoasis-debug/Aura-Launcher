@@ -64,6 +64,17 @@ public static class AlivePlayer3D
         controller.SetExactAngles(yaw, pitch);
     }
 
+    public static void SmoothRotateTo(FrameworkElement host, double yaw, double pitch = 0.0)
+    {
+        var controller = EnsureController(host);
+        controller.AnimateToAngle(yaw, pitch);
+    }
+
+    public static void AnimateToAngle(FrameworkElement host, double yaw, double pitch = 0.0)
+    {
+        SmoothRotateTo(host, yaw, pitch);
+    }
+
     public static void ResetToBaseSmooth(FrameworkElement host)
     {
         var controller = EnsureController(host);
@@ -141,6 +152,9 @@ public static class AlivePlayer3D
         private bool _hasInitializedAngles;
         private bool _isDragging;
         private bool _isReturningToBase;
+        private bool _isAnimatingTarget;
+        private double _targetYaw;
+        private double _targetPitch;
         private Point _lastMousePos;
 
         private bool _isRenderingHooked;
@@ -215,7 +229,7 @@ public static class AlivePlayer3D
                 _charPitchRotation.Angle = _currentPitch;
                 _hasInitializedAngles = true;
             }
-            else if (!_isDragging && Math.Abs( prevBaseYaw - baseYaw) > 0.1)
+            else if (!_isDragging && !_isAnimatingTarget && Math.Abs(prevBaseYaw - baseYaw) > 0.1)
             {
                 _isReturningToBase = true;
             }
@@ -232,6 +246,7 @@ public static class AlivePlayer3D
         {
             _isDragging = false;
             _isReturningToBase = false;
+            _isAnimatingTarget = false;
             _velocityYaw = 0;
             _velocityPitch = 0;
             _currentYaw = NormalizeAngle(yaw);
@@ -241,9 +256,27 @@ public static class AlivePlayer3D
             _hasInitializedAngles = true;
         }
 
+        public void AnimateToAngle(double yaw, double pitch)
+        {
+            _isDragging = false;
+            if (_host.IsMouseCaptured)
+            {
+                _host.ReleaseMouseCapture();
+            }
+            _isReturningToBase = false;
+            _velocityYaw = 0;
+            _velocityPitch = 0;
+            _targetYaw = NormalizeAngle(yaw);
+            _targetPitch = Math.Clamp(pitch, -20.0, 20.0);
+            _isAnimatingTarget = true;
+            _hasInitializedAngles = true;
+            UpdateRenderingSubscription();
+        }
+
         public void TriggerReturnToBase()
         {
             _isDragging = false;
+            _isAnimatingTarget = false;
             _velocityYaw = 0;
             _velocityPitch = 0;
             _isReturningToBase = true;
@@ -276,6 +309,7 @@ public static class AlivePlayer3D
             if (e.ClickCount == 2)
             {
                 _isDragging = false;
+                _isAnimatingTarget = false;
                 _velocityYaw = 0;
                 _velocityPitch = 0;
                 _isReturningToBase = true;
@@ -287,6 +321,7 @@ public static class AlivePlayer3D
 
             _isDragging = true;
             _isReturningToBase = false;
+            _isAnimatingTarget = false;
             _velocityYaw = 0;
             _velocityPitch = 0;
             _lastMousePos = e.GetPosition(_host);
@@ -486,12 +521,33 @@ public static class AlivePlayer3D
             // 1. Вращение всего персонажа мышью + инерция + возврат по двойному клику
             if (!_isDragging)
             {
-                if (_isReturningToBase)
+                if (_isAnimatingTarget)
+                {
+                    double diffYaw = ShortestAngleDelta(_currentYaw, _targetYaw);
+                    double diffPitch = _targetPitch - _currentPitch;
+
+                    double blend = 1.0 - Math.Pow(1.0 - 0.28, frameScale);
+                    blend = Math.Clamp(blend, 0.0, 1.0);
+                    _currentYaw = NormalizeAngle(_currentYaw + diffYaw * blend);
+                    _currentPitch += diffPitch * blend;
+
+                    if (Math.Abs(diffYaw) < 0.1 && Math.Abs(diffPitch) < 0.1)
+                    {
+                        _currentYaw = _targetYaw;
+                        _currentPitch = _targetPitch;
+                        _isAnimatingTarget = false;
+                    }
+
+                    _charYawRotation.Angle = _currentYaw;
+                    _charPitchRotation.Angle = _currentPitch;
+                }
+                else if (_isReturningToBase)
                 {
                     double diffYaw = ShortestAngleDelta(_currentYaw, _baseYaw);
                     double diffPitch = _basePitch - _currentPitch;
 
                     double blend = 1.0 - Math.Pow(1.0 - 0.16, frameScale);
+                    blend = Math.Clamp(blend, 0.0, 1.0);
                     _currentYaw = NormalizeAngle(_currentYaw + diffYaw * blend);
                     _currentPitch += diffPitch * blend;
 

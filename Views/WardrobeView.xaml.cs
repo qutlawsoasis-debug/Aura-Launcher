@@ -157,6 +157,13 @@ public partial class WardrobeView : UserControl
     {
         _rotY.Angle = yaw;
         _rotX.Angle = pitch;
+        AlivePlayer3D.SmoothRotateTo(SkinDragArea, yaw, pitch);
+    }
+
+    public void RotateToExact(double yaw, double pitch = 0)
+    {
+        _rotY.Angle = yaw;
+        _rotX.Angle = pitch;
         AlivePlayer3D.RotateTo(SkinDragArea, yaw, pitch);
     }
 

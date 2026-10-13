@@ -18,5 +18,6 @@ public interface IGraphicsPresetService
 {
     IReadOnlyDictionary<string, GraphicsPresetModel> GetPresets();
     GraphicsPresetModel? GetPreset(string presetKey);
-    PresetApplyResult ApplyPreset(string gameDir, string presetKey);
+    PresetApplyResult ApplyPreset(string gameDir, string presetKey, bool persistConfig = true);
+    string AutoDetectPreset();
 }

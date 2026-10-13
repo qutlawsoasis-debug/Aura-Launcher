@@ -284,4 +284,51 @@ public class WorkshopServiceTests : IDisposable
         Assert.Contains("profile=DER25", ultraShaderTxt);
         Assert.Contains("PARALLAX=true", ultraShaderTxt);
     }
+
+    [Fact]
+    public void AutoDetectPreset_HardwareTiersClassifiedCorrectly()
+    {
+        // 1. Weak / Integrated GPUs -> Low
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "Intel(R) UHD Graphics 630" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "AMD Radeon RX Vega 8" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce GTX 1050 Ti" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce GTX 1650" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "AMD Radeon RX 560 Series" }, out _));
+
+        // 2. RAM < 8GB -> Strictly Low regardless of powerful GPU
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(6144, new[] { "NVIDIA GeForce RTX 4090" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Low, GraphicsPresetService.DetermineHardwareTier(4096, new[] { "NVIDIA GeForce RTX 3080" }, out _));
+
+        // 3. Medium tier GPUs
+        Assert.Equal(GraphicsPresetService.HardwareTier.Medium, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce GTX 1660 SUPER" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Medium, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce RTX 2060" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Medium, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "AMD Radeon RX 6600" }, out _));
+
+        // 4. High tier GPUs (RTX 30)
+        Assert.Equal(GraphicsPresetService.HardwareTier.High, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce RTX 3060" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.High, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce RTX 3070 Ti" }, out _));
+
+        // 5. Ultra tier GPUs (RTX 40 / 50)
+        Assert.Equal(GraphicsPresetService.HardwareTier.Ultra, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "NVIDIA GeForce RTX 4070" }, out _));
+        Assert.Equal(GraphicsPresetService.HardwareTier.Ultra, GraphicsPresetService.DetermineHardwareTier(32768, new[] { "NVIDIA GeForce RTX 4090" }, out _));
+
+        // 6. Unknown GPU -> Never Ultra
+        Assert.NotEqual(GraphicsPresetService.HardwareTier.Ultra, GraphicsPresetService.DetermineHardwareTier(16384, new[] { "Unknown Custom GPU" }, out _));
+    }
+
+    [Fact]
+    public void ApplyGraphicsPreset_DoesNotModifyUnderlyingConfigServiceByDefault()
+    {
+        var inMemoryConfig = new InMemoryConfigService(new LauncherConfig { GraphicsPreset = "Medium", RamMb = 4096 });
+        var workshopService = new WorkshopService();
+        var presetService = new GraphicsPresetService(inMemoryConfig, workshopService);
+
+        string testDir = Path.Combine(_tempDir, "game_test_config");
+        Directory.CreateDirectory(testDir);
+
+        FabricGameLaunchService.ApplyGraphicsPreset(testDir, "Ultra", presetService: presetService, persistConfig: false);
+
+        Assert.Equal("Medium", inMemoryConfig.CurrentConfig.GraphicsPreset);
+        Assert.Equal(4096, inMemoryConfig.CurrentConfig.RamMb);
+    }
 }

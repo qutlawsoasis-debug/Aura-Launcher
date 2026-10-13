@@ -240,7 +240,7 @@ public class FabricGameLaunchService : IGameLaunchService
         catch { }
     }
 
-    public static void ApplyGraphicsPreset(string gameDir, string? preset, IGraphicsPresetService? presetService = null)
+    public static void ApplyGraphicsPreset(string gameDir, string? preset, IGraphicsPresetService? presetService = null, bool persistConfig = false)
     {
         if (string.IsNullOrWhiteSpace(gameDir))
         {
@@ -249,15 +249,17 @@ public class FabricGameLaunchService : IGameLaunchService
 
         try
         {
-            var service = presetService ?? new GraphicsPresetService(new JsonConfigService(), new WorkshopService());
-            string targetKey = string.IsNullOrWhiteSpace(preset) ? "Medium" : preset;
+            var service = presetService ?? new GraphicsPresetService(new InMemoryConfigService(), new WorkshopService());
+            string targetKey = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "Balanced", StringComparison.OrdinalIgnoreCase)
+                ? service.AutoDetectPreset()
+                : preset;
+
             if (string.Equals(targetKey, "Custom", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(targetKey, "Balanced", StringComparison.OrdinalIgnoreCase) ||
                 service.GetPreset(targetKey) == null)
             {
                 return;
             }
-            service.ApplyPreset(gameDir, targetKey);
+            service.ApplyPreset(gameDir, targetKey, persistConfig: persistConfig);
         }
         catch (Exception ex)
         {

@@ -2,7 +2,7 @@
   "presets": {
     "Low": {
       "name": "Слабый ПК",
-      "hardware": "RX 560, GTX 1660 и подобные",
+      "hardware": "GTX 1050/1650, RX 550/560, Vega, Intel HD",
       "renderDistance": 12,
       "simulationDistance": 6,
       "graphics": "fast",
@@ -27,7 +27,7 @@
     },
     "Medium": {
       "name": "Средний",
-      "hardware": "RTX 20",
+      "hardware": "GTX 1660, RTX 2060, RX 6600",
       "renderDistance": 16,
       "simulationDistance": 8,
       "graphics": "fancy",

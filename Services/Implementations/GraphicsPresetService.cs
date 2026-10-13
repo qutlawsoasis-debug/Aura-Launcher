@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Management;
 using System.Text;
 using System.Text.Json;
 using AuraLauncher.Models;
@@ -97,7 +98,7 @@ public class GraphicsPresetService : IGraphicsPresetService
         _presets["Low"] = new GraphicsPresetModel
         {
             Name = "Слабый ПК",
-            Hardware = "RX 560, GTX 1660 и подобные",
+            Hardware = "GTX 1050/1650, RX 550/560, Vega, Intel HD",
             RenderDistance = 12,
             SimulationDistance = 6,
             Graphics = "fast",
@@ -125,7 +126,7 @@ public class GraphicsPresetService : IGraphicsPresetService
         _presets["Medium"] = new GraphicsPresetModel
         {
             Name = "Средний",
-            Hardware = "RTX 20",
+            Hardware = "GTX 1660, RTX 2060, RX 6600",
             RenderDistance = 16,
             SimulationDistance = 8,
             Graphics = "fancy",
@@ -275,7 +276,154 @@ public class GraphicsPresetService : IGraphicsPresetService
         return 16384;
     }
 
-    public PresetApplyResult ApplyPreset(string gameDir, string presetKey)
+    public enum HardwareTier
+    {
+        Low,
+        Medium,
+        High,
+        Ultra
+    }
+
+    public static List<string> GetGpuNames()
+    {
+        var list = new List<string>();
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return list;
+        }
+
+        try
+        {
+            using var searcher = new ManagementObjectSearcher("SELECT Name, Description FROM Win32_VideoController");
+            foreach (ManagementObject obj in searcher.Get())
+            {
+                var name = obj["Name"]?.ToString() ?? obj["Description"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    list.Add(name.Trim());
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[GPU: ERROR] Ошибка при чтении Win32_VideoController: {ex.Message}");
+        }
+
+        return list;
+    }
+
+    public static HardwareTier ClassifyGpu(string gpuName)
+    {
+        if (string.IsNullOrWhiteSpace(gpuName)) return HardwareTier.Low;
+        var name = gpuName.ToUpperInvariant();
+
+        if (name.Contains("BASIC DISPLAY") || name.Contains("BASIC RENDER") || name.Contains("VIRTUAL") || name.Contains("REMOTE"))
+        {
+            return HardwareTier.Low;
+        }
+
+        // Ultra: RTX 40xx, RTX 50xx, RX 7900
+        if (name.Contains("RTX 40") || name.Contains("RTX 50") || name.Contains("RX 7900"))
+        {
+            return HardwareTier.Ultra;
+        }
+
+        // High: RTX 30xx, RX 6700+, RX 6800+, RX 6900+, RX 7700+, RX 7800+
+        if (name.Contains("RTX 30") ||
+            name.Contains("RX 6700") || name.Contains("RX 6750") ||
+            name.Contains("RX 6800") || name.Contains("RX 6850") ||
+            name.Contains("RX 6900") || name.Contains("RX 6950") ||
+            name.Contains("RX 7700") || name.Contains("RX 7800"))
+        {
+            return HardwareTier.High;
+        }
+
+        // Medium: GTX 1660, RTX 20xx, RX 6600, RX 7600, GTX 1070/1080, RX 580/590, etc.
+        if (name.Contains("1660") ||
+            name.Contains("RTX 20") ||
+            name.Contains("RX 6600") || name.Contains("RX 6650") ||
+            name.Contains("RX 7600") || name.Contains("RX 5600") ||
+            name.Contains("RX 5700") || name.Contains("RX 580") ||
+            name.Contains("RX 590") || name.Contains("GTX 1070") ||
+            name.Contains("GTX 1080") || name.Contains("GTX 1060") ||
+            name.Contains("ARC A7") || name.Contains("ARC A5"))
+        {
+            return HardwareTier.Medium;
+        }
+
+        // Low: слабая/интегрированная (Intel HD/UHD/Iris, Vega, RX 550/560, GT/GTX 1050/1650 и т.д.)
+        if (name.Contains("INTEL") || name.Contains("HD GRAPHICS") || name.Contains("UHD GRAPHICS") || name.Contains("IRIS") ||
+            name.Contains("VEGA") || name.Contains("RX 550") || name.Contains("RX 560") || name.Contains("RX 460") ||
+            name.Contains("1050") || name.Contains("1650") || name.Contains("GT ") || name.Contains("GTX 7") ||
+            name.Contains("GTX 8") || name.Contains("GTX 9") || name.Contains("MX") || name.Contains("RADEON(TM) GRAPHICS") ||
+            name.Contains("R7") || name.Contains("R5") || name.Contains("R9") || name.Contains("QUADRO") || name.Contains("NVS"))
+        {
+            return HardwareTier.Low;
+        }
+
+        // Если не распознано: ни в коем случае не Ultra по умолчанию!
+        return HardwareTier.Low;
+    }
+
+    public static HardwareTier DetermineHardwareTier(int ramMb, IEnumerable<string>? gpuNames, out string bestGpu)
+    {
+        bestGpu = "Не определена";
+        var list = gpuNames?.Where(g => !string.IsNullOrWhiteSpace(g)).ToList() ?? new List<string>();
+
+        var maxTier = HardwareTier.Low;
+        if (list.Count > 0)
+        {
+            foreach (var gpu in list)
+            {
+                var tier = ClassifyGpu(gpu);
+                if (tier > maxTier || bestGpu == "Не определена")
+                {
+                    maxTier = tier;
+                    bestGpu = gpu;
+                }
+            }
+        }
+
+        // RAM < 8GB (с учетом резерва < 7680 MB) -> строго Low
+        if (ramMb < 7680)
+        {
+            return HardwareTier.Low;
+        }
+
+        // Ultra требует >= 15360 MB (16GB) RAM
+        if (maxTier == HardwareTier.Ultra && ramMb < 15360)
+        {
+            return HardwareTier.High;
+        }
+
+        // High требует >= 10240 MB RAM
+        if (maxTier == HardwareTier.High && ramMb < 10240)
+        {
+            return HardwareTier.Medium;
+        }
+
+        return maxTier;
+    }
+
+    public string AutoDetectPreset()
+    {
+        int ramMb = GetPhysicalRamMb();
+        var gpus = GetGpuNames();
+        var bestTier = DetermineHardwareTier(ramMb, gpus, out string bestGpu);
+
+        string preset = bestTier switch
+        {
+            HardwareTier.Ultra => "Ultra",
+            HardwareTier.High => "High",
+            HardwareTier.Medium => "Medium",
+            _ => "Low"
+        };
+
+        FabricGameLaunchService.LogLauncherEvent($"[HARDWARE] Детекция железа: RAM={ramMb} MB, GPU='{bestGpu}' -> Рекомендованный пресет: {preset}");
+        return preset;
+    }
+
+    public PresetApplyResult ApplyPreset(string gameDir, string presetKey, bool persistConfig = true)
     {
         var result = new PresetApplyResult
         {
@@ -461,11 +609,14 @@ public class GraphicsPresetService : IGraphicsPresetService
             File.Move(tmpOptionsPath, optionsPath, overwrite: true);
 
             // 4. Обновление конфигурации лаунчера (RAM, JvmArgs, GraphicsPreset)
-            var config = _configService.CurrentConfig;
-            config.RamMb = finalRam;
-            config.JvmArgs = string.Join(" ", preset.JvmArgs);
-            config.GraphicsPreset = presetKey;
-            _configService.SaveConfigAsync(config).ConfigureAwait(false);
+            if (persistConfig)
+            {
+                var config = _configService.CurrentConfig;
+                config.RamMb = finalRam;
+                config.JvmArgs = string.Join(" ", preset.JvmArgs);
+                config.GraphicsPreset = presetKey;
+                _configService.SaveConfigAsync(config).ConfigureAwait(false);
+            }
 
             // 5. Логирование в launcher-game.log и launcher.log
             string shaderOptsDesc = (preset.ShaderOptions?.Count > 0)
