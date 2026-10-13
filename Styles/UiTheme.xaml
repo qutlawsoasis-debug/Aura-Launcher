@@ -140,17 +140,17 @@
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentFaint}" />
     </Style>
 
-    <!-- Aura Input Box -->
+    <!-- Aura Input Box (Apple-inspired translucent frosted glass) -->
     <Style x:Key="AuraTextBox" TargetType="TextBox">
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         <Setter Property="FontFamily" Value="{StaticResource MainFont}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Normal" />
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
-        <Setter Property="Background" Value="{DynamicResource MediaPlaceholder}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtle}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextWhite}" />
+        <Setter Property="Background" Value="{DynamicResource StoriesCardGlass}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource StoriesCardBorder}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="Padding" Value="14,8" />
+        <Setter Property="Padding" Value="14,9" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
         <Setter Property="CaretBrush" Value="{DynamicResource Accent}" />
         <Setter Property="SelectionBrush" Value="{DynamicResource AccentFaint}" />
@@ -158,69 +158,57 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <Grid SnapsToDevicePixels="True">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="3"
-                                SnapsToDevicePixels="True">
-                            <Grid>
-                                <ScrollViewer x:Name="PART_ContentHost"
-                                              Margin="{TemplateBinding Padding}"
-                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                              Focusable="False"
-                                              HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
-                                              VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}" />
-                                <TextBlock x:Name="PlaceholderText"
-                                           Text="{TemplateBinding Tag}"
-                                           Margin="{TemplateBinding Padding}"
-                                           Foreground="{DynamicResource StoriesTextSecondary}"
-                                           Opacity="0.45"
-                                           FontFamily="{TemplateBinding FontFamily}"
-                                           FontSize="{TemplateBinding FontSize}"
-                                           FontWeight="Normal"
-                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                           HorizontalAlignment="Left"
-                                           IsHitTestVisible="False">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Visible" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                        </Border>
-                        <!-- Signature bottom accent indicator line (amber glow on focus, no harsh box outline) -->
-                        <Border x:Name="BottomAccentLine"
-                                Height="2"
-                                Background="{DynamicResource Accent}"
-                                VerticalAlignment="Bottom"
-                                HorizontalAlignment="Stretch"
-                                CornerRadius="0,0,3,3"
-                                Opacity="0.0"
-                                SnapsToDevicePixels="True" />
-                    </Grid>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="3"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                          VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}" />
+                            <TextBlock x:Name="PlaceholderText"
+                                       Text="{TemplateBinding Tag}"
+                                       Margin="{TemplateBinding Padding}"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Opacity="0.35"
+                                       FontFamily="{TemplateBinding FontFamily}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       FontWeight="Normal"
+                                       VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                       HorizontalAlignment="Left"
+                                       IsHitTestVisible="False">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource TemplatedParent}}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelGlass}" />
                             <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Panel}" />
                         </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelRaised}" />
-                            <Setter TargetName="BottomAccentLine" Property="Opacity" Value="1.0" />
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelGlass}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="Bd" Property="Opacity" Value="0.4" />
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.38" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -228,7 +216,7 @@
         </Setter>
     </Style>
 
-    <!-- Friend add button inside input bar (FriendsView) -->
+    <!-- Friend add button inside input bar (Apple-style pill button) -->
     <Style x:Key="FriendAddActionBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -242,6 +230,8 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="BtnBrd"
                             Background="{DynamicResource Accent}"
+                            BorderBrush="Transparent"
+                            BorderThickness="1"
                             CornerRadius="3"
                             SnapsToDevicePixels="True">
                         <TextBlock x:Name="BtnTxt"
@@ -256,16 +246,17 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="BtnBrd" Property="Opacity" Value="0.9" />
+                            <Setter TargetName="BtnBrd" Property="Opacity" Value="0.88" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="BtnBrd" Property="Opacity" Value="0.78" />
+                            <Setter TargetName="BtnBrd" Property="Opacity" Value="0.75" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="BtnBrd" Property="Background" Value="{DynamicResource BorderSubtle}" />
+                            <Setter TargetName="BtnBrd" Property="Background" Value="Transparent" />
+                            <Setter TargetName="BtnBrd" Property="BorderBrush" Value="{DynamicResource BorderSubtle}" />
                             <Setter TargetName="BtnTxt" Property="Foreground" Value="{DynamicResource StoriesTextSecondary}" />
+                            <Setter TargetName="BtnTxt" Property="Opacity" Value="0.4" />
                             <Setter Property="Cursor" Value="Arrow" />
-                            <Setter Property="Opacity" Value="0.55" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

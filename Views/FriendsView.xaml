@@ -227,12 +227,12 @@
                        Foreground="{DynamicResource TextPrimary}"
                        Margin="0,0,0,8" />
 
-            <!-- Интегрированная панель ввода кода друга -->
+            <!-- Интегрированная стеклянная панель ввода кода друга (Apple style frosted glass) -->
             <Border x:Name="AddFriendBar"
-                    Width="380" Height="42"
+                    Width="380" Height="44"
                     HorizontalAlignment="Left"
-                    Background="{DynamicResource MediaPlaceholder}"
-                    BorderBrush="{DynamicResource BorderSubtle}"
+                    Background="{DynamicResource StoriesCardGlass}"
+                    BorderBrush="{DynamicResource StoriesCardBorder}"
                     BorderThickness="1"
                     CornerRadius="3"
                     SnapsToDevicePixels="True"
@@ -241,12 +241,12 @@
                     <Style TargetType="Border">
                         <Style.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
                                 <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                                <Setter Property="Background" Value="{DynamicResource Panel}" />
                             </Trigger>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
-                                <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
                             </Trigger>
                         </Style.Triggers>
                     </Style>
@@ -262,9 +262,10 @@
                     <Path Grid.Column="0"
                           Style="{StaticResource IconPath}"
                           Data="{StaticResource IconUser}"
-                          Width="14" Height="14"
-                          Stroke="{DynamicResource StoriesTextSecondary}"
-                          Margin="12,0,8,0"
+                          Width="15" Height="15"
+                          Stroke="{DynamicResource TextSecondary}"
+                          Opacity="0.6"
+                          Margin="14,0,10,0"
                           VerticalAlignment="Center"
                           IsHitTestVisible="False" />
 
@@ -277,40 +278,20 @@
                              FontFamily="{StaticResource HeadingFont}"
                              FontSize="16"
                              FontWeight="SemiBold"
-                             Foreground="{DynamicResource TextPrimary}"
+                             Foreground="{DynamicResource TextWhite}"
                              CaretBrush="{DynamicResource Accent}"
                              Tag="Код друга (8 знаков)"
                              VerticalAlignment="Center"
                              KeyDown="OnAddFriendCodeKeyDown" />
 
-                    <!-- Интегрированная кнопка Добавить -->
+                    <!-- Интегрированная стеклянная кнопка Добавить -->
                     <Button Grid.Column="2"
                             Command="{Binding AddFriendCommand}"
                             IsEnabled="{Binding CanAddFriend}"
                             Style="{StaticResource FriendAddActionBtn}"
                             Content="Добавить"
-                            Margin="0,0,5,0"
+                            Margin="0,0,6,0"
                             VerticalAlignment="Center" />
-
-                    <!-- Нижний акцентный штрих при фокусе панели -->
-                    <Border Grid.ColumnSpan="3"
-                            Height="2"
-                            Background="{DynamicResource Accent}"
-                            VerticalAlignment="Bottom"
-                            HorizontalAlignment="Stretch"
-                            CornerRadius="0,0,3,3"
-                            SnapsToDevicePixels="True">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Opacity" Value="0.0" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=AddFriendBar}" Value="True">
-                                        <Setter Property="Opacity" Value="1.0" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                    </Border>
                 </Grid>
             </Border>
 
