@@ -215,6 +215,13 @@
             </Setter.Value>
         </Setter>
     </Style>
+ 
+    <!-- Aura Compact Input Box (Height 36, Padding 10,0) -->
+    <Style x:Key="AuraCompactTextBox" TargetType="TextBox" BasedOn="{StaticResource AuraTextBox}">
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
 
     <!-- Friend add button inside input bar (Apple-style pill button) -->
     <Style x:Key="FriendAddActionBtn" TargetType="Button">

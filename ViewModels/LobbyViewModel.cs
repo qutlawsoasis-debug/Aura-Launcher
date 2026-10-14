@@ -42,7 +42,14 @@ public class LobbyViewModel : ObservableObject
     public bool HasCloudWorlds
     {
         get => _hasCloudWorlds;
-        set => SetProperty(ref _hasCloudWorlds, value);
+        set
+        {
+            if (SetProperty(ref _hasCloudWorlds, value))
+            {
+                OnPropertyChanged(nameof(IsEmptyWorldListVisible));
+                OnPropertyChanged(nameof(IsCloudWorldsListVisible));
+            }
+        }
     }
 
     private bool _isRefreshingWorlds;
@@ -56,8 +63,18 @@ public class LobbyViewModel : ObservableObject
     public bool IsCreateWorldFormVisible
     {
         get => _isCreateWorldFormVisible;
-        set => SetProperty(ref _isCreateWorldFormVisible, value);
+        set
+        {
+            if (SetProperty(ref _isCreateWorldFormVisible, value))
+            {
+                OnPropertyChanged(nameof(IsEmptyWorldListVisible));
+                OnPropertyChanged(nameof(IsCloudWorldsListVisible));
+            }
+        }
     }
+
+    public bool IsEmptyWorldListVisible => !_isCreateWorldFormVisible && !_hasCloudWorlds;
+    public bool IsCloudWorldsListVisible => !_isCreateWorldFormVisible && _hasCloudWorlds;
 
     private string _newWorldName = "Выживание";
     public string NewWorldName
@@ -3015,6 +3032,7 @@ public class CloudWorldItemViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsStarting));
                 OnPropertyChanged(nameof(IsStopped));
                 OnPropertyChanged(nameof(StatusDescription));
+                OnPropertyChanged(nameof(CompactStatusText));
                 OnPropertyChanged(nameof(CanStop));
                 OnPropertyChanged(nameof(PlayButtonText));
                 StopCommand?.RaiseCanExecuteChanged();
@@ -3027,6 +3045,16 @@ public class CloudWorldItemViewModel : ObservableObject
     public bool IsStopped => !IsRunning && !IsStarting;
     public bool CanStop => IsOwner && (IsRunning || IsStarting);
     public string PlayButtonText => IsRunning ? "Войти" : "Запустить и войти";
+
+    public string CompactStatusText
+    {
+        get
+        {
+            if (IsRunning) return $"В сети • {_item.FormattedPlayers}";
+            if (IsStarting) return "Запуск сервера...";
+            return IsOwner ? "Сохранён • Мой мир" : $"Сохранён • От: {_item.Owner}";
+        }
+    }
 
     public string StatusDescription
     {

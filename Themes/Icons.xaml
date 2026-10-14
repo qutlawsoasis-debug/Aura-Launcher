@@ -41,6 +41,7 @@
     <StreamGeometry x:Key="IconSparkles">M12,3 L14,8 L19,10 L14,12 L12,17 L10,12 L5,10 L10,8 Z</StreamGeometry>
     <StreamGeometry x:Key="IconList">M8,6 H21 M8,12 H21 M8,18 H21 M3,6 H3.01 M3,12 H3.01 M3,18 H3.01</StreamGeometry>
     <StreamGeometry x:Key="IconGrid">M3,3 H10 V10 H3 Z M14,3 H21 V10 H14 Z M14,14 H21 V21 H14 Z M3,14 H10 V21 H3 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconSettings">M12.22,2 H11.78 L11.45,4.35 A8.4,8.4 0 0,0 9.7,5.08 L7.53,4.15 L7.08,4.6 L5.78,6.85 L7.22,8.6 A8.5,8.5 0 0,0 6.9,10.6 L4.6,11.2 V12.8 L6.9,13.4 A8.5,8.5 0 0,0 7.22,15.4 L5.78,17.15 L7.08,19.4 L9.25,18.47 A8.4,8.4 0 0,0 11,19.2 L11.33,21.55 H12.67 L13,19.2 A8.4,8.4 0 0,0 14.75,18.47 L16.92,19.4 L18.22,17.15 L16.78,15.4 A8.5,8.5 0 0,0 17.1,13.4 L19.4,12.8 V11.2 L17.1,10.6 A8.5,8.5 0 0,0 16.78,8.6 L18.22,6.85 L16.92,4.6 L14.75,5.53 A8.4,8.4 0 0,0 13,4.8 L12.67,2.45 Z M12,15 A3,3 0 1,0 12,9 A3,3 0 0,0 12,15 Z</StreamGeometry>
 
     <!-- Base Lucide Icon Style: uniform outline, inherits parent Foreground, default 14x14 -->
     <Style x:Key="IconPath" TargetType="Path">
