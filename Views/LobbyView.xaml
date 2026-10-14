@@ -38,6 +38,34 @@
             <DoubleAnimation Storyboard.TargetProperty="Opacity"
                              From="1.0" To="0.0" Duration="0:0:0.5" AutoReverse="True" />
         </Storyboard>
+
+        <Style x:Key="TabFadeSlideContentStyle" TargetType="FrameworkElement">
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <TranslateTransform Y="0" />
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Visibility" Value="Visible">
+                    <Trigger.EnterActions>
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                 From="0.0" To="1.0"
+                                                 Duration="0:0:0.180" />
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
+                                                 From="6.0" To="0.0"
+                                                 Duration="0:0:0.180">
+                                    <DoubleAnimation.EasingFunction>
+                                        <CubicEase EasingMode="EaseOut" />
+                                    </DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </Trigger.EnterActions>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid Background="Transparent" Focusable="False" FocusVisualStyle="{x:Null}" ClipToBounds="False">
@@ -119,7 +147,10 @@
                     </Grid>
 
                     <!-- РЕЖИМ 1: ОБЛАЧНЫЕ МИРЫ -->
-                    <StackPanel Visibility="{Binding IsCloudWorldsTab, Converter={StaticResource BoolToVis}}" Width="320" HorizontalAlignment="Left">
+                    <StackPanel Style="{StaticResource TabFadeSlideContentStyle}"
+                                Visibility="{Binding IsCloudWorldsTab, Converter={StaticResource BoolToVis}}"
+                                Width="320"
+                                HorizontalAlignment="Left">
 
                         <!-- Верхняя панель: Создать мир + Квадратная кнопка Обновить 40x40 -->
                         <Grid Margin="0,0,0,14" Visibility="{Binding IsCreateWorldFormVisible, Converter={StaticResource InverseBoolToVis}}">
@@ -146,18 +177,41 @@
                                         BorderBrush="{DynamicResource StoriesCardBorder}"
                                         BorderThickness="1"
                                         CornerRadius="3">
-                                    <Path Style="{StaticResource IconPath}"
+                                    <Path x:Name="RefreshIconPath"
+                                          Style="{StaticResource IconPath}"
                                           Width="14" Height="14"
                                           Data="{StaticResource IconRefresh}"
                                           Stroke="{DynamicResource TextPrimary}"
                                           HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
+                                          VerticalAlignment="Center"
+                                          RenderTransformOrigin="0.5,0.5">
+                                        <Path.RenderTransform>
+                                            <RotateTransform Angle="0" />
+                                        </Path.RenderTransform>
+                                    </Path>
                                 </Border>
+                                <Button.Triggers>
+                                    <EventTrigger RoutedEvent="Button.Click">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="RefreshIconPath"
+                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                                                 From="0" To="360"
+                                                                 Duration="0:0:0.4">
+                                                    <DoubleAnimation.EasingFunction>
+                                                        <CubicEase EasingMode="EaseOut" />
+                                                    </DoubleAnimation.EasingFunction>
+                                                </DoubleAnimation>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Button.Triggers>
                             </Button>
                         </Grid>
 
                         <!-- Форма создания нового мира (заменяет список миров) -->
-                        <StackPanel Visibility="{Binding IsCreateWorldFormVisible, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Style="{StaticResource TabFadeSlideContentStyle}"
+                                    Visibility="{Binding IsCreateWorldFormVisible, Converter={StaticResource BoolToVis}}">
                             <TextBlock Text="Новый мир"
                                        FontFamily="{StaticResource HeadingFont}"
                                        FontSize="16"
@@ -299,24 +353,54 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </Border.Style>
-                                                        <Path Width="16" Height="16"
-                                                              Data="{StaticResource IconWorld}"
-                                                              HorizontalAlignment="Center"
-                                                              VerticalAlignment="Center">
-                                                            <Path.Style>
-                                                                <Style TargetType="Path" BasedOn="{StaticResource IconPath}">
-                                                                    <Setter Property="Stroke" Value="{DynamicResource TextMuted}" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                                            <Setter Property="Stroke" Value="{DynamicResource PrimaryActionText}" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IsStarting}" Value="True">
-                                                                            <Setter Property="Stroke" Value="{DynamicResource TextWhite}" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Path.Style>
-                                                        </Path>
+                                                        <Grid>
+                                                            <Path Width="16" Height="16"
+                                                                  Data="{StaticResource IconWorld}"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center">
+                                                                <Path.Style>
+                                                                    <Style TargetType="Path" BasedOn="{StaticResource IconPath}">
+                                                                        <Setter Property="Stroke" Value="{DynamicResource TextMuted}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                                <Setter Property="Stroke" Value="{DynamicResource PrimaryActionText}" />
+                                                                            </DataTrigger>
+                                                                            <DataTrigger Binding="{Binding IsStarting}" Value="True">
+                                                                                <Setter Property="Stroke" Value="{DynamicResource TextWhite}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Path.Style>
+                                                            </Path>
+
+                                                            <!-- Пульсирующая янтарная точка при запуске -->
+                                                            <Border Width="6" Height="6"
+                                                                    CornerRadius="3"
+                                                                    Background="{DynamicResource Accent}"
+                                                                    HorizontalAlignment="Right"
+                                                                    VerticalAlignment="Top"
+                                                                    Margin="0,3,3,0"
+                                                                    Visibility="{Binding IsStarting, Converter={StaticResource BoolToVis}}">
+                                                                <Border.Style>
+                                                                    <Style TargetType="Border">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsStarting}" Value="True">
+                                                                                <DataTrigger.EnterActions>
+                                                                                    <BeginStoryboard>
+                                                                                        <Storyboard RepeatBehavior="Forever">
+                                                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                                             From="0.3" To="1.0"
+                                                                                                             Duration="0:0:0.7"
+                                                                                                             AutoReverse="True" />
+                                                                                        </Storyboard>
+                                                                                    </BeginStoryboard>
+                                                                                </DataTrigger.EnterActions>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Border.Style>
+                                                            </Border>
+                                                        </Grid>
                                                     </Border>
 
                                                     <!-- Инфо о мире на всю ширину -->
@@ -330,10 +414,31 @@
                                                         <TextBlock Text="{Binding CompactStatusText}"
                                                                    FontFamily="{StaticResource MainFont}"
                                                                    FontSize="12"
-                                                                   Foreground="{DynamicResource TextMuted}"
-                                                                   Margin="0,2,0,0" />
+                                                                   Margin="0,2,0,0">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsStarting}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+                                                                            <Setter Property="FontWeight" Value="Medium" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsStopping}" Value="True">
+                                                                            <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
                                                     </StackPanel>
                                                 </Grid>
+
+                                                <!-- Прогресс-бар этапов запуска мира -->
+                                                <ProgressBar Style="{StaticResource StoryProgressBar}"
+                                                             Value="{Binding Progress, Mode=OneWay}"
+                                                             Height="4"
+                                                             Margin="0,8,0,0"
+                                                             Visibility="{Binding IsStarting, Converter={StaticResource BoolToVis}}" />
 
                                                 <!-- Нижний ярус: Кнопки действий -->
                                                 <Grid Margin="0,10,0,0">
@@ -496,7 +601,10 @@
                     </StackPanel>
 
                     <!-- РЕЖИМ 2: БЫСТРЫЙ ВХОД (LAN) -->
-                    <StackPanel Visibility="{Binding IsLanTab, Converter={StaticResource BoolToVis}}" Width="320" HorizontalAlignment="Left">
+                    <StackPanel Style="{StaticResource TabFadeSlideContentStyle}"
+                                Visibility="{Binding IsLanTab, Converter={StaticResource BoolToVis}}"
+                                Width="320"
+                                HorizontalAlignment="Left">
                         <Button Command="{Binding CreateLobbyCommand}"
                                 Style="{StaticResource SecondaryBtn}"
                                 Height="40"

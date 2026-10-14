@@ -15,7 +15,9 @@ public record CloudWorldItem(
     [property: JsonPropertyName("port")] int? Port,
     [property: JsonPropertyName("online_players")] List<string>? OnlinePlayers,
     [property: JsonPropertyName("max_players")] int MaxPlayers = 8,
-    [property: JsonPropertyName("is_owner")] bool IsOwner = false
+    [property: JsonPropertyName("is_owner")] bool IsOwner = false,
+    [property: JsonPropertyName("stageText")] string? StageText = null,
+    [property: JsonPropertyName("progress")] int Progress = 0
 )
 {
     [JsonIgnore]
@@ -25,7 +27,10 @@ public record CloudWorldItem(
     public bool IsStarting => string.Equals(Status, "starting", System.StringComparison.OrdinalIgnoreCase);
 
     [JsonIgnore]
-    public bool IsActive => IsRunning || IsStarting;
+    public bool IsStopping => string.Equals(Status, "stopping", System.StringComparison.OrdinalIgnoreCase);
+
+    [JsonIgnore]
+    public bool IsActive => IsRunning || IsStarting || IsStopping;
 
     [JsonIgnore]
     public int OnlineCount => OnlinePlayers?.Count ?? 0;

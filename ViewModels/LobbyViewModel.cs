@@ -2910,21 +2910,45 @@ public class LobbyViewModel : ObservableObject
             var resp = await _cloudLobbyService.GetWorldsAsync(myNick);
             Dispatch(() =>
             {
-                CloudWorlds.Clear();
                 if (resp?.Worlds != null)
                 {
+                    var incomingById = resp.Worlds.ToDictionary(w => w.Id, StringComparer.OrdinalIgnoreCase);
+
+                    // 1. Удаляем миры, которых больше нет
+                    for (int i = CloudWorlds.Count - 1; i >= 0; i--)
+                    {
+                        if (!incomingById.ContainsKey(CloudWorlds[i].Id))
+                        {
+                            CloudWorlds.RemoveAt(i);
+                        }
+                    }
+
+                    // 2. Обновляем существующие или добавляем новые
                     foreach (var w in resp.Worlds)
                     {
-                        var vm = new CloudWorldItemViewModel(
-                            w,
-                            _cloudLobbyService,
-                            onConnectAddress: addr => GuestConnectRequested?.Invoke(this, addr),
-                            onWakeAndConnect: WakeAndConnectWorldAsync,
-                            onStop: StopWorldAsync);
-                        CloudWorlds.Add(vm);
+                        var existing = CloudWorlds.FirstOrDefault(x => string.Equals(x.Id, w.Id, StringComparison.OrdinalIgnoreCase));
+                        if (existing != null)
+                        {
+                            existing.UpdateFromItem(w);
+                        }
+                        else
+                        {
+                            var vm = new CloudWorldItemViewModel(
+                                w,
+                                _cloudLobbyService,
+                                onConnectAddress: addr => GuestConnectRequested?.Invoke(this, addr),
+                                onWakeAndConnect: WakeAndConnectWorldAsync,
+                                onStop: StopWorldAsync);
+                            CloudWorlds.Add(vm);
+                        }
                     }
                 }
+                else
+                {
+                    CloudWorlds.Clear();
+                }
                 HasCloudWorlds = CloudWorlds.Count > 0;
+                UpdatePollingTimerInterval();
             });
         }
         catch
@@ -2934,6 +2958,15 @@ public class LobbyViewModel : ObservableObject
         {
             IsRefreshingWorlds = false;
         }
+    }
+
+    private void UpdatePollingTimerInterval()
+    {
+        if (_cloudLobbyRefreshTimer == null) return;
+        bool hasActiveTransit = CloudWorlds.Any(w => w.IsStarting || w.IsStopping);
+        _cloudLobbyRefreshTimer.Interval = hasActiveTransit
+            ? TimeSpan.FromMilliseconds(1500)
+            : TimeSpan.FromSeconds(15);
     }
 
     public async Task CreateNewWorldAsync()
@@ -2963,7 +2996,14 @@ public class LobbyViewModel : ObservableObject
             {
                 IsCreateWorldFormVisible = false;
                 await RefreshWorldsAsync();
-                GuestConnectRequested?.Invoke(this, $"89.168.82.200:{res.Port.Value}");
+
+                // Ищем созданный мир в списке и запускаем отслеживание до полной готовности
+                var createdVm = CloudWorlds.FirstOrDefault(w => string.Equals(w.Id, res.WorldId, StringComparison.OrdinalIgnoreCase))
+                                ?? CloudWorlds.FirstOrDefault(w => string.Equals(w.Name, wName, StringComparison.OrdinalIgnoreCase));
+                if (createdVm != null)
+                {
+                    _ = WakeAndConnectWorldAsync(createdVm);
+                }
             }
             else
             {
@@ -2985,28 +3025,65 @@ public class LobbyViewModel : ObservableObject
         if (_cloudLobbyService == null || world.IsActionInProgress) return;
         world.IsActionInProgress = true;
         world.Status = "starting";
+        world.StageText = "Запуск виртуальной машины Java...";
+        world.Progress = 10;
+        UpdatePollingTimerInterval();
 
         try
         {
             var res = await _cloudLobbyService.CreateOrStartWorldAsync(world.Owner, world.Name, world.Seed, world.Id);
-            if (res != null && res.Port.HasValue)
+            if (res == null || !res.Port.HasValue)
+            {
+                world.Status = "sleeping";
+                world.StageText = res?.Error ?? "Ошибка запуска";
+                world.Progress = 0;
+                return;
+            }
+
+            int port = res.Port.Value;
+            world.Port = port;
+
+            if (string.Equals(res.Status, "running", StringComparison.OrdinalIgnoreCase))
             {
                 world.Status = "running";
-                await RefreshWorldsAsync();
-                GuestConnectRequested?.Invoke(this, $"89.168.82.200:{res.Port.Value}");
+                world.Progress = 100;
+                world.StageText = "В сети • Готов к игре";
+                GuestConnectRequested?.Invoke(this, $"89.168.82.200:{port}");
+                return;
             }
-            else
+
+            // Ждём в цикле поллинга до 180 секунд (120 итераций по 1.5 сек)
+            int attempts = 0;
+            const int maxAttempts = 120;
+            while (attempts < maxAttempts)
             {
-                world.Status = "stopped";
+                await Task.Delay(1500);
+                attempts++;
+
+                await RefreshWorldsAsync();
+
+                var currentWorld = CloudWorlds.FirstOrDefault(w => string.Equals(w.Id, world.Id, StringComparison.OrdinalIgnoreCase)) ?? world;
+                if (currentWorld.IsRunning)
+                {
+                    GuestConnectRequested?.Invoke(this, $"89.168.82.200:{port}");
+                    break;
+                }
+
+                if (currentWorld.IsStopped || currentWorld.Status == "stopped")
+                {
+                    break;
+                }
             }
         }
         catch
         {
-            world.Status = "stopped";
+            world.Status = "sleeping";
+            world.Progress = 0;
         }
         finally
         {
             world.IsActionInProgress = false;
+            UpdatePollingTimerInterval();
         }
     }
 
@@ -3014,13 +3091,19 @@ public class LobbyViewModel : ObservableObject
     {
         if (_cloudLobbyService == null || world.IsActionInProgress) return;
         world.IsActionInProgress = true;
+        world.Status = "stopping";
+        world.StageText = "Сохранение мира...";
+        world.Progress = 0;
+        UpdatePollingTimerInterval();
 
         try
         {
             bool ok = await _cloudLobbyService.StopWorldAsync(world.Id, world.Port);
             if (ok)
             {
-                world.Status = "stopped";
+                world.Status = "sleeping";
+                world.StageText = "Мир сохранён";
+                world.Progress = 0;
                 await RefreshWorldsAsync();
             }
         }
@@ -3030,13 +3113,14 @@ public class LobbyViewModel : ObservableObject
         finally
         {
             world.IsActionInProgress = false;
+            UpdatePollingTimerInterval();
         }
     }
 }
 
 public class CloudWorldItemViewModel : ObservableObject
 {
-    private readonly CloudWorldItem _item;
+    private CloudWorldItem _item;
     private readonly ICloudLobbyService _cloudService;
     private readonly Action<string> _onConnectAddress;
     private readonly Func<CloudWorldItemViewModel, Task> _onWakeAndConnect;
@@ -3046,7 +3130,14 @@ public class CloudWorldItemViewModel : ObservableObject
     public string Name => _item.Name;
     public string Owner => _item.Owner;
     public string? Seed => _item.Seed;
-    public int? Port => _item.Port;
+
+    private int? _port;
+    public int? Port
+    {
+        get => _port;
+        set => SetProperty(ref _port, value);
+    }
+
     public bool IsOwner => _item.IsOwner;
     public string BadgeText => IsOwner ? "Мой мир" : $"От: {_item.Owner}";
 
@@ -3060,28 +3151,64 @@ public class CloudWorldItemViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(IsRunning));
                 OnPropertyChanged(nameof(IsStarting));
+                OnPropertyChanged(nameof(IsStopping));
                 OnPropertyChanged(nameof(IsStopped));
                 OnPropertyChanged(nameof(StatusDescription));
                 OnPropertyChanged(nameof(CompactStatusText));
                 OnPropertyChanged(nameof(CanStop));
+                OnPropertyChanged(nameof(CanPlay));
                 OnPropertyChanged(nameof(PlayButtonText));
+                PlayCommand?.RaiseCanExecuteChanged();
                 StopCommand?.RaiseCanExecuteChanged();
             }
         }
     }
 
+    private string? _stageText;
+    public string? StageText
+    {
+        get => _stageText;
+        set
+        {
+            if (SetProperty(ref _stageText, value))
+            {
+                OnPropertyChanged(nameof(CompactStatusText));
+                OnPropertyChanged(nameof(StatusDescription));
+            }
+        }
+    }
+
+    private int _progress;
+    public int Progress
+    {
+        get => _progress;
+        set => SetProperty(ref _progress, value);
+    }
+
     public bool IsRunning => string.Equals(_status, "running", StringComparison.OrdinalIgnoreCase);
     public bool IsStarting => string.Equals(_status, "starting", StringComparison.OrdinalIgnoreCase);
-    public bool IsStopped => !IsRunning && !IsStarting;
+    public bool IsStopping => string.Equals(_status, "stopping", StringComparison.OrdinalIgnoreCase);
+    public bool IsStopped => !IsRunning && !IsStarting && !IsStopping;
     public bool CanStop => IsOwner && (IsRunning || IsStarting);
-    public string PlayButtonText => IsRunning ? "Войти" : "Запустить и войти";
+    public bool CanPlay => !IsActionInProgress && !IsStarting && !IsStopping;
+
+    public string PlayButtonText
+    {
+        get
+        {
+            if (IsStarting) return "Запуск...";
+            if (IsStopping) return "Остановка...";
+            return IsRunning ? "Войти" : "Запустить и войти";
+        }
+    }
 
     public string CompactStatusText
     {
         get
         {
             if (IsRunning) return $"В сети • {_item.FormattedPlayers}";
-            if (IsStarting) return "Запуск сервера...";
+            if (IsStarting) return !string.IsNullOrWhiteSpace(StageText) ? StageText : "Запуск сервера...";
+            if (IsStopping) return !string.IsNullOrWhiteSpace(StageText) ? StageText : "Сохранение мира...";
             return IsOwner ? "Сохранён • Мой мир" : $"Сохранён • От: {_item.Owner}";
         }
     }
@@ -3091,9 +3218,36 @@ public class CloudWorldItemViewModel : ObservableObject
         get
         {
             if (IsRunning) return $"В сети • {_item.FormattedPlayers}";
-            if (IsStarting) return "Запуск сервера...";
+            if (IsStarting) return !string.IsNullOrWhiteSpace(StageText) ? StageText : "Запуск сервера...";
+            if (IsStopping) return !string.IsNullOrWhiteSpace(StageText) ? StageText : "Сохранение мира...";
             return "Мир сохранён (спит)";
         }
+    }
+
+    public void UpdateFromItem(CloudWorldItem item)
+    {
+        _item = item;
+        Status = item.Status;
+        StageText = item.StageText;
+        Progress = item.Progress;
+        Port = item.Port;
+
+        if (item.AllowedPlayers != null)
+        {
+            var newSet = new HashSet<string>(item.AllowedPlayers, StringComparer.OrdinalIgnoreCase);
+            for (int i = AllowedPlayers.Count - 1; i >= 0; i--)
+            {
+                if (!newSet.Contains(AllowedPlayers[i]))
+                    AllowedPlayers.RemoveAt(i);
+            }
+            foreach (var p in item.AllowedPlayers)
+            {
+                if (!AllowedPlayers.Contains(p, StringComparer.OrdinalIgnoreCase))
+                    AllowedPlayers.Add(p);
+            }
+        }
+        PlayCommand?.RaiseCanExecuteChanged();
+        StopCommand?.RaiseCanExecuteChanged();
     }
 
     private bool _isActionInProgress;
@@ -3104,6 +3258,7 @@ public class CloudWorldItemViewModel : ObservableObject
         {
             if (SetProperty(ref _isActionInProgress, value))
             {
+                OnPropertyChanged(nameof(CanPlay));
                 PlayCommand?.RaiseCanExecuteChanged();
                 StopCommand?.RaiseCanExecuteChanged();
             }
@@ -3151,6 +3306,9 @@ public class CloudWorldItemViewModel : ObservableObject
         _onWakeAndConnect = onWakeAndConnect;
         _onStop = onStop;
         _status = item.Status;
+        _port = item.Port;
+        _stageText = item.StageText;
+        _progress = item.Progress;
 
         if (item.AllowedPlayers != null)
         {
@@ -3166,11 +3324,11 @@ public class CloudWorldItemViewModel : ObservableObject
             {
                 _onConnectAddress($"89.168.82.200:{Port.Value}");
             }
-            else
+            else if (!IsStarting && !IsStopping)
             {
                 _ = _onWakeAndConnect(this);
             }
-        }, _ => !IsActionInProgress);
+        }, _ => !IsActionInProgress && !IsStarting && !IsStopping);
 
         StopCommand = new RelayCommand(_ =>
         {
@@ -3193,7 +3351,7 @@ public class CloudWorldItemViewModel : ObservableObject
             {
                 _ = RemoveFriendInternalAsync(friendNick);
             }
-        }, _ => IsOwner);
+        });
     }
 
     private async Task AddFriendInternalAsync()
