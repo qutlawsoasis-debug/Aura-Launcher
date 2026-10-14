@@ -84,52 +84,449 @@
 
             <Grid Grid.Row="1" Focusable="False">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="280" />
-                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="340" />
+                    <ColumnDefinition Width="24" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Левая колонка: Создать лобби / Код от друга -->
+                <!-- Левая колонка: Управление режимами (Облачные миры / LAN) -->
                 <StackPanel Grid.Column="0" VerticalAlignment="Top">
-                    <Button Command="{Binding OpenCreateWorldFormCommand}"
-                            Style="{StaticResource PrimaryNeonBtn}"
-                            Height="48"
-                            Content="Создать мир"
-                            HorizontalAlignment="Left"
-                            Width="260"
-                            Margin="0,0,0,8" />
 
-                    <Button Command="{Binding CreateLobbyCommand}"
-                            Style="{StaticResource SecondaryBtn}"
-                            Height="38"
-                            Content="Локальный хост"
-                            HorizontalAlignment="Left"
-                            Width="260"
-                            Margin="0,0,0,20" />
-
-                    <Grid Width="260" HorizontalAlignment="Left" Margin="0,0,0,20">
+                    <!-- Сегментированный переключатель режимов -->
+                    <Grid Width="320" Height="36" HorizontalAlignment="Left" Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" Height="1" Background="{StaticResource LineInkBrush}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Text="или"
+                        <RadioButton Grid.Column="0"
+                                     GroupName="LobbyModeGroup"
+                                     Content="Облачные миры"
+                                     IsChecked="{Binding IsCloudWorldsTab, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}"
+                                     HorizontalAlignment="Stretch"
+                                     HorizontalContentAlignment="Center"
+                                     Height="36"
+                                     Margin="0,0,3,0" />
+                        <RadioButton Grid.Column="1"
+                                     GroupName="LobbyModeGroup"
+                                     Content="Быстрый вход (LAN)"
+                                     IsChecked="{Binding IsLanTab, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}"
+                                     HorizontalAlignment="Stretch"
+                                     HorizontalContentAlignment="Center"
+                                     Height="36"
+                                     Margin="3,0,0,0" />
+                    </Grid>
+
+                    <!-- РЕЖИМ 1: ОБЛАЧНЫЕ МИРЫ -->
+                    <StackPanel Visibility="{Binding IsCloudWorldsTab, Converter={StaticResource BoolToVis}}" Width="320" HorizontalAlignment="Left">
+
+                        <!-- Верхняя панель: Создать мир + Квадратная кнопка Обновить 40x40 -->
+                        <Grid Margin="0,0,0,14" Visibility="{Binding IsCreateWorldFormVisible, Converter={StaticResource InverseBoolToVis}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0"
+                                    Command="{Binding OpenCreateWorldFormCommand}"
+                                    Style="{StaticResource PrimaryNeonBtn}"
+                                    Height="40"
+                                    FontSize="14"
+                                    Content="+ Создать мир" />
+
+                            <Button Grid.Column="1"
+                                    Command="{Binding RefreshWorldsCommand}"
+                                    Style="{StaticResource StoryBarBtn}"
+                                    Width="40" Height="40"
+                                    Margin="8,0,0,0"
+                                    ToolTip="Обновить список миров">
+                                <Border Width="40" Height="40"
+                                        Background="{DynamicResource StoriesCardGlass}"
+                                        BorderBrush="{DynamicResource StoriesCardBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="3">
+                                    <Path Style="{StaticResource IconPath}"
+                                          Width="14" Height="14"
+                                          Data="{StaticResource IconRefresh}"
+                                          Stroke="{DynamicResource TextPrimary}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                                </Border>
+                            </Button>
+                        </Grid>
+
+                        <!-- Форма создания нового мира (заменяет список миров) -->
+                        <StackPanel Visibility="{Binding IsCreateWorldFormVisible, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Новый мир"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       Margin="0,0,0,12" />
+
+                            <TextBlock Text="Название мира"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource GameInputTextMutedBrush}"
+                                       Margin="2,0,0,6" />
+                            <TextBox Style="{StaticResource AuraCompactTextBox}"
+                                     Text="{Binding NewWorldName, UpdateSourceTrigger=PropertyChanged}"
+                                     Tag="Название мира..."
+                                     Margin="0,0,0,12" />
+
+                            <TextBlock Text="Сид генерации"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource GameInputTextMutedBrush}"
+                                       Margin="2,0,0,6" />
+                            <TextBox Style="{StaticResource AuraCompactTextBox}"
+                                     Text="{Binding NewWorldSeed, UpdateSourceTrigger=PropertyChanged}"
+                                     Tag="Необязательно (случайный)"
+                                     Margin="0,0,0,14" />
+
+                            <TextBlock Text="{Binding CreateWorldError}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource Danger}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,10"
+                                       Visibility="{Binding HasCreateWorldError, Converter={StaticResource BoolToVis}}" />
+
+                            <Grid Margin="0,4,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Column="0"
+                                        Command="{Binding CancelCreateWorldFormCommand}"
+                                        Style="{StaticResource FormCancelBtn}"
+                                        Height="36"
+                                        Padding="16,0"
+                                        Content="Отмена" />
+
+                                <Button Grid.Column="1"
+                                        Command="{Binding SubmitCreateWorldCommand}"
+                                        Style="{StaticResource PrimaryNeonBtn}"
+                                        Height="36"
+                                        Padding="14,0"
+                                        FontSize="13"
+                                        Margin="8,0,0,0"
+                                        Content="Создать и войти" />
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- Состояние: Миров нет и форма закрыта -->
+                        <StackPanel Margin="0,24,0,24"
+                                    HorizontalAlignment="Center"
+                                    Visibility="{Binding IsEmptyWorldListVisible, Converter={StaticResource BoolToVis}}">
+                            <Path Style="{StaticResource IconPath}"
+                                  Width="28" Height="28"
+                                  Data="{StaticResource IconWorld}"
+                                  Stroke="{DynamicResource TextMuted}"
+                                  Opacity="0.4"
+                                  HorizontalAlignment="Center"
+                                  Margin="0,0,0,12" />
+
+                            <TextBlock Text="Нет доступных миров"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,4" />
+
+                            <TextBlock Text="Создайте мир или попросите друга добавить вас"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       Margin="0,0,0,16" />
+
+                            <Button Command="{Binding OpenCreateWorldFormCommand}"
+                                    Style="{StaticResource StandardBtn}"
+                                    Height="32"
+                                    Padding="16,0"
+                                    FontSize="13"
+                                    HorizontalAlignment="Center"
+                                    Content="+ Новый мир" />
+                        </StackPanel>
+
+                        <!-- Список миров: 2-ярусные карточки миров -->
+                        <ScrollViewer Style="{StaticResource AuraScrollViewer}"
+                                      MaxHeight="440"
+                                      Focusable="False"
+                                      Visibility="{Binding IsCloudWorldsListVisible, Converter={StaticResource BoolToVis}}">
+                            <ItemsControl ItemsSource="{Binding CloudWorlds}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="{DynamicResource StoriesCardGlass}"
+                                                BorderBrush="{DynamicResource StoriesCardBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="3"
+                                                Padding="14,12"
+                                                Margin="0,0,0,10">
+                                            <StackPanel>
+                                                <!-- Верхний ярус: Иконка 32x32 + Название мира + Статус -->
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- Иконка 32x32: статус запуска -->
+                                                    <Border Grid.Column="0"
+                                                            Width="32" Height="32"
+                                                            CornerRadius="3"
+                                                            Margin="0,0,10,0"
+                                                            VerticalAlignment="Center">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{DynamicResource StoriesCardGlass}" />
+                                                                <Setter Property="BorderBrush" Value="{DynamicResource StoriesCardBorder}" />
+                                                                <Setter Property="BorderThickness" Value="1" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource AchievementGoldBrush}" />
+                                                                        <Setter Property="BorderThickness" Value="0" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsStarting}" Value="True">
+                                                                        <Setter Property="Background" Value="{DynamicResource AccentDim}" />
+                                                                        <Setter Property="BorderThickness" Value="0" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Path Width="16" Height="16"
+                                                              Data="{StaticResource IconWorld}"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center">
+                                                            <Path.Style>
+                                                                <Style TargetType="Path" BasedOn="{StaticResource IconPath}">
+                                                                    <Setter Property="Stroke" Value="{DynamicResource TextMuted}" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                            <Setter Property="Stroke" Value="{DynamicResource PrimaryActionText}" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsStarting}" Value="True">
+                                                                            <Setter Property="Stroke" Value="{DynamicResource TextWhite}" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Path.Style>
+                                                        </Path>
+                                                    </Border>
+
+                                                    <!-- Инфо о мире на всю ширину -->
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontFamily="{StaticResource MainFont}"
+                                                                   FontSize="15"
+                                                                   FontWeight="SemiBold"
+                                                                   Foreground="{StaticResource TextWhite}"
+                                                                   TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding CompactStatusText}"
+                                                                   FontFamily="{StaticResource MainFont}"
+                                                                   FontSize="12"
+                                                                   Foreground="{DynamicResource TextMuted}"
+                                                                   Margin="0,2,0,0" />
+                                                    </StackPanel>
+                                                </Grid>
+
+                                                <!-- Нижний ярус: Кнопки действий -->
+                                                <Grid Margin="0,10,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- Кнопка Войти / Запустить и войти -->
+                                                    <Button Grid.Column="0"
+                                                            Command="{Binding PlayCommand}"
+                                                            Style="{StaticResource PrimaryNeonBtn}"
+                                                            Height="32"
+                                                            Padding="14,0"
+                                                            FontSize="12"
+                                                            FontWeight="SemiBold"
+                                                            Content="{Binding PlayButtonText}" />
+
+                                                    <!-- Кнопка Друзья (управление доступом) -->
+                                                    <Button Grid.Column="1"
+                                                            Command="{Binding ToggleSharePanelCommand}"
+                                                            Style="{StaticResource StoryBarBtn}"
+                                                            Height="32"
+                                                            Margin="6,0,0,0"
+                                                            ToolTip="Управление доступом друзей"
+                                                            Visibility="{Binding IsOwner, Converter={StaticResource BoolToVis}}">
+                                                        <Border Height="32"
+                                                                Padding="10,0"
+                                                                CornerRadius="3"
+                                                                Background="{DynamicResource StoriesCardGlass}"
+                                                                BorderBrush="{DynamicResource StoriesCardBorder}"
+                                                                BorderThickness="1">
+                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Path Style="{StaticResource IconPath}"
+                                                                      Width="13" Height="13"
+                                                                      Data="{StaticResource IconSettings}"
+                                                                      Stroke="{DynamicResource TextPrimary}"
+                                                                      Margin="0,0,6,0" />
+                                                                <TextBlock Text="Друзья"
+                                                                           FontFamily="{StaticResource MainFont}"
+                                                                           FontSize="12"
+                                                                           FontWeight="Medium"
+                                                                           Foreground="{DynamicResource TextPrimary}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </Button>
+
+                                                    <!-- Кнопка Стоп -->
+                                                    <Button Grid.Column="2"
+                                                            Command="{Binding StopCommand}"
+                                                            Style="{StaticResource StoryBarBtn}"
+                                                            Height="32"
+                                                            Margin="6,0,0,0"
+                                                            ToolTip="Остановить сервер"
+                                                            Visibility="{Binding CanStop, Converter={StaticResource BoolToVis}}">
+                                                        <Border Height="32"
+                                                                Width="32"
+                                                                CornerRadius="3"
+                                                                Background="{DynamicResource StoriesCardGlass}"
+                                                                BorderBrush="{DynamicResource BadBrush}"
+                                                                BorderThickness="1">
+                                                            <Path Style="{StaticResource IconPath}"
+                                                                  Width="11" Height="11"
+                                                                  Data="{StaticResource IconClose}"
+                                                                  Stroke="{DynamicResource BadBrush}"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center" />
+                                                        </Border>
+                                                    </Button>
+                                                </Grid>
+
+                                                <!-- Выпадающая панель доступа друзьям -->
+                                                <Border Background="{DynamicResource StoriesPanelBg}"
+                                                        BorderBrush="{DynamicResource StoriesCardBorder}"
+                                                        BorderThickness="0,1,0,0"
+                                                        Margin="-14,10,-14,-12"
+                                                        Padding="12,10"
+                                                        Visibility="{Binding IsSharePanelOpen, Converter={StaticResource BoolToVis}}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="ДОСТУП ДРУЗЬЯМ"
+                                                                   FontFamily="{StaticResource HeadingFont}"
+                                                                   FontSize="11"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextMuted}"
+                                                                   Margin="0,0,0,6" />
+
+                                                        <!-- Чипы друзей -->
+                                                        <ItemsControl ItemsSource="{Binding AllowedPlayers}" Margin="0,0,0,6">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel Orientation="Horizontal" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <Border Background="{DynamicResource StoriesCardGlass}"
+                                                                            BorderBrush="{DynamicResource StoriesCardBorder}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="3"
+                                                                            Padding="8,2"
+                                                                            Margin="0,0,4,4">
+                                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                                            <TextBlock Text="{Binding}"
+                                                                                       FontFamily="{StaticResource MainFont}"
+                                                                                       FontSize="11"
+                                                                                       Foreground="{DynamicResource TextPrimary}"
+                                                                                       Margin="0,0,6,0" />
+                                                                            <Button Command="{Binding Path=DataContext.RemoveFriendCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                                    CommandParameter="{Binding}"
+                                                                                    Style="{StaticResource GhostBtn}"
+                                                                                    Padding="2,0"
+                                                                                    ToolTip="Забрать доступ">
+                                                                                <TextBlock Text="X"
+                                                                                           FontFamily="{StaticResource MainFont}"
+                                                                                           FontSize="10"
+                                                                                           FontWeight="Bold"
+                                                                                           Foreground="{DynamicResource Danger}" />
+                                                                            </Button>
+                                                                        </StackPanel>
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+
+                                                        <!-- Строка добавления друга: поле ввода + кнопка + -->
+                                                        <Grid Height="30">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <TextBox Grid.Column="0"
+                                                                     Style="{StaticResource AuraCompactTextBox}"
+                                                                     Height="30"
+                                                                     Padding="8,0"
+                                                                     FontSize="12"
+                                                                     Text="{Binding FriendNickToAdd, UpdateSourceTrigger=PropertyChanged}"
+                                                                     Tag="Никнейм друга..."
+                                                                     Margin="0,0,6,0" />
+
+                                                            <Button Grid.Column="1"
+                                                                    Command="{Binding AddFriendCommand}"
+                                                                    Style="{StaticResource PrimaryActionBtn}"
+                                                                    Height="30"
+                                                                    Padding="12,0"
+                                                                    Content="+"
+                                                                    FontWeight="Bold"
+                                                                    FontSize="14"
+                                                                    ToolTip="Предоставить доступ" />
+                                                        </Grid>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+
+                    <!-- РЕЖИМ 2: БЫСТРЫЙ ВХОД (LAN) -->
+                    <StackPanel Visibility="{Binding IsLanTab, Converter={StaticResource BoolToVis}}" Width="320" HorizontalAlignment="Left">
+                        <Button Command="{Binding CreateLobbyCommand}"
+                                Style="{StaticResource SecondaryBtn}"
+                                Height="40"
+                                Content="Локальный хост (Playit)"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,0,0,16" />
+
+                        <Grid Margin="0,0,0,16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Height="1" Background="{StaticResource LineInkBrush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="или"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="13"
+                                       Foreground="{StaticResource MuteBrush}"
+                                       Margin="14,0" VerticalAlignment="Center" />
+                            <Border Grid.Column="2" Height="1" Background="{StaticResource LineInkBrush}" VerticalAlignment="Center" />
+                        </Grid>
+
+                        <TextBlock Text="Код от друга"
                                    FontFamily="{StaticResource MainFont}"
                                    FontSize="13"
                                    Foreground="{StaticResource MuteBrush}"
-                                   Margin="14,0" VerticalAlignment="Center" />
-                        <Border Grid.Column="2" Height="1" Background="{StaticResource LineInkBrush}" VerticalAlignment="Center" />
-                    </Grid>
+                                   Margin="0,0,0,8" />
 
-                    <TextBlock Text="Код от друга"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="13"
-                               Foreground="{StaticResource MuteBrush}"
-                               Margin="0,0,0,8" />
-
-                    <WrapPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Grid Margin="0,0,12,8">
+                        <!-- 6 ячеек кода (44px * 6 + 8px * 5 = 304px, центрированы в 320px) -->
+                        <Grid HorizontalAlignment="Center" Margin="0,0,0,14">
                             <StackPanel Orientation="Horizontal">
                                 <!-- Cell 0 -->
                                 <Border Margin="0,0,8,0">
@@ -301,460 +698,67 @@
                                      VerticalAlignment="Stretch" />
                         </Grid>
 
+                        <!-- Кнопка "Войти" прямо под ячейками кода -->
                         <Button Command="{Binding JoinLobbyCommand}"
-                                Style="{StaticResource StandardBtn}"
-                                Height="58"
+                                Style="{StaticResource PrimaryNeonBtn}"
+                                Height="42"
                                 Content="{Binding JoinButtonText}"
-                                Margin="0,0,0,8" />
-                    </WrapPanel>
+                                HorizontalAlignment="Stretch"
+                                Margin="0,0,0,12" />
 
-                    <StackPanel Orientation="Vertical" Margin="0,0,0,12" Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}">
-                        <TextBlock Text="{Binding JoinErrorMessage}"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="13"
-                                   FontWeight="Medium"
-                                   Foreground="{DynamicResource Danger}"
-                                   TextWrapping="Wrap"
-                                   Margin="0,0,0,6" />
-                        <Button Command="{Binding SendReportCommand}"
-                                Style="{StaticResource BadLinkBtn}"
-                                Content="Отправить отчёт об ошибке"
-                                HorizontalAlignment="Left" />
+                        <!-- Ошибка входа в лобби -->
+                        <StackPanel Orientation="Vertical" Margin="0,0,0,12" Visibility="{Binding HasJoinError, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding JoinErrorMessage}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="13"
+                                       FontWeight="Medium"
+                                       Foreground="{DynamicResource Danger}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,6" />
+                            <Button Command="{Binding SendReportCommand}"
+                                    Style="{StaticResource BadLinkBtn}"
+                                    Content="Отправить отчёт об ошибке"
+                                    HorizontalAlignment="Left" />
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Правая колонка: 3D-персонаж + Список облачных миров 24/7 -->
-                <Grid Grid.Column="2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="16" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <!-- Правая зона: 3D-персонаж игрока до входа в лобби -->
+                <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Grid Width="180" Height="280"
+                          Background="Transparent"
+                          Cursor="Hand"
+                          ToolTip="Потяните мышью, чтобы повернуть персонажа"
+                          behaviors:AlivePlayer3D.SourceModel="{Binding LocalPlayerModel3D}"
+                          behaviors:AlivePlayer3D.BaseYaw="-14"
+                          behaviors:AlivePlayer3D.BasePitch="4"
+                          behaviors:AlivePlayer3D.PhaseSeed="{Binding LocalPlayerNickname}">
+                        <Viewport3D Width="180" Height="280" ClipToBounds="False" IsHitTestVisible="False">
+                            <Viewport3D.Camera>
+                                <PerspectiveCamera Position="0,0,27.5"
+                                                   LookDirection="0,0,-1"
+                                                   UpDirection="0,1,0"
+                                                   FieldOfView="45" />
+                            </Viewport3D.Camera>
+                            <ModelVisual3D />
+                        </Viewport3D>
+                    </Grid>
 
-                    <!-- 3D-персонаж игрока до входа в лобби -->
-                    <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0">
-                        <Grid Width="156" Height="244"
-                              Background="Transparent"
-                              Cursor="Hand"
-                              ToolTip="Потяните мышью, чтобы повернуть персонажа"
-                              behaviors:AlivePlayer3D.SourceModel="{Binding LocalPlayerModel3D}"
-                              behaviors:AlivePlayer3D.BaseYaw="-14"
-                              behaviors:AlivePlayer3D.BasePitch="4"
-                              behaviors:AlivePlayer3D.PhaseSeed="{Binding LocalPlayerNickname}">
-                            <Viewport3D Width="156" Height="244" ClipToBounds="False" IsHitTestVisible="False">
-                                <Viewport3D.Camera>
-                                    <PerspectiveCamera Position="0,0,27.5"
-                                                       LookDirection="0,0,-1"
-                                                       UpDirection="0,1,0"
-                                                       FieldOfView="45" />
-                                </Viewport3D.Camera>
-                                <ModelVisual3D />
-                            </Viewport3D>
-                        </Grid>
+                    <TextBlock Text="{Binding LocalPlayerNickname}"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource InkBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,6,0,0" />
 
-                        <TextBlock Text="{Binding LocalPlayerNickname}"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="15"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource InkBrush}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,4,0,0" />
-
-                        <TextBlock Text="Готов к лобби"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MuteBrush}"
-                                   HorizontalAlignment="Center"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
-
-                    <!-- Правая панель: «Мои миры» (стилизована под эталон панели OverviewView) -->
-                    <Border Grid.Column="2"
-                            Width="320"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
-                            Margin="12,0,16,16"
-                            Background="{DynamicResource StoriesPanelBg}"
-                            BorderBrush="{DynamicResource BorderSubtle}"
-                            BorderThickness="1"
-                            CornerRadius="3"
-                            Padding="16"
-                            ClipToBounds="True">
-                        <StackPanel>
-                            <!-- 1. Шапка внутри контейнера: текст МОИ МИРЫ и кнопка Обновить 26px -->
-                            <Grid Margin="0,0,0,10">
-                                <TextBlock Text="МОИ МИРЫ"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="12"
-                                           FontWeight="Bold"
-                                           Foreground="{DynamicResource TextMuted}"
-                                           VerticalAlignment="Center" />
-
-                                <!-- Кнопка обновления: аккуратная компактная таблетка 26px без подчёркиваний -->
-                                <Button Command="{Binding RefreshWorldsCommand}"
-                                        Style="{StaticResource StoryBarBtn}"
-                                        HorizontalAlignment="Right"
-                                        VerticalAlignment="Center"
-                                        Height="26">
-                                    <Border Background="{DynamicResource StoriesCardGlass}"
-                                            BorderBrush="{DynamicResource StoriesCardBorder}"
-                                            BorderThickness="1"
-                                            CornerRadius="3"
-                                            Padding="8,0"
-                                            Height="26">
-                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Path Style="{StaticResource IconPath}"
-                                                  Width="11" Height="11"
-                                                  Data="{StaticResource IconRefresh}"
-                                                  Stroke="{DynamicResource TextPrimary}"
-                                                  Margin="0,0,5,0" />
-                                            <TextBlock Text="Обновить"
-                                                       FontFamily="{StaticResource MainFont}"
-                                                       FontSize="11"
-                                                       FontWeight="Medium"
-                                                       Foreground="{DynamicResource TextPrimary}"
-                                                       VerticalAlignment="Center" />
-                                        </StackPanel>
-                                    </Border>
-                                </Button>
-                            </Grid>
-
-                            <!-- Тонкая разделительная линия (2px, Accent на StoriesTrack) -->
-                            <Border Height="2"
-                                    Background="{DynamicResource StoriesTrack}"
-                                    CornerRadius="1"
-                                    ClipToBounds="False"
-                                    Margin="0,0,0,14">
-                                <Border Width="36"
-                                        HorizontalAlignment="Left"
-                                        Background="{StaticResource Accent}"
-                                        CornerRadius="1" />
-                            </Border>
-
-                            <!-- 2. Взаимоисключающие состояния -->
-
-                            <!-- Состояние 1: Открыта форма создания мира -->
-                            <StackPanel Visibility="{Binding IsCreateWorldFormVisible, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="Новый мир"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"
-                                           Margin="0,0,0,12" />
-
-                                <TextBlock Text="Название мира"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource GameInputTextMutedBrush}"
-                                           Margin="4,0,0,6" />
-                                <TextBox Style="{StaticResource AuraCompactTextBox}"
-                                         Text="{Binding NewWorldName, UpdateSourceTrigger=PropertyChanged}"
-                                         Tag="Название мира..."
-                                         Margin="0,0,0,12" />
-
-                                <TextBlock Text="Сид генерации"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="11"
-                                           Foreground="{DynamicResource GameInputTextMutedBrush}"
-                                           Margin="4,0,0,6" />
-                                <TextBox Style="{StaticResource AuraCompactTextBox}"
-                                         Text="{Binding NewWorldSeed, UpdateSourceTrigger=PropertyChanged}"
-                                         Tag="Необязательно (случайный)"
-                                         Margin="0,0,0,14" />
-
-                                <TextBlock Text="{Binding CreateWorldError}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           Foreground="{DynamicResource Danger}"
-                                           TextWrapping="Wrap"
-                                           Margin="0,0,0,10"
-                                           Visibility="{Binding HasCreateWorldError, Converter={StaticResource BoolToVis}}" />
-
-                                <Grid Margin="0,14,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <Button Grid.Column="0"
-                                            Command="{Binding CancelCreateWorldFormCommand}"
-                                            Style="{StaticResource FormCancelBtn}"
-                                            Height="36"
-                                            Padding="16,0"
-                                            Content="Отмена" />
-
-                                    <Button Grid.Column="1"
-                                            Command="{Binding SubmitCreateWorldCommand}"
-                                            Style="{StaticResource PrimaryNeonBtn}"
-                                            Height="36"
-                                            Padding="14,0"
-                                            FontSize="13"
-                                            Margin="8,0,0,0"
-                                            Content="Создать и войти" />
-                                </Grid>
-                            </StackPanel>
-
-                            <!-- Состояние 2: Миров нет и форма закрыта -->
-                            <StackPanel VerticalAlignment="Center"
-                                        HorizontalAlignment="Center"
-                                        Margin="0,32,0,32"
-                                        Visibility="{Binding IsEmptyWorldListVisible, Converter={StaticResource BoolToVis}}">
-                                <Path Style="{StaticResource IconPath}"
-                                      Width="28" Height="28"
-                                      Data="{StaticResource IconWorld}"
-                                      Stroke="{DynamicResource TextMuted}"
-                                      Opacity="0.4"
-                                      HorizontalAlignment="Center"
-                                      Margin="0,0,0,12" />
-
-                                <TextBlock Text="Нет доступных миров"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimary}"
-                                           HorizontalAlignment="Center"
-                                           Margin="0,0,0,4" />
-
-                                <TextBlock Text="Нажмите «Создать мир», чтобы начать"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="12"
-                                           Foreground="{DynamicResource TextMuted}"
-                                           HorizontalAlignment="Center"
-                                           TextAlignment="Center"
-                                           Margin="0,0,0,16" />
-
-                                <Button Command="{Binding OpenCreateWorldFormCommand}"
-                                        Style="{StaticResource StandardBtn}"
-                                        Height="32"
-                                        Padding="16,0"
-                                        FontSize="13"
-                                        HorizontalAlignment="Center"
-                                        Content="+ Новый мир" />
-                            </StackPanel>
-
-                            <!-- Состояние 3: Есть миры и форма закрыта -->
-                            <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                          MaxHeight="420"
-                                          Focusable="False"
-                                          Visibility="{Binding IsCloudWorldsListVisible, Converter={StaticResource BoolToVis}}">
-                                <ItemsControl ItemsSource="{Binding CloudWorlds}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{DynamicResource StoriesCardGlass}"
-                                                    BorderBrush="{DynamicResource StoriesCardBorder}"
-                                                    BorderThickness="1"
-                                                    CornerRadius="3"
-                                                    Padding="12,10"
-                                                    Margin="0,0,0,8">
-                                                <StackPanel>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                            <ColumnDefinition Width="Auto" />
-                                                        </Grid.ColumnDefinitions>
-
-                                                        <!-- Колонка 0 (Иконка 36x36): активный/спящий статус -->
-                                                        <Border Grid.Column="0"
-                                                                Width="36" Height="36"
-                                                                CornerRadius="3"
-                                                                HorizontalAlignment="Left"
-                                                                VerticalAlignment="Center">
-                                                            <Border.Style>
-                                                                <Style TargetType="Border">
-                                                                    <Setter Property="Background" Value="{DynamicResource StoriesCardGlass}" />
-                                                                    <Setter Property="BorderBrush" Value="{DynamicResource StoriesCardBorder}" />
-                                                                    <Setter Property="BorderThickness" Value="1" />
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                                            <Setter Property="Background" Value="{DynamicResource AchievementGoldBrush}" />
-                                                                            <Setter Property="BorderThickness" Value="0" />
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IsStarting}" Value="True">
-                                                                            <Setter Property="Background" Value="{DynamicResource AccentDim}" />
-                                                                            <Setter Property="BorderThickness" Value="0" />
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </Border.Style>
-                                                            <Path Width="16" Height="16"
-                                                                  Data="{StaticResource IconWorld}"
-                                                                  HorizontalAlignment="Center"
-                                                                  VerticalAlignment="Center">
-                                                                <Path.Style>
-                                                                    <Style TargetType="Path" BasedOn="{StaticResource IconPath}">
-                                                                        <Setter Property="Stroke" Value="{DynamicResource TextMuted}" />
-                                                                        <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding IsRunning}" Value="True">
-                                                                                <Setter Property="Stroke" Value="{DynamicResource PrimaryActionText}" />
-                                                                            </DataTrigger>
-                                                                            <DataTrigger Binding="{Binding IsStarting}" Value="True">
-                                                                                <Setter Property="Stroke" Value="{DynamicResource TextWhite}" />
-                                                                            </DataTrigger>
-                                                                        </Style.Triggers>
-                                                                    </Style>
-                                                                </Path.Style>
-                                                            </Path>
-                                                        </Border>
-
-                                                        <!-- Колонка 1: Инфо в 2 компактные строки -->
-                                                        <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding Name}"
-                                                                       FontFamily="{StaticResource MainFont}"
-                                                                       FontSize="14"
-                                                                       FontWeight="SemiBold"
-                                                                       Foreground="{StaticResource TextWhite}"
-                                                                       TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Text="{Binding CompactStatusText}"
-                                                                       FontFamily="{StaticResource MainFont}"
-                                                                       FontSize="11"
-                                                                       Foreground="{DynamicResource TextMuted}"
-                                                                       Margin="0,2,0,0" />
-                                                        </StackPanel>
-
-                                                        <!-- Колонка 2: Действие (Войти + шестерёнка) -->
-                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                                            <Button Command="{Binding PlayCommand}"
-                                                                    Style="{StaticResource PrimaryNeonBtn}"
-                                                                    Height="30"
-                                                                    Padding="12,0"
-                                                                    FontSize="12"
-                                                                    FontWeight="SemiBold"
-                                                                    Content="{Binding PlayButtonText}" />
-
-                                                            <Button Command="{Binding ToggleSharePanelCommand}"
-                                                                    Style="{StaticResource StoryBarBtn}"
-                                                                    Width="30" Height="30"
-                                                                    Margin="6,0,0,0"
-                                                                    ToolTip="Управление миром"
-                                                                    Visibility="{Binding IsOwner, Converter={StaticResource BoolToVis}}">
-                                                                <Border Width="30" Height="30"
-                                                                        CornerRadius="3"
-                                                                        Background="{DynamicResource StoriesCardGlass}"
-                                                                        BorderBrush="{DynamicResource StoriesCardBorder}"
-                                                                        BorderThickness="1">
-                                                                    <Path Style="{StaticResource IconPath}"
-                                                                          Width="14" Height="14"
-                                                                          Data="{StaticResource IconSettings}"
-                                                                          Stroke="{DynamicResource TextPrimary}"
-                                                                          HorizontalAlignment="Center"
-                                                                          VerticalAlignment="Center" />
-                                                                </Border>
-                                                            </Button>
-                                                        </StackPanel>
-                                                    </Grid>
-
-                                                    <!-- Выпадающая панель: Настройки мира и Доступ -->
-                                                    <Border Background="{DynamicResource StoriesPanelBg}"
-                                                            BorderBrush="{DynamicResource StoriesCardBorder}"
-                                                            BorderThickness="0,1,0,0"
-                                                            Margin="-12,10,-12,-10"
-                                                            Padding="12,10"
-                                                            Visibility="{Binding IsSharePanelOpen, Converter={StaticResource BoolToVis}}">
-                                                        <StackPanel>
-                                                            <!-- Кнопка "Остановить сервер" -->
-                                                            <Button Command="{Binding StopCommand}"
-                                                                    Style="{StaticResource BadLinkBtn}"
-                                                                    Padding="0"
-                                                                    Margin="0,0,0,8"
-                                                                    HorizontalAlignment="Left"
-                                                                    Visibility="{Binding CanStop, Converter={StaticResource BoolToVis}}">
-                                                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                                    <Path Style="{StaticResource IconPath}"
-                                                                          Width="11" Height="11"
-                                                                          Data="{StaticResource IconClose}"
-                                                                          Stroke="{DynamicResource BadBrush}"
-                                                                          Margin="0,0,6,0" />
-                                                                    <TextBlock Text="Остановить сервер"
-                                                                               FontFamily="{StaticResource MainFont}"
-                                                                               FontSize="12"
-                                                                               FontWeight="Medium"
-                                                                               Foreground="{DynamicResource BadBrush}" />
-                                                                </StackPanel>
-                                                            </Button>
-
-                                                            <TextBlock Text="ДОСТУП ДРУЗЬЯМ"
-                                                                       FontFamily="{StaticResource HeadingFont}"
-                                                                       FontSize="11"
-                                                                       FontWeight="Bold"
-                                                                       Foreground="{DynamicResource TextMuted}"
-                                                                       Margin="0,0,0,6" />
-
-                                                            <!-- Чипы друзей -->
-                                                            <ItemsControl ItemsSource="{Binding AllowedPlayers}" Margin="0,0,0,6">
-                                                                <ItemsControl.ItemsPanel>
-                                                                    <ItemsPanelTemplate>
-                                                                        <WrapPanel Orientation="Horizontal" />
-                                                                    </ItemsPanelTemplate>
-                                                                </ItemsControl.ItemsPanel>
-                                                                <ItemsControl.ItemTemplate>
-                                                                    <DataTemplate>
-                                                                        <Border Background="{DynamicResource StoriesCardGlass}"
-                                                                                BorderBrush="{DynamicResource StoriesCardBorder}"
-                                                                                BorderThickness="1"
-                                                                                CornerRadius="3"
-                                                                                Padding="8,2"
-                                                                                Margin="0,0,4,4">
-                                                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                                                                <TextBlock Text="{Binding}"
-                                                                                           FontFamily="{StaticResource MainFont}"
-                                                                                           FontSize="11"
-                                                                                           Foreground="{DynamicResource TextPrimary}"
-                                                                                           Margin="0,0,6,0" />
-                                                                                <Button Command="{Binding Path=DataContext.RemoveFriendCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                                                        CommandParameter="{Binding}"
-                                                                                        Style="{StaticResource GhostBtn}"
-                                                                                        Padding="2,0"
-                                                                                        ToolTip="Забрать доступ">
-                                                                                    <TextBlock Text="X"
-                                                                                               FontFamily="{StaticResource MainFont}"
-                                                                                               FontSize="10"
-                                                                                               FontWeight="Bold"
-                                                                                               Foreground="{DynamicResource Danger}" />
-                                                                                </Button>
-                                                                            </StackPanel>
-                                                                        </Border>
-                                                                    </DataTemplate>
-                                                                </ItemsControl.ItemTemplate>
-                                                            </ItemsControl>
-
-                                                            <!-- Строка добавления друга: поле ввода 30px + кнопка 30px -->
-                                                            <Grid Height="30">
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*" />
-                                                                    <ColumnDefinition Width="Auto" />
-                                                                </Grid.ColumnDefinitions>
-
-                                                                <TextBox Grid.Column="0"
-                                                                         Style="{StaticResource AuraCompactTextBox}"
-                                                                         Height="30"
-                                                                         Padding="8,0"
-                                                                         FontSize="12"
-                                                                         Text="{Binding FriendNickToAdd, UpdateSourceTrigger=PropertyChanged}"
-                                                                         Tag="Никнейм друга..."
-                                                                         Margin="0,0,6,0" />
-
-                                                                <Button Grid.Column="1"
-                                                                        Command="{Binding AddFriendCommand}"
-                                                                        Style="{StaticResource PrimaryActionBtn}"
-                                                                        Height="30"
-                                                                        Padding="12,0"
-                                                                        Content="+"
-                                                                        FontWeight="Bold"
-                                                                        FontSize="14"
-                                                                        ToolTip="Предоставить доступ" />
-                                                            </Grid>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </StackPanel>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </StackPanel>
-                    </Border>
-                </Grid>
+                    <TextBlock Text="Готов к игре"
+                               FontFamily="{StaticResource MainFont}"
+                               FontSize="12"
+                               Foreground="{StaticResource MuteBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,2,0,0" />
+                </StackPanel>
             </Grid>
         </Grid>
 

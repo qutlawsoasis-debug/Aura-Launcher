@@ -76,6 +76,34 @@ public class LobbyViewModel : ObservableObject
     public bool IsEmptyWorldListVisible => !_isCreateWorldFormVisible && !_hasCloudWorlds;
     public bool IsCloudWorldsListVisible => !_isCreateWorldFormVisible && _hasCloudWorlds;
 
+    private bool _isCloudWorldsTab = true;
+    public bool IsCloudWorldsTab
+    {
+        get => _isCloudWorldsTab;
+        set
+        {
+            if (SetProperty(ref _isCloudWorldsTab, value))
+            {
+                OnPropertyChanged(nameof(IsLanTab));
+            }
+        }
+    }
+
+    public bool IsLanTab
+    {
+        get => !_isCloudWorldsTab;
+        set
+        {
+            if (value != !_isCloudWorldsTab)
+            {
+                IsCloudWorldsTab = !value;
+            }
+        }
+    }
+
+    public RelayCommand SelectCloudWorldsTabCommand { get; }
+    public RelayCommand SelectLanTabCommand { get; }
+
     private string _newWorldName = "Выживание";
     public string NewWorldName
     {
@@ -445,6 +473,8 @@ public class LobbyViewModel : ObservableObject
         });
         SubmitCreateWorldCommand = new AsyncRelayCommand(CreateNewWorldAsync, () => !IsCreatingWorld && !string.IsNullOrWhiteSpace(NewWorldName));
         RefreshWorldsCommand = new AsyncRelayCommand(RefreshWorldsAsync, () => !IsRefreshingWorlds);
+        SelectCloudWorldsTabCommand = new RelayCommand(_ => IsCloudWorldsTab = true);
+        SelectLanTabCommand = new RelayCommand(_ => IsCloudWorldsTab = false);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6 && !IsJoiningLobby);
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         CopyLinkCommand = new RelayCommand(_ => CopyLobbyLink(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
