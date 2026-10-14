@@ -66,7 +66,20 @@
     <Color x:Key="ColorAchievementGoldStart">#F2A63C</Color>
     <Color x:Key="ColorAchievementGoldEnd">#E08E1E</Color>
 
+    <!-- Game Input Box & Form Button Colors -->
+    <Color x:Key="ColorGameInputBg">#1A1F26</Color>
+    <Color x:Key="ColorGameInputBorder">#2E3742</Color>
+    <Color x:Key="ColorGameInputBorderFocus">#D9943B</Color>
+    <Color x:Key="ColorGameInputTextMuted">#7E8B9B</Color>
+    <Color x:Key="ColorCancelBtnBg">#2C323B</Color>
+
     <!-- Named SolidColorBrush resources for UI controls (Frozen for GPU performance) -->
+    <SolidColorBrush x:Key="GameInputBgBrush" Color="{StaticResource ColorGameInputBg}" po:Freeze="True" />
+    <SolidColorBrush x:Key="GameInputBorderBrush" Color="{StaticResource ColorGameInputBorder}" po:Freeze="True" />
+    <SolidColorBrush x:Key="GameInputBorderFocusBrush" Color="{StaticResource ColorGameInputBorderFocus}" po:Freeze="True" />
+    <SolidColorBrush x:Key="GameInputTextMutedBrush" Color="{StaticResource ColorGameInputTextMuted}" po:Freeze="True" />
+    <SolidColorBrush x:Key="CancelBtnBgBrush" Color="{StaticResource ColorCancelBtnBg}" po:Freeze="True" />
+
     <SolidColorBrush x:Key="BgBase" Color="{StaticResource ColorBgBase}" po:Freeze="True" />
     <SolidColorBrush x:Key="Panel" Color="{StaticResource ColorPanel}" po:Freeze="True" />
     <SolidColorBrush x:Key="PanelRaised" Color="{StaticResource ColorPanelRaised}" po:Freeze="True" />
