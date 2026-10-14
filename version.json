@@ -1,8 +1,8 @@
 {
-    "internalVersion":  "1.2.123",
-    "userFacingVersion":  "beta 1.0.115",
+    "internalVersion":  "1.2.124",
+    "userFacingVersion":  "beta 1.0.116",
     "changelog":  [
-                      "[Схемы] Стартовый каталог из 100 построек для Litematica (дома, замки, склады, декор)",
-                      "[Сборка] Авто-активация ресурспаков в options.txt и синхронизация папки schematics"
+                      "[Строительство] Добавлены моды Accurate Block Placement и Bridging Mod (быстрая установка блоков без задержек и на бегу)",
+                      "[Ресурспаки] Автоматическая активация всех ресурспаков сборки в options.txt перед запуском"
                   ]
 }
