@@ -1,8 +1,7 @@
 {
-    "internalVersion":  "1.2.121",
-    "userFacingVersion":  "beta 1.0.113",
+    "internalVersion":  "1.2.122",
+    "userFacingVersion":  "beta 1.0.114",
     "changelog":  [
-                      "[Лобби] Исправлено отображение списка локальных миров при выгрузке в облако",
-                      "[Лобби] Обновлён дизайн полей ввода создания мира под стиль лаунчера"
+                      "[Сборка] Добавлены моды Litematica, MaLiLib и Effortless Structure"
                   ]
 }
