@@ -3,42 +3,58 @@ using System.Text.Json.Serialization;
 
 namespace AuraLauncher.Models;
 
-public record CloudLobbyItem(
-    [property: JsonPropertyName("port")] int Port,
-    [property: JsonPropertyName("owner")] string Owner,
+public record CloudWorldItem(
+    [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("owner")] string Owner,
+    [property: JsonPropertyName("seed")] string? Seed,
+    [property: JsonPropertyName("allowed_players")] List<string>? AllowedPlayers,
     [property: JsonPropertyName("created_at")] double CreatedAt,
+    [property: JsonPropertyName("last_played")] double LastPlayed,
     [property: JsonPropertyName("status")] string Status,
-    [property: JsonPropertyName("online_players")] List<string>? OnlinePlayers = null
+    [property: JsonPropertyName("port")] int? Port,
+    [property: JsonPropertyName("online_players")] List<string>? OnlinePlayers,
+    [property: JsonPropertyName("max_players")] int MaxPlayers = 8,
+    [property: JsonPropertyName("is_owner")] bool IsOwner = false
 )
 {
     [JsonIgnore]
-    public string DisplayAddress => $"89.168.82.200:{Port}";
+    public bool IsRunning => string.Equals(Status, "running", System.StringComparison.OrdinalIgnoreCase);
 
     [JsonIgnore]
-    public int PlayerCount => OnlinePlayers?.Count ?? 0;
+    public bool IsStarting => string.Equals(Status, "starting", System.StringComparison.OrdinalIgnoreCase);
 
     [JsonIgnore]
-    public string FormattedPlayers => $"{PlayerCount} игрок{(PlayerCount == 1 ? "" : (PlayerCount >= 2 && PlayerCount <= 4 ? "а" : "ов"))}";
+    public bool IsActive => IsRunning || IsStarting;
+
+    [JsonIgnore]
+    public int OnlineCount => OnlinePlayers?.Count ?? 0;
+
+    [JsonIgnore]
+    public string FormattedPlayers => $"{OnlineCount}/{MaxPlayers}";
+
+    [JsonIgnore]
+    public string DisplayAddress => Port.HasValue ? $"89.168.82.200:{Port.Value}" : string.Empty;
 }
 
-public record CloudLobbiesListResponse(
+public record CloudWorldsResponse(
     [property: JsonPropertyName("max_active")] int MaxActive,
     [property: JsonPropertyName("active_count")] int ActiveCount,
-    [property: JsonPropertyName("lobbies")] List<CloudLobbyItem> Lobbies
+    [property: JsonPropertyName("worlds")] List<CloudWorldItem> Worlds
 );
 
 public record CloudLobbyCreateResponse(
     [property: JsonPropertyName("ip")] string? Ip,
     [property: JsonPropertyName("port")] int? Port,
     [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("worldId")] string? WorldId,
+    [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("owner")] string? Owner,
-    [property: JsonPropertyName("lobbyName")] string? LobbyName,
     [property: JsonPropertyName("error")] string? Error
 );
 
-public record CloudLobbyStopResponse(
-    [property: JsonPropertyName("status")] string Status,
-    [property: JsonPropertyName("port")] int? Port,
+public record CloudWorldShareResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("allowed_players")] List<string>? AllowedPlayers,
     [property: JsonPropertyName("error")] string? Error
 );

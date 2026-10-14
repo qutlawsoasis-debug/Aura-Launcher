@@ -12,57 +12,29 @@ namespace AuraLauncher.Services.Implementations;
 public class CloudLobbyService : ICloudLobbyService
 {
     private const string DefaultServerHost = "89.168.82.200";
-    private const int DefaultMainServerPort = 25565;
     private const int DefaultManagerPort = 25571;
     private const string DefaultSecret = "aura-secret-2026";
 
     private readonly HttpClient _httpClient;
-    private readonly IMinecraftPingService _pingService;
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
     public string ServerHost { get; } = DefaultServerHost;
-    public int MainServerPort { get; } = DefaultMainServerPort;
-    public string MainServerAddress => $"{ServerHost}:{MainServerPort}";
     public string ManagerBaseUrl => $"http://{ServerHost}:{DefaultManagerPort}/";
 
-    public CloudLobbyService(IMinecraftPingService pingService, HttpClient? httpClient = null)
+    public CloudLobbyService(HttpClient? httpClient = null)
     {
-        _pingService = pingService ?? throw new ArgumentNullException(nameof(pingService));
-        _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+        _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
     }
 
-    public async Task<ServerPingResult> PingMainServerAsync(CancellationToken cancellationToken = default)
+    public async Task<CloudWorldsResponse?> GetWorldsAsync(string playerName, CancellationToken cancellationToken = default)
     {
         try
         {
-            return await _pingService.PingServerAsync(MainServerAddress, cancellationToken);
-        }
-        catch
-        {
-            return new ServerPingResult(null, null, null);
-        }
-    }
-
-    public async Task<ServerPingResult> PingLobbyAsync(int port, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await _pingService.PingServerAsync($"{ServerHost}:{port}", cancellationToken);
-        }
-        catch
-        {
-            return new ServerPingResult(null, null, null);
-        }
-    }
-
-    public async Task<CloudLobbiesListResponse?> GetCloudLobbiesAsync(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(ManagerBaseUrl), "lobbies"));
+            var url = $"worlds?player={Uri.EscapeDataString(playerName)}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(ManagerBaseUrl), url));
             req.Headers.Add("X-Aura-Secret", DefaultSecret);
 
             using var resp = await _httpClient.SendAsync(req, cancellationToken);
@@ -72,7 +44,7 @@ public class CloudLobbyService : ICloudLobbyService
             }
 
             var json = await resp.Content.ReadAsStringAsync(cancellationToken);
-            return JsonSerializer.Deserialize<CloudLobbiesListResponse>(json, _jsonOptions);
+            return JsonSerializer.Deserialize<CloudWorldsResponse>(json, _jsonOptions);
         }
         catch
         {
@@ -80,10 +52,11 @@ public class CloudLobbyService : ICloudLobbyService
         }
     }
 
-    public async Task<CloudLobbyCreateResponse?> CreateCloudLobbyAsync(
+    public async Task<CloudLobbyCreateResponse?> CreateOrStartWorldAsync(
         string owner,
-        string lobbyName,
-        int maxPlayers = 8,
+        string worldName,
+        string? seed = null,
+        string? worldId = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -91,8 +64,9 @@ public class CloudLobbyService : ICloudLobbyService
             var payload = new
             {
                 owner = string.IsNullOrWhiteSpace(owner) ? "Player" : owner.Trim(),
-                lobbyName = string.IsNullOrWhiteSpace(lobbyName) ? $"{owner}'s World" : lobbyName.Trim(),
-                maxPlayers
+                worldName = string.IsNullOrWhiteSpace(worldName) ? "Мир" : worldName.Trim(),
+                seed = seed?.Trim() ?? string.Empty,
+                worldId = worldId?.Trim()
             };
 
             var content = new StringContent(
@@ -113,15 +87,20 @@ public class CloudLobbyService : ICloudLobbyService
         }
         catch (Exception ex)
         {
-            return new CloudLobbyCreateResponse(null, null, "error", owner, lobbyName, ex.Message);
+            return new CloudLobbyCreateResponse(null, null, "error", worldId, worldName, owner, ex.Message);
         }
     }
 
-    public async Task<bool> StopCloudLobbyAsync(int port, CancellationToken cancellationToken = default)
+    public async Task<bool> StopWorldAsync(string? worldId = null, int? port = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var payload = new { port };
+            var payload = new
+            {
+                worldId = worldId?.Trim(),
+                port
+            };
+
             var content = new StringContent(
                 JsonSerializer.Serialize(payload),
                 Encoding.UTF8,
@@ -139,6 +118,45 @@ public class CloudLobbyService : ICloudLobbyService
         catch
         {
             return false;
+        }
+    }
+
+    public async Task<CloudWorldShareResponse?> ShareWorldAsync(
+        string owner,
+        string worldId,
+        string targetPlayer,
+        string action = "add",
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var payload = new
+            {
+                owner = owner.Trim(),
+                worldId = worldId.Trim(),
+                targetPlayer = targetPlayer.Trim(),
+                action = action.Trim().ToLowerInvariant()
+            };
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(payload),
+                Encoding.UTF8,
+                "application/json");
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, new Uri(new Uri(ManagerBaseUrl), "lobbies/share"))
+            {
+                Content = content
+            };
+            req.Headers.Add("X-Aura-Secret", DefaultSecret);
+
+            using var resp = await _httpClient.SendAsync(req, cancellationToken);
+            var json = await resp.Content.ReadAsStringAsync(cancellationToken);
+
+            return JsonSerializer.Deserialize<CloudWorldShareResponse>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return new CloudWorldShareResponse(false, null, ex.Message);
         }
     }
 }

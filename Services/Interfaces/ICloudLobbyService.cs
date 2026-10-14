@@ -7,12 +7,9 @@ namespace AuraLauncher.Services.Interfaces;
 public interface ICloudLobbyService
 {
     string ServerHost { get; }
-    int MainServerPort { get; }
-    string MainServerAddress { get; }
 
-    Task<ServerPingResult> PingMainServerAsync(CancellationToken cancellationToken = default);
-    Task<CloudLobbiesListResponse?> GetCloudLobbiesAsync(CancellationToken cancellationToken = default);
-    Task<CloudLobbyCreateResponse?> CreateCloudLobbyAsync(string owner, string lobbyName, int maxPlayers = 8, CancellationToken cancellationToken = default);
-    Task<bool> StopCloudLobbyAsync(int port, CancellationToken cancellationToken = default);
-    Task<ServerPingResult> PingLobbyAsync(int port, CancellationToken cancellationToken = default);
+    Task<CloudWorldsResponse?> GetWorldsAsync(string playerName, CancellationToken cancellationToken = default);
+    Task<CloudLobbyCreateResponse?> CreateOrStartWorldAsync(string owner, string worldName, string? seed = null, string? worldId = null, CancellationToken cancellationToken = default);
+    Task<bool> StopWorldAsync(string? worldId = null, int? port = null, CancellationToken cancellationToken = default);
+    Task<CloudWorldShareResponse?> ShareWorldAsync(string owner, string worldId, string targetPlayer, string action = "add", CancellationToken cancellationToken = default);
 }

@@ -36,63 +36,68 @@ public class LobbyViewModel : ObservableObject
     private readonly ICloudLobbyService? _cloudLobbyService;
     private readonly System.Windows.Threading.DispatcherTimer? _cloudLobbyRefreshTimer;
 
-    public ObservableCollection<CloudLobbyItemViewModel> CloudLobbies { get; } = new();
+    public ObservableCollection<CloudWorldItemViewModel> CloudWorlds { get; } = new();
 
-    private bool _hasCloudLobbies;
-    public bool HasCloudLobbies
+    private bool _hasCloudWorlds;
+    public bool HasCloudWorlds
     {
-        get => _hasCloudLobbies;
-        set => SetProperty(ref _hasCloudLobbies, value);
+        get => _hasCloudWorlds;
+        set => SetProperty(ref _hasCloudWorlds, value);
     }
 
-    private bool _isRefreshingCloudLobbies;
-    public bool IsRefreshingCloudLobbies
+    private bool _isRefreshingWorlds;
+    public bool IsRefreshingWorlds
     {
-        get => _isRefreshingCloudLobbies;
-        set => SetProperty(ref _isRefreshingCloudLobbies, value);
+        get => _isRefreshingWorlds;
+        set => SetProperty(ref _isRefreshingWorlds, value);
     }
 
-    private bool _isCreatingCloudLobby;
-    public bool IsCreatingCloudLobby
+    private bool _isCreateWorldFormVisible;
+    public bool IsCreateWorldFormVisible
     {
-        get => _isCreatingCloudLobby;
-        set => SetProperty(ref _isCreatingCloudLobby, value);
+        get => _isCreateWorldFormVisible;
+        set => SetProperty(ref _isCreateWorldFormVisible, value);
     }
 
-    private string? _cloudLobbyStatusMessage;
-    public string? CloudLobbyStatusMessage
+    private string _newWorldName = "Выживание";
+    public string NewWorldName
     {
-        get => _cloudLobbyStatusMessage;
+        get => _newWorldName;
+        set => SetProperty(ref _newWorldName, value);
+    }
+
+    private string _newWorldSeed = string.Empty;
+    public string NewWorldSeed
+    {
+        get => _newWorldSeed;
+        set => SetProperty(ref _newWorldSeed, value);
+    }
+
+    private bool _isCreatingWorld;
+    public bool IsCreatingWorld
+    {
+        get => _isCreatingWorld;
+        set => SetProperty(ref _isCreatingWorld, value);
+    }
+
+    private string? _createWorldError;
+    public string? CreateWorldError
+    {
+        get => _createWorldError;
         set
         {
-            if (SetProperty(ref _cloudLobbyStatusMessage, value))
+            if (SetProperty(ref _createWorldError, value))
             {
-                OnPropertyChanged(nameof(HasCloudLobbyStatusMessage));
+                OnPropertyChanged(nameof(HasCreateWorldError));
             }
         }
     }
-    public bool HasCloudLobbyStatusMessage => !string.IsNullOrWhiteSpace(_cloudLobbyStatusMessage);
+    public bool HasCreateWorldError => !string.IsNullOrWhiteSpace(_createWorldError);
 
-    private int? _myCloudLobbyPort;
-    public int? MyCloudLobbyPort
-    {
-        get => _myCloudLobbyPort;
-        set
-        {
-            if (SetProperty(ref _myCloudLobbyPort, value))
-            {
-                OnPropertyChanged(nameof(HasMyCloudLobby));
-                OnPropertyChanged(nameof(MyCloudLobbyAddress));
-            }
-        }
-    }
-    public bool HasMyCloudLobby => _myCloudLobbyPort.HasValue;
-    public string MyCloudLobbyAddress => _myCloudLobbyPort.HasValue ? $"89.168.82.200:{_myCloudLobbyPort.Value}" : "";
-
-    public AsyncRelayCommand CreateCloudLobbyCommand { get; }
-    public AsyncRelayCommand RefreshCloudLobbiesCommand { get; }
-    public AsyncRelayCommand StopMyCloudLobbyCommand { get; }
-    public RelayCommand ConnectMyCloudLobbyCommand { get; }
+    public RelayCommand OpenCreateWorldFormCommand { get; }
+    public RelayCommand CancelCreateWorldFormCommand { get; }
+    public AsyncRelayCommand SubmitCreateWorldCommand { get; }
+    public AsyncRelayCommand RefreshWorldsCommand { get; }
     private string _serverPingText = "—";
     private string _serverPlayersText = "—";
     private string? _currentPingAddress;
@@ -411,13 +416,18 @@ public class LobbyViewModel : ObservableObject
         _cloudLobbyService = cloudLobbyService ?? (App.Services?.GetService(typeof(ICloudLobbyService)) as ICloudLobbyService);
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
-        CreateCloudLobbyCommand = new AsyncRelayCommand(CreateCloudLobbyAsync, () => !IsBusy && !IsInLobby && !IsCreatingCloudLobby);
-        RefreshCloudLobbiesCommand = new AsyncRelayCommand(RefreshCloudLobbiesAsync, () => !IsRefreshingCloudLobbies);
-        StopMyCloudLobbyCommand = new AsyncRelayCommand(() => StopMyCloudLobbyAsync(), () => HasMyCloudLobby);
-        ConnectMyCloudLobbyCommand = new RelayCommand(_ =>
+        OpenCreateWorldFormCommand = new RelayCommand(_ =>
         {
-            if (MyCloudLobbyPort.HasValue) ConnectToCloudLobby(MyCloudLobbyPort.Value);
-        }, _ => HasMyCloudLobby);
+            CreateWorldError = null;
+            IsCreateWorldFormVisible = true;
+        }, _ => !IsInLobby);
+        CancelCreateWorldFormCommand = new RelayCommand(_ =>
+        {
+            CreateWorldError = null;
+            IsCreateWorldFormVisible = false;
+        });
+        SubmitCreateWorldCommand = new AsyncRelayCommand(CreateNewWorldAsync, () => !IsCreatingWorld && !string.IsNullOrWhiteSpace(NewWorldName));
+        RefreshWorldsCommand = new AsyncRelayCommand(RefreshWorldsAsync, () => !IsRefreshingWorlds);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6 && !IsJoiningLobby);
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         CopyLinkCommand = new RelayCommand(_ => CopyLobbyLink(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
@@ -436,11 +446,11 @@ public class LobbyViewModel : ObservableObject
         };
         _cloudLobbyRefreshTimer.Tick += (s, e) =>
         {
-            if (!IsInLobby) _ = RefreshCloudLobbiesAsync();
+            if (!IsInLobby) _ = RefreshWorldsAsync();
         };
         _cloudLobbyRefreshTimer.Start();
 
-        _ = RefreshCloudLobbiesAsync();
+        _ = RefreshWorldsAsync();
 
         CopyTunnelLogCommand = new RelayCommand(_ =>
         {
@@ -2843,40 +2853,31 @@ public class LobbyViewModel : ObservableObject
         UpdatePlayerModSync(dict);
     }
 
-    public async Task RefreshCloudLobbiesAsync()
+    public async Task RefreshWorldsAsync()
     {
-        if (_cloudLobbyService == null || _isRefreshingCloudLobbies) return;
-        IsRefreshingCloudLobbies = true;
+        if (_cloudLobbyService == null || _isRefreshingWorlds) return;
+        IsRefreshingWorlds = true;
         try
         {
-            var resp = await _cloudLobbyService.GetCloudLobbiesAsync();
+            var myNick = _configService.CurrentConfig.Nickname;
+            var resp = await _cloudLobbyService.GetWorldsAsync(myNick);
             Dispatch(() =>
             {
-                CloudLobbies.Clear();
-                if (resp?.Lobbies != null)
+                CloudWorlds.Clear();
+                if (resp?.Worlds != null)
                 {
-                    var myNick = _configService.CurrentConfig.Nickname;
-                    bool foundMy = false;
-                    foreach (var lobby in resp.Lobbies)
+                    foreach (var w in resp.Worlds)
                     {
-                        var vm = new CloudLobbyItemViewModel(
-                            lobby,
-                            myNick,
-                            onConnect: port => ConnectToCloudLobby(port),
-                            onStop: port => _ = StopMyCloudLobbyAsync(port));
-                        CloudLobbies.Add(vm);
-                        if (vm.IsMyLobby)
-                        {
-                            MyCloudLobbyPort = vm.Port;
-                            foundMy = true;
-                        }
-                    }
-                    if (!foundMy && MyCloudLobbyPort.HasValue)
-                    {
-                        MyCloudLobbyPort = null;
+                        var vm = new CloudWorldItemViewModel(
+                            w,
+                            _cloudLobbyService,
+                            onConnectAddress: addr => GuestConnectRequested?.Invoke(this, addr),
+                            onWakeAndConnect: WakeAndConnectWorldAsync,
+                            onStop: StopWorldAsync);
+                        CloudWorlds.Add(vm);
                     }
                 }
-                HasCloudLobbies = CloudLobbies.Count > 0;
+                HasCloudWorlds = CloudWorlds.Count > 0;
             });
         }
         catch
@@ -2884,112 +2885,289 @@ public class LobbyViewModel : ObservableObject
         }
         finally
         {
-            IsRefreshingCloudLobbies = false;
+            IsRefreshingWorlds = false;
         }
     }
 
-    public async Task CreateCloudLobbyAsync()
+    public async Task CreateNewWorldAsync()
     {
-        if (_cloudLobbyService == null || IsCreatingCloudLobby || IsInLobby) return;
-        var nick = _configService.CurrentConfig.Nickname;
-        if (!NicknameValidator.Validate(nick).IsValid)
+        if (_cloudLobbyService == null || IsCreatingWorld) return;
+        var myNick = _configService.CurrentConfig.Nickname;
+        if (!NicknameValidator.Validate(myNick).IsValid)
         {
-            CloudLobbyStatusMessage = "Укажите корректный никнейм в настройках";
+            CreateWorldError = "Укажите корректный никнейм в настройках";
             return;
         }
 
-        IsCreatingCloudLobby = true;
-        CloudLobbyStatusMessage = "Запуск выделенного сервера на Oracle Cloud...";
+        var wName = NewWorldName?.Trim();
+        if (string.IsNullOrWhiteSpace(wName))
+        {
+            CreateWorldError = "Укажите название мира";
+            return;
+        }
+
+        IsCreatingWorld = true;
+        CreateWorldError = null;
 
         try
         {
-            var resp = await _cloudLobbyService.CreateCloudLobbyAsync(nick, $"{nick}'s World", maxPlayers: 8);
-            if (resp != null && resp.Port.HasValue)
+            var res = await _cloudLobbyService.CreateOrStartWorldAsync(myNick, wName, NewWorldSeed);
+            if (res != null && res.Port.HasValue)
             {
-                MyCloudLobbyPort = resp.Port.Value;
-                CloudLobbyStatusMessage = $"Сервер запущен (порт {resp.Port.Value}). Мир сохранён.";
-                await RefreshCloudLobbiesAsync();
+                IsCreateWorldFormVisible = false;
+                await RefreshWorldsAsync();
+                GuestConnectRequested?.Invoke(this, $"89.168.82.200:{res.Port.Value}");
             }
             else
             {
-                CloudLobbyStatusMessage = resp?.Error ?? "Не удалось запустить сервер";
+                CreateWorldError = res?.Error ?? "Не удалось создать мир";
             }
         }
         catch (Exception ex)
         {
-            CloudLobbyStatusMessage = $"Ошибка запуска: {ex.Message}";
+            CreateWorldError = $"Ошибка: {ex.Message}";
         }
         finally
         {
-            IsCreatingCloudLobby = false;
+            IsCreatingWorld = false;
         }
     }
 
-    public async Task StopMyCloudLobbyAsync(int? port = null)
+    public async Task WakeAndConnectWorldAsync(CloudWorldItemViewModel world)
     {
-        if (_cloudLobbyService == null) return;
-        int targetPort = port ?? MyCloudLobbyPort ?? 0;
-        if (targetPort <= 0) return;
+        if (_cloudLobbyService == null || world.IsActionInProgress) return;
+        world.IsActionInProgress = true;
+        world.Status = "starting";
 
-        CloudLobbyStatusMessage = "Остановка сервера и сохранение мира...";
         try
         {
-            bool ok = await _cloudLobbyService.StopCloudLobbyAsync(targetPort);
-            if (ok)
+            var res = await _cloudLobbyService.CreateOrStartWorldAsync(world.Owner, world.Name, world.Seed, world.Id);
+            if (res != null && res.Port.HasValue)
             {
-                if (MyCloudLobbyPort == targetPort) MyCloudLobbyPort = null;
-                CloudLobbyStatusMessage = "Сервер остановлен. Мир сохранён.";
-                await RefreshCloudLobbiesAsync();
+                world.Status = "running";
+                await RefreshWorldsAsync();
+                GuestConnectRequested?.Invoke(this, $"89.168.82.200:{res.Port.Value}");
             }
             else
             {
-                CloudLobbyStatusMessage = "Не удалось остановить сервер";
+                world.Status = "stopped";
             }
         }
-        catch (Exception ex)
+        catch
         {
-            CloudLobbyStatusMessage = $"Ошибка остановки: {ex.Message}";
+            world.Status = "stopped";
+        }
+        finally
+        {
+            world.IsActionInProgress = false;
         }
     }
 
-    public void ConnectToCloudLobby(int port)
+    public async Task StopWorldAsync(CloudWorldItemViewModel world)
     {
-        if (port <= 0) return;
-        GuestConnectRequested?.Invoke(this, $"89.168.82.200:{port}");
+        if (_cloudLobbyService == null || world.IsActionInProgress) return;
+        world.IsActionInProgress = true;
+
+        try
+        {
+            bool ok = await _cloudLobbyService.StopWorldAsync(world.Id, world.Port);
+            if (ok)
+            {
+                world.Status = "stopped";
+                await RefreshWorldsAsync();
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            world.IsActionInProgress = false;
+        }
     }
 }
 
-public class CloudLobbyItemViewModel : ObservableObject
+public class CloudWorldItemViewModel : ObservableObject
 {
-    public int Port { get; }
-    public string Owner { get; }
-    public string Name { get; }
-    public string Address => $"89.168.82.200:{Port}";
-    public string Status { get; }
-    public int PlayersCount { get; }
-    public string PlayersFormatted => $"{PlayersCount} игрок{(PlayersCount == 1 ? "" : (PlayersCount >= 2 && PlayersCount <= 4 ? "а" : "ов"))}";
-    public bool IsMyLobby { get; }
+    private readonly CloudWorldItem _item;
+    private readonly ICloudLobbyService _cloudService;
+    private readonly Action<string> _onConnectAddress;
+    private readonly Func<CloudWorldItemViewModel, Task> _onWakeAndConnect;
+    private readonly Func<CloudWorldItemViewModel, Task> _onStop;
 
-    public System.Windows.Input.ICommand ConnectCommand { get; }
-    public System.Windows.Input.ICommand? StopCommand { get; }
+    public string Id => _item.Id;
+    public string Name => _item.Name;
+    public string Owner => _item.Owner;
+    public string? Seed => _item.Seed;
+    public int? Port => _item.Port;
+    public bool IsOwner => _item.IsOwner;
+    public string BadgeText => IsOwner ? "Мой мир" : $"От: {_item.Owner}";
 
-    public CloudLobbyItemViewModel(
-        CloudLobbyItem item,
-        string currentNickname,
-        Action<int> onConnect,
-        Action<int>? onStop)
+    private string _status;
+    public string Status
     {
-        Port = item.Port;
-        Owner = item.Owner;
-        Name = string.IsNullOrWhiteSpace(item.Name) ? $"{item.Owner}'s World" : item.Name;
-        Status = item.Status;
-        PlayersCount = item.OnlinePlayers?.Count ?? 0;
-        IsMyLobby = string.Equals(Owner, currentNickname, StringComparison.OrdinalIgnoreCase);
-
-        ConnectCommand = new RelayCommand(_ => onConnect(Port));
-        if (IsMyLobby && onStop != null)
+        get => _status;
+        set
         {
-            StopCommand = new RelayCommand(_ => onStop(Port));
+            if (SetProperty(ref _status, value))
+            {
+                OnPropertyChanged(nameof(IsRunning));
+                OnPropertyChanged(nameof(IsStarting));
+                OnPropertyChanged(nameof(IsStopped));
+                OnPropertyChanged(nameof(StatusDescription));
+                OnPropertyChanged(nameof(CanStop));
+                OnPropertyChanged(nameof(PlayButtonText));
+                StopCommand?.RaiseCanExecuteChanged();
+            }
         }
+    }
+
+    public bool IsRunning => string.Equals(_status, "running", StringComparison.OrdinalIgnoreCase);
+    public bool IsStarting => string.Equals(_status, "starting", StringComparison.OrdinalIgnoreCase);
+    public bool IsStopped => !IsRunning && !IsStarting;
+    public bool CanStop => IsOwner && (IsRunning || IsStarting);
+    public string PlayButtonText => IsRunning ? "Войти" : "Запустить и войти";
+
+    public string StatusDescription
+    {
+        get
+        {
+            if (IsRunning) return $"В сети • {_item.FormattedPlayers}";
+            if (IsStarting) return "Запуск сервера...";
+            return "Мир сохранён (спит)";
+        }
+    }
+
+    private bool _isActionInProgress;
+    public bool IsActionInProgress
+    {
+        get => _isActionInProgress;
+        set
+        {
+            if (SetProperty(ref _isActionInProgress, value))
+            {
+                PlayCommand?.RaiseCanExecuteChanged();
+                StopCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private bool _isSharePanelOpen;
+    public bool IsSharePanelOpen
+    {
+        get => _isSharePanelOpen;
+        set => SetProperty(ref _isSharePanelOpen, value);
+    }
+
+    public ObservableCollection<string> AllowedPlayers { get; } = new();
+
+    private string _friendNickToAdd = string.Empty;
+    public string FriendNickToAdd
+    {
+        get => _friendNickToAdd;
+        set
+        {
+            if (SetProperty(ref _friendNickToAdd, value))
+            {
+                AddFriendCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public RelayCommand PlayCommand { get; }
+    public RelayCommand StopCommand { get; }
+    public RelayCommand ToggleSharePanelCommand { get; }
+    public RelayCommand AddFriendCommand { get; }
+    public RelayCommand RemoveFriendCommand { get; }
+
+    public CloudWorldItemViewModel(
+        CloudWorldItem item,
+        ICloudLobbyService cloudService,
+        Action<string> onConnectAddress,
+        Func<CloudWorldItemViewModel, Task> onWakeAndConnect,
+        Func<CloudWorldItemViewModel, Task> onStop)
+    {
+        _item = item;
+        _cloudService = cloudService;
+        _onConnectAddress = onConnectAddress;
+        _onWakeAndConnect = onWakeAndConnect;
+        _onStop = onStop;
+        _status = item.Status;
+
+        if (item.AllowedPlayers != null)
+        {
+            foreach (var p in item.AllowedPlayers)
+            {
+                AllowedPlayers.Add(p);
+            }
+        }
+
+        PlayCommand = new RelayCommand(_ =>
+        {
+            if (IsRunning && Port.HasValue)
+            {
+                _onConnectAddress($"89.168.82.200:{Port.Value}");
+            }
+            else
+            {
+                _ = _onWakeAndConnect(this);
+            }
+        }, _ => !IsActionInProgress);
+
+        StopCommand = new RelayCommand(_ =>
+        {
+            _ = _onStop(this);
+        }, _ => !IsActionInProgress && (IsRunning || IsStarting) && IsOwner);
+
+        ToggleSharePanelCommand = new RelayCommand(_ =>
+        {
+            IsSharePanelOpen = !IsSharePanelOpen;
+        }, _ => IsOwner);
+
+        AddFriendCommand = new RelayCommand(_ =>
+        {
+            _ = AddFriendInternalAsync();
+        }, _ => !string.IsNullOrWhiteSpace(FriendNickToAdd) && IsOwner);
+
+        RemoveFriendCommand = new RelayCommand(param =>
+        {
+            if (param is string friendNick)
+            {
+                _ = RemoveFriendInternalAsync(friendNick);
+            }
+        }, _ => IsOwner);
+    }
+
+    private async Task AddFriendInternalAsync()
+    {
+        var nick = FriendNickToAdd?.Trim();
+        if (string.IsNullOrWhiteSpace(nick)) return;
+
+        try
+        {
+            var res = await _cloudService.ShareWorldAsync(Owner, Id, nick, "add");
+            if (res != null && res.Success)
+            {
+                if (!AllowedPlayers.Contains(nick, StringComparer.OrdinalIgnoreCase))
+                {
+                    AllowedPlayers.Add(nick);
+                }
+                FriendNickToAdd = string.Empty;
+            }
+        }
+        catch { }
+    }
+
+    private async Task RemoveFriendInternalAsync(string friendNick)
+    {
+        try
+        {
+            var res = await _cloudService.ShareWorldAsync(Owner, Id, friendNick, "remove");
+            if (res != null && res.Success)
+            {
+                AllowedPlayers.Remove(friendNick);
+            }
+        }
+        catch { }
     }
 }

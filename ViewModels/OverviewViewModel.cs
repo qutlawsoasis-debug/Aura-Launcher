@@ -81,9 +81,6 @@ public class OverviewViewModel : ObservableObject
     }
 
     private readonly IBackgroundService? _backgroundService;
-    private readonly ICloudLobbyService? _cloudLobbyService;
-    private readonly System.Windows.Threading.DispatcherTimer? _serverPingTimer;
-
     private System.Windows.Media.ImageSource? _launcherBackground;
     public System.Windows.Media.ImageSource? LauncherBackground
     {
@@ -95,57 +92,11 @@ public class OverviewViewModel : ObservableObject
 
     public RelayCommand OpenAchievementsCommand { get; }
 
-    public event Action<string>? QuickPlayConnectRequested;
-
-    private bool _isOfficialServerOnline;
-    public bool IsOfficialServerOnline
-    {
-        get => _isOfficialServerOnline;
-        private set => SetProperty(ref _isOfficialServerOnline, value);
-    }
-
-    private string _officialServerPingText = "—";
-    public string OfficialServerPingText
-    {
-        get => _officialServerPingText;
-        private set => SetProperty(ref _officialServerPingText, value);
-    }
-
-    private string _officialServerPlayersText = "—";
-    public string OfficialServerPlayersText
-    {
-        get => _officialServerPlayersText;
-        private set => SetProperty(ref _officialServerPlayersText, value);
-    }
-
-    private string _officialServerStatusText = "Опрос...";
-    public string OfficialServerStatusText
-    {
-        get => _officialServerStatusText;
-        private set => SetProperty(ref _officialServerStatusText, value);
-    }
-
-    private bool _isOfficialServerPinging;
-    public bool IsOfficialServerPinging
-    {
-        get => _isOfficialServerPinging;
-        private set => SetProperty(ref _isOfficialServerPinging, value);
-    }
-
-    public string OfficialServerAddress => _cloudLobbyService?.MainServerAddress ?? "89.168.82.200:25565";
-
-    public RelayCommand LaunchOfficialServerCommand { get; }
-
-    public OverviewViewModel(
-        IConfigService configService,
-        IGameLaunchService launchService,
-        IBackgroundService? backgroundService = null,
-        ICloudLobbyService? cloudLobbyService = null)
+    public OverviewViewModel(IConfigService configService, IGameLaunchService launchService, IBackgroundService? backgroundService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _backgroundService = backgroundService ?? (App.Services?.GetService(typeof(IBackgroundService)) as IBackgroundService);
-        _cloudLobbyService = cloudLobbyService ?? (App.Services?.GetService(typeof(ICloudLobbyService)) as ICloudLobbyService);
 
         if (_backgroundService != null)
         {
@@ -157,11 +108,6 @@ public class OverviewViewModel : ObservableObject
         }
 
         OpenAchievementsCommand = new RelayCommand(_ => { });
-
-        LaunchOfficialServerCommand = new RelayCommand(_ =>
-        {
-            QuickPlayConnectRequested?.Invoke(OfficialServerAddress);
-        }, _ => !_launchService.IsGameRunning && NicknameValidator.Validate(_configService.CurrentConfig.Nickname).IsValid);
 
         RefreshStats();
 
@@ -177,51 +123,6 @@ public class OverviewViewModel : ObservableObject
             {
                 System.Windows.Application.Current?.Dispatcher?.InvokeAsync(RefreshAchievementBlock);
             };
-        }
-
-        // Запуск первого пинга официального сервера и периодического обновления
-        _ = PingOfficialServerAsync();
-
-        _serverPingTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(20)
-        };
-        _serverPingTimer.Tick += (s, e) => _ = PingOfficialServerAsync();
-        _serverPingTimer.Start();
-    }
-
-    public async Task PingOfficialServerAsync()
-    {
-        if (_cloudLobbyService == null || _isOfficialServerPinging) return;
-        IsOfficialServerPinging = true;
-        try
-        {
-            var res = await _cloudLobbyService.PingMainServerAsync();
-            if (res.HasPing)
-            {
-                IsOfficialServerOnline = true;
-                OfficialServerPingText = res.FormattedPing;
-                OfficialServerPlayersText = res.FormattedPlayers;
-                OfficialServerStatusText = "В сети";
-            }
-            else
-            {
-                IsOfficialServerOnline = false;
-                OfficialServerPingText = "—";
-                OfficialServerPlayersText = "—";
-                OfficialServerStatusText = "Недоступен";
-            }
-        }
-        catch
-        {
-            IsOfficialServerOnline = false;
-            OfficialServerPingText = "—";
-            OfficialServerPlayersText = "—";
-            OfficialServerStatusText = "Недоступен";
-        }
-        finally
-        {
-            IsOfficialServerPinging = false;
         }
     }
 
