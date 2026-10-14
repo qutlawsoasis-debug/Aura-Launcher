@@ -33,6 +33,66 @@ public class LobbyViewModel : ObservableObject
     private readonly IServerListSyncService? _serverListSyncService;
     private readonly IWorkshopService? _workshopService;
     private readonly IMinecraftPingService _pingService;
+    private readonly ICloudLobbyService? _cloudLobbyService;
+    private readonly System.Windows.Threading.DispatcherTimer? _cloudLobbyRefreshTimer;
+
+    public ObservableCollection<CloudLobbyItemViewModel> CloudLobbies { get; } = new();
+
+    private bool _hasCloudLobbies;
+    public bool HasCloudLobbies
+    {
+        get => _hasCloudLobbies;
+        set => SetProperty(ref _hasCloudLobbies, value);
+    }
+
+    private bool _isRefreshingCloudLobbies;
+    public bool IsRefreshingCloudLobbies
+    {
+        get => _isRefreshingCloudLobbies;
+        set => SetProperty(ref _isRefreshingCloudLobbies, value);
+    }
+
+    private bool _isCreatingCloudLobby;
+    public bool IsCreatingCloudLobby
+    {
+        get => _isCreatingCloudLobby;
+        set => SetProperty(ref _isCreatingCloudLobby, value);
+    }
+
+    private string? _cloudLobbyStatusMessage;
+    public string? CloudLobbyStatusMessage
+    {
+        get => _cloudLobbyStatusMessage;
+        set
+        {
+            if (SetProperty(ref _cloudLobbyStatusMessage, value))
+            {
+                OnPropertyChanged(nameof(HasCloudLobbyStatusMessage));
+            }
+        }
+    }
+    public bool HasCloudLobbyStatusMessage => !string.IsNullOrWhiteSpace(_cloudLobbyStatusMessage);
+
+    private int? _myCloudLobbyPort;
+    public int? MyCloudLobbyPort
+    {
+        get => _myCloudLobbyPort;
+        set
+        {
+            if (SetProperty(ref _myCloudLobbyPort, value))
+            {
+                OnPropertyChanged(nameof(HasMyCloudLobby));
+                OnPropertyChanged(nameof(MyCloudLobbyAddress));
+            }
+        }
+    }
+    public bool HasMyCloudLobby => _myCloudLobbyPort.HasValue;
+    public string MyCloudLobbyAddress => _myCloudLobbyPort.HasValue ? $"89.168.82.200:{_myCloudLobbyPort.Value}" : "";
+
+    public AsyncRelayCommand CreateCloudLobbyCommand { get; }
+    public AsyncRelayCommand RefreshCloudLobbiesCommand { get; }
+    public AsyncRelayCommand StopMyCloudLobbyCommand { get; }
+    public RelayCommand ConnectMyCloudLobbyCommand { get; }
     private string _serverPingText = "—";
     private string _serverPlayersText = "—";
     private string? _currentPingAddress;
@@ -332,7 +392,8 @@ public class LobbyViewModel : ObservableObject
         IModManifestService? modManifestService = null,
         IServerListSyncService? serverListSyncService = null,
         IWorkshopService? workshopService = null,
-        IMinecraftPingService? pingService = null)
+        IMinecraftPingService? pingService = null,
+        ICloudLobbyService? cloudLobbyService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
@@ -347,8 +408,16 @@ public class LobbyViewModel : ObservableObject
         _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
         _workshopService = workshopService;
         _pingService = pingService ?? new MinecraftPingService();
+        _cloudLobbyService = cloudLobbyService ?? (App.Services?.GetService(typeof(ICloudLobbyService)) as ICloudLobbyService);
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
+        CreateCloudLobbyCommand = new AsyncRelayCommand(CreateCloudLobbyAsync, () => !IsBusy && !IsInLobby && !IsCreatingCloudLobby);
+        RefreshCloudLobbiesCommand = new AsyncRelayCommand(RefreshCloudLobbiesAsync, () => !IsRefreshingCloudLobbies);
+        StopMyCloudLobbyCommand = new AsyncRelayCommand(() => StopMyCloudLobbyAsync(), () => HasMyCloudLobby);
+        ConnectMyCloudLobbyCommand = new RelayCommand(_ =>
+        {
+            if (MyCloudLobbyPort.HasValue) ConnectToCloudLobby(MyCloudLobbyPort.Value);
+        }, _ => HasMyCloudLobby);
         JoinLobbyCommand = new AsyncRelayCommand(JoinLobbyAsync, () => !IsBusy && !IsInLobby && GuestCodeInput.Length >= 6 && !IsJoiningLobby);
         CopyCodeCommand = new RelayCommand(_ => CopyCode(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
         CopyLinkCommand = new RelayCommand(_ => CopyLobbyLink(), _ => !string.IsNullOrWhiteSpace(LobbyCode));
@@ -360,6 +429,18 @@ public class LobbyViewModel : ObservableObject
         FixAndProceedCommand = new AsyncRelayCommand(FixAndProceedAsync, () => CanFixAny && !IsGameRunningWarning);
         JoinAsIsCommand = new RelayCommand(_ => JoinAsIs());
         CancelMismatchDialogCommand = new RelayCommand(_ => CancelMismatchDialog());
+
+        _cloudLobbyRefreshTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(15)
+        };
+        _cloudLobbyRefreshTimer.Tick += (s, e) =>
+        {
+            if (!IsInLobby) _ = RefreshCloudLobbiesAsync();
+        };
+        _cloudLobbyRefreshTimer.Start();
+
+        _ = RefreshCloudLobbiesAsync();
 
         CopyTunnelLogCommand = new RelayCommand(_ =>
         {
@@ -2760,5 +2841,155 @@ public class LobbyViewModel : ObservableObject
         };
 
         UpdatePlayerModSync(dict);
+    }
+
+    public async Task RefreshCloudLobbiesAsync()
+    {
+        if (_cloudLobbyService == null || _isRefreshingCloudLobbies) return;
+        IsRefreshingCloudLobbies = true;
+        try
+        {
+            var resp = await _cloudLobbyService.GetCloudLobbiesAsync();
+            Dispatch(() =>
+            {
+                CloudLobbies.Clear();
+                if (resp?.Lobbies != null)
+                {
+                    var myNick = _configService.CurrentConfig.Nickname;
+                    bool foundMy = false;
+                    foreach (var lobby in resp.Lobbies)
+                    {
+                        var vm = new CloudLobbyItemViewModel(
+                            lobby,
+                            myNick,
+                            onConnect: port => ConnectToCloudLobby(port),
+                            onStop: port => _ = StopMyCloudLobbyAsync(port));
+                        CloudLobbies.Add(vm);
+                        if (vm.IsMyLobby)
+                        {
+                            MyCloudLobbyPort = vm.Port;
+                            foundMy = true;
+                        }
+                    }
+                    if (!foundMy && MyCloudLobbyPort.HasValue)
+                    {
+                        MyCloudLobbyPort = null;
+                    }
+                }
+                HasCloudLobbies = CloudLobbies.Count > 0;
+            });
+        }
+        catch
+        {
+        }
+        finally
+        {
+            IsRefreshingCloudLobbies = false;
+        }
+    }
+
+    public async Task CreateCloudLobbyAsync()
+    {
+        if (_cloudLobbyService == null || IsCreatingCloudLobby || IsInLobby) return;
+        var nick = _configService.CurrentConfig.Nickname;
+        if (!NicknameValidator.Validate(nick).IsValid)
+        {
+            CloudLobbyStatusMessage = "Укажите корректный никнейм в настройках";
+            return;
+        }
+
+        IsCreatingCloudLobby = true;
+        CloudLobbyStatusMessage = "Запуск выделенного сервера на Oracle Cloud...";
+
+        try
+        {
+            var resp = await _cloudLobbyService.CreateCloudLobbyAsync(nick, $"{nick}'s World", maxPlayers: 8);
+            if (resp != null && resp.Port.HasValue)
+            {
+                MyCloudLobbyPort = resp.Port.Value;
+                CloudLobbyStatusMessage = $"Сервер запущен (порт {resp.Port.Value}). Мир сохранён.";
+                await RefreshCloudLobbiesAsync();
+            }
+            else
+            {
+                CloudLobbyStatusMessage = resp?.Error ?? "Не удалось запустить сервер";
+            }
+        }
+        catch (Exception ex)
+        {
+            CloudLobbyStatusMessage = $"Ошибка запуска: {ex.Message}";
+        }
+        finally
+        {
+            IsCreatingCloudLobby = false;
+        }
+    }
+
+    public async Task StopMyCloudLobbyAsync(int? port = null)
+    {
+        if (_cloudLobbyService == null) return;
+        int targetPort = port ?? MyCloudLobbyPort ?? 0;
+        if (targetPort <= 0) return;
+
+        CloudLobbyStatusMessage = "Остановка сервера и сохранение мира...";
+        try
+        {
+            bool ok = await _cloudLobbyService.StopCloudLobbyAsync(targetPort);
+            if (ok)
+            {
+                if (MyCloudLobbyPort == targetPort) MyCloudLobbyPort = null;
+                CloudLobbyStatusMessage = "Сервер остановлен. Мир сохранён.";
+                await RefreshCloudLobbiesAsync();
+            }
+            else
+            {
+                CloudLobbyStatusMessage = "Не удалось остановить сервер";
+            }
+        }
+        catch (Exception ex)
+        {
+            CloudLobbyStatusMessage = $"Ошибка остановки: {ex.Message}";
+        }
+    }
+
+    public void ConnectToCloudLobby(int port)
+    {
+        if (port <= 0) return;
+        GuestConnectRequested?.Invoke(this, $"89.168.82.200:{port}");
+    }
+}
+
+public class CloudLobbyItemViewModel : ObservableObject
+{
+    public int Port { get; }
+    public string Owner { get; }
+    public string Name { get; }
+    public string Address => $"89.168.82.200:{Port}";
+    public string Status { get; }
+    public int PlayersCount { get; }
+    public string PlayersFormatted => $"{PlayersCount} игрок{(PlayersCount == 1 ? "" : (PlayersCount >= 2 && PlayersCount <= 4 ? "а" : "ов"))}";
+    public bool IsMyLobby { get; }
+
+    public System.Windows.Input.ICommand ConnectCommand { get; }
+    public System.Windows.Input.ICommand? StopCommand { get; }
+
+    public CloudLobbyItemViewModel(
+        CloudLobbyItem item,
+        string currentNickname,
+        Action<int> onConnect,
+        Action<int>? onStop)
+    {
+        Port = item.Port;
+        Owner = item.Owner;
+        Name = string.IsNullOrWhiteSpace(item.Name) ? $"{item.Owner}'s World" : item.Name;
+        Status = item.Status;
+        PlayersCount = item.OnlinePlayers?.Count ?? 0;
+        IsMyLobby = string.Equals(Owner, currentNickname, StringComparison.OrdinalIgnoreCase);
+
+        ConnectCommand = new RelayCommand(_ => onConnect(Port));
+        if (IsMyLobby && onStop != null)
+        {
+            StopCommand = new RelayCommand(_ => onStop(Port));
+        }
     }
 }

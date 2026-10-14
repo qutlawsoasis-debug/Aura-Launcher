@@ -810,6 +810,7 @@ public class MainViewModel : ObservableObject
         WorkshopVM.ModToggled += () => _ = LobbyVM.UpdateManifestAsync();
         WorkshopVM.ScreenshotsCountChanged += _ => OverviewVM.RefreshRightFeed();
         WorkshopVM.LaunchWorldRequested += folder => _ = LaunchGameAsync(quickPlaySingleplayer: folder);
+        OverviewVM.QuickPlayConnectRequested += address => _ = LaunchGameAsync(quickPlayMultiplayer: address);
         
         _friendService = friendService;
         FriendsVM = friendsViewModel ?? new FriendsViewModel(_friendService ?? new FriendService(_configService), sharedLobbyService!, _skinService, LobbyVM, _notificationService);

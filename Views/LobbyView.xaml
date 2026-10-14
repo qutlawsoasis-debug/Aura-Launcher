@@ -12,6 +12,7 @@
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <core:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis" xmlns:core="clr-namespace:AuraLauncher.Core" />
 
         <Style x:Key="CodeCellBorderStyle" TargetType="Border">
             <Setter Property="Width" Value="44" />
@@ -90,12 +91,20 @@
 
                 <!-- Левая колонка: Создать лобби / Код от друга -->
                 <StackPanel Grid.Column="0" VerticalAlignment="Top">
-                    <Button Command="{Binding CreateLobbyCommand}"
+                    <Button Command="{Binding CreateCloudLobbyCommand}"
                             Style="{StaticResource PrimaryNeonBtn}"
                             Height="48"
-                            Content="Создать лобби"
+                            Content="Создать облачный сервер (24/7)"
                             HorizontalAlignment="Left"
-                            Width="260"
+                            Width="280"
+                            Margin="0,0,0,8" />
+
+                    <Button Command="{Binding CreateLobbyCommand}"
+                            Style="{StaticResource SecondaryBtn}"
+                            Height="38"
+                            Content="Локальный хост (Playit)"
+                            HorizontalAlignment="Left"
+                            Width="280"
                             Margin="0,0,0,20" />
 
                     <Grid Width="260" HorizontalAlignment="Left" Margin="0,0,0,20">
@@ -314,42 +323,188 @@
                     </StackPanel>
                 </StackPanel>
 
-                <!-- Правая колонка: 3D-персонаж игрока до входа в лобби (живой и вращаемый мышью) -->
-                <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0">
-                    <Grid Width="156" Height="244"
-                          Background="Transparent"
-                          Cursor="Hand"
-                          ToolTip="Потяните мышью, чтобы повернуть персонажа"
-                          behaviors:AlivePlayer3D.SourceModel="{Binding LocalPlayerModel3D}"
-                          behaviors:AlivePlayer3D.BaseYaw="-14"
-                          behaviors:AlivePlayer3D.BasePitch="4"
-                          behaviors:AlivePlayer3D.PhaseSeed="{Binding LocalPlayerNickname}">
-                        <Viewport3D Width="156" Height="244" ClipToBounds="False" IsHitTestVisible="False">
-                            <Viewport3D.Camera>
-                                <PerspectiveCamera Position="0,0,27.5"
-                                                   LookDirection="0,0,-1"
-                                                   UpDirection="0,1,0"
-                                                   FieldOfView="45" />
-                            </Viewport3D.Camera>
-                            <ModelVisual3D />
-                        </Viewport3D>
-                    </Grid>
+                <!-- Правая колонка: 3D-персонаж + Список облачных миров 24/7 -->
+                <Grid Grid.Column="2" Margin="8,0,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-                    <TextBlock Text="{Binding LocalPlayerNickname}"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource InkBrush}"
-                               HorizontalAlignment="Center"
-                               Margin="0,4,0,0" />
+                    <!-- 3D-персонаж игрока до входа в лобби -->
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0">
+                        <Grid Width="156" Height="244"
+                              Background="Transparent"
+                              Cursor="Hand"
+                              ToolTip="Потяните мышью, чтобы повернуть персонажа"
+                              behaviors:AlivePlayer3D.SourceModel="{Binding LocalPlayerModel3D}"
+                              behaviors:AlivePlayer3D.BaseYaw="-14"
+                              behaviors:AlivePlayer3D.BasePitch="4"
+                              behaviors:AlivePlayer3D.PhaseSeed="{Binding LocalPlayerNickname}">
+                            <Viewport3D Width="156" Height="244" ClipToBounds="False" IsHitTestVisible="False">
+                                <Viewport3D.Camera>
+                                    <PerspectiveCamera Position="0,0,27.5"
+                                                       LookDirection="0,0,-1"
+                                                       UpDirection="0,1,0"
+                                                       FieldOfView="45" />
+                                </Viewport3D.Camera>
+                                <ModelVisual3D />
+                            </Viewport3D>
+                        </Grid>
 
-                    <TextBlock Text="Готов к лобби"
-                               FontFamily="{StaticResource MainFont}"
-                               FontSize="12"
-                               Foreground="{StaticResource MuteBrush}"
-                               HorizontalAlignment="Center"
-                               Margin="0,2,0,0" />
-                </StackPanel>
+                        <TextBlock Text="{Binding LocalPlayerNickname}"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource InkBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,4,0,0" />
+
+                        <TextBlock Text="Готов к лобби"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <!-- Список активных облачных миров (Oracle Cloud 24/7) -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Top">
+                        <Grid Margin="0,0,0,12">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Облачные миры 24/7"
+                                           FontFamily="{StaticResource HeadingFont}"
+                                           FontSize="22"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}" />
+                                <TextBlock Text=" (Oracle Cloud)"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="13"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0" />
+                            </StackPanel>
+
+                            <Button HorizontalAlignment="Right"
+                                    Command="{Binding RefreshCloudLobbiesCommand}"
+                                    Style="{StaticResource GhostBtn}"
+                                    Padding="6,4">
+                                <TextBlock Text="Обновить"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           Foreground="{StaticResource EmberBrush}"
+                                           TextDecorations="Underline" />
+                            </Button>
+                        </Grid>
+
+                        <!-- Информационное сообщение о создании / статусе своего лобби -->
+                        <Border Background="{DynamicResource PanelRaised}"
+                                BorderBrush="{StaticResource LineInkBrush}"
+                                BorderThickness="1"
+                                CornerRadius="3"
+                                Padding="12,8"
+                                Margin="0,0,0,12"
+                                Visibility="{Binding HasCloudLobbyStatusMessage, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding CloudLobbyStatusMessage}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{StaticResource EmberBrush}"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                        <!-- Список активных миров -->
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="380" Focusable="False">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding CloudLobbies}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{DynamicResource Panel}"
+                                                    BorderBrush="{DynamicResource BorderSubtle}"
+                                                    BorderThickness="1"
+                                                    CornerRadius="3"
+                                                    Padding="12,10"
+                                                    Margin="0,0,0,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
+                                                            <Ellipse Width="7" Height="7" Fill="{DynamicResource Success}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontFamily="{StaticResource HeadingFont}"
+                                                                       FontSize="15"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource TextPrimary}" />
+                                                            <TextBlock Text=" • хост "
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="12"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                            <TextBlock Text="{Binding Owner}"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="12"
+                                                                       FontWeight="Medium"
+                                                                       Foreground="{StaticResource EmberBrush}" />
+                                                        </StackPanel>
+
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Address}"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="12"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                            <TextBlock Text=" • "
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="12"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                            <TextBlock Text="{Binding PlayersFormatted}"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="12"
+                                                                       Foreground="{DynamicResource TextMuted}" />
+                                                        </StackPanel>
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                        <Button Command="{Binding StopCommand}"
+                                                                Style="{StaticResource GhostBtn}"
+                                                                Padding="8,6"
+                                                                Margin="0,0,8,0"
+                                                                Visibility="{Binding IsMyLobby, Converter={StaticResource BoolToVis}}">
+                                                            <TextBlock Text="Остановить"
+                                                                       FontFamily="{StaticResource MainFont}"
+                                                                       FontSize="12"
+                                                                       Foreground="{DynamicResource Danger}" />
+                                                        </Button>
+
+                                                        <Button Command="{Binding ConnectCommand}"
+                                                                Style="{StaticResource StandardBtn}"
+                                                                Padding="14,6"
+                                                                Content="Войти" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Если облачных лобби нет -->
+                                <Border Background="{DynamicResource Panel}"
+                                        BorderBrush="{DynamicResource BorderSubtle}"
+                                        BorderThickness="1"
+                                        CornerRadius="3"
+                                        Padding="16,14"
+                                        Visibility="{Binding HasCloudLobbies, Converter={StaticResource InverseBoolToVis}}">
+                                    <TextBlock Text="Сейчас нет активных облачных миров. Нажмите «Создать облачный сервер», чтобы запустить свой выделенный мир 24/7 с сохранением."
+                                               FontFamily="{StaticResource MainFont}"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource TextMuted}"
+                                               TextWrapping="Wrap" />
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Grid>
             </Grid>
         </Grid>
 

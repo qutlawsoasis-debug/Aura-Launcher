@@ -640,6 +640,7 @@ public partial class App : Application
         services.AddSingleton<IReportService, ReportService>();
         services.AddSingleton<IBackgroundService, BackgroundService>();
         services.AddSingleton<IMinecraftPingService, MinecraftPingService>();
+        services.AddSingleton<ICloudLobbyService, CloudLobbyService>();
         services.AddSingleton<IScreenshotWatcherService, ScreenshotWatcherService>();
         services.AddSingleton<IReleaseNotesService, ReleaseNotesService>();
         services.AddSingleton<IGraphicsPresetService, GraphicsPresetService>();

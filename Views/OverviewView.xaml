@@ -58,6 +58,84 @@
                 </TextBlock.Effect>
             </TextBlock>
 
+            <!-- Карточка официального сервера 24/7 -->
+            <Border Background="{DynamicResource Panel}"
+                    BorderBrush="{DynamicResource BorderSubtle}"
+                    BorderThickness="1"
+                    CornerRadius="3"
+                    Padding="14,10"
+                    Margin="0,0,0,16"
+                    MaxWidth="360"
+                    HorizontalAlignment="Left">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <!-- Статус и название сервера -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,4">
+                            <Ellipse Width="7" Height="7" Margin="0,0,8,0" VerticalAlignment="Center">
+                                <Ellipse.Style>
+                                    <Style TargetType="Ellipse">
+                                        <Setter Property="Fill" Value="{DynamicResource BorderStrong}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsOfficialServerOnline}" Value="True">
+                                                <Setter Property="Fill" Value="{DynamicResource Success}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Ellipse.Style>
+                            </Ellipse>
+                            <TextBlock Text="Сервер Aura 24/7"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}" />
+                        </StackPanel>
+
+                        <!-- Пинг и онлайн игроков -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding OfficialServerStatusText}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}" />
+                            <TextBlock Text=" • "
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Visibility="{Binding IsOfficialServerOnline, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="{Binding OfficialServerPingText}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Visibility="{Binding IsOfficialServerOnline, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text=" • "
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Visibility="{Binding IsOfficialServerOnline, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="{Binding OfficialServerPlayersText}"
+                                       FontFamily="{StaticResource MainFont}"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Visibility="{Binding IsOfficialServerOnline, Converter={StaticResource BoolToVis}}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Кнопка быстрого подключения к серверу -->
+                    <Button Grid.Column="1"
+                            Command="{Binding LaunchOfficialServerCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Padding="16,6"
+                            Margin="12,0,0,0"
+                            VerticalAlignment="Center"
+                            Content="Войти"
+                            IsEnabled="{Binding IsOfficialServerOnline}" />
+                </Grid>
+            </Border>
+
             <!-- 3) Button "Играть" 260x70 with bottom progress bar -->
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Grid Width="260" Height="70">
