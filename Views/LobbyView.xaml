@@ -254,20 +254,108 @@
                                            FontSize="12"
                                            Foreground="{DynamicResource GameInputTextMutedBrush}"
                                            Margin="2,0,0,6" />
-                                <TextBox Style="{StaticResource AuraUnderlineTextBox}"
-                                         Text="{Binding NewWorldName, UpdateSourceTrigger=PropertyChanged}"
-                                         Tag="Название мира..."
-                                         Margin="0,0,0,12" />
+                                <Border Height="42"
+                                        Background="{DynamicResource StoriesCardGlass}"
+                                        BorderBrush="{DynamicResource StoriesCardBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        SnapsToDevicePixels="True"
+                                        Margin="0,0,0,12">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Path Grid.Column="0"
+                                              Style="{StaticResource IconPath}"
+                                              Data="{StaticResource IconWorld}"
+                                              Width="16" Height="16"
+                                              Stroke="{DynamicResource TextSecondary}"
+                                              Opacity="0.6"
+                                              Margin="14,0,10,0"
+                                              VerticalAlignment="Center"
+                                              IsHitTestVisible="False" />
+
+                                        <TextBox Grid.Column="1"
+                                                 Style="{StaticResource AuraEmbeddedTextBox}"
+                                                 Text="{Binding NewWorldName, UpdateSourceTrigger=PropertyChanged}"
+                                                 FontFamily="{StaticResource MainFont}"
+                                                 FontSize="13"
+                                                 Foreground="{DynamicResource TextWhite}"
+                                                 CaretBrush="{DynamicResource Accent}"
+                                                 Tag="Название мира..."
+                                                 VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
 
                                 <TextBlock Text="Сид генерации"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="12"
                                            Foreground="{DynamicResource GameInputTextMutedBrush}"
                                            Margin="2,0,0,6" />
-                                <TextBox Style="{StaticResource AuraUnderlineTextBox}"
-                                         Text="{Binding NewWorldSeed, UpdateSourceTrigger=PropertyChanged}"
-                                         Tag="Необязательно (случайный)"
-                                         Margin="0,0,0,14" />
+                                <Border Height="42"
+                                        Background="{DynamicResource StoriesCardGlass}"
+                                        BorderBrush="{DynamicResource StoriesCardBorder}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        SnapsToDevicePixels="True"
+                                        Margin="0,0,0,14">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Style.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderStrong}" />
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                                    <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentDim}" />
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Path Grid.Column="0"
+                                              Style="{StaticResource IconPath}"
+                                              Data="{StaticResource IconSparkles}"
+                                              Width="16" Height="16"
+                                              Stroke="{DynamicResource TextSecondary}"
+                                              Opacity="0.6"
+                                              Margin="14,0,10,0"
+                                              VerticalAlignment="Center"
+                                              IsHitTestVisible="False" />
+
+                                        <TextBox Grid.Column="1"
+                                                 Style="{StaticResource AuraEmbeddedTextBox}"
+                                                 Text="{Binding NewWorldSeed, UpdateSourceTrigger=PropertyChanged}"
+                                                 FontFamily="{StaticResource MainFont}"
+                                                 FontSize="13"
+                                                 Foreground="{DynamicResource TextWhite}"
+                                                 CaretBrush="{DynamicResource Accent}"
+                                                 Tag="Необязательно (случайный)"
+                                                 VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
 
                                 <TextBlock Text="{Binding CreateWorldError}"
                                            FontFamily="{StaticResource MainFont}"
@@ -329,14 +417,21 @@
                                               Margin="0,0,0,12"
                                               Visibility="{Binding HasNoLocalSaves, Converter={StaticResource InverseBoolToVis}}">
                                     <ItemsControl ItemsSource="{Binding LocalSaves}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Vertical" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Button Command="{Binding DataContext.SelectLocalSaveCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                         CommandParameter="{Binding}"
-                                                        Style="{StaticResource StoryBarBtn}"
-                                                        Margin="0,0,0,6">
-                                                    <Border Padding="10,8"
-                                                            CornerRadius="3"
+                                                        Style="{StaticResource StoryCardBtn}"
+                                                        Margin="0,0,0,6"
+                                                        HorizontalContentAlignment="Stretch">
+                                                    <Border MinHeight="44"
+                                                            Padding="12,8"
+                                                            CornerRadius="6"
                                                             Background="{DynamicResource StoriesCardGlass}">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
@@ -345,7 +440,7 @@
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                                         <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
-                                                                        <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
+                                                                        <Setter Property="Background" Value="{DynamicResource PanelGlass}" />
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
@@ -356,27 +451,32 @@
                                                                 <ColumnDefinition Width="Auto" />
                                                             </Grid.ColumnDefinitions>
 
-                                                            <StackPanel Grid.Column="0">
+                                                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                                                <Path Style="{StaticResource IconPath}"
+                                                                      Data="{StaticResource IconWorld}"
+                                                                      Width="14" Height="14"
+                                                                      Stroke="{DynamicResource TextSecondary}"
+                                                                      Opacity="0.7"
+                                                                      Margin="0,0,8,0"
+                                                                      VerticalAlignment="Center"
+                                                                      IsHitTestVisible="False" />
                                                                 <TextBlock Text="{Binding DisplayName}"
                                                                            FontFamily="{StaticResource MainFont}"
                                                                            FontSize="13"
                                                                            FontWeight="SemiBold"
-                                                                           Foreground="{DynamicResource TextPrimary}"
+                                                                           Foreground="{DynamicResource TextWhite}"
+                                                                           VerticalAlignment="Center"
                                                                            TextTrimming="CharacterEllipsis" />
-                                                                <TextBlock Text="{Binding LastPlayedFormatted}"
-                                                                           FontFamily="{StaticResource MainFont}"
-                                                                           FontSize="11"
-                                                                           Foreground="{DynamicResource TextMuted}"
-                                                                           Margin="0,2,0,0" />
                                                             </StackPanel>
 
                                                             <TextBlock Grid.Column="1"
                                                                        Text="{Binding SizeFormatted}"
                                                                        FontFamily="{StaticResource MainFont}"
                                                                        FontSize="11"
-                                                                       Foreground="{DynamicResource TextMuted}"
+                                                                       Foreground="{DynamicResource TextSecondary}"
+                                                                       Opacity="0.75"
                                                                        VerticalAlignment="Center"
-                                                                       Margin="6,0,0,0" />
+                                                                       Margin="8,0,0,0" />
                                                         </Grid>
                                                     </Border>
                                                 </Button>
