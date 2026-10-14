@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,6 +35,7 @@ public class LobbyViewModel : ObservableObject
     private readonly IWorkshopService? _workshopService;
     private readonly IMinecraftPingService _pingService;
     private readonly ICloudLobbyService? _cloudLobbyService;
+    private readonly IFriendService? _friendService;
     private readonly System.Windows.Threading.DispatcherTimer? _cloudLobbyRefreshTimer;
 
     public ObservableCollection<CloudWorldItemViewModel> CloudWorlds { get; } = new();
@@ -137,11 +139,86 @@ public class LobbyViewModel : ObservableObject
             }
         }
     }
+
     public bool HasCreateWorldError => !string.IsNullOrWhiteSpace(_createWorldError);
+    private bool _isCreateModeFromScratch = true;
+    public bool IsCreateModeFromScratch
+    {
+        get => _isCreateModeFromScratch;
+        set
+        {
+            if (SetProperty(ref _isCreateModeFromScratch, value))
+            {
+                OnPropertyChanged(nameof(IsCreateModeFromSingleplayer));
+                if (!value)
+                {
+                    _ = LoadLocalSavesAsync();
+                }
+            }
+        }
+    }
+
+    public bool IsCreateModeFromSingleplayer
+    {
+        get => !_isCreateModeFromScratch;
+        set => IsCreateModeFromScratch = !value;
+    }
+
+    public ObservableCollection<WorldSaveItem> LocalSaves { get; } = new();
+
+    private WorldSaveItem? _selectedLocalSave;
+    public WorldSaveItem? SelectedLocalSave
+    {
+        get => _selectedLocalSave;
+        set
+        {
+            if (SetProperty(ref _selectedLocalSave, value))
+            {
+                UploadLocalWorldCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private bool _isLoadingLocalSaves;
+    public bool IsLoadingLocalSaves
+    {
+        get => _isLoadingLocalSaves;
+        set
+        {
+            if (SetProperty(ref _isLoadingLocalSaves, value))
+            {
+                OnPropertyChanged(nameof(HasNoLocalSaves));
+            }
+        }
+    }
+
+    public bool HasNoLocalSaves => !IsLoadingLocalSaves && LocalSaves.Count == 0;
+
+    private bool _isUploadingLocalWorld;
+    public bool IsUploadingLocalWorld
+    {
+        get => _isUploadingLocalWorld;
+        set
+        {
+            if (SetProperty(ref _isUploadingLocalWorld, value))
+            {
+                UploadLocalWorldCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    private string? _uploadStatusText;
+    public string? UploadStatusText
+    {
+        get => _uploadStatusText;
+        set => SetProperty(ref _uploadStatusText, value);
+    }
 
     public RelayCommand OpenCreateWorldFormCommand { get; }
     public RelayCommand CancelCreateWorldFormCommand { get; }
+    public RelayCommand SelectLocalSaveCommand { get; }
     public AsyncRelayCommand SubmitCreateWorldCommand { get; }
+    public AsyncRelayCommand UploadLocalWorldCommand { get; }
     public AsyncRelayCommand RefreshWorldsCommand { get; }
     private string _serverPingText = "—";
     private string _serverPlayersText = "—";
@@ -443,7 +520,8 @@ public class LobbyViewModel : ObservableObject
         IServerListSyncService? serverListSyncService = null,
         IWorkshopService? workshopService = null,
         IMinecraftPingService? pingService = null,
-        ICloudLobbyService? cloudLobbyService = null)
+        ICloudLobbyService? cloudLobbyService = null,
+        IFriendService? friendService = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
@@ -459,19 +537,27 @@ public class LobbyViewModel : ObservableObject
         _workshopService = workshopService;
         _pingService = pingService ?? new MinecraftPingService();
         _cloudLobbyService = cloudLobbyService ?? (App.Services?.GetService(typeof(ICloudLobbyService)) as ICloudLobbyService);
+        _friendService = friendService ?? (App.Services?.GetService(typeof(IFriendService)) as IFriendService);
 
         CreateLobbyCommand = new AsyncRelayCommand(CreateLobbyAsync, () => !IsBusy && !IsInLobby);
         OpenCreateWorldFormCommand = new RelayCommand(_ =>
         {
             CreateWorldError = null;
+            IsCreateModeFromScratch = true;
             IsCreateWorldFormVisible = true;
         }, _ => !IsInLobby);
         CancelCreateWorldFormCommand = new RelayCommand(_ =>
         {
             CreateWorldError = null;
             IsCreateWorldFormVisible = false;
+            IsCreateModeFromScratch = true;
+        });
+        SelectLocalSaveCommand = new RelayCommand(param =>
+        {
+            if (param is WorldSaveItem s) SelectLocalSave(s);
         });
         SubmitCreateWorldCommand = new AsyncRelayCommand(CreateNewWorldAsync, () => !IsCreatingWorld && !string.IsNullOrWhiteSpace(NewWorldName));
+        UploadLocalWorldCommand = new AsyncRelayCommand(UploadLocalWorldAsync, () => SelectedLocalSave != null && !IsUploadingLocalWorld && !IsBusy);
         RefreshWorldsCommand = new AsyncRelayCommand(RefreshWorldsAsync, () => !IsRefreshingWorlds);
         SelectCloudWorldsTabCommand = new RelayCommand(_ => IsCloudWorldsTab = true);
         SelectLanTabCommand = new RelayCommand(_ => IsCloudWorldsTab = false);
@@ -2938,7 +3024,10 @@ public class LobbyViewModel : ObservableObject
                                 _cloudLobbyService,
                                 onConnectAddress: addr => GuestConnectRequested?.Invoke(this, addr),
                                 onWakeAndConnect: WakeAndConnectWorldAsync,
-                                onStop: StopWorldAsync);
+                                onStop: StopWorldAsync,
+                                onDelete: DeleteWorldAsync,
+                                friendService: _friendService,
+                                skinService: _skinService);
                             CloudWorlds.Add(vm);
                         }
                     }
@@ -3116,6 +3205,265 @@ public class LobbyViewModel : ObservableObject
             UpdatePollingTimerInterval();
         }
     }
+
+    public void SelectLocalSave(WorldSaveItem save)
+    {
+        foreach (var s in LocalSaves)
+        {
+            s.IsSelected = (s == save);
+        }
+        SelectedLocalSave = save;
+    }
+
+    public async Task LoadLocalSavesAsync()
+    {
+        if (IsLoadingLocalSaves) return;
+        IsLoadingLocalSaves = true;
+        try
+        {
+            LocalSaves.Clear();
+            var gameDir = _configService.CurrentConfig.GameDir;
+            if (string.IsNullOrWhiteSpace(gameDir))
+            {
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                gameDir = System.IO.Path.Combine(appData, ".aura");
+            }
+
+            if (_workshopService != null)
+            {
+                var saves = await _workshopService.GetWorldSavesAsync(gameDir);
+                if (saves != null)
+                {
+                    foreach (var s in saves)
+                    {
+                        LocalSaves.Add(s);
+                    }
+                }
+            }
+
+            if (LocalSaves.Count > 0)
+            {
+                SelectLocalSave(LocalSaves[0]);
+            }
+            else
+            {
+                SelectedLocalSave = null;
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            IsLoadingLocalSaves = false;
+        }
+    }
+
+    public async Task UploadLocalWorldAsync()
+    {
+        if (_cloudLobbyService == null || SelectedLocalSave == null || IsUploadingLocalWorld) return;
+
+        var myNick = _configService.CurrentConfig.Nickname;
+        if (!NicknameValidator.Validate(myNick).IsValid)
+        {
+            CreateWorldError = "Укажите корректный никнейм в настройках";
+            return;
+        }
+
+        var sourceFolder = SelectedLocalSave.FolderPath;
+        if (string.IsNullOrWhiteSpace(sourceFolder) || !System.IO.Directory.Exists(sourceFolder))
+        {
+            CreateWorldError = "Папка мира не найдена";
+            return;
+        }
+
+        IsUploadingLocalWorld = true;
+        CreateWorldError = null;
+        UploadStatusText = "Подготовка архива мира...";
+
+        string? tempZipPath = null;
+        try
+        {
+            tempZipPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"aura_upload_{Guid.NewGuid():N}.zip");
+
+            await Task.Run(() =>
+            {
+                using var zipStream = System.IO.File.Create(tempZipPath);
+                using var archive = new System.IO.Compression.ZipArchive(zipStream, System.IO.Compression.ZipArchiveMode.Create, true);
+
+                var sourceDirInfo = new System.IO.DirectoryInfo(sourceFolder);
+                var files = sourceDirInfo.GetFiles("*", System.IO.SearchOption.AllDirectories);
+                bool hasUsercacheInWorld = false;
+
+                foreach (var file in files)
+                {
+                    if (string.Equals(file.Name, "session.lock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (string.Equals(file.Name, "usercache.json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        hasUsercacheInWorld = true;
+                    }
+
+                    string relPath = System.IO.Path.GetRelativePath(sourceFolder, file.FullName).Replace('\\', '/');
+                    archive.CreateEntryFromFile(file.FullName, relPath, System.IO.Compression.CompressionLevel.Fastest);
+                }
+
+                if (!hasUsercacheInWorld)
+                {
+                    var gameDir = _configService.CurrentConfig.GameDir;
+                    if (string.IsNullOrWhiteSpace(gameDir))
+                    {
+                        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                        gameDir = System.IO.Path.Combine(appData, ".aura");
+                    }
+                    var rootUserCache = System.IO.Path.Combine(gameDir, "usercache.json");
+                    if (System.IO.File.Exists(rootUserCache))
+                    {
+                        archive.CreateEntryFromFile(rootUserCache, "usercache.json", System.IO.Compression.CompressionLevel.Fastest);
+                    }
+                }
+            });
+
+            UploadStatusText = "Загрузка мира в облако...";
+            var uploadedWorld = await _cloudLobbyService.UploadWorldAsync(myNick, SelectedLocalSave.DisplayName, tempZipPath);
+
+            if (uploadedWorld != null)
+            {
+                UploadStatusText = "Мир успешно выгружен!";
+                IsCreateWorldFormVisible = false;
+                await RefreshWorldsAsync();
+
+                var targetVm = CloudWorlds.FirstOrDefault(w => string.Equals(w.Id, uploadedWorld.Id, StringComparison.OrdinalIgnoreCase))
+                               ?? CloudWorlds.FirstOrDefault(w => string.Equals(w.Name, SelectedLocalSave.DisplayName, StringComparison.OrdinalIgnoreCase));
+                if (targetVm != null)
+                {
+                    _ = WakeAndConnectWorldAsync(targetVm);
+                }
+            }
+            else
+            {
+                CreateWorldError = "Не удалось выгрузить мир на сервер";
+            }
+        }
+        catch (Exception ex)
+        {
+            CreateWorldError = $"Ошибка выгрузки: {ex.Message}";
+        }
+        finally
+        {
+            if (tempZipPath != null && System.IO.File.Exists(tempZipPath))
+            {
+                try { System.IO.File.Delete(tempZipPath); } catch { }
+            }
+            IsUploadingLocalWorld = false;
+        }
+    }
+
+    public async Task DeleteWorldAsync(CloudWorldItemViewModel world)
+    {
+        if (_cloudLobbyService == null || world.IsActionInProgress) return;
+        world.IsActionInProgress = true;
+        try
+        {
+            var res = await _cloudLobbyService.DeleteWorldAsync(world.Owner, world.Id);
+            if (res != null && res.Success)
+            {
+                CloudWorlds.Remove(world);
+                HasCloudWorlds = CloudWorlds.Count > 0;
+                UpdatePollingTimerInterval();
+            }
+        }
+        catch
+        {
+        }
+        finally
+        {
+            world.IsActionInProgress = false;
+        }
+    }
+}
+
+public class CloudWorldFriendShareItemViewModel : ObservableObject
+{
+    private readonly Func<CloudWorldFriendShareItemViewModel, Task> _toggleAccessFunc;
+    public string Nick { get; }
+
+    private bool _hasAccess;
+    public bool HasAccess
+    {
+        get => _hasAccess;
+        set
+        {
+            if (SetProperty(ref _hasAccess, value))
+            {
+                OnPropertyChanged(nameof(ActionButtonText));
+            }
+        }
+    }
+
+    public string ActionButtonText => HasAccess ? "Доступ открыт ×" : "Дать доступ";
+
+    private ImageSource _avatar;
+    public ImageSource Avatar
+    {
+        get => _avatar;
+        set => SetProperty(ref _avatar, value);
+    }
+
+    private bool _isBusy;
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                ToggleAccessCommand?.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public RelayCommand ToggleAccessCommand { get; }
+
+    public CloudWorldFriendShareItemViewModel(
+        string nick,
+        bool hasAccess,
+        ISkinService? skinService,
+        Func<CloudWorldFriendShareItemViewModel, Task> toggleAccessFunc)
+    {
+        Nick = nick;
+        _hasAccess = hasAccess;
+        _toggleAccessFunc = toggleAccessFunc;
+        _avatar = SkinService.LoadDefaultSteveHead();
+
+        ToggleAccessCommand = new RelayCommand(_ =>
+        {
+            _ = _toggleAccessFunc(this);
+        }, _ => !IsBusy);
+
+        if (skinService != null)
+        {
+            _ = LoadAvatarAsync(skinService);
+        }
+    }
+
+    private async Task LoadAvatarAsync(ISkinService skinService)
+    {
+        try
+        {
+            var head = await skinService.GetAvatarForPlayerAsync(Nick);
+            if (head != null)
+            {
+                Avatar = head;
+            }
+        }
+        catch
+        {
+        }
+    }
 }
 
 public class CloudWorldItemViewModel : ObservableObject
@@ -3125,6 +3473,9 @@ public class CloudWorldItemViewModel : ObservableObject
     private readonly Action<string> _onConnectAddress;
     private readonly Func<CloudWorldItemViewModel, Task> _onWakeAndConnect;
     private readonly Func<CloudWorldItemViewModel, Task> _onStop;
+    private readonly Func<CloudWorldItemViewModel, Task>? _onDelete;
+    private readonly IFriendService? _friendService;
+    private readonly ISkinService? _skinService;
 
     public string Id => _item.Id;
     public string Name => _item.Name;
@@ -3160,6 +3511,7 @@ public class CloudWorldItemViewModel : ObservableObject
                 OnPropertyChanged(nameof(PlayButtonText));
                 PlayCommand?.RaiseCanExecuteChanged();
                 StopCommand?.RaiseCanExecuteChanged();
+                DeleteWorldCommand?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -3245,9 +3597,15 @@ public class CloudWorldItemViewModel : ObservableObject
                 if (!AllowedPlayers.Contains(p, StringComparer.OrdinalIgnoreCase))
                     AllowedPlayers.Add(p);
             }
+
+            foreach (var f in FriendsToShareWith)
+            {
+                f.HasAccess = AllowedPlayers.Contains(f.Nick, StringComparer.OrdinalIgnoreCase);
+            }
         }
         PlayCommand?.RaiseCanExecuteChanged();
         StopCommand?.RaiseCanExecuteChanged();
+        DeleteWorldCommand?.RaiseCanExecuteChanged();
     }
 
     private bool _isActionInProgress;
@@ -3261,6 +3619,7 @@ public class CloudWorldItemViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanPlay));
                 PlayCommand?.RaiseCanExecuteChanged();
                 StopCommand?.RaiseCanExecuteChanged();
+                DeleteWorldCommand?.RaiseCanExecuteChanged();
             }
         }
     }
@@ -3273,38 +3632,65 @@ public class CloudWorldItemViewModel : ObservableObject
     }
 
     public ObservableCollection<string> AllowedPlayers { get; } = new();
+    public ObservableCollection<CloudWorldFriendShareItemViewModel> FriendsToShareWith { get; } = new();
+    public bool HasNoFriends => FriendsToShareWith.Count == 0;
+    public bool HasFriends => FriendsToShareWith.Count > 0;
 
-    private string _friendNickToAdd = string.Empty;
-    public string FriendNickToAdd
+    public void RefreshFriendsList()
     {
-        get => _friendNickToAdd;
-        set
+        FriendsToShareWith.Clear();
+        if (_friendService != null)
         {
-            if (SetProperty(ref _friendNickToAdd, value))
+            var cached = _friendService.CachedFriends;
+            if (cached != null)
             {
-                AddFriendCommand?.RaiseCanExecuteChanged();
+                foreach (var f in cached)
+                {
+                    bool hasAccess = AllowedPlayers.Contains(f.Nick, StringComparer.OrdinalIgnoreCase);
+                    var friendVm = new CloudWorldFriendShareItemViewModel(
+                        f.Nick,
+                        hasAccess,
+                        _skinService,
+                        ToggleFriendAccessAsync);
+                    FriendsToShareWith.Add(friendVm);
+                }
             }
         }
+        OnPropertyChanged(nameof(HasNoFriends));
+        OnPropertyChanged(nameof(HasFriends));
+    }
+
+    private bool _isConfirmingDelete;
+    private CancellationTokenSource? _deleteConfirmCts;
+    public bool IsConfirmingDelete
+    {
+        get => _isConfirmingDelete;
+        set => SetProperty(ref _isConfirmingDelete, value);
     }
 
     public RelayCommand PlayCommand { get; }
     public RelayCommand StopCommand { get; }
     public RelayCommand ToggleSharePanelCommand { get; }
-    public RelayCommand AddFriendCommand { get; }
-    public RelayCommand RemoveFriendCommand { get; }
+    public RelayCommand DeleteWorldCommand { get; }
 
     public CloudWorldItemViewModel(
         CloudWorldItem item,
         ICloudLobbyService cloudService,
         Action<string> onConnectAddress,
         Func<CloudWorldItemViewModel, Task> onWakeAndConnect,
-        Func<CloudWorldItemViewModel, Task> onStop)
+        Func<CloudWorldItemViewModel, Task> onStop,
+        Func<CloudWorldItemViewModel, Task>? onDelete = null,
+        IFriendService? friendService = null,
+        ISkinService? skinService = null)
     {
         _item = item;
         _cloudService = cloudService;
         _onConnectAddress = onConnectAddress;
         _onWakeAndConnect = onWakeAndConnect;
         _onStop = onStop;
+        _onDelete = onDelete;
+        _friendService = friendService;
+        _skinService = skinService;
         _status = item.Status;
         _port = item.Port;
         _stageText = item.StageText;
@@ -3338,52 +3724,75 @@ public class CloudWorldItemViewModel : ObservableObject
         ToggleSharePanelCommand = new RelayCommand(_ =>
         {
             IsSharePanelOpen = !IsSharePanelOpen;
+            if (IsSharePanelOpen)
+            {
+                RefreshFriendsList();
+            }
         }, _ => IsOwner);
 
-        AddFriendCommand = new RelayCommand(_ =>
+        DeleteWorldCommand = new RelayCommand(_ =>
         {
-            _ = AddFriendInternalAsync();
-        }, _ => !string.IsNullOrWhiteSpace(FriendNickToAdd) && IsOwner);
-
-        RemoveFriendCommand = new RelayCommand(param =>
-        {
-            if (param is string friendNick)
+            if (!IsConfirmingDelete)
             {
-                _ = RemoveFriendInternalAsync(friendNick);
-            }
-        });
-    }
-
-    private async Task AddFriendInternalAsync()
-    {
-        var nick = FriendNickToAdd?.Trim();
-        if (string.IsNullOrWhiteSpace(nick)) return;
-
-        try
-        {
-            var res = await _cloudService.ShareWorldAsync(Owner, Id, nick, "add");
-            if (res != null && res.Success)
-            {
-                if (!AllowedPlayers.Contains(nick, StringComparer.OrdinalIgnoreCase))
+                IsConfirmingDelete = true;
+                _deleteConfirmCts?.Cancel();
+                _deleteConfirmCts = new CancellationTokenSource();
+                var token = _deleteConfirmCts.Token;
+                _ = Task.Delay(3000, token).ContinueWith(t =>
                 {
-                    AllowedPlayers.Add(nick);
-                }
-                FriendNickToAdd = string.Empty;
+                    if (!t.IsCanceled)
+                    {
+                        System.Windows.Application.Current?.Dispatcher?.Invoke(() => IsConfirmingDelete = false);
+                    }
+                }, TaskScheduler.Default);
             }
-        }
-        catch { }
+            else
+            {
+                IsConfirmingDelete = false;
+                _deleteConfirmCts?.Cancel();
+                if (_onDelete != null)
+                {
+                    _ = _onDelete(this);
+                }
+            }
+        }, _ => !IsActionInProgress && IsOwner);
     }
 
-    private async Task RemoveFriendInternalAsync(string friendNick)
+    private async Task ToggleFriendAccessAsync(CloudWorldFriendShareItemViewModel friendItem)
     {
+        if (friendItem.IsBusy || !IsOwner) return;
+        friendItem.IsBusy = true;
         try
         {
-            var res = await _cloudService.ShareWorldAsync(Owner, Id, friendNick, "remove");
+            string action = friendItem.HasAccess ? "remove" : "add";
+            var res = await _cloudService.ShareWorldAsync(Owner, Id, friendItem.Nick, action);
             if (res != null && res.Success)
             {
-                AllowedPlayers.Remove(friendNick);
+                if (action == "add")
+                {
+                    if (!AllowedPlayers.Contains(friendItem.Nick, StringComparer.OrdinalIgnoreCase))
+                    {
+                        AllowedPlayers.Add(friendItem.Nick);
+                    }
+                    friendItem.HasAccess = true;
+                }
+                else
+                {
+                    for (int i = AllowedPlayers.Count - 1; i >= 0; i--)
+                    {
+                        if (string.Equals(AllowedPlayers[i], friendItem.Nick, StringComparison.OrdinalIgnoreCase))
+                            AllowedPlayers.RemoveAt(i);
+                    }
+                    friendItem.HasAccess = false;
+                }
             }
         }
-        catch { }
+        catch
+        {
+        }
+        finally
+        {
+            friendItem.IsBusy = false;
+        }
     }
 }

@@ -39,6 +39,13 @@ public class WorldSaveItem : ObservableObject
     private bool _isBackingUp;
     private string _backupStatusText = string.Empty;
 
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetProperty(ref _isSelected, value);
+    }
+
     public string FolderName { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string FolderPath { get; set; } = string.Empty;

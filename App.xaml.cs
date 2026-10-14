@@ -676,7 +676,9 @@ public partial class App : Application
             sp.GetRequiredService<IModManifestService>(),
             sp.GetRequiredService<IServerListSyncService>(),
             sp.GetRequiredService<IWorkshopService>(),
-            sp.GetRequiredService<IMinecraftPingService>()));
+            sp.GetRequiredService<IMinecraftPingService>(),
+            cloudLobbyService: sp.GetService<ICloudLobbyService>(),
+            friendService: sp.GetService<IFriendService>()));
         services.AddSingleton<FriendsViewModel>();
         services.AddSingleton<MainViewModel>();
     }

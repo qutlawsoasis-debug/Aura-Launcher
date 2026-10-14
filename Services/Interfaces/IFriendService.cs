@@ -10,6 +10,7 @@ public interface IFriendService : IDisposable
     bool IsRegistered { get; }
     string? CurrentUserId { get; }
     string? CurrentFriendCode { get; }
+    IReadOnlyList<FriendPresenceItem> CachedFriends => Array.Empty<FriendPresenceItem>();
 
     bool IsFriendsTabActive { get; set; }
     bool IsInLobby { get; set; }

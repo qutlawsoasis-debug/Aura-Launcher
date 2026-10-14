@@ -93,6 +93,9 @@ public class FriendService : IFriendService
         }
     }
 
+    private IReadOnlyList<FriendPresenceItem> _cachedFriends = Array.Empty<FriendPresenceItem>();
+    public IReadOnlyList<FriendPresenceItem> CachedFriends => _cachedFriends;
+
     public event Action<SyncResponse>? SyncUpdated;
     public event Action<IReadOnlyList<FriendPresenceItem>>? FriendsListUpdated;
     public event Action<IncomingInviteItem>? InviteReceived;
@@ -315,7 +318,8 @@ public class FriendService : IFriendService
                 }
 
                 SyncUpdated?.Invoke(syncResult);
-                FriendsListUpdated?.Invoke(syncResult.Friends ?? Array.Empty<FriendPresenceItem>());
+                _cachedFriends = syncResult.Friends ?? Array.Empty<FriendPresenceItem>();
+                FriendsListUpdated?.Invoke(_cachedFriends);
             }
 
             return syncResult;

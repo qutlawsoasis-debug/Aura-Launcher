@@ -63,3 +63,10 @@ public record CloudWorldShareResponse(
     [property: JsonPropertyName("allowed_players")] List<string>? AllowedPlayers,
     [property: JsonPropertyName("error")] string? Error
 );
+
+public record CloudWorldDeleteResponse(
+    [property: JsonPropertyName("success")] bool Success,
+    [property: JsonPropertyName("message")] string? Message,
+    [property: JsonPropertyName("error")] string? Error = null
+);
+
