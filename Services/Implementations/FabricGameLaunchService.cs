@@ -220,10 +220,183 @@ public class FabricGameLaunchService : IGameLaunchService
                 LogLauncherEvent($"[OPTIONS] Создан файл настроек по умолчанию (options.txt): {optionsPath}");
                 ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Medium");
             }
+            EnsureDefaultResourcePacksEnabled(gameDir);
         }
         catch (Exception ex)
         {
             LogLauncherEvent($"[OPTIONS: ERROR] Ошибка создания options.txt: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Парсинг списка в формате Minecraft options.txt (например, resourcePacks:["vanilla","fabric","file/pack.zip"]).
+    /// </summary>
+    public static List<string> ParseOptionsList(string rawLine)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrWhiteSpace(rawLine))
+        {
+            return list;
+        }
+
+        int colonIdx = rawLine.IndexOf(':');
+        string content = colonIdx >= 0 ? rawLine.Substring(colonIdx + 1).Trim() : rawLine.Trim();
+
+        if (content.StartsWith('[') && content.EndsWith(']'))
+        {
+            content = content.Substring(1, content.Length - 2);
+        }
+
+        var matches = Regex.Matches(content, @"""((?:[^""\\]|\\.)*)""");
+        foreach (Match m in matches)
+        {
+            var val = m.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\");
+            list.Add(val);
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// Форматирование списка в формат массива Minecraft options.txt.
+    /// </summary>
+    public static string FormatOptionsList(IEnumerable<string> items)
+    {
+        var formatted = items.Select(i =>
+        {
+            var escaped = i.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return $"\"{escaped}\"";
+        });
+        return $"[{string.Join(",", formatted)}]";
+    }
+
+    /// <summary>
+    /// Автоматическое обнаружение и включение всех ресурспаков из папки resourcepacks в options.txt
+    /// с дублированием в incompatibleResourcePacks перед запуском клиента.
+    /// </summary>
+    public static void EnsureDefaultResourcePacksEnabled(string gameDir)
+    {
+        if (string.IsNullOrWhiteSpace(gameDir))
+        {
+            return;
+        }
+
+        try
+        {
+            var rpDir = Path.Combine(gameDir, "resourcepacks");
+            var foundPacks = new List<string>();
+
+            if (Directory.Exists(rpDir))
+            {
+                foreach (var file in Directory.GetFiles(rpDir, "*.zip"))
+                {
+                    foundPacks.Add(Path.GetFileName(file));
+                }
+
+                foreach (var dir in Directory.GetDirectories(rpDir))
+                {
+                    if (File.Exists(Path.Combine(dir, "pack.mcmeta")))
+                    {
+                        foundPacks.Add(Path.GetFileName(dir));
+                    }
+                }
+            }
+
+            // Стабильный алфавитный порядок для новых ресурспаков
+            foundPacks.Sort(StringComparer.OrdinalIgnoreCase);
+
+            var optionsPath = Path.Combine(gameDir, "options.txt");
+            Directory.CreateDirectory(gameDir);
+
+            List<string> lines;
+            if (File.Exists(optionsPath))
+            {
+                lines = File.ReadAllLines(optionsPath, Encoding.UTF8).ToList();
+            }
+            else
+            {
+                lines = new List<string>
+                {
+                    "version:3465",
+                    "lang:ru_ru",
+                    "guiScale:2",
+                    "fullscreen:true"
+                };
+            }
+
+            // 1. Обработка resourcePacks:[...]
+            int rpLineIndex = lines.FindIndex(l => l.StartsWith("resourcePacks:", StringComparison.Ordinal));
+            List<string> currentPacks = rpLineIndex >= 0
+                ? ParseOptionsList(lines[rpLineIndex])
+                : new List<string>();
+
+            // Гарантируем "vanilla"
+            if (!currentPacks.Contains("vanilla", StringComparer.OrdinalIgnoreCase))
+            {
+                currentPacks.Insert(0, "vanilla");
+            }
+
+            // Гарантируем "fabric" (или "Fabric Mods")
+            if (!currentPacks.Contains("fabric", StringComparer.OrdinalIgnoreCase) &&
+                !currentPacks.Contains("Fabric Mods", StringComparer.OrdinalIgnoreCase))
+            {
+                int vanillaIdx = currentPacks.FindIndex(p => string.Equals(p, "vanilla", StringComparison.OrdinalIgnoreCase));
+                int insertIdx = vanillaIdx >= 0 ? vanillaIdx + 1 : 0;
+                currentPacks.Insert(insertIdx, "fabric");
+            }
+
+            // Добавляем все найденные ресурспаки из resourcepacks/, сохраняя существующие позиции
+            foreach (var packName in foundPacks)
+            {
+                var packEntry = $"file/{packName}";
+                if (!currentPacks.Contains(packEntry, StringComparer.OrdinalIgnoreCase))
+                {
+                    currentPacks.Add(packEntry);
+                }
+            }
+
+            var newRpLine = $"resourcePacks:{FormatOptionsList(currentPacks)}";
+            if (rpLineIndex >= 0)
+            {
+                lines[rpLineIndex] = newRpLine;
+            }
+            else
+            {
+                lines.Add(newRpLine);
+            }
+
+            // 2. Обработка incompatibleResourcePacks:[...]
+            int incompLineIndex = lines.FindIndex(l => l.StartsWith("incompatibleResourcePacks:", StringComparison.Ordinal));
+            List<string> incompPacks = incompLineIndex >= 0
+                ? ParseOptionsList(lines[incompLineIndex])
+                : new List<string>();
+
+            // Продублировать все ресурспаки из resourcepacks/ в incompatibleResourcePacks
+            foreach (var packName in foundPacks)
+            {
+                var packEntry = $"file/{packName}";
+                if (!incompPacks.Contains(packEntry, StringComparer.OrdinalIgnoreCase))
+                {
+                    incompPacks.Add(packEntry);
+                }
+            }
+
+            var newIncompLine = $"incompatibleResourcePacks:{FormatOptionsList(incompPacks)}";
+            if (incompLineIndex >= 0)
+            {
+                lines[incompLineIndex] = newIncompLine;
+            }
+            else
+            {
+                lines.Add(newIncompLine);
+            }
+
+            File.WriteAllLines(optionsPath, lines, new UTF8Encoding(false));
+            LogLauncherEvent($"[OPTIONS] Синхронизированы ресурспаки в options.txt (активно: {currentPacks.Count}, несовместимых: {incompPacks.Count})");
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[OPTIONS: ERROR] Ошибка при обновлении ресурспаков в options.txt: {ex.Message}");
         }
     }
 
@@ -1151,6 +1324,9 @@ public class FabricGameLaunchService : IGameLaunchService
                 onLogReceived?.Invoke("[STDERR] " + e.Data);
             }
         };
+
+        // Гарантированное включение ресурспаков в options.txt перед самым стартом клиента
+        EnsureDefaultResourcePacksEnabled(gameDir);
 
         process.Start();
         process.BeginOutputReadLine();

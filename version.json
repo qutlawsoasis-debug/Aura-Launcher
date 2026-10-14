@@ -1,7 +1,8 @@
 {
-    "internalVersion":  "1.2.122",
-    "userFacingVersion":  "beta 1.0.114",
+    "internalVersion":  "1.2.123",
+    "userFacingVersion":  "beta 1.0.115",
     "changelog":  [
-                      "[Сборка] Добавлены моды Litematica, MaLiLib и Effortless Structure"
+                      "[Схемы] Стартовый каталог из 100 построек для Litematica (дома, замки, склады, декор)",
+                      "[Сборка] Авто-активация ресурспаков в options.txt и синхронизация папки schematics"
                   ]
 }
