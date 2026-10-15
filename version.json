@@ -1,8 +1,8 @@
 {
-    "internalVersion":  "1.2.125",
-    "userFacingVersion":  "beta 1.0.117",
+    "internalVersion":  "1.2.126",
+    "userFacingVersion":  "beta 1.0.118",
     "changelog":  [
-                      "[Строительство] Добавлен мод Prefabricated с готовыми чертежами домов, складов, мостов и ферм",
-                      "[Схемы] Интегрирован Litematica Printer (авто-постройка по нажатию Caps Lock) и готовый удобный конфиг"
+                      "[Строительство] В сборку добавлен мод WorldEdit (Fabric 1.20.1)",
+                      "[Схемы] Патч Litematica: поддержка загрузки схем версий v7+ (Minecraft 1.20.5 - 1.21)"
                   ]
 }
