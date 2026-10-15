@@ -1,8 +1,8 @@
 {
-    "internalVersion":  "1.2.124",
-    "userFacingVersion":  "beta 1.0.116",
+    "internalVersion":  "1.2.125",
+    "userFacingVersion":  "beta 1.0.117",
     "changelog":  [
-                      "[Строительство] Добавлены моды Accurate Block Placement и Bridging Mod (быстрая установка блоков без задержек и на бегу)",
-                      "[Ресурспаки] Автоматическая активация всех ресурспаков сборки в options.txt перед запуском"
+                      "[Строительство] Добавлен мод Prefabricated с готовыми чертежами домов, складов, мостов и ферм",
+                      "[Схемы] Интегрирован Litematica Printer (авто-постройка по нажатию Caps Lock) и готовый удобный конфиг"
                   ]
 }
