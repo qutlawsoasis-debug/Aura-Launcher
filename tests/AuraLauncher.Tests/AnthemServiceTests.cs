@@ -45,9 +45,13 @@ public class AnthemServiceTests
         public bool Stopped { get; set; } = false;
         public string CurrentTrackTitle { get; set; } = "zxcursed · Aura";
         public double PlaybackProgress { get; set; } = 0.0;
+        public TimeSpan CurrentPosition { get; set; } = TimeSpan.Zero;
+        public TimeSpan TotalDuration { get; set; } = TimeSpan.FromSeconds(76);
         public event EventHandler<string>? TrackChanged;
         public event EventHandler<bool>? PlayStateChanged;
         public event EventHandler<double>? ProgressChanged;
+
+        public void Seek(double progress) { PlaybackProgress = progress; ProgressChanged?.Invoke(this, progress); }
 
         public void Initialize() => Initialized = true;
         public void PlayAnthem(bool force = false) { IsPlaying = true; PlayStateChanged?.Invoke(this, true); }

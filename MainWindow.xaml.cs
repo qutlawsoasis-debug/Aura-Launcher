@@ -104,7 +104,11 @@ public partial class MainWindow : Window
                 }
                 else if (args.PropertyName == nameof(MainViewModel.IsMusicPlaying))
                 {
-                    Dispatcher.InvokeAsync(() => UpdateVinylState(vm.IsMusicPlaying));
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        UpdateVinylState(vm.IsMusicPlaying);
+                        AnimateTonearm(vm.IsMusicPlaying);
+                    });
                 }
                 else if (args.PropertyName == nameof(MainViewModel.IsMusicWidgetVisible))
                 {
@@ -567,9 +571,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private bool _isMusicWidgetExpanded = false;
+
     private void SoundControl_MouseEnter(object sender, MouseEventArgs e)
     {
         _sliderHideTimer?.Stop();
+        _isMusicWidgetExpanded = true;
 
         if (GlassHoverOverlay != null)
         {
@@ -580,7 +587,7 @@ public partial class MainWindow : Window
             GlassHoverOverlay.BeginAnimation(UIElement.OpacityProperty, hoverAnim);
         }
 
-        AnimateSlider(open: true);
+        AnimateWidgetExpansion(expand: true);
     }
 
     private void SoundControl_MouseLeave(object sender, MouseEventArgs e)
@@ -597,24 +604,119 @@ public partial class MainWindow : Window
         _sliderHideTimer?.Stop();
         _sliderHideTimer = new System.Windows.Threading.DispatcherTimer
         {
-            Interval = TimeSpan.FromSeconds(1)
+            Interval = TimeSpan.FromMilliseconds(240)
         };
         _sliderHideTimer.Tick += (s, args) =>
         {
             _sliderHideTimer.Stop();
             if (SoundControlRoot != null && !SoundControlRoot.IsMouseOver)
             {
-                AnimateSlider(open: false);
+                _isMusicWidgetExpanded = false;
+                AnimateWidgetExpansion(expand: false);
             }
         };
         _sliderHideTimer.Start();
     }
 
-    private void SoundControl_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void AnimateWidgetExpansion(bool expand)
     {
-        if (SliderBox != null && SliderBox.IsMouseOver) return;
+        if (SoundControlRoot == null || GlassCardBody == null) return;
+
+        double targetH = expand ? 134.0 : 64.0;
+        double targetW = expand ? 310.0 : 280.0;
+        double vinylScale = expand ? 1.25 : 1.0;
+        double tonearmOp = expand ? 1.0 : 0.0;
+        double expandedOp = expand ? 1.0 : 0.0;
+        double compactBarOp = expand ? 0.0 : 1.0;
+
+        var duration = TimeSpan.FromMilliseconds(220);
+        var easeOut = new CubicEase { EasingMode = EasingMode.EaseOut };
+        var easeIn = new CubicEase { EasingMode = EasingMode.EaseIn };
+        var ease = expand ? (IEasingFunction)easeOut : easeIn;
+
+        var animH = new DoubleAnimation(targetH, duration) { EasingFunction = ease };
+        var animW = new DoubleAnimation(targetW, duration) { EasingFunction = ease };
+        var animGlassH = new DoubleAnimation(targetH, duration) { EasingFunction = ease };
+
+        SoundControlRoot.BeginAnimation(FrameworkElement.HeightProperty, animH);
+        SoundControlRoot.BeginAnimation(FrameworkElement.WidthProperty, animW);
+        GlassCardBody.BeginAnimation(FrameworkElement.HeightProperty, animGlassH);
+
+        if (VinylScale != null)
+        {
+            var scaleAnim = new DoubleAnimation(vinylScale, duration) { EasingFunction = ease };
+            VinylScale.BeginAnimation(ScaleTransform.ScaleXProperty, scaleAnim);
+            VinylScale.BeginAnimation(ScaleTransform.ScaleYProperty, scaleAnim);
+        }
+
+        if (TonearmCanvas != null)
+        {
+            var tonearmAnim = new DoubleAnimation(tonearmOp, TimeSpan.FromMilliseconds(expand ? 220 : 160)) { EasingFunction = ease };
+            TonearmCanvas.BeginAnimation(UIElement.OpacityProperty, tonearmAnim);
+        }
+
+        if (ExpandedControls != null)
+        {
+            if (expand)
+            {
+                ExpandedControls.Visibility = Visibility.Visible;
+                ExpandedControls.IsHitTestVisible = true;
+            }
+            var expAnim = new DoubleAnimation(expandedOp, TimeSpan.FromMilliseconds(expand ? 220 : 160)) { EasingFunction = ease };
+            if (!expand)
+            {
+                expAnim.Completed += (s, e) =>
+                {
+                    if (!_isMusicWidgetExpanded && ExpandedControls != null)
+                    {
+                        ExpandedControls.Visibility = Visibility.Collapsed;
+                        ExpandedControls.IsHitTestVisible = false;
+                    }
+                };
+            }
+            ExpandedControls.BeginAnimation(UIElement.OpacityProperty, expAnim);
+        }
+
+        if (CompactProgressBar != null)
+        {
+            var compactAnim = new DoubleAnimation(compactBarOp, TimeSpan.FromMilliseconds(expand ? 160 : 220)) { EasingFunction = ease };
+            CompactProgressBar.BeginAnimation(UIElement.OpacityProperty, compactAnim);
+        }
 
         if (DataContext is MainViewModel vm)
+        {
+            AnimateTonearm(vm.IsMusicPlaying);
+        }
+    }
+
+    private void AnimateTonearm(bool isPlaying)
+    {
+        if (TonearmRotate == null) return;
+
+        double targetAngle = isPlaying ? 18.0 : 0.0;
+        var anim = new DoubleAnimation(targetAngle, TimeSpan.FromMilliseconds(280))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+        };
+        TonearmRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+    }
+
+    private void Vinyl_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is MainViewModel vm)
+        {
+            vm.TogglePlayPauseCommand?.Execute(null);
+            e.Handled = true;
+        }
+    }
+
+    private void SoundControl_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (HeaderVolSlider != null && HeaderVolSlider.IsMouseOver) return;
+        if (ExpandedControls != null && ExpandedControls.IsMouseOver) return;
+        if (VinylContainer != null && VinylContainer.IsMouseOver) return;
+
+        if (!_isMusicWidgetExpanded && DataContext is MainViewModel vm)
         {
             vm.TogglePlayPauseCommand?.Execute(null);
         }
@@ -630,20 +732,15 @@ public partial class MainWindow : Window
         }
     }
 
-    public void AnimateSlider(bool open)
+    private void ProgressSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (SliderBox == null) return;
-
-        double targetWidth = open ? 72.0 : 0.0;
-        double targetOpacity = open ? 1.0 : 0.0;
-        var duration = TimeSpan.FromMilliseconds(150);
-        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-
-        var animW = new DoubleAnimation(targetWidth, duration) { EasingFunction = ease };
-        var animO = new DoubleAnimation(targetOpacity, duration) { EasingFunction = ease };
-
-        SliderBox.BeginAnimation(FrameworkElement.WidthProperty, animW);
-        SliderBox.BeginAnimation(UIElement.OpacityProperty, animO);
+        if (sender is Slider slider && (slider.IsMouseOver || slider.IsFocused))
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                vm.SeekCommand?.Execute(e.NewValue);
+            }
+        }
     }
 
     private void UpdateVinylState(bool isPlaying)

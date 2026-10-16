@@ -177,6 +177,8 @@
     <Color x:Key="ColorWhite60">#99FFFFFF</Color>
     <Color x:Key="ColorGlassHover">#0AFFFFFF</Color>
     <Color x:Key="ColorVinylBody">#0D0F12</Color>
+    <Color x:Key="ColorTonearmBase">#2A2A32</Color>
+    <Color x:Key="ColorTonearmMetal">#D0D0D8</Color>
 
     <SolidColorBrush x:Key="GlassDarkBaseBrush" Color="{StaticResource ColorGlassDarkBase}" po:Freeze="True" />
     <SolidColorBrush x:Key="ProgressTrackBrush" Color="{StaticResource ColorProgressTrack}" po:Freeze="True" />
@@ -184,6 +186,8 @@
     <SolidColorBrush x:Key="White60Brush" Color="{StaticResource ColorWhite60}" po:Freeze="True" />
     <SolidColorBrush x:Key="GlassHoverBrush" Color="{StaticResource ColorGlassHover}" po:Freeze="True" />
     <SolidColorBrush x:Key="VinylBodyBrush" Color="{StaticResource ColorVinylBody}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TonearmBaseBrush" Color="{StaticResource ColorTonearmBase}" po:Freeze="True" />
+    <SolidColorBrush x:Key="TonearmMetalBrush" Color="{StaticResource ColorTonearmMetal}" po:Freeze="True" />
 
     <LinearGradientBrush x:Key="GlassTopGradientBrush" StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
         <GradientStop Color="#14FFFFFF" Offset="0.0" />

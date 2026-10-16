@@ -74,6 +74,12 @@ public class AnthemService : IAnthemService
 
     public bool IsPlaying => _isPlaying;
 
+    private TimeSpan _currentPosition = TimeSpan.Zero;
+    private TimeSpan _totalDuration = TimeSpan.Zero;
+
+    public TimeSpan CurrentPosition => _currentPosition;
+    public TimeSpan TotalDuration => _totalDuration;
+
     public AnthemService(IConfigService configService)
     {
         _configService = configService;
@@ -130,6 +136,8 @@ public class AnthemService : IAnthemService
                     {
                         double pos = _player.Position.TotalSeconds;
                         double dur = _player.NaturalDuration.TimeSpan.TotalSeconds;
+                        _currentPosition = _player.Position;
+                        _totalDuration = _player.NaturalDuration.TimeSpan;
                         double prog = Math.Clamp(pos / dur, 0.0, 1.0);
                         if (Math.Abs(_playbackProgress - prog) > 0.002)
                         {
@@ -424,6 +432,27 @@ public class AnthemService : IAnthemService
             {
                 FabricGameLaunchService.LogLauncherEvent($"[ANTHEM: SAVE ERROR] {ex.Message}");
             }
+        });
+    }
+
+    public void Seek(double progress)
+    {
+        if (_playerDispatcher == null || _player == null || _disposed) return;
+        _playerDispatcher.InvokeAsync(() =>
+        {
+            try
+            {
+                if (_player.NaturalDuration.HasTimeSpan && _player.NaturalDuration.TimeSpan.TotalSeconds > 0)
+                {
+                    double totalSec = _player.NaturalDuration.TimeSpan.TotalSeconds;
+                    double targetSec = Math.Clamp(totalSec * progress, 0.0, totalSec);
+                    _player.Position = TimeSpan.FromSeconds(targetSec);
+                    _currentPosition = _player.Position;
+                    _playbackProgress = Math.Clamp(progress, 0.0, 1.0);
+                    ProgressChanged?.Invoke(this, _playbackProgress);
+                }
+            }
+            catch { }
         });
     }
 

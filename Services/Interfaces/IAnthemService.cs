@@ -10,6 +10,8 @@ public interface IAnthemService : IDisposable
     bool IsAvailable { get; }
     double PlaybackProgress { get; }
     string CurrentTrackTitle { get; }
+    TimeSpan CurrentPosition { get; }
+    TimeSpan TotalDuration { get; }
 
     event EventHandler<string>? TrackChanged;
     event EventHandler<bool>? PlayStateChanged;
@@ -22,5 +24,6 @@ public interface IAnthemService : IDisposable
     void PreviousTrack();
     void ToggleMute();
     void SetVolume(int volumePercent);
+    void Seek(double progress);
     void Stop();
 }

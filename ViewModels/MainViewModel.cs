@@ -688,6 +688,8 @@ public class MainViewModel : ObservableObject
     public RelayCommand PreviousTrackCommand { get; }
     public RelayCommand DismissInfoToastCommand { get; }
     public RelayCommand ClickInfoToastCommand { get; }
+    public RelayCommand SeekCommand { get; }
+    public RelayCommand PlayPauseCommand => TogglePlayPauseCommand;
 
     private bool _isWindowMaximized = true;
     public bool IsWindowMaximized
@@ -731,6 +733,26 @@ public class MainViewModel : ObservableObject
             if (title.Contains("·")) return title.Split('·')[1].Trim();
             if (title.Contains("-")) return title.Split('-')[1].Trim();
             return title;
+        }
+    }
+
+    public TimeSpan CurrentPosition => AnthemService?.CurrentPosition ?? TimeSpan.Zero;
+    public TimeSpan TotalDuration => AnthemService?.TotalDuration ?? TimeSpan.FromSeconds(76);
+    public string CurrentPositionFormatted
+    {
+        get
+        {
+            var pos = CurrentPosition;
+            return $"{pos.Minutes}:{pos.Seconds:D2}";
+        }
+    }
+    public string TotalDurationFormatted
+    {
+        get
+        {
+            var dur = TotalDuration;
+            if (dur == TimeSpan.Zero) dur = TimeSpan.FromSeconds(76);
+            return $"{dur.Minutes}:{dur.Seconds:D2}";
         }
     }
 
@@ -1150,6 +1172,22 @@ public class MainViewModel : ObservableObject
             OnPropertyChanged(nameof(IsMusicWidgetVisible));
         });
 
+        SeekCommand = new RelayCommand(p =>
+        {
+            if (p is double prog)
+            {
+                AnthemService?.Seek(prog);
+            }
+            else if (p is float f)
+            {
+                AnthemService?.Seek(f);
+            }
+            else if (p != null && double.TryParse(p.ToString(), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double parsed))
+            {
+                AnthemService?.Seek(parsed);
+            }
+        });
+
         if (AnthemService != null)
         {
             AnthemService.TrackChanged += (s, title) =>
@@ -1168,6 +1206,10 @@ public class MainViewModel : ObservableObject
             AnthemService.ProgressChanged += (s, prog) =>
             {
                 OnPropertyChanged(nameof(PlaybackProgress));
+                OnPropertyChanged(nameof(CurrentPosition));
+                OnPropertyChanged(nameof(TotalDuration));
+                OnPropertyChanged(nameof(CurrentPositionFormatted));
+                OnPropertyChanged(nameof(TotalDurationFormatted));
             };
         }
 
