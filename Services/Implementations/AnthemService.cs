@@ -176,12 +176,6 @@ public class AnthemService : IAnthemService
 
         FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Audio path: '{_resolvedAudioPath}', Vol: {_volumePercent}%, Muted: {_isMuted}, UpdateRestart: {isUpdateRestart}, SecondInstance: {isSecondInstance}, TestMode: {isTestMode}");
 
-        if (isUpdateRestart)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (update restart)");
-            return;
-        }
-
         if (isSecondInstance)
         {
             FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (second instance)");
@@ -270,7 +264,7 @@ public class AnthemService : IAnthemService
                 }
                 else
                 {
-                    if (_playlist.Count == 0)
+                    if (_playlist.Count == 0 || _player.Source == null)
                     {
                         PlayAnthem(true);
                     }

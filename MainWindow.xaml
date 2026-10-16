@@ -308,13 +308,24 @@
                             </Border.Effect>
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <!-- Concentric groove lines (1px, white 5%) -->
-                                <Ellipse Width="40" Height="40" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <Ellipse Width="32" Height="32" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <Ellipse Width="24" Height="24" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <!-- Center Amber Label (#F2A63C, diameter 14px) -->
-                                <Ellipse Width="14" Height="14" Fill="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <!-- Center spindle hole (diameter 4px) -->
+                                <Ellipse Width="42" Height="42" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="36" Height="36" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <!-- Center Artist Label (Spotify style, diameter 28px, 1px amber border, circular clip) -->
+                                <Border Width="28" Height="28"
+                                        CornerRadius="14"
+                                        Background="{StaticResource PanelRaised}"
+                                        BorderBrush="{StaticResource Accent}"
+                                        BorderThickness="1"
+                                        ClipToBounds="True"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                    <Image Source="pack://application:,,,/Resources/Audio/artist.jpg"
+                                           Stretch="UniformToFill"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Border>
+                                <!-- Center spindle hole (diameter 4px) with accent rim -->
                                 <Ellipse Width="4" Height="4" Fill="{StaticResource BgBase}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="6" Height="6" Stroke="{StaticResource AccentDim}" StrokeThickness="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>
                         </Border>
                     </Grid>

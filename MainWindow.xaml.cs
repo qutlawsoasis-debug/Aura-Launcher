@@ -108,14 +108,17 @@ public partial class MainWindow : Window
                 }
                 else if (args.PropertyName == nameof(MainViewModel.IsMusicWidgetVisible))
                 {
-                    if (vm.IsMusicWidgetVisible && SoundControlRoot != null)
+                    Dispatcher.InvokeAsync(() =>
                     {
-                        var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(300))
+                        if (vm.IsMusicWidgetVisible && SoundControlRoot != null && SoundControlRoot.Opacity < 0.9)
                         {
-                            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-                        };
-                        SoundControlRoot.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-                    }
+                            var fadeIn = new DoubleAnimation(0.0, 1.0, TimeSpan.FromMilliseconds(300))
+                            {
+                                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                            };
+                            SoundControlRoot.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+                        }
+                    });
                 }
             };
             vm.SelectedVersionChanged += (s, e) => AnimateReleaseNotesContent();
