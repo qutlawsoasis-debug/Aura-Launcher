@@ -5,6 +5,7 @@
         xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
         xmlns:vm="clr-namespace:AuraLauncher.ViewModels"
         xmlns:views="clr-namespace:AuraLauncher.Views"
+        xmlns:controls="clr-namespace:AuraLauncher.Controls"
         xmlns:core="clr-namespace:AuraLauncher.Core"
         mc:Ignorable="po"
         Title="Aura" Height="720" Width="1280"
@@ -238,261 +239,22 @@
             </StackPanel>
 
             <!-- Glass Background Music Widget (Hybrid: Compact 64px <-> Expanded 134px on Hover) -->
-            <Grid x:Name="SoundControlRoot"
-                  HorizontalAlignment="Left"
-                  VerticalAlignment="Bottom"
-                  Margin="60,0,0,104"
-                  Height="64"
-                  Width="280"
-                  Panel.ZIndex="45"
-                  UseLayoutRounding="True"
-                  SnapsToDevicePixels="True"
-                  Cursor="Hand"
-                  Opacity="0"
-                  Visibility="{Binding IsMusicWidgetVisible, Converter={StaticResource BoolToVis}}"
-                  WindowChrome.IsHitTestVisibleInChrome="True"
-                  MouseEnter="SoundControl_MouseEnter"
-                  MouseLeave="SoundControl_MouseLeave"
-                  MouseLeftButtonUp="SoundControl_MouseLeftButtonUp"
-                  PreviewMouseWheel="SoundControl_PreviewMouseWheel"
-                  ToolTip="Колесо мыши — громкость. Наведение — расширенный плеер.">
-                
-                <!-- 1. Glass Card Base (CornerRadius 3, 1px Gradient Border, Shadow) -->
-                <Border x:Name="GlassCardBody"
-                        Height="64"
-                        CornerRadius="3"
-                        BorderThickness="1"
-                        BorderBrush="{StaticResource GlassBorderBrush}"
-                        Background="{StaticResource GlassDarkBaseBrush}">
-                    <Border.Effect>
-                        <DropShadowEffect BlurRadius="24" Opacity="0.35" ShadowDepth="4" Direction="270" Color="#000000" />
-                    </Border.Effect>
-                    
-                    <Border CornerRadius="2.5" ClipToBounds="True">
-                        <Grid>
-                            <Border Background="{StaticResource GlassTopGradientBrush}" />
-                            <Border x:Name="GlassHoverOverlay"
-                                    Background="{StaticResource GlassHoverBrush}"
-                                    Opacity="0" />
-                        </Grid>
-                    </Border>
-                </Border>
-
-                <!-- 2. Foreground Content (Two Columns: Left = Vinyl + Tonearm, Right = Info + Controls) -->
-                <Grid Margin="10,8,12,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Left: Vinyl Record Disc (48px -> 64px scale) + Tonearm -->
-                    <Grid Grid.Column="0" Width="82" VerticalAlignment="Center" Margin="0,0,8,0">
-                        <!-- Vinyl Record Disc (RenderTransform with Rotate + Scale) -->
-                        <Grid x:Name="VinylContainer"
-                              Width="48" Height="48"
-                              HorizontalAlignment="Left"
-                              VerticalAlignment="Center"
-                              Cursor="Hand"
-                              MouseLeftButtonUp="Vinyl_MouseLeftButtonUp"
-                              ToolTip="Нажмите для паузы / воспроизведения"
-                              RenderTransformOrigin="0.5,0.5">
-                            <Grid.RenderTransform>
-                                <TransformGroup>
-                                    <ScaleTransform x:Name="VinylScale" ScaleX="1.0" ScaleY="1.0" />
-                                    <RotateTransform x:Name="VinylRotateTransform" Angle="0" />
-                                </TransformGroup>
-                            </Grid.RenderTransform>
-                            <Border x:Name="VinylRecord"
-                                    Width="48" Height="48"
-                                    CornerRadius="24"
-                                    Background="{StaticResource VinylBodyBrush}"
-                                    BorderBrush="{StaticResource VinylGrooveBrush}"
-                                    BorderThickness="1">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="6" Opacity="0.35" ShadowDepth="2" Direction="270" Color="#000000" />
-                                </Border.Effect>
-                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <Ellipse Width="42" Height="42" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <Ellipse Width="36" Height="36" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <!-- Center Artist Label (Spotify style, diameter 28px, 1px amber border, circular clip) -->
-                                    <Border Width="28" Height="28"
-                                            CornerRadius="14"
-                                            Background="{StaticResource PanelRaised}"
-                                            BorderBrush="{StaticResource Accent}"
-                                            BorderThickness="1"
-                                            ClipToBounds="True"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                        <Image Source="pack://application:,,,/Resources/Audio/artist.jpg"
-                                               Stretch="UniformToFill"
-                                               RenderOptions.BitmapScalingMode="HighQuality" />
-                                    </Border>
-                                    <!-- Center spindle hole (diameter 4px) with accent rim -->
-                                    <Ellipse Width="4" Height="4" Fill="{StaticResource BgBase}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <Ellipse Width="6" Height="6" Stroke="{StaticResource AccentDim}" StrokeThickness="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Grid>
-                            </Border>
-                        </Grid>
-
-                        <!-- Vector Tonearm (Appears in Expanded mode, rotates 18 deg when IsPlaying) -->
-                        <Canvas x:Name="TonearmCanvas"
-                                Width="32" Height="70"
-                                HorizontalAlignment="Right"
-                                VerticalAlignment="Top"
-                                Margin="0,0,-4,0"
-                                Opacity="0"
-                                IsHitTestVisible="False"
-                                RenderTransformOrigin="0.69,0.16">
-                            <Canvas.RenderTransform>
-                                <RotateTransform x:Name="TonearmRotate" Angle="0" />
-                            </Canvas.RenderTransform>
-                            <!-- Tonearm Pivot Base (14px diameter) -->
-                            <Ellipse Width="14" Height="14" Canvas.Right="2" Canvas.Top="4"
-                                     Fill="{StaticResource TonearmBaseBrush}"
-                                     Stroke="{StaticResource Accent}" StrokeThickness="1" />
-                            <!-- Pivot Center Screw -->
-                            <Ellipse Width="4" Height="4" Canvas.Right="7" Canvas.Top="9"
-                                     Fill="{StaticResource TextSecondary}" />
-                            <!-- Tonearm Metal Tube -->
-                            <Path Data="M 22,11 L 13,48 L 7,55"
-                                  Stroke="{StaticResource TonearmMetalBrush}"
-                                  StrokeThickness="2"
-                                  StrokeStartLineCap="Round"
-                                  StrokeEndLineCap="Round" />
-                            <!-- Cartridge / Stylus Headshell with Amber Accent -->
-                            <Rectangle Width="5" Height="9" Canvas.Left="4" Canvas.Top="50"
-                                       Fill="{StaticResource Accent}" RadiusX="1" RadiusY="1">
-                                <Rectangle.RenderTransform>
-                                    <RotateTransform Angle="25" />
-                                </Rectangle.RenderTransform>
-                            </Rectangle>
-                        </Canvas>
-                    </Grid>
-
-                    <!-- Right: Info & Controls -->
-                    <Grid Grid.Column="1" VerticalAlignment="Center">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <!-- Row 0: Track Title + Artist + Top-Right Volume Slider -->
-                        <Grid Grid.Row="0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding CurrentTrackSong, FallbackValue='AURA'}"
-                                           FontFamily="{StaticResource HeadingFont}"
-                                           FontSize="15"
-                                           FontWeight="Bold"
-                                           Foreground="{StaticResource TextWhite}"
-                                           TextTrimming="CharacterEllipsis"
-                                           LineHeight="16"
-                                           LineStackingStrategy="BlockLineHeight" />
-                                <TextBlock Text="{Binding CurrentTrackArtist, FallbackValue='zxcursed'}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="11"
-                                           FontWeight="Normal"
-                                           Foreground="{StaticResource White60Brush}"
-                                           Margin="0,2,0,0"
-                                           TextTrimming="CharacterEllipsis"
-                                           LineHeight="12" />
-                            </StackPanel>
-
-                            <!-- Volume Slider (slides in/visible, 56px wide) -->
-                            <Slider x:Name="HeaderVolSlider"
-                                    Grid.Column="1"
-                                    Width="56"
-                                    VerticalAlignment="Center"
-                                    Margin="8,0,0,0"
-                                    Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
-                                    Value="{Binding AnthemVolume, Mode=TwoWay}"
-                                    Style="{StaticResource HeaderVolumeSlider}"
-                                    ToolTip="{Binding AnthemVolume, StringFormat='{}Громкость: {0}%'}" />
-                        </Grid>
-
-                        <!-- Row 1: Expanded Controls (Progress, Timings, Buttons Prev/Play-Pause/Next) -->
-                        <StackPanel x:Name="ExpandedControls"
-                                    Grid.Row="1"
-                                    Opacity="0"
-                                    Visibility="Collapsed"
-                                    IsHitTestVisible="False"
-                                    Margin="0,8,0,0">
-                            <!-- Progress Track with Amber Fill & Hover Thumb -->
-                            <Slider Minimum="0" Maximum="1"
-                                    Value="{Binding PlaybackProgress, Mode=OneWay}"
-                                    Style="{StaticResource MusicProgressSlider}"
-                                    Height="12"
-                                    ValueChanged="ProgressSlider_ValueChanged" />
-
-                            <!-- Timings Row: Current Position and Total Duration -->
-                            <Grid Margin="0,1,0,3">
-                                <TextBlock Text="{Binding CurrentPositionFormatted, FallbackValue='0:00'}"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="10"
-                                           Foreground="{StaticResource White60Brush}" />
-                                <TextBlock Text="{Binding TotalDurationFormatted, FallbackValue='1:16'}"
-                                           HorizontalAlignment="Right"
-                                           FontFamily="{StaticResource MainFont}"
-                                           FontSize="10"
-                                           Foreground="{StaticResource White60Brush}" />
-                            </Grid>
-
-                            <!-- Controls: Prev, Play/Pause, Next Buttons -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,2,0,0">
-                                <Button Style="{StaticResource PlayerControlBtn}"
-                                        Command="{Binding PreviousTrackCommand}"
-                                        ToolTip="Предыдущий трек">
-                                    <Path Style="{StaticResource IconPath}"
-                                          Data="{StaticResource IconSkipBack}"
-                                          Width="13" Height="13"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                </Button>
-                                <Button Style="{StaticResource PlayerControlBtn}"
-                                        Command="{Binding TogglePlayPauseCommand}"
-                                        Margin="14,0"
-                                        ToolTip="Воспроизведение / Пауза">
-                                    <Grid Width="14" Height="14">
-                                        <Path Style="{StaticResource IconPath}"
-                                              Data="{StaticResource IconPlay}"
-                                              Width="14" Height="14"
-                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              Visibility="{Binding IsMusicPlaying, Converter={StaticResource InverseBoolToVis}}" />
-                                        <Path Style="{StaticResource IconPath}"
-                                              Data="{StaticResource IconPause}"
-                                              Width="14" Height="14"
-                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                              Visibility="{Binding IsMusicPlaying, Converter={StaticResource BoolToVis}}" />
-                                    </Grid>
-                                </Button>
-                                <Button Style="{StaticResource PlayerControlBtn}"
-                                        Command="{Binding NextTrackCommand}"
-                                        ToolTip="Следующий трек">
-                                    <Path Style="{StaticResource IconPath}"
-                                          Data="{StaticResource IconSkipForward}"
-                                          Width="13" Height="13"
-                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
-                                </Button>
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-                </Grid>
-
-                <!-- 3. Bottom: Thin Progress Line 2px (only in Compact Mode) -->
-                <ProgressBar x:Name="CompactProgressBar"
-                             Margin="10,0,10,0"
-                             Height="2"
-                             VerticalAlignment="Bottom"
-                             HorizontalAlignment="Stretch"
-                             Minimum="0" Maximum="1"
-                             Value="{Binding PlaybackProgress, Mode=OneWay}"
-                             Style="{StaticResource ThinMusicProgressBar}" />
-            </Grid>
+            <!-- Vinyl Background Music Widget (Mix Music Disk) -->
+            <controls:MusicDiskWidget Width="420"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Bottom"
+                                      Margin="60,0,0,104"
+                                      Panel.ZIndex="45"
+                                      DataContext="{Binding MusicDiskVM}"
+                                      Title="{Binding Title}"
+                                      Artist="{Binding Artist}"
+                                      Cover="{Binding Cover}"
+                                      Position="{Binding Position}"
+                                      Duration="{Binding Duration}"
+                                      IsPlaying="{Binding IsPlaying}"
+                                      PlayPauseCommand="{Binding PlayPauseCommand}"
+                                      PreviousCommand="{Binding PreviousCommand}"
+                                      NextCommand="{Binding NextCommand}" />
 
             <!-- 2. Game menu and player info (left side) -->
             <Grid Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">

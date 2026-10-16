@@ -198,5 +198,39 @@
         <GradientStop Color="#33FFFFFF" Offset="0.0" />
         <GradientStop Color="#0DFFFFFF" Offset="1.0" />
     </LinearGradientBrush>
+
+    <!-- Mix Music Disk Widget Tokens -->
+    <Color x:Key="ColorMusicDiskGrad1">#6E9BA4</Color>
+    <Color x:Key="ColorMusicDiskGrad2">#B3A199</Color>
+    <Color x:Key="ColorMusicDiskGrad3">#7F8FA4</Color>
+    <Color x:Key="ColorMusicDiskPanelGlass">#1AFFFFFF</Color>
+    <Color x:Key="ColorMusicDiskVinylRadial1">#16181B</Color>
+    <Color x:Key="ColorMusicDiskVinylRadial2">#0D0E10</Color>
+    <Color x:Key="ColorMusicDiskVinylRadial3">#191B1F</Color>
+    <Color x:Key="ColorMusicDiskVinylRadial4">#08080A</Color>
+    <Color x:Key="ColorMusicDiskVinylGroove">#3A3D43</Color>
+    <Color x:Key="ColorMusicDiskVinylGrooveLight">#0DFFFFFF</Color>
+    <Color x:Key="ColorMusicDiskCenterDefault">#1F7CC0</Color>
+    <Color x:Key="ColorMusicDiskSpindle">#0C0D0F</Color>
+    <Color x:Key="ColorMusicDiskGlare">#0FFFFFFF</Color>
+    <Color x:Key="ColorMusicDiskTonearm">#CFD2D9</Color>
+    <Color x:Key="ColorMusicDiskTonearmHead">#D8DBE1</Color>
+    <Color x:Key="ColorMusicDiskPivotOuter">#34333B</Color>
+    <Color x:Key="ColorMusicDiskPivotInner">#BFC2C9</Color>
+    <Color x:Key="ColorMusicDiskArtist">#73FFFFFF</Color>
+    <Color x:Key="ColorMusicDiskTrackBar">#A6FFFFFF</Color>
+
+    <SolidColorBrush x:Key="MusicDiskPanelGlassBrush" Color="{StaticResource ColorMusicDiskPanelGlass}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskVinylGrooveBrush" Color="{StaticResource ColorMusicDiskVinylGroove}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskVinylGrooveLightBrush" Color="{StaticResource ColorMusicDiskVinylGrooveLight}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskCenterDefaultBrush" Color="{StaticResource ColorMusicDiskCenterDefault}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskSpindleBrush" Color="{StaticResource ColorMusicDiskSpindle}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskGlareBrush" Color="{StaticResource ColorMusicDiskGlare}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskTonearmBrush" Color="{StaticResource ColorMusicDiskTonearm}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskTonearmHeadBrush" Color="{StaticResource ColorMusicDiskTonearmHead}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskPivotOuterBrush" Color="{StaticResource ColorMusicDiskPivotOuter}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskPivotInnerBrush" Color="{StaticResource ColorMusicDiskPivotInner}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskArtistBrush" Color="{StaticResource ColorMusicDiskArtist}" po:Freeze="True" />
+    <SolidColorBrush x:Key="MusicDiskTrackBarBrush" Color="{StaticResource ColorMusicDiskTrackBar}" po:Freeze="True" />
 </ResourceDictionary>
 

@@ -1680,4 +1680,31 @@
         </Setter>
     </Style>
 
+    <!-- MusicDiskWidget Button Style: pure icon with press scale feedback -->
+    <Style x:Key="MusicDiskIconButton" TargetType="Button">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="BtnRoot" Background="Transparent" RenderTransformOrigin="0.5,0.5">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="BtnRoot" Property="Opacity" Value="0.82"/>
+                            <Setter TargetName="BtnRoot" Property="RenderTransform">
+                                <Setter.Value>
+                                    <ScaleTransform ScaleX="0.88" ScaleY="0.88"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="BtnRoot" Property="Opacity" Value="0.4"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

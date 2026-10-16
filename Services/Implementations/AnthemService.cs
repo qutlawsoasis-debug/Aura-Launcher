@@ -1,643 +1,77 @@
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows.Media;
-using System.Windows.Threading;
-using AuraLauncher.Models;
 using AuraLauncher.Services.Interfaces;
 
 namespace AuraLauncher.Services.Implementations;
 
 public class AnthemService : IAnthemService
 {
-    private readonly IConfigService _configService;
-    private Thread? _playerThread;
-    private Dispatcher? _playerDispatcher;
-    private MediaPlayer? _player;
-    private readonly TaskCompletionSource<bool> _initTcs = new();
+    private readonly IAudioService _audioService;
 
-    private int _volumePercent = 100;
-    private bool _isMuted = false;
-    private bool _isPlaying = false;
-    private bool _mediaFailed = false;
-    private bool _disposed = false;
-    private string? _resolvedAudioPath;
-
-    private readonly System.Collections.Generic.List<string> _playlist = new();
-    private int _currentTrackIndex = 0;
-    private string _currentTrackTitle = "zxcursed · Aura";
-    private DispatcherTimer? _progressTimer;
-    private double _playbackProgress = 0.0;
-
-    public string CurrentTrackTitle => _currentTrackTitle;
-    public double PlaybackProgress => _playbackProgress;
-    public event EventHandler<string>? TrackChanged;
-    public event EventHandler<bool>? PlayStateChanged;
-    public event EventHandler<double>? ProgressChanged;
-
-    public bool IsAvailable
+    public AnthemService(IAudioService audioService)
     {
-        get
+        _audioService = audioService ?? throw new ArgumentNullException(nameof(audioService));
+        _audioService.TrackChanged += (s, track) => TrackChanged?.Invoke(this, CurrentTrackTitle);
+        _audioService.PlayStateChanged += (s, playing) => PlayStateChanged?.Invoke(this, playing);
+        _audioService.PositionChanged += (s, pos) =>
         {
-            if (_mediaFailed) return false;
-            if (_playlist.Count == 0)
-            {
-                EnsurePlaylistLoaded();
-            }
-            return _playlist.Count > 0 && !_mediaFailed;
-        }
+            double progress = TotalDuration.TotalSeconds > 0 ? pos.TotalSeconds / TotalDuration.TotalSeconds : 0.0;
+            ProgressChanged?.Invoke(this, progress);
+        };
     }
 
     public int VolumePercent
     {
-        get => _volumePercent;
-        set => SetVolume(value);
+        get => _audioService.VolumePercent;
+        set => _audioService.VolumePercent = value;
     }
 
     public bool IsMuted
     {
-        get => _isMuted;
-        set
+        get => _audioService.IsMuted;
+        set => _audioService.IsMuted = value;
+    }
+
+    public bool IsPlaying => _audioService.IsPlaying;
+    public bool IsAvailable => _audioService.HasTracks;
+
+    public double PlaybackProgress
+    {
+        get
         {
-            if (_isMuted != value)
-            {
-                _isMuted = value;
-                ApplyVolume();
-                SaveSettings();
-            }
+            double total = TotalDuration.TotalSeconds;
+            return total > 0 ? CurrentPosition.TotalSeconds / total : 0.0;
         }
     }
 
-    public bool IsPlaying => _isPlaying;
-
-    private TimeSpan _currentPosition = TimeSpan.Zero;
-    private TimeSpan _totalDuration = TimeSpan.Zero;
-
-    public TimeSpan CurrentPosition => _currentPosition;
-    public TimeSpan TotalDuration => _totalDuration;
-
-    public AnthemService(IConfigService configService)
+    public string CurrentTrackTitle
     {
-        _configService = configService;
-        _volumePercent = Math.Clamp(_configService.CurrentConfig.AnthemVolume, 0, 100);
-        _isMuted = _configService.CurrentConfig.AnthemMuted;
-        _configService.ConfigChanged += (s, cfg) =>
+        get
         {
-            int vol = Math.Clamp(cfg.AnthemVolume, 0, 100);
-            bool muted = cfg.AnthemMuted;
-            if (_volumePercent != vol || _isMuted != muted)
-            {
-                _volumePercent = vol;
-                _isMuted = muted;
-                ApplyVolume();
-            }
-        };
-        StartPlayerThread();
-    }
-
-    private void StartPlayerThread()
-    {
-        _playerThread = new Thread(() =>
-        {
-            try
-            {
-                _player = new MediaPlayer();
-                _player.MediaEnded += (s, e) =>
-                {
-                    _isPlaying = false;
-                    _playbackProgress = 0.0;
-                    ProgressChanged?.Invoke(this, 0.0);
-                    PlayStateChanged?.Invoke(this, false);
-                    _playerDispatcher?.InvokeAsync(() =>
-                    {
-                        PlayCurrentTrack();
-                    });
-                };
-                _player.MediaFailed += (s, e) =>
-                {
-                    _isPlaying = false;
-                    _mediaFailed = true;
-                    _playbackProgress = 0.0;
-                    _progressTimer?.Stop();
-                    ProgressChanged?.Invoke(this, 0.0);
-                    PlayStateChanged?.Invoke(this, false);
-                    TrackChanged?.Invoke(this, string.Empty);
-                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Media failed: {e.ErrorException?.Message}");
-                };
-
-                _playerDispatcher = Dispatcher.CurrentDispatcher;
-                _progressTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (s, e) =>
-                {
-                    if (_player != null && _isPlaying && _player.NaturalDuration.HasTimeSpan && _player.NaturalDuration.TimeSpan.TotalSeconds > 0)
-                    {
-                        double pos = _player.Position.TotalSeconds;
-                        double dur = _player.NaturalDuration.TimeSpan.TotalSeconds;
-                        _currentPosition = _player.Position;
-                        _totalDuration = _player.NaturalDuration.TimeSpan;
-                        double prog = Math.Clamp(pos / dur, 0.0, 1.0);
-                        if (Math.Abs(_playbackProgress - prog) > 0.002)
-                        {
-                            _playbackProgress = prog;
-                            ProgressChanged?.Invoke(this, _playbackProgress);
-                        }
-                    }
-                }, _playerDispatcher);
-                _initTcs.TrySetResult(true);
-                Dispatcher.Run();
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Thread exception: {ex.Message}");
-                _initTcs.TrySetException(ex);
-            }
-        })
-        {
-            IsBackground = true,
-            Name = "AnthemAudioThread"
-        };
-
-        _playerThread.SetApartmentState(ApartmentState.STA);
-        _playerThread.Start();
-    }
-
-    public void Initialize()
-    {
-        LauncherConfig config = _configService.CurrentConfig;
-
-        _volumePercent = Math.Clamp(config.AnthemVolume, 0, 100);
-        _isMuted = config.AnthemMuted;
-
-        _resolvedAudioPath = ResolveAudioFilePath(config);
-        EnsurePlaylistLoaded();
-        if (_playlist.Count > 0)
-        {
-            UpdateTrackTitle(_playlist[_currentTrackIndex]);
-        }
-
-        bool isUpdateRestart = IsUpdateRestart();
-        bool isSecondInstance = IsSecondInstance();
-        bool isTestMode = IsTestMode();
-
-        FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Audio path: '{_resolvedAudioPath}', Vol: {_volumePercent}%, Muted: {_isMuted}, UpdateRestart: {isUpdateRestart}, SecondInstance: {isSecondInstance}, TestMode: {isTestMode}");
-
-        if (isSecondInstance)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (second instance)");
-            return;
-        }
-
-        if (!config.MusicOnStartup)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (startup music disabled in settings)");
-            return;
-        }
-
-        if (_isMuted)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (muted)");
-            return;
-        }
-
-        if (_volumePercent <= 0)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (volume 0%)");
-            return;
-        }
-
-        if (isTestMode)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM] Anthem skipped (automated UI test mode)");
-            return;
-        }
-
-        PlayAnthem(force: false);
-    }
-
-    public void PlayAnthem(bool force = false)
-    {
-        EnsurePlaylistLoaded();
-
-        if (_playlist.Count == 0)
-        {
-            FabricGameLaunchService.LogLauncherEvent("[ANTHEM: ERROR] Audio file not found.");
-            return;
-        }
-
-        string currentPath = _playlist[_currentTrackIndex];
-        UpdateTrackTitle(currentPath);
-
-        _ = Task.Run(async () =>
-        {
-            await _initTcs.Task.ConfigureAwait(false);
-            if (_playerDispatcher == null || _player == null || _disposed) return;
-
-            await _playerDispatcher.InvokeAsync(() =>
-            {
-                try
-                {
-                    _player.Open(new Uri(currentPath, UriKind.Absolute));
-                    _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
-                    _player.Play();
-                    _isPlaying = true;
-                    _progressTimer?.Start();
-                    PlayStateChanged?.Invoke(this, true);
-                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Started playback track '{_currentTrackTitle}' (vol: {_volumePercent}%, muted: {_isMuted})");
-                }
-                catch (Exception ex)
-                {
-                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM: ERROR] Playback failed: {ex.Message}");
-                }
-            });
-        });
-    }
-
-    public void TogglePlayPause()
-    {
-        if (_playerDispatcher == null || _player == null || _disposed) return;
-
-        _playerDispatcher.InvokeAsync(() =>
-        {
-            try
-            {
-                if (_isPlaying)
-                {
-                    _player.Pause();
-                    _isPlaying = false;
-                    _progressTimer?.Stop();
-                    PlayStateChanged?.Invoke(this, false);
-                }
-                else
-                {
-                    if (_playlist.Count == 0 || _player.Source == null)
-                    {
-                        PlayAnthem(true);
-                    }
-                    else
-                    {
-                        _player.Play();
-                        _isPlaying = true;
-                        _progressTimer?.Start();
-                        PlayStateChanged?.Invoke(this, true);
-                    }
-                }
-            }
-            catch { }
-        });
-    }
-
-    public void NextTrack()
-    {
-        EnsurePlaylistLoaded();
-        if (_playlist.Count <= 1) return;
-
-        _currentTrackIndex = (_currentTrackIndex + 1) % _playlist.Count;
-        PlayCurrentTrack();
-    }
-
-    public void PreviousTrack()
-    {
-        EnsurePlaylistLoaded();
-        if (_playlist.Count <= 1) return;
-
-        _currentTrackIndex = (_currentTrackIndex - 1 + _playlist.Count) % _playlist.Count;
-        PlayCurrentTrack();
-    }
-
-    private void PlayCurrentTrack()
-    {
-        if (_playlist.Count == 0) return;
-        string track = _playlist[_currentTrackIndex];
-        UpdateTrackTitle(track);
-
-        _playerDispatcher?.InvokeAsync(() =>
-        {
-            try
-            {
-                _player?.Open(new Uri(track, UriKind.Absolute));
-                if (_player != null)
-                {
-                    _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
-                    _player.Play();
-                    _isPlaying = true;
-                    _progressTimer?.Start();
-                    PlayStateChanged?.Invoke(this, true);
-                }
-            }
-            catch { }
-        });
-    }
-
-    private void UpdateTrackTitle(string path)
-    {
-        string fileName = Path.GetFileNameWithoutExtension(path);
-        _currentTrackTitle = string.Equals(fileName, "anthem", StringComparison.OrdinalIgnoreCase)
-            ? "zxcursed · Aura"
-            : fileName;
-        TrackChanged?.Invoke(this, _currentTrackTitle);
-    }
-
-    private void EnsurePlaylistLoaded()
-    {
-        if (_playlist.Count > 0) return;
-
-        if (string.IsNullOrWhiteSpace(_resolvedAudioPath) || !File.Exists(_resolvedAudioPath))
-        {
-            _resolvedAudioPath = ResolveAudioFilePath(_configService.CurrentConfig);
-        }
-
-        if (!string.IsNullOrWhiteSpace(_resolvedAudioPath) && File.Exists(_resolvedAudioPath))
-        {
-            _playlist.Add(_resolvedAudioPath);
-        }
-
-        try
-        {
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string musicDir = Path.Combine(appData, "Aura", "Music");
-            if (Directory.Exists(musicDir))
-            {
-                var files = Directory.GetFiles(musicDir, "*.*")
-                    .Where(f => f.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) ||
-                                f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase));
-                foreach (var f in files)
-                {
-                    if (!_playlist.Contains(f, StringComparer.OrdinalIgnoreCase))
-                    {
-                        _playlist.Add(f);
-                    }
-                }
-            }
-        }
-        catch { }
-    }
-
-    public void ToggleMute()
-    {
-        _isMuted = !_isMuted;
-        if (!_isMuted && _volumePercent == 0)
-        {
-            _volumePercent = 50;
-        }
-
-        ApplyVolume();
-        SaveSettings();
-    }
-
-    public void SetVolume(int volumePercent)
-    {
-        int clamped = Math.Clamp(volumePercent, 0, 100);
-        if (_volumePercent != clamped)
-        {
-            _volumePercent = clamped;
-            if (_volumePercent > 0 && _isMuted)
-            {
-                // Note: user explicitly dragging volume above 0 un-mutes
-                _isMuted = false;
-            }
-            ApplyVolume();
-            SaveSettings();
+            var t = _audioService.CurrentTrack;
+            if (t == null) return "";
+            return $"{t.Artist} · {t.Title}";
         }
     }
 
-    private void ApplyVolume()
-    {
-        if (_playerDispatcher != null && _player != null && !_disposed)
-        {
-            _playerDispatcher.InvokeAsync(() =>
-            {
-                try
-                {
-                    _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
-                }
-                catch { }
-            });
-        }
-    }
+    public TimeSpan CurrentPosition => _audioService.Position;
+    public TimeSpan TotalDuration => _audioService.Duration;
 
-    private void SaveSettings()
-    {
-        _configService.CurrentConfig.AnthemVolume = _volumePercent;
-        _configService.CurrentConfig.AnthemMuted = _isMuted;
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await _configService.SaveConfigAsync(_configService.CurrentConfig).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[ANTHEM: SAVE ERROR] {ex.Message}");
-            }
-        });
-    }
+    public event EventHandler<string>? TrackChanged;
+    public event EventHandler<bool>? PlayStateChanged;
+    public event EventHandler<double>? ProgressChanged;
 
+    public void Initialize() => _audioService.Initialize();
+    public void PlayAnthem(bool force = false) => _audioService.Play();
+    public void TogglePlayPause() => _audioService.TogglePlayPause();
+    public void NextTrack() => _audioService.Next();
+    public void PreviousTrack() => _audioService.Previous();
+    public void ToggleMute() => _audioService.IsMuted = !_audioService.IsMuted;
+    public void SetVolume(int volumePercent) => _audioService.VolumePercent = volumePercent;
     public void Seek(double progress)
     {
-        if (_playerDispatcher == null || _player == null || _disposed) return;
-        _playerDispatcher.InvokeAsync(() =>
-        {
-            try
-            {
-                if (_player.NaturalDuration.HasTimeSpan && _player.NaturalDuration.TimeSpan.TotalSeconds > 0)
-                {
-                    double totalSec = _player.NaturalDuration.TimeSpan.TotalSeconds;
-                    double targetSec = Math.Clamp(totalSec * progress, 0.0, totalSec);
-                    _player.Position = TimeSpan.FromSeconds(targetSec);
-                    _currentPosition = _player.Position;
-                    _playbackProgress = Math.Clamp(progress, 0.0, 1.0);
-                    ProgressChanged?.Invoke(this, _playbackProgress);
-                }
-            }
-            catch { }
-        });
+        var total = _audioService.Duration.TotalSeconds;
+        _audioService.Seek(TimeSpan.FromSeconds(progress * total));
     }
-
-    public void Stop()
-    {
-        _isPlaying = false;
-        _progressTimer?.Stop();
-        _playbackProgress = 0.0;
-        ProgressChanged?.Invoke(this, 0.0);
-        PlayStateChanged?.Invoke(this, false);
-        if (_playerDispatcher != null && _player != null && !_disposed)
-        {
-            try
-            {
-                _playerDispatcher.Invoke(() =>
-                {
-                    try
-                    {
-                        _player.Stop();
-                        _player.Close();
-                    }
-                    catch { }
-                });
-            }
-            catch { }
-        }
-    }
-
-    public void Dispose()
-    {
-        if (_disposed) return;
-        _disposed = true;
-        Stop();
-        if (_playerDispatcher != null)
-        {
-            try
-            {
-                _playerDispatcher.InvokeShutdown();
-            }
-            catch { }
-        }
-    }
-
-    private string? ResolveAudioFilePath(LauncherConfig config)
-    {
-        // 1. Custom path from user config
-        if (!string.IsNullOrWhiteSpace(config.AnthemCustomPath) && File.Exists(config.AnthemCustomPath))
-        {
-            return Path.GetFullPath(config.AnthemCustomPath);
-        }
-
-        // 2. BaseDirectory Resources/Audio/anthem.mp3
-        string candidate1 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Audio", "anthem.mp3");
-        if (File.Exists(candidate1))
-        {
-            return Path.GetFullPath(candidate1);
-        }
-
-        // 3. CurrentDirectory Resources/Audio/anthem.mp3
-        string candidate2 = Path.Combine(Environment.CurrentDirectory, "Resources", "Audio", "anthem.mp3");
-        if (File.Exists(candidate2))
-        {
-            return Path.GetFullPath(candidate2);
-        }
-
-        // 4. Check already extracted file in %APPDATA%\.aura\anthem.mp3
-        string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        string targetDir = Path.Combine(appData, ".aura");
-        string targetFile = Path.Combine(targetDir, "anthem.mp3");
-        if (File.Exists(targetFile) && new FileInfo(targetFile).Length > 10000)
-        {
-            return Path.GetFullPath(targetFile);
-        }
-
-        // 5. Extract from WPF Pack Resource (Application.GetResourceStream)
-        try
-        {
-            var uris = new[]
-            {
-                new Uri("pack://application:,,,/Resources/Audio/anthem.mp3", UriKind.Absolute),
-                new Uri("pack://application:,,,/AuraLauncher;component/Resources/Audio/anthem.mp3", UriKind.Absolute)
-            };
-
-            foreach (var uri in uris)
-            {
-                try
-                {
-                    var streamInfo = System.Windows.Application.GetResourceStream(uri);
-                    if (streamInfo?.Stream != null)
-                    {
-                        Directory.CreateDirectory(targetDir);
-                        using (var fs = new FileStream(targetFile, FileMode.Create, FileAccess.Write))
-                        {
-                            streamInfo.Stream.CopyTo(fs);
-                        }
-                        FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Successfully extracted pack resource to '{targetFile}'");
-                        return Path.GetFullPath(targetFile);
-                    }
-                }
-                catch { }
-            }
-        }
-        catch (Exception ex)
-        {
-            FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Pack stream extraction error: {ex.Message}");
-        }
-
-        // 6. Extract from embedded manifest resource
-        try
-        {
-            var asm = Assembly.GetExecutingAssembly();
-            string? resName = asm.GetManifestResourceNames()
-                .FirstOrDefault(n => n.EndsWith("anthem.mp3", StringComparison.OrdinalIgnoreCase));
-
-            if (resName != null)
-            {
-                using var stream = asm.GetManifestResourceStream(resName);
-                if (stream != null)
-                {
-                    Directory.CreateDirectory(targetDir);
-                    using var fs = new FileStream(targetFile, FileMode.Create, FileAccess.Write);
-                    stream.CopyTo(fs);
-                    FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Successfully extracted manifest stream to '{targetFile}'");
-                    return Path.GetFullPath(targetFile);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Manifest extraction error: {ex.Message}");
-        }
-
-        return candidate1;
-    }
-
-    private static bool IsUpdateRestart()
-    {
-        if (string.Equals(Environment.GetEnvironmentVariable("AURA_UPDATED_RESTART"), "1", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (Program.StartupArgs != null)
-        {
-            return Program.StartupArgs.Any(a =>
-                a.Equals("--updated-restart", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--veloapp-install", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--veloapp-updated", StringComparison.OrdinalIgnoreCase));
-        }
-
-        return false;
-    }
-
-    private static bool IsSecondInstance()
-    {
-        try
-        {
-            var cur = Process.GetCurrentProcess();
-            var sameNameProcesses = Process.GetProcessesByName(cur.ProcessName);
-            if (sameNameProcesses.Length > 1)
-                return true;
-
-            var launcherProcesses = Process.GetProcessesByName("AuraLauncher");
-            if (launcherProcesses.Length > 1)
-                return true;
-        }
-        catch { }
-
-        return false;
-    }
-
-    private static bool IsTestMode()
-    {
-        if (Program.StartupArgs != null)
-        {
-            if (Program.StartupArgs.Any(a => a.Equals("--selftest-anthem", StringComparison.OrdinalIgnoreCase)))
-                return false;
-
-            return Program.StartupArgs.Any(a =>
-                a.Equals("--capture-shots", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--selftest", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--selftest-shots", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--selftest-lobby", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--selftest-lifecycle", StringComparison.OrdinalIgnoreCase) ||
-                a.Equals("--selftest-kill-playit", StringComparison.OrdinalIgnoreCase));
-        }
-
-        return false;
-    }
+    public void Stop() => _audioService.Stop();
+    public void Dispose() => _audioService.Dispose();
 }

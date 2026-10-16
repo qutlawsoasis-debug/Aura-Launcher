@@ -757,6 +757,7 @@ public class MainViewModel : ObservableObject
     }
 
     public WorkshopViewModel WorkshopVM { get; }
+    public MusicDiskViewModel? MusicDiskVM { get; }
 
     private DateTime? _gameSessionStartTime;
 
@@ -809,7 +810,8 @@ public class MainViewModel : ObservableObject
         IAchievementService? achievementService = null,
         IScreenshotWatcherService? screenshotWatcher = null,
         IReportService? reportService = null,
-        IReleaseNotesService? releaseNotesService = null)
+        IReleaseNotesService? releaseNotesService = null,
+        MusicDiskViewModel? musicDiskViewModel = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -838,6 +840,7 @@ public class MainViewModel : ObservableObject
             _ = WorkshopVM?.RefreshAllAsync();
         };
         AnthemService = anthemService;
+        MusicDiskVM = musicDiskViewModel ?? (App.Services?.GetService(typeof(MusicDiskViewModel)) as MusicDiskViewModel);
         OverviewVM = overviewViewModel ?? throw new ArgumentNullException(nameof(overviewViewModel));
         SettingsVM = settingsViewModel ?? throw new ArgumentNullException(nameof(settingsViewModel));
         WardrobeVM = wardrobeViewModel ?? throw new ArgumentNullException(nameof(wardrobeViewModel));

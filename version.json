@@ -1,7 +1,7 @@
 {
-    "internalVersion":  "1.2.131",
-    "userFacingVersion":  "beta 1.0.123",
+    "internalVersion":  "1.2.132",
+    "userFacingVersion":  "beta 1.0.124",
     "changelog":  [
-                      "[Новое] Гибридный музыкальный виджет: тонарм, тайминги и управление треком"
+                      "[Новое] Виниловый плеер Mix Music Disk, анимация тонарма и воспроизведение из %APPDATA%\\.aura\\Music"
                   ]
 }
