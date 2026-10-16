@@ -1,8 +1,8 @@
 {
-    "internalVersion":  "1.2.126",
-    "userFacingVersion":  "beta 1.0.118",
+    "internalVersion":  "1.2.127",
+    "userFacingVersion":  "beta 1.0.119",
     "changelog":  [
-                      "[Строительство] В сборку добавлен мод WorldEdit (Fabric 1.20.1)",
-                      "[Схемы] Патч Litematica: поддержка загрузки схем версий v7+ (Minecraft 1.20.5 - 1.21)"
+                      "[Аудио] Фоновый трек заменён на zxcursed · Aura",
+                      "[Интерфейс] Добавлен интерактивный мини-плеер в стиле Spotify с крутящейся виниловой пластинкой"
                   ]
 }

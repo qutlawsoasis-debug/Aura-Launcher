@@ -10,6 +10,7 @@ public interface IAnthemService : IDisposable
     string CurrentTrackTitle { get; }
 
     event EventHandler<string>? TrackChanged;
+    event EventHandler<bool>? PlayStateChanged;
 
     void Initialize();
     void PlayAnthem(bool force = false);

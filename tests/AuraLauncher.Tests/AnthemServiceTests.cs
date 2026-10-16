@@ -42,17 +42,18 @@ public class AnthemServiceTests
         public bool IsPlaying { get; set; } = false;
         public bool Initialized { get; set; } = false;
         public bool Stopped { get; set; } = false;
-        public string CurrentTrackTitle { get; set; } = "Aura Theme";
+        public string CurrentTrackTitle { get; set; } = "zxcursed · Aura";
         public event EventHandler<string>? TrackChanged;
+        public event EventHandler<bool>? PlayStateChanged;
 
         public void Initialize() => Initialized = true;
-        public void PlayAnthem(bool force = false) => IsPlaying = true;
-        public void TogglePlayPause() => IsPlaying = !IsPlaying;
+        public void PlayAnthem(bool force = false) { IsPlaying = true; PlayStateChanged?.Invoke(this, true); }
+        public void TogglePlayPause() { IsPlaying = !IsPlaying; PlayStateChanged?.Invoke(this, IsPlaying); }
         public void NextTrack() => TrackChanged?.Invoke(this, CurrentTrackTitle);
         public void PreviousTrack() => TrackChanged?.Invoke(this, CurrentTrackTitle);
         public void ToggleMute() => IsMuted = !IsMuted;
         public void SetVolume(int volumePercent) => VolumePercent = Math.Clamp(volumePercent, 0, 100);
-        public void Stop() { IsPlaying = false; Stopped = true; }
+        public void Stop() { IsPlaying = false; Stopped = true; PlayStateChanged?.Invoke(this, false); }
         public void Dispose() => Stop();
     }
 
@@ -147,6 +148,9 @@ public class AnthemServiceTests
 
         Assert.Equal(80, mainVM.AnthemVolume);
         Assert.False(mainVM.IsAnthemMuted);
+        Assert.Equal("zxcursed · Aura", mainVM.CurrentTrackTitle);
+        Assert.Equal("zxcursed", mainVM.CurrentTrackArtist);
+        Assert.Equal("Aura", mainVM.CurrentTrackSong);
 
         // Toggle mute
         mainVM.ToggleMuteCommand.Execute(null);

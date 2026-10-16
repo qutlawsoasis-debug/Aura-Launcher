@@ -25,6 +25,8 @@ namespace AuraLauncher;
 public partial class MainWindow : Window
 {
     private System.Windows.Threading.DispatcherTimer? _sliderHideTimer;
+    private Storyboard? _vinylStoryboard;
+    private bool _vinylIsPaused = false;
     private FrameworkElement? _currentActiveView;
     private Storyboard? _activeTransitionStoryboard;
     private TaskbarIcon? _trayIcon;
@@ -102,6 +104,10 @@ public partial class MainWindow : Window
                 {
                     AnimateChangelogModal(vm.IsChangelogModalVisible);
                 }
+                else if (args.PropertyName == nameof(MainViewModel.IsMusicPlaying))
+                {
+                    Dispatcher.InvokeAsync(() => UpdateVinylState(vm.IsMusicPlaying));
+                }
             };
             vm.SelectedVersionChanged += (s, e) => AnimateReleaseNotesContent();
             TransitionToTab(vm.CurrentTabName, animate: false);
@@ -135,6 +141,8 @@ public partial class MainWindow : Window
                     BgImageCurrent.Source = bgService.CurrentImage;
                 }
             }
+
+            SetupVinylAnimation(vm);
         }
         RestoreDisplayState();
     }
@@ -564,7 +572,7 @@ public partial class MainWindow : Window
     {
         if (SliderBox == null) return;
 
-        double targetWidth = open ? 190.0 : 0.0;
+        double targetWidth = open ? 128.0 : 0.0;
         double targetOpacity = open ? 1.0 : 0.0;
         var duration = TimeSpan.FromMilliseconds(180);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
@@ -574,6 +582,47 @@ public partial class MainWindow : Window
 
         SliderBox.BeginAnimation(FrameworkElement.WidthProperty, animW);
         SliderBox.BeginAnimation(UIElement.OpacityProperty, animO);
+    }
+
+    private void SetupVinylAnimation(MainViewModel vm)
+    {
+        if (VinylRecord == null || VinylRotateTransform == null) return;
+
+        var spinAnim = new DoubleAnimation
+        {
+            From = 0.0,
+            To = 360.0,
+            Duration = TimeSpan.FromSeconds(6),
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        Storyboard.SetTarget(spinAnim, VinylRecord);
+        Storyboard.SetTargetProperty(spinAnim, new PropertyPath("(UIElement.RenderTransform).(RotateTransform.Angle)"));
+
+        _vinylStoryboard = new Storyboard();
+        _vinylStoryboard.Children.Add(spinAnim);
+        _vinylStoryboard.Begin(this, isControllable: true);
+
+        if (!vm.IsMusicPlaying)
+        {
+            _vinylStoryboard.Pause(this);
+            _vinylIsPaused = true;
+        }
+    }
+
+    private void UpdateVinylState(bool isPlaying)
+    {
+        if (_vinylStoryboard == null) return;
+
+        if (isPlaying && _vinylIsPaused)
+        {
+            _vinylStoryboard.Resume(this);
+            _vinylIsPaused = false;
+        }
+        else if (!isPlaying && !_vinylIsPaused)
+        {
+            _vinylStoryboard.Pause(this);
+            _vinylIsPaused = true;
+        }
     }
 
     private void SetupTrayIcon()

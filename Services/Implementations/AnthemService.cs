@@ -28,10 +28,11 @@ public class AnthemService : IAnthemService
 
     private readonly System.Collections.Generic.List<string> _playlist = new();
     private int _currentTrackIndex = 0;
-    private string _currentTrackTitle = "Aura Theme";
+    private string _currentTrackTitle = "zxcursed · Aura";
 
     public string CurrentTrackTitle => _currentTrackTitle;
     public event EventHandler<string>? TrackChanged;
+    public event EventHandler<bool>? PlayStateChanged;
 
     public int VolumePercent
     {
@@ -84,10 +85,16 @@ public class AnthemService : IAnthemService
                 _player.MediaEnded += (s, e) =>
                 {
                     _isPlaying = false;
+                    PlayStateChanged?.Invoke(this, false);
+                    _playerDispatcher?.InvokeAsync(() =>
+                    {
+                        PlayCurrentTrack();
+                    });
                 };
                 _player.MediaFailed += (s, e) =>
                 {
                     _isPlaying = false;
+                    PlayStateChanged?.Invoke(this, false);
                     FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Media failed: {e.ErrorException?.Message}");
                 };
 
@@ -190,6 +197,7 @@ public class AnthemService : IAnthemService
                     _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
                     _player.Play();
                     _isPlaying = true;
+                    PlayStateChanged?.Invoke(this, true);
                     FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Started playback track '{_currentTrackTitle}' (vol: {_volumePercent}%, muted: {_isMuted})");
                 }
                 catch (Exception ex)
@@ -212,6 +220,7 @@ public class AnthemService : IAnthemService
                 {
                     _player.Pause();
                     _isPlaying = false;
+                    PlayStateChanged?.Invoke(this, false);
                 }
                 else
                 {
@@ -223,6 +232,7 @@ public class AnthemService : IAnthemService
                     {
                         _player.Play();
                         _isPlaying = true;
+                        PlayStateChanged?.Invoke(this, true);
                     }
                 }
             }
@@ -264,6 +274,7 @@ public class AnthemService : IAnthemService
                     _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
                     _player.Play();
                     _isPlaying = true;
+                    PlayStateChanged?.Invoke(this, true);
                 }
             }
             catch { }
@@ -274,7 +285,7 @@ public class AnthemService : IAnthemService
     {
         string fileName = Path.GetFileNameWithoutExtension(path);
         _currentTrackTitle = string.Equals(fileName, "anthem", StringComparison.OrdinalIgnoreCase)
-            ? "Aura Theme"
+            ? "zxcursed · Aura"
             : fileName;
         TrackChanged?.Invoke(this, _currentTrackTitle);
     }
@@ -377,6 +388,7 @@ public class AnthemService : IAnthemService
     public void Stop()
     {
         _isPlaying = false;
+        PlayStateChanged?.Invoke(this, false);
         if (_playerDispatcher != null && _player != null && !_disposed)
         {
             try

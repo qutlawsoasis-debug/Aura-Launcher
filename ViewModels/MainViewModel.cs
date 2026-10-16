@@ -705,7 +705,31 @@ public class MainViewModel : ObservableObject
     public string MaximizeRestoreToolTip => IsWindowMaximized ? "Оконный режим" : "Во весь экран";
 
     public IAnthemService? AnthemService { get; }
-    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "Aura Theme";
+    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "zxcursed · Aura";
+
+    public bool IsMusicPlaying => AnthemService?.IsPlaying == true && !IsAnthemMuted;
+
+    public string CurrentTrackArtist
+    {
+        get
+        {
+            var title = CurrentTrackTitle;
+            if (title.Contains("·")) return title.Split('·')[0].Trim();
+            if (title.Contains("-")) return title.Split('-')[0].Trim();
+            return "zxcursed";
+        }
+    }
+
+    public string CurrentTrackSong
+    {
+        get
+        {
+            var title = CurrentTrackTitle;
+            if (title.Contains("·")) return title.Split('·')[1].Trim();
+            if (title.Contains("-")) return title.Split('-')[1].Trim();
+            return title;
+        }
+    }
 
     public WorkshopViewModel WorkshopVM { get; }
 
@@ -1086,6 +1110,7 @@ public class MainViewModel : ObservableObject
                 AnthemService.ToggleMute();
                 OnPropertyChanged(nameof(IsAnthemMuted));
                 OnPropertyChanged(nameof(AnthemVolume));
+                OnPropertyChanged(nameof(IsMusicPlaying));
             }
         });
 
@@ -1093,18 +1118,27 @@ public class MainViewModel : ObservableObject
         {
             AnthemService?.TogglePlayPause();
             OnPropertyChanged(nameof(CurrentTrackTitle));
+            OnPropertyChanged(nameof(CurrentTrackArtist));
+            OnPropertyChanged(nameof(CurrentTrackSong));
+            OnPropertyChanged(nameof(IsMusicPlaying));
         });
 
         NextTrackCommand = new RelayCommand(_ =>
         {
             AnthemService?.NextTrack();
             OnPropertyChanged(nameof(CurrentTrackTitle));
+            OnPropertyChanged(nameof(CurrentTrackArtist));
+            OnPropertyChanged(nameof(CurrentTrackSong));
+            OnPropertyChanged(nameof(IsMusicPlaying));
         });
 
         PreviousTrackCommand = new RelayCommand(_ =>
         {
             AnthemService?.PreviousTrack();
             OnPropertyChanged(nameof(CurrentTrackTitle));
+            OnPropertyChanged(nameof(CurrentTrackArtist));
+            OnPropertyChanged(nameof(CurrentTrackSong));
+            OnPropertyChanged(nameof(IsMusicPlaying));
         });
 
         if (AnthemService != null)
@@ -1112,6 +1146,12 @@ public class MainViewModel : ObservableObject
             AnthemService.TrackChanged += (s, title) =>
             {
                 OnPropertyChanged(nameof(CurrentTrackTitle));
+                OnPropertyChanged(nameof(CurrentTrackArtist));
+                OnPropertyChanged(nameof(CurrentTrackSong));
+            };
+            AnthemService.PlayStateChanged += (s, isPlaying) =>
+            {
+                OnPropertyChanged(nameof(IsMusicPlaying));
             };
         }
 
