@@ -1,7 +1,7 @@
 {
-    "internalVersion":  "1.2.128",
-    "userFacingVersion":  "beta 1.0.120",
+    "internalVersion":  "1.2.129",
+    "userFacingVersion":  "beta 1.0.121",
     "changelog":  [
-                      "[Улучшено] Новый музыкальный виджет, фоновый трек zxcursed — Aura"
+                      "[Исправлено] Музыкальный виджет: стекло и положение"
                   ]
 }
