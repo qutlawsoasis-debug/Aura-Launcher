@@ -240,10 +240,10 @@
 
             <!-- Glass Background Music Widget (Hybrid: Compact 64px <-> Expanded 134px on Hover) -->
             <!-- Vinyl Background Music Widget (Mix Music Disk) -->
-            <controls:MusicDiskWidget Width="420"
+            <controls:MusicDiskWidget Width="240"
                                       HorizontalAlignment="Left"
                                       VerticalAlignment="Bottom"
-                                      Margin="60,0,0,104"
+                                      Margin="50,0,0,96"
                                       Panel.ZIndex="45"
                                       DataContext="{Binding MusicDiskVM}"
                                       Title="{Binding Title}"
