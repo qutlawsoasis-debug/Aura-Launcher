@@ -239,13 +239,12 @@
 
             <!-- Glass Background Music Widget (zxcursed · Aura) -->
             <Grid x:Name="SoundControlRoot"
-                  HorizontalAlignment="Right"
-                  VerticalAlignment="Top"
-                  Margin="0,24,144,0"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Bottom"
+                  Margin="60,0,0,104"
                   Height="64"
                   MaxWidth="280"
-                  Panel.ZIndex="55"
-                  ClipToBounds="False"
+                  Panel.ZIndex="45"
                   UseLayoutRounding="True"
                   SnapsToDevicePixels="True"
                   Cursor="Hand"
@@ -264,41 +263,19 @@
                         CornerRadius="3"
                         BorderThickness="1"
                         BorderBrush="{StaticResource GlassBorderBrush}"
-                        ClipToBounds="False">
-                    <!-- Soft black shadow (blur 24, opacity 0.35, no color) -->
+                        Background="{StaticResource GlassDarkBaseBrush}">
+                    <!-- Soft black shadow (blur 24, opacity 0.35, black) -->
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="24" Opacity="0.35" ShadowDepth="4" Direction="270" Color="#000000" />
                     </Border.Effect>
                     
-                    <!-- Clipped contents of the glass plate -->
+                    <!-- Clipped contents of the glass plate: top vertical gradient and hover overlay -->
                     <Border CornerRadius="2.5" ClipToBounds="True">
                         <Grid>
-                            <!-- Layer A: Hardware-accelerated blurred background copy -->
-                            <Canvas x:Name="GlassCanvas" ClipToBounds="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                                <Image x:Name="GlassBgImage"
-                                       Stretch="UniformToFill"
-                                       HorizontalAlignment="Left"
-                                       VerticalAlignment="Top"
-                                       RenderOptions.BitmapScalingMode="LowQuality">
-                                    <Image.Effect>
-                                        <BlurEffect Radius="22" KernelType="Gaussian" RenderingBias="Performance" />
-                                    </Image.Effect>
-                                    <Image.RenderTransform>
-                                        <TranslateTransform x:Name="GlassBgTransform" X="0" Y="0" />
-                                    </Image.RenderTransform>
-                                </Image>
-                            </Canvas>
+                            <!-- Light vertical gradient from white 8% to 0% -->
+                            <Border Background="{StaticResource GlassTopGradientBrush}" />
 
-                            <!-- Layer B: Fallback solid overlay rgba(14,12,10,0.78) if blur fails -->
-                            <Border x:Name="GlassFallbackOverlay"
-                                    Background="{StaticResource GlassFallbackBrush}"
-                                    Visibility="Collapsed" />
-
-                            <!-- Layer C: Dark warm overlay rgba(20,16,12,0.45) -->
-                            <Border x:Name="GlassWarmOverlay"
-                                    Background="{StaticResource GlassWarmOverlayBrush}" />
-
-                            <!-- Layer D: Hover highlight overlay (+4% white) -->
+                            <!-- Hover highlight overlay (+4% white) -->
                             <Border x:Name="GlassHoverOverlay"
                                     Background="{StaticResource GlassHoverBrush}"
                                     Opacity="0" />
@@ -306,19 +283,19 @@
                     </Border>
                 </Border>
 
-                <!-- 2. Foreground Content (Vinyl overflowing, Track info, Volume slider) -->
-                <Grid Margin="12,0,12,0" ClipToBounds="False">
+                <!-- 2. Foreground Content (Vinyl disc 48px, Track info, Volume slider) -->
+                <Grid Margin="0,0,12,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Vinyl Record Disc (76px diameter, overflows by 6px top and bottom) -->
-                    <Grid Grid.Column="0" Width="76" Height="76" VerticalAlignment="Center" Margin="0,0,12,0" ClipToBounds="False">
+                    <!-- Left: Vinyl Record Disc (48px diameter, inside 64px card, 8px margin left) -->
+                    <Grid Grid.Column="0" Width="48" Height="48" VerticalAlignment="Center" Margin="8,0,8,0">
                         <Border x:Name="VinylRecord"
-                                Width="76" Height="76"
-                                CornerRadius="38"
+                                Width="48" Height="48"
+                                CornerRadius="24"
                                 Background="{StaticResource VinylBodyBrush}"
                                 BorderBrush="{StaticResource VinylGrooveBrush}"
                                 BorderThickness="1"
@@ -327,16 +304,15 @@
                                 <RotateTransform x:Name="VinylRotateTransform" Angle="0" />
                             </Border.RenderTransform>
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" Direction="270" Color="#000000" />
+                                <DropShadowEffect BlurRadius="6" Opacity="0.35" ShadowDepth="2" Direction="270" Color="#000000" />
                             </Border.Effect>
                             <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <!-- Concentric groove lines (1px, white 5%) -->
-                                <Ellipse Width="64" Height="64" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <Ellipse Width="54" Height="54" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <Ellipse Width="44" Height="44" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <Ellipse Width="34" Height="34" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                <!-- Center Amber Label (#F2A63C, diameter 22px) -->
-                                <Ellipse Width="22" Height="22" Fill="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="40" Height="40" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="32" Height="32" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="24" Height="24" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <!-- Center Amber Label (#F2A63C, diameter 14px) -->
+                                <Ellipse Width="14" Height="14" Fill="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <!-- Center spindle hole (diameter 4px) -->
                                 <Ellipse Width="4" Height="4" Fill="{StaticResource BgBase}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Grid>
@@ -490,9 +466,9 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 3. Content area (bounds: left 340, right 56, top 100, bottom 44) -->
+            <!-- 3. Content area (bounds: left 340, right 56, top 64, bottom 44) -->
             <!-- Storyboard tab transitions: outgoing Opacity 1 -> 0 in 100ms; incoming Opacity 0 -> 1 and Y 8 -> 0 in 220ms -->
-            <Grid x:Name="ScreensContainer" Margin="340,100,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
+            <Grid x:Name="ScreensContainer" Margin="340,64,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
                 <views:OverviewView x:Name="ViewOverview"
                                     DataContext="{Binding OverviewVM}"
                                     Visibility="Visible"

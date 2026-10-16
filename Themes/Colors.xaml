@@ -170,26 +170,29 @@
         <GradientStop Color="#00050C10" Offset="1.0" />
     </LinearGradientBrush>
 
-    <!-- Glass Music Widget Tokens (rgba(20,16,12,0.45), rgba(14,12,10,0.78), border 22%->6%, 4% hover) -->
-    <Color x:Key="ColorGlassWarmOverlay">#7314100C</Color>
-    <Color x:Key="ColorGlassFallback">#C70E0C0A</Color>
+    <!-- Glass Music Widget Tokens (rgba(16,14,24,0.62), top gradient 8%->0%, border 20%->5%, 4% hover) -->
+    <Color x:Key="ColorGlassDarkBase">#9E100E18</Color>
     <Color x:Key="ColorProgressTrack">#1FFFFFFF</Color>
     <Color x:Key="ColorVinylGroove">#0DFFFFFF</Color>
     <Color x:Key="ColorWhite60">#99FFFFFF</Color>
     <Color x:Key="ColorGlassHover">#0AFFFFFF</Color>
     <Color x:Key="ColorVinylBody">#0D0F12</Color>
 
-    <SolidColorBrush x:Key="GlassWarmOverlayBrush" Color="{StaticResource ColorGlassWarmOverlay}" po:Freeze="True" />
-    <SolidColorBrush x:Key="GlassFallbackBrush" Color="{StaticResource ColorGlassFallback}" po:Freeze="True" />
+    <SolidColorBrush x:Key="GlassDarkBaseBrush" Color="{StaticResource ColorGlassDarkBase}" po:Freeze="True" />
     <SolidColorBrush x:Key="ProgressTrackBrush" Color="{StaticResource ColorProgressTrack}" po:Freeze="True" />
     <SolidColorBrush x:Key="VinylGrooveBrush" Color="{StaticResource ColorVinylGroove}" po:Freeze="True" />
     <SolidColorBrush x:Key="White60Brush" Color="{StaticResource ColorWhite60}" po:Freeze="True" />
     <SolidColorBrush x:Key="GlassHoverBrush" Color="{StaticResource ColorGlassHover}" po:Freeze="True" />
     <SolidColorBrush x:Key="VinylBodyBrush" Color="{StaticResource ColorVinylBody}" po:Freeze="True" />
 
+    <LinearGradientBrush x:Key="GlassTopGradientBrush" StartPoint="0,0" EndPoint="0,1" po:Freeze="True">
+        <GradientStop Color="#14FFFFFF" Offset="0.0" />
+        <GradientStop Color="#00FFFFFF" Offset="1.0" />
+    </LinearGradientBrush>
+
     <LinearGradientBrush x:Key="GlassBorderBrush" StartPoint="0,0" EndPoint="1,1" po:Freeze="True">
-        <GradientStop Color="#38FFFFFF" Offset="0.0" />
-        <GradientStop Color="#0FFFFFFF" Offset="1.0" />
+        <GradientStop Color="#33FFFFFF" Offset="0.0" />
+        <GradientStop Color="#0DFFFFFF" Offset="1.0" />
     </LinearGradientBrush>
 </ResourceDictionary>
 

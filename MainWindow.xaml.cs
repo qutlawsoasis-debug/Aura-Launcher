@@ -115,7 +115,6 @@ public partial class MainWindow : Window
                             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
                         };
                         SoundControlRoot.BeginAnimation(UIElement.OpacityProperty, fadeIn);
-                        UpdateGlassBackground();
                     }
                 }
             };
@@ -147,7 +146,6 @@ public partial class MainWindow : Window
                     Dispatcher.Invoke(() =>
                     {
                         AnimateBackgroundTransition(nextImg);
-                        UpdateGlassBackground();
                     });
                 };
                 if (bgService.CurrentImage != null)
@@ -165,7 +163,6 @@ public partial class MainWindow : Window
                 SoundControlRoot.BeginAnimation(UIElement.OpacityProperty, fadeIn);
             }
             UpdateVinylState(vm.IsMusicPlaying);
-            UpdateGlassBackground();
         }
         RestoreDisplayState();
     }
@@ -708,57 +705,6 @@ public partial class MainWindow : Window
         VinylRotateTransform.BeginAnimation(RotateTransform.AngleProperty, decelAnim);
     }
 
-    public void UpdateGlassBackground()
-    {
-        try
-        {
-            if (SoundControlRoot == null || GlassBgImage == null || GlassBgTransform == null)
-            {
-                ApplyGlassFallback();
-                return;
-            }
-
-            if (BgImageCurrent?.Source == null)
-            {
-                ApplyGlassFallback();
-                return;
-            }
-
-            GlassBgImage.Source = BgImageCurrent.Source;
-            GlassBgImage.Width = BgImageCurrent.ActualWidth > 0 ? BgImageCurrent.ActualWidth : ActualWidth;
-            GlassBgImage.Height = BgImageCurrent.ActualHeight > 0 ? BgImageCurrent.ActualHeight : ActualHeight;
-
-            Point widgetPos = SoundControlRoot.TransformToAncestor(this).Transform(new Point(0, 0));
-            GlassBgTransform.X = -widgetPos.X;
-            GlassBgTransform.Y = -widgetPos.Y;
-
-            if (GlassCanvas != null)
-            {
-                GlassCanvas.Visibility = Visibility.Visible;
-            }
-            if (GlassFallbackOverlay != null)
-            {
-                GlassFallbackOverlay.Visibility = Visibility.Collapsed;
-            }
-        }
-        catch
-        {
-            ApplyGlassFallback();
-        }
-    }
-
-    public void ApplyGlassFallback()
-    {
-        if (GlassFallbackOverlay != null)
-        {
-            GlassFallbackOverlay.Visibility = Visibility.Visible;
-        }
-        if (GlassCanvas != null)
-        {
-            GlassCanvas.Visibility = Visibility.Collapsed;
-        }
-    }
-
     private void SetupTrayIcon()
     {
         if (_trayIcon != null) return;
@@ -1139,7 +1085,6 @@ public partial class MainWindow : Window
     {
         base.OnRenderSizeChanged(sizeInfo);
         UpdateLayoutAndScale();
-        UpdateGlassBackground();
     }
 
     public void UpdateLayoutAndScale(double? overrideW = null, double? overrideH = null)

@@ -1227,7 +1227,7 @@
         </Setter>
     </Style>
 
-    <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку", "Сменить фон") -->
+    <!-- Settings Action Button (e.g. "Изменить" folder button, "Проверить сборку", "Сменить фон", "Все изменения") -->
     <Style x:Key="SettingsActionBtn" TargetType="Button">
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -1237,12 +1237,13 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="Medium" />
         <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        <Setter Property="Background" Value="{DynamicResource PanelRaised}" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="ActionBorder"
                             CornerRadius="3"
-                            Background="#1AFFFFFF"
+                            Background="{TemplateBinding Background}"
                             BorderBrush="{StaticResource LineInkBrush}"
                             BorderThickness="1"
                             Padding="{TemplateBinding Padding}"
@@ -1253,12 +1254,13 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="ActionBorder" Property="Background" Value="#2BFFFFFF" />
-                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{StaticResource LineInkBrush}" />
+                            <Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource PanelInput}" />
+                            <Setter TargetName="ActionBorder" Property="BorderBrush" Value="{StaticResource BorderHoverBrush}" />
                             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.82" />
+                            <Setter TargetName="ActionBorder" Property="Background" Value="{DynamicResource PanelCard}" />
+                            <Setter TargetName="ActionBorder" Property="Opacity" Value="0.9" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="ActionBorder" Property="Opacity" Value="0.4" />
