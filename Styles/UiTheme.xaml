@@ -1123,33 +1123,34 @@
         </Setter>
     </Style>
 
-    <!-- Header Volume Slider (112px wide track) -->
+    <!-- Header Volume Slider (thin 2px track with 8px amber thumb) -->
     <Style x:Key="HeaderVolumeSlider" TargetType="Slider">
         <Setter Property="SnapsToDevicePixels" Value="True" />
         <Setter Property="OverridesDefaultStyle" Value="True" />
         <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Height" Value="20" />
+        <Setter Property="Height" Value="18" />
         <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
-                    <Grid VerticalAlignment="Center">
-                        <!-- Track 4px -->
-                        <Border Height="4" Background="#33FFFFFF" CornerRadius="2" VerticalAlignment="Center" />
-                        <!-- Thumb -->
+                    <Grid VerticalAlignment="Center" Background="Transparent">
+                        <!-- Track 2px -->
+                        <Border Height="2" Background="{StaticResource BorderSubtle}" CornerRadius="1" VerticalAlignment="Center" />
+                        <!-- Thumb 8px -->
                         <Track x:Name="PART_Track">
                             <Track.Thumb>
                                 <Thumb>
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
                                             <Border x:Name="ThumbBorder"
-                                                    Width="10" Height="10"
-                                                    CornerRadius="2"
-                                                    Background="{StaticResource EmberBrush}"
+                                                    Width="8" Height="8"
+                                                    CornerRadius="1"
+                                                    Background="{StaticResource Accent}"
                                                     Cursor="Hand" />
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="#F7B44F" />
+                                                    <Setter TargetName="ThumbBorder" Property="Opacity" Value="0.9" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -1157,6 +1158,26 @@
                                 </Thumb>
                             </Track.Thumb>
                         </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Thin Music Progress Bar (2px height, amber fill, 12% white track) -->
+    <Style x:Key="ThinMusicProgressBar" TargetType="ProgressBar">
+        <Setter Property="Height" Value="2" />
+        <Setter Property="Background" Value="{StaticResource ProgressTrackBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource Accent}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid x:Name="TemplateRoot" Height="2" Background="{TemplateBinding Background}">
+                        <Border x:Name="PART_Track" />
+                        <Border x:Name="PART_Indicator"
+                                HorizontalAlignment="Left"
+                                Background="{TemplateBinding Foreground}" />
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

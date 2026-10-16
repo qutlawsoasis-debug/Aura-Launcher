@@ -23,16 +23,34 @@ public class AnthemService : IAnthemService
     private int _volumePercent = 100;
     private bool _isMuted = false;
     private bool _isPlaying = false;
+    private bool _mediaFailed = false;
     private bool _disposed = false;
     private string? _resolvedAudioPath;
 
     private readonly System.Collections.Generic.List<string> _playlist = new();
     private int _currentTrackIndex = 0;
     private string _currentTrackTitle = "zxcursed · Aura";
+    private DispatcherTimer? _progressTimer;
+    private double _playbackProgress = 0.0;
 
     public string CurrentTrackTitle => _currentTrackTitle;
+    public double PlaybackProgress => _playbackProgress;
     public event EventHandler<string>? TrackChanged;
     public event EventHandler<bool>? PlayStateChanged;
+    public event EventHandler<double>? ProgressChanged;
+
+    public bool IsAvailable
+    {
+        get
+        {
+            if (_mediaFailed) return false;
+            if (_playlist.Count == 0)
+            {
+                EnsurePlaylistLoaded();
+            }
+            return _playlist.Count > 0 && !_mediaFailed;
+        }
+    }
 
     public int VolumePercent
     {
@@ -85,6 +103,8 @@ public class AnthemService : IAnthemService
                 _player.MediaEnded += (s, e) =>
                 {
                     _isPlaying = false;
+                    _playbackProgress = 0.0;
+                    ProgressChanged?.Invoke(this, 0.0);
                     PlayStateChanged?.Invoke(this, false);
                     _playerDispatcher?.InvokeAsync(() =>
                     {
@@ -94,11 +114,30 @@ public class AnthemService : IAnthemService
                 _player.MediaFailed += (s, e) =>
                 {
                     _isPlaying = false;
+                    _mediaFailed = true;
+                    _playbackProgress = 0.0;
+                    _progressTimer?.Stop();
+                    ProgressChanged?.Invoke(this, 0.0);
                     PlayStateChanged?.Invoke(this, false);
+                    TrackChanged?.Invoke(this, string.Empty);
                     FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Media failed: {e.ErrorException?.Message}");
                 };
 
                 _playerDispatcher = Dispatcher.CurrentDispatcher;
+                _progressTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (s, e) =>
+                {
+                    if (_player != null && _isPlaying && _player.NaturalDuration.HasTimeSpan && _player.NaturalDuration.TimeSpan.TotalSeconds > 0)
+                    {
+                        double pos = _player.Position.TotalSeconds;
+                        double dur = _player.NaturalDuration.TimeSpan.TotalSeconds;
+                        double prog = Math.Clamp(pos / dur, 0.0, 1.0);
+                        if (Math.Abs(_playbackProgress - prog) > 0.002)
+                        {
+                            _playbackProgress = prog;
+                            ProgressChanged?.Invoke(this, _playbackProgress);
+                        }
+                    }
+                }, _playerDispatcher);
                 _initTcs.TrySetResult(true);
                 Dispatcher.Run();
             }
@@ -125,6 +164,11 @@ public class AnthemService : IAnthemService
         _isMuted = config.AnthemMuted;
 
         _resolvedAudioPath = ResolveAudioFilePath(config);
+        EnsurePlaylistLoaded();
+        if (_playlist.Count > 0)
+        {
+            UpdateTrackTitle(_playlist[_currentTrackIndex]);
+        }
 
         bool isUpdateRestart = IsUpdateRestart();
         bool isSecondInstance = IsSecondInstance();
@@ -197,6 +241,7 @@ public class AnthemService : IAnthemService
                     _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
                     _player.Play();
                     _isPlaying = true;
+                    _progressTimer?.Start();
                     PlayStateChanged?.Invoke(this, true);
                     FabricGameLaunchService.LogLauncherEvent($"[ANTHEM] Started playback track '{_currentTrackTitle}' (vol: {_volumePercent}%, muted: {_isMuted})");
                 }
@@ -220,6 +265,7 @@ public class AnthemService : IAnthemService
                 {
                     _player.Pause();
                     _isPlaying = false;
+                    _progressTimer?.Stop();
                     PlayStateChanged?.Invoke(this, false);
                 }
                 else
@@ -232,6 +278,7 @@ public class AnthemService : IAnthemService
                     {
                         _player.Play();
                         _isPlaying = true;
+                        _progressTimer?.Start();
                         PlayStateChanged?.Invoke(this, true);
                     }
                 }
@@ -274,6 +321,7 @@ public class AnthemService : IAnthemService
                     _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
                     _player.Play();
                     _isPlaying = true;
+                    _progressTimer?.Start();
                     PlayStateChanged?.Invoke(this, true);
                 }
             }
@@ -388,6 +436,9 @@ public class AnthemService : IAnthemService
     public void Stop()
     {
         _isPlaying = false;
+        _progressTimer?.Stop();
+        _playbackProgress = 0.0;
+        ProgressChanged?.Invoke(this, 0.0);
         PlayStateChanged?.Invoke(this, false);
         if (_playerDispatcher != null && _player != null && !_disposed)
         {

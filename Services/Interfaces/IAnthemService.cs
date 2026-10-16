@@ -7,10 +7,13 @@ public interface IAnthemService : IDisposable
     int VolumePercent { get; set; }
     bool IsMuted { get; set; }
     bool IsPlaying { get; }
+    bool IsAvailable { get; }
+    double PlaybackProgress { get; }
     string CurrentTrackTitle { get; }
 
     event EventHandler<string>? TrackChanged;
     event EventHandler<bool>? PlayStateChanged;
+    event EventHandler<double>? ProgressChanged;
 
     void Initialize();
     void PlayAnthem(bool force = false);

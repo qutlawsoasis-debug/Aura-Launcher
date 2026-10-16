@@ -198,159 +198,10 @@
 
             <!-- Top-right: Sound Icon + Minimize + Close (32x34 each, on hover white 10%) -->
             <!-- Sound icon: on hover volume slider (112px wide) slides out to the LEFT in 180ms, collapses 400ms after mouse leave -->
+            <!-- Top-right Window Controls: Minimize, Maximize, Close -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                         Margin="0,8,12,0" Panel.ZIndex="60"
                         WindowChrome.IsHitTestVisibleInChrome="True">
-                
-                <!-- Spotify-Style Mini Player Pill: vinyl record, artist/track, controls -->
-                <Border x:Name="SoundControlRoot"
-                        Background="{StaticResource PanelCard}"
-                        BorderBrush="{StaticResource BorderSubtle}"
-                        BorderThickness="1"
-                        CornerRadius="3"
-                        Height="34"
-                        Margin="0,0,8,0"
-                        Padding="6,2,6,2"
-                        WindowChrome.IsHitTestVisibleInChrome="True"
-                        MouseEnter="SoundControl_MouseEnter"
-                        MouseLeave="SoundControl_MouseLeave">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
-                        <!-- Rotating Vinyl Record Disc -->
-                        <Grid Width="24" Height="24" Margin="0,0,6,0" VerticalAlignment="Center" ToolTip="{Binding CurrentTrackTitle}">
-                            <Border x:Name="VinylRecord"
-                                    Width="24" Height="24"
-                                    CornerRadius="12"
-                                    Background="{StaticResource PanelRaised}"
-                                    BorderBrush="{StaticResource BorderStrong}"
-                                    BorderThickness="1"
-                                    RenderTransformOrigin="0.5,0.5">
-                                <Border.RenderTransform>
-                                    <RotateTransform x:Name="VinylRotateTransform" Angle="0" />
-                                </Border.RenderTransform>
-                                <Grid>
-                                    <!-- Concentric groove rings -->
-                                    <Ellipse Width="18" Height="18" Stroke="{StaticResource BorderSubtle}" StrokeThickness="0.8" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <Ellipse Width="13" Height="13" Stroke="{StaticResource Border}" StrokeThickness="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <!-- Center Amber Label -->
-                                    <Ellipse Width="8" Height="8" Fill="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    <!-- Center spindle hole -->
-                                    <Ellipse Width="3" Height="3" Fill="{StaticResource BgBase}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Grid>
-                            </Border>
-                        </Grid>
-
-                        <!-- Track & Artist Info -->
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,8,0" MaxWidth="110">
-                            <TextBlock Text="{Binding CurrentTrackSong}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontSize="11" FontWeight="SemiBold"
-                                       Foreground="{StaticResource TextPrimary}"
-                                       TextTrimming="CharacterEllipsis"
-                                       LineHeight="13" />
-                            <TextBlock Text="{Binding CurrentTrackArtist}"
-                                       FontFamily="{StaticResource MainFont}"
-                                       FontSize="10" FontWeight="Normal"
-                                       Foreground="{StaticResource StoriesTextSecondary}"
-                                       TextTrimming="CharacterEllipsis"
-                                       Margin="0,-1,0,0" />
-                        </StackPanel>
-
-                        <!-- Play/Pause Button (Ember accent icon) -->
-                        <Button Command="{Binding TogglePlayPauseCommand}"
-                                Style="{StaticResource WinSoundBtn}"
-                                WindowChrome.IsHitTestVisibleInChrome="True"
-                                ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Музыка: {0}'}"
-                                Width="22" Height="24" Margin="0,0,2,0">
-                            <Grid Width="12" Height="12">
-                                <!-- When playing, show pause icon -->
-                                <Path Style="{StaticResource IconPath}"
-                                      Data="M2,2 L5,2 L5,10 L2,10 Z M7,2 L10,2 L10,10 L7,10 Z"
-                                      Width="10" Height="10"
-                                      StrokeThickness="1.2"
-                                      Fill="{StaticResource Accent}"
-                                      Stroke="{StaticResource Accent}"
-                                      Visibility="{Binding IsMusicPlaying, Converter={StaticResource BoolToVis}}" />
-                                <!-- When paused, show play icon -->
-                                <Path Style="{StaticResource IconPath}"
-                                      Data="M3,2 L10,6 L3,10 Z"
-                                      Width="10" Height="10"
-                                      StrokeThickness="1.2"
-                                      Fill="{StaticResource Accent}"
-                                      Stroke="{StaticResource Accent}"
-                                      Visibility="{Binding IsMusicPlaying, Converter={StaticResource InverseBoolToVis}}" />
-                            </Grid>
-                        </Button>
-
-                        <!-- Sliding Box to the RIGHT on Hover (Prev, Next, Slider) -->
-                        <Border x:Name="SliderBox" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,4,0" WindowChrome.IsHitTestVisibleInChrome="True">
-                                <!-- Prev Track -->
-                                <Button Command="{Binding PreviousTrackCommand}"
-                                        Style="{StaticResource WinSoundBtn}"
-                                        WindowChrome.IsHitTestVisibleInChrome="True"
-                                        ToolTip="Предыдущий трек"
-                                        Width="20" Height="22" Margin="0,0,2,0">
-                                    <Path Style="{StaticResource IconPath}"
-                                          Data="{StaticResource IconSkipBack}"
-                                          Width="10" Height="10"
-                                          StrokeThickness="1.3"
-                                          Stroke="{StaticResource DimInkBrush}" />
-                                </Button>
-
-                                <!-- Next Track -->
-                                <Button Command="{Binding NextTrackCommand}"
-                                        Style="{StaticResource WinSoundBtn}"
-                                        WindowChrome.IsHitTestVisibleInChrome="True"
-                                        ToolTip="Следующий трек"
-                                        Width="20" Height="22" Margin="0,0,4,0">
-                                    <Path Style="{StaticResource IconPath}"
-                                          Data="{StaticResource IconSkipForward}"
-                                          Width="10" Height="10"
-                                          StrokeThickness="1.3"
-                                          Stroke="{StaticResource DimInkBrush}" />
-                                </Button>
-
-                                <Slider x:Name="HeaderVolSlider"
-                                        Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
-                                        Value="{Binding AnthemVolume, Mode=TwoWay}"
-                                        Style="{StaticResource HeaderVolumeSlider}"
-                                        Width="70"
-                                        WindowChrome.IsHitTestVisibleInChrome="True"
-                                        ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Громкость: {0}% • {1}'}" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Sound Mute Button -->
-                        <Button Command="{Binding ToggleMuteCommand}"
-                                Style="{StaticResource WinSoundBtn}"
-                                WindowChrome.IsHitTestVisibleInChrome="True"
-                                ToolTip="Звук: включён / выключен"
-                                Width="22" Height="24">
-                            <Grid Width="14" Height="14">
-                                <!-- Sound On -->
-                                <Path x:Name="IconSoundOn"
-                                      Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M11.5,5.5 C12.8,6.8 13.5,8.3 13.5,10 C13.5,11.7 12.8,13.2 11.5,14.5"
-                                      Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.2"
-                                      StrokeLineJoin="Round"
-                                      Stretch="Uniform"
-                                      Visibility="{Binding IsAnthemMuted, Converter={StaticResource InverseBoolToVis}}" />
-                                <!-- Sound Muted -->
-                                <Path x:Name="IconSoundMuted"
-                                      Data="M2,5 L5,5 L9,1 L9,15 L5,11 L2,11 Z M12,7 L16,11 M16,7 L12,11"
-                                      Fill="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.4"
-                                      StrokeLineJoin="Round"
-                                      Stretch="Uniform"
-                                      Visibility="{Binding IsAnthemMuted, Converter={StaticResource BoolToVis}}" />
-                            </Grid>
-                        </Button>
-                    </StackPanel>
-                </Border>
-
-                <!-- Minimize, Maximize/Restore & Close Buttons -->
                 <Button Command="{Binding MinimizeWindowCommand}"
                         Style="{StaticResource WinControlBtn}"
                         WindowChrome.IsHitTestVisibleInChrome="True"
@@ -360,14 +211,12 @@
                         WindowChrome.IsHitTestVisibleInChrome="True"
                         ToolTip="{Binding MaximizeRestoreToolTip}">
                     <Grid Width="11" Height="11">
-                        <!-- State 1: In windowed mode -> Single square (Expand / Во весь экран) -->
                         <Path Style="{StaticResource IconPath}"
                               Data="{StaticResource IconMaximize}"
                               Width="10" Height="10"
                               StrokeThickness="1.5"
                               Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                               Visibility="{Binding IsWindowMaximized, Converter={StaticResource InverseBoolToVis}}" />
-                        <!-- State 2: In maximized mode -> Two overlapping squares (Restore / Оконный режим) -->
                         <Path Style="{StaticResource IconPath}"
                               Data="{StaticResource IconRestore}"
                               Width="11" Height="11"
@@ -387,6 +236,152 @@
                           Stroke="{Binding Path=Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
                 </Button>
             </StackPanel>
+
+            <!-- Glass Background Music Widget (zxcursed · Aura) -->
+            <Grid x:Name="SoundControlRoot"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Top"
+                  Margin="0,24,144,0"
+                  Height="64"
+                  MaxWidth="280"
+                  Panel.ZIndex="55"
+                  ClipToBounds="False"
+                  UseLayoutRounding="True"
+                  SnapsToDevicePixels="True"
+                  Cursor="Hand"
+                  Opacity="0"
+                  Visibility="{Binding IsMusicWidgetVisible, Converter={StaticResource BoolToVis}}"
+                  WindowChrome.IsHitTestVisibleInChrome="True"
+                  MouseEnter="SoundControl_MouseEnter"
+                  MouseLeave="SoundControl_MouseLeave"
+                  MouseLeftButtonUp="SoundControl_MouseLeftButtonUp"
+                  PreviewMouseWheel="SoundControl_PreviewMouseWheel"
+                  ToolTip="Нажмите для паузы/воспроизведения. Колесо мыши — громкость.">
+                
+                <!-- 1. Glass Card Base (Height 64px, CornerRadius 3, 1px Gradient Border, Shadow) -->
+                <Border x:Name="GlassCardBody"
+                        Height="64"
+                        CornerRadius="3"
+                        BorderThickness="1"
+                        BorderBrush="{StaticResource GlassBorderBrush}"
+                        ClipToBounds="False">
+                    <!-- Soft black shadow (blur 24, opacity 0.35, no color) -->
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="24" Opacity="0.35" ShadowDepth="4" Direction="270" Color="#000000" />
+                    </Border.Effect>
+                    
+                    <!-- Clipped contents of the glass plate -->
+                    <Border CornerRadius="2.5" ClipToBounds="True">
+                        <Grid>
+                            <!-- Layer A: Hardware-accelerated blurred background copy -->
+                            <Canvas x:Name="GlassCanvas" ClipToBounds="True" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <Image x:Name="GlassBgImage"
+                                       Stretch="UniformToFill"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Top"
+                                       RenderOptions.BitmapScalingMode="LowQuality">
+                                    <Image.Effect>
+                                        <BlurEffect Radius="22" KernelType="Gaussian" RenderingBias="Performance" />
+                                    </Image.Effect>
+                                    <Image.RenderTransform>
+                                        <TranslateTransform x:Name="GlassBgTransform" X="0" Y="0" />
+                                    </Image.RenderTransform>
+                                </Image>
+                            </Canvas>
+
+                            <!-- Layer B: Fallback solid overlay rgba(14,12,10,0.78) if blur fails -->
+                            <Border x:Name="GlassFallbackOverlay"
+                                    Background="{StaticResource GlassFallbackBrush}"
+                                    Visibility="Collapsed" />
+
+                            <!-- Layer C: Dark warm overlay rgba(20,16,12,0.45) -->
+                            <Border x:Name="GlassWarmOverlay"
+                                    Background="{StaticResource GlassWarmOverlayBrush}" />
+
+                            <!-- Layer D: Hover highlight overlay (+4% white) -->
+                            <Border x:Name="GlassHoverOverlay"
+                                    Background="{StaticResource GlassHoverBrush}"
+                                    Opacity="0" />
+                        </Grid>
+                    </Border>
+                </Border>
+
+                <!-- 2. Foreground Content (Vinyl overflowing, Track info, Volume slider) -->
+                <Grid Margin="12,0,12,0" ClipToBounds="False">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left: Vinyl Record Disc (76px diameter, overflows by 6px top and bottom) -->
+                    <Grid Grid.Column="0" Width="76" Height="76" VerticalAlignment="Center" Margin="0,0,12,0" ClipToBounds="False">
+                        <Border x:Name="VinylRecord"
+                                Width="76" Height="76"
+                                CornerRadius="38"
+                                Background="{StaticResource VinylBodyBrush}"
+                                BorderBrush="{StaticResource VinylGrooveBrush}"
+                                BorderThickness="1"
+                                RenderTransformOrigin="0.5,0.5">
+                            <Border.RenderTransform>
+                                <RotateTransform x:Name="VinylRotateTransform" Angle="0" />
+                            </Border.RenderTransform>
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="8" Opacity="0.4" ShadowDepth="2" Direction="270" Color="#000000" />
+                            </Border.Effect>
+                            <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <!-- Concentric groove lines (1px, white 5%) -->
+                                <Ellipse Width="64" Height="64" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="54" Height="54" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="44" Height="44" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Ellipse Width="34" Height="34" Stroke="{StaticResource VinylGrooveBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <!-- Center Amber Label (#F2A63C, diameter 22px) -->
+                                <Ellipse Width="22" Height="22" Fill="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <!-- Center spindle hole (diameter 4px) -->
+                                <Ellipse Width="4" Height="4" Fill="{StaticResource BgBase}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- Right: Text column («AURA» Oswald 17px + «zxcursed» Onest 11px 60% white) -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <TextBlock Text="AURA"
+                                   FontFamily="{StaticResource HeadingFont}"
+                                   FontSize="17"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextWhite}"
+                                   LineHeight="18"
+                                   LineStackingStrategy="BlockLineHeight" />
+                        <TextBlock Text="zxcursed"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="11"
+                                   FontWeight="Normal"
+                                   Foreground="{StaticResource White60Brush}"
+                                   Margin="0,2,0,0"
+                                   LineHeight="12" />
+                    </StackPanel>
+
+                    <!-- Right edge: Volume Slider on Hover (slides out to the right in 150ms) -->
+                    <Border x:Name="SliderBox" Grid.Column="2" Width="0" Opacity="0" ClipToBounds="True" VerticalAlignment="Center">
+                        <Slider x:Name="HeaderVolSlider"
+                                Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                                Value="{Binding AnthemVolume, Mode=TwoWay}"
+                                Style="{StaticResource HeaderVolumeSlider}"
+                                Width="64"
+                                Margin="4,0,0,0"
+                                ToolTip="{Binding CurrentTrackTitle, StringFormat='{}Громкость: {0}%'}" />
+                    </Border>
+                </Grid>
+
+                <!-- Bottom: Thin Progress Line 2px (amber filled, white 12% track, inside 12px padding) -->
+                <ProgressBar Margin="12,0,12,0"
+                             Height="2"
+                             VerticalAlignment="Bottom"
+                             HorizontalAlignment="Stretch"
+                             Minimum="0" Maximum="1"
+                             Value="{Binding PlaybackProgress, Mode=OneWay}"
+                             Style="{StaticResource ThinMusicProgressBar}" />
+            </Grid>
 
             <!-- 2. Game menu and player info (left side) -->
             <Grid Width="340" HorizontalAlignment="Left" Panel.ZIndex="40">
@@ -495,9 +490,9 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 3. Content area (bounds: left 340, right 56, top 64, bottom 44) -->
+            <!-- 3. Content area (bounds: left 340, right 56, top 100, bottom 44) -->
             <!-- Storyboard tab transitions: outgoing Opacity 1 -> 0 in 100ms; incoming Opacity 0 -> 1 and Y 8 -> 0 in 220ms -->
-            <Grid x:Name="ScreensContainer" Margin="340,64,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
+            <Grid x:Name="ScreensContainer" Margin="340,100,56,44" ClipToBounds="False" Focusable="False" FocusVisualStyle="{x:Null}" Panel.ZIndex="30">
                 <views:OverviewView x:Name="ViewOverview"
                                     DataContext="{Binding OverviewVM}"
                                     Visibility="Visible"

@@ -706,6 +706,9 @@ public class MainViewModel : ObservableObject
 
     public IAnthemService? AnthemService { get; }
     public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "zxcursed · Aura";
+    public string CurrentTrackDisplayName => (AnthemService?.CurrentTrackTitle ?? "ZXCURSED — AURA").ToUpperInvariant().Replace("·", "—");
+    public bool IsMusicWidgetVisible => AnthemService != null && AnthemService.IsAvailable && !string.IsNullOrWhiteSpace(CurrentTrackTitle);
+    public double PlaybackProgress => AnthemService?.PlaybackProgress ?? 0.0;
 
     public bool IsMusicPlaying => AnthemService?.IsPlaying == true && !IsAnthemMuted;
 
@@ -1118,27 +1121,33 @@ public class MainViewModel : ObservableObject
         {
             AnthemService?.TogglePlayPause();
             OnPropertyChanged(nameof(CurrentTrackTitle));
+            OnPropertyChanged(nameof(CurrentTrackDisplayName));
             OnPropertyChanged(nameof(CurrentTrackArtist));
             OnPropertyChanged(nameof(CurrentTrackSong));
             OnPropertyChanged(nameof(IsMusicPlaying));
+            OnPropertyChanged(nameof(IsMusicWidgetVisible));
         });
 
         NextTrackCommand = new RelayCommand(_ =>
         {
             AnthemService?.NextTrack();
             OnPropertyChanged(nameof(CurrentTrackTitle));
+            OnPropertyChanged(nameof(CurrentTrackDisplayName));
             OnPropertyChanged(nameof(CurrentTrackArtist));
             OnPropertyChanged(nameof(CurrentTrackSong));
             OnPropertyChanged(nameof(IsMusicPlaying));
+            OnPropertyChanged(nameof(IsMusicWidgetVisible));
         });
 
         PreviousTrackCommand = new RelayCommand(_ =>
         {
             AnthemService?.PreviousTrack();
             OnPropertyChanged(nameof(CurrentTrackTitle));
+            OnPropertyChanged(nameof(CurrentTrackDisplayName));
             OnPropertyChanged(nameof(CurrentTrackArtist));
             OnPropertyChanged(nameof(CurrentTrackSong));
             OnPropertyChanged(nameof(IsMusicPlaying));
+            OnPropertyChanged(nameof(IsMusicWidgetVisible));
         });
 
         if (AnthemService != null)
@@ -1146,12 +1155,19 @@ public class MainViewModel : ObservableObject
             AnthemService.TrackChanged += (s, title) =>
             {
                 OnPropertyChanged(nameof(CurrentTrackTitle));
+                OnPropertyChanged(nameof(CurrentTrackDisplayName));
                 OnPropertyChanged(nameof(CurrentTrackArtist));
                 OnPropertyChanged(nameof(CurrentTrackSong));
+                OnPropertyChanged(nameof(IsMusicWidgetVisible));
             };
             AnthemService.PlayStateChanged += (s, isPlaying) =>
             {
                 OnPropertyChanged(nameof(IsMusicPlaying));
+                OnPropertyChanged(nameof(IsMusicWidgetVisible));
+            };
+            AnthemService.ProgressChanged += (s, prog) =>
+            {
+                OnPropertyChanged(nameof(PlaybackProgress));
             };
         }
 

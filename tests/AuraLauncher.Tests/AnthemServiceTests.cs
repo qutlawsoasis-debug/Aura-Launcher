@@ -40,11 +40,14 @@ public class AnthemServiceTests
         public int VolumePercent { get; set; } = 100;
         public bool IsMuted { get; set; } = false;
         public bool IsPlaying { get; set; } = false;
+        public bool IsAvailable { get; set; } = true;
         public bool Initialized { get; set; } = false;
         public bool Stopped { get; set; } = false;
         public string CurrentTrackTitle { get; set; } = "zxcursed · Aura";
+        public double PlaybackProgress { get; set; } = 0.0;
         public event EventHandler<string>? TrackChanged;
         public event EventHandler<bool>? PlayStateChanged;
+        public event EventHandler<double>? ProgressChanged;
 
         public void Initialize() => Initialized = true;
         public void PlayAnthem(bool force = false) { IsPlaying = true; PlayStateChanged?.Invoke(this, true); }
