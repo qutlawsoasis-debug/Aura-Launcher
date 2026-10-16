@@ -1,8 +1,7 @@
 {
-    "internalVersion":  "1.2.127",
-    "userFacingVersion":  "beta 1.0.119",
+    "internalVersion":  "1.2.128",
+    "userFacingVersion":  "beta 1.0.120",
     "changelog":  [
-                      "[Аудио] Фоновый трек заменён на zxcursed · Aura",
-                      "[Интерфейс] Добавлен интерактивный мини-плеер в стиле Spotify с крутящейся виниловой пластинкой"
+                      "[Улучшено] Новый музыкальный виджет, фоновый трек zxcursed — Aura"
                   ]
 }
