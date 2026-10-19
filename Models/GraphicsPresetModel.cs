@@ -18,7 +18,9 @@ public class GraphicsPresetModel
     public int Ao { get; set; } = 2;
     public int RamMb { get; set; } = 6144;
     public List<string> JvmArgs { get; set; } = new();
-    public string ShaderPack { get; set; } = "MakeUp-UltraFast-9.5f.zip";
+    public string ShaderPack { get; set; } = "Sildurs-Enhanced-Default-Fancy.zip";
+    public List<string> ShaderPacks { get; set; } = new();
+    public bool DistantHorizons { get; set; } = false;
     public bool EnableShaders { get; set; } = true;
     public Dictionary<string, string> ShaderOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<string> ResourcePacks { get; set; } = new();

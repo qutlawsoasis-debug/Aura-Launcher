@@ -257,31 +257,34 @@ public class WorkshopServiceTests : IDisposable
     {
         string dirHigh = Path.Combine(_tempDir, "game_high");
         Directory.CreateDirectory(Path.Combine(dirHigh, "shaderpacks"));
-        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip"), "dummy complementary");
+        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "OldShader.zip"), "dummy old shader");
+        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "ProjectLUMA.zip"), "dummy luma");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirHigh, "High");
 
         Assert.True(File.Exists(Path.Combine(dirHigh, "options.txt")));
-        Assert.True(File.Exists(Path.Combine(dirHigh, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip.txt")));
         string highOptions = File.ReadAllText(Path.Combine(dirHigh, "options.txt"));
-        string highShaderTxt = File.ReadAllText(Path.Combine(dirHigh, "shaderpacks", "ComplementaryReimagined_r5.9.3.zip.txt"));
         Assert.Contains("renderDistance:24", highOptions);
         Assert.Contains("simulationDistance:10", highOptions);
-        Assert.Contains("profile=ULTRA", highShaderTxt);
+        // Old shader not belonging to High preset should be deleted
+        Assert.False(File.Exists(Path.Combine(dirHigh, "shaderpacks", "OldShader.zip")));
+        Assert.True(File.Exists(Path.Combine(dirHigh, "shaderpacks", "ProjectLUMA.zip")));
 
         string dirUltra = Path.Combine(_tempDir, "game_ultra");
         Directory.CreateDirectory(Path.Combine(dirUltra, "shaderpacks"));
-        File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "ComplementaryUnbound_r5.9.3.zip"), "dummy complementary unbound");
+        Directory.CreateDirectory(Path.Combine(dirUltra, "mods"));
+        File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "Bliss_v2.1.2.zip"), "dummy bliss");
+        File.WriteAllText(Path.Combine(dirUltra, "mods", "DistantHorizons-2.2.1-a-1.20.1.jar.disabled"), "dummy dh");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirUltra, "Ultra");
 
         Assert.True(File.Exists(Path.Combine(dirUltra, "options.txt")));
-        Assert.True(File.Exists(Path.Combine(dirUltra, "shaderpacks", "ComplementaryUnbound_r5.9.3.zip.txt")));
         string ultraOptions = File.ReadAllText(Path.Combine(dirUltra, "options.txt"));
-        string ultraShaderTxt = File.ReadAllText(Path.Combine(dirUltra, "shaderpacks", "ComplementaryUnbound_r5.9.3.zip.txt"));
         Assert.Contains("renderDistance:32", ultraOptions);
         Assert.Contains("simulationDistance:12", ultraOptions);
-        Assert.Contains("profile=ULTRA", ultraShaderTxt);
+        // Distant Horizons enabled on Ultra
+        Assert.True(File.Exists(Path.Combine(dirUltra, "mods", "DistantHorizons-2.2.1-a-1.20.1.jar")));
+        Assert.False(File.Exists(Path.Combine(dirUltra, "mods", "DistantHorizons-2.2.1-a-1.20.1.jar.disabled")));
     }
 
     [Fact]

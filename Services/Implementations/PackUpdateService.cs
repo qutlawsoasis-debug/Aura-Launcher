@@ -316,17 +316,33 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 var localPath = fullPathByEntry[file];
                 if (!File.Exists(localPath))
                 {
-                    needsFullCheck = true;
-                    break;
+                    if (localPath.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) && File.Exists(localPath[..^".disabled".Length]))
+                    {
+                        // Включенная версия мода существует
+                    }
+                    else
+                    {
+                        needsFullCheck = true;
+                        break;
+                    }
                 }
 
                 if (file.Mode == "sync")
                 {
-                    var fi = new FileInfo(localPath);
-                    if (fi.Length != file.Size)
+                    var checkPath = localPath;
+                    if (!File.Exists(checkPath) && localPath.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) && File.Exists(localPath[..^".disabled".Length]))
                     {
-                        needsFullCheck = true;
-                        break;
+                        checkPath = localPath[..^".disabled".Length];
+                    }
+
+                    if (File.Exists(checkPath))
+                    {
+                        var fi = new FileInfo(checkPath);
+                        if (fi.Length != file.Size)
+                        {
+                            needsFullCheck = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -349,6 +365,11 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 var fileName = Path.GetFileName(jar);
                 if (!manifestModsJars.Contains(fileName))
                 {
+                    // Если в манифесте этот мод присутствует как .disabled, не удаляем его
+                    if (manifest.Files.Any(f => string.Equals(Path.GetFileName(f.Path), fileName + ".disabled", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
                     jarsToDelete.Add(jar);
                 }
             }
@@ -360,22 +381,28 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             foreach (var file in manifest.Files)
             {
                 var localPath = fullPathByEntry[file];
+                var checkPath = localPath;
+                if (!File.Exists(checkPath) && localPath.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) && File.Exists(localPath[..^".disabled".Length]))
+                {
+                    checkPath = localPath[..^".disabled".Length];
+                }
+
                 if (file.Mode == "sync" || forceFullCheck)
                 {
-                    if (!File.Exists(localPath))
+                    if (!File.Exists(checkPath))
                     {
                         toDownload.Add(file);
                     }
                     else
                     {
-                        var fi = new FileInfo(localPath);
+                        var fi = new FileInfo(checkPath);
                         if (fi.Length != file.Size)
                         {
                             toDownload.Add(file);
                         }
-                        else
+                        else if (forceFullCheck)
                         {
-                            var hash = ComputeFileSha256(localPath);
+                            var hash = ComputeFileSha256(checkPath);
                             if (!string.Equals(hash, file.Sha256, StringComparison.OrdinalIgnoreCase))
                             {
                                 toDownload.Add(file);
@@ -385,7 +412,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 }
                 else // default
                 {
-                    if (!File.Exists(localPath))
+                    if (!File.Exists(checkPath))
                     {
                         toDownload.Add(file);
                     }
@@ -460,7 +487,9 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             {
                 ct.ThrowIfCancellationRequested();
                 var targetFile = fullPathByEntry[file];
-                var repoPrefix = GameVersionProfiles.GetRepoPrefix(targetVersion);
+                var repoPrefix = file.Path.StartsWith("shaderpacks_pool/", StringComparison.OrdinalIgnoreCase)
+                    ? ""
+                    : GameVersionProfiles.GetRepoPrefix(targetVersion);
                 await DownloadSingleFileWithRetryAsync(repo, file, targetFile, bytesRead =>
                 {
                     lock (progressLock)

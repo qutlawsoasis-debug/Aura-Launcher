@@ -147,6 +147,12 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:G1HeapRegionSize=16M"
             },
             ShaderPack = "Sildurs-Enhanced-Default-Fancy.zip",
+            ShaderPacks = new List<string>
+            {
+                "Sildurs-Enhanced-Default-Fancy.zip",
+                "Builders-QOL.zip"
+            },
+            DistantHorizons = false,
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
@@ -156,7 +162,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "unobtrusive-grass-1.0.1.zip",
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
-                "FreshAnimations_v1.10.4.zip"
+                "FreshAnimations_v1.10.4.zip",
+                "Universal Bushy Leaves.zip"
             }
         };
 
@@ -183,7 +190,13 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=16M"
             },
-            ShaderPack = "BSL_v10.1.8.zip",
+            ShaderPack = "Derivative.zip",
+            ShaderPacks = new List<string>
+            {
+                "Derivative.zip",
+                "Nostalgia_v5.1.zip"
+            },
+            DistantHorizons = false,
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
@@ -194,7 +207,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
-                "Universal Bushy Leaves.zip"
+                "Universal Bushy Leaves.zip",
+                "SPBR.zip"
             }
         };
 
@@ -221,26 +235,15 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=16M"
             },
-            ShaderPack = "ComplementaryReimagined_r5.9.3.zip",
-            EnableShaders = true,
-            ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            ShaderPack = "ProjectLUMA.zip",
+            ShaderPacks = new List<string>
             {
-                ["profile"] = "ULTRA",
-                ["SHADOW_QUALITY"] = "2",
-                ["shadowDistance"] = "224.0",
-                ["WATER_REFLECT_QUALITY"] = "2",
-                ["BLOCK_REFLECT_QUALITY"] = "3",
-                ["LIGHTSHAFT_QUALI_DEFINE"] = "2",
-                ["SSAO_QUALI_DEFINE"] = "2",
-                ["FXAA_DEFINE"] = "1",
-                ["DETAIL_QUALITY"] = "3",
-                ["CLOUD_QUALITY"] = "3",
-                ["ANISOTROPIC_FILTER"] = "8",
-                ["COLORED_LIGHTING"] = "256",
-                ["WORLD_SPACE_REFLECTIONS"] = "1",
-                ["ENTITY_SHADOW"] = "1",
-                ["RAIN_PUDDLES"] = "2"
+                "ProjectLUMA.zip",
+                "Noble_v1.9.9.zip"
             },
+            DistantHorizons = false,
+            EnableShaders = true,
+            ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
             {
                 "Sodium_Russian_Translation.zip",
@@ -249,7 +252,10 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
-                "Universal Bushy Leaves.zip"
+                "Universal Bushy Leaves.zip",
+                "SPBR.zip",
+                "Classic-3D.zip",
+                "Even-Better-Enchants.zip"
             }
         };
 
@@ -276,26 +282,15 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=32M"
             },
-            ShaderPack = "ComplementaryUnbound_r5.9.3.zip",
-            EnableShaders = true,
-            ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            ShaderPack = "Bliss_v2.1.2.zip",
+            ShaderPacks = new List<string>
             {
-                ["profile"] = "ULTRA",
-                ["SHADOW_QUALITY"] = "2",
-                ["shadowDistance"] = "224.0",
-                ["WATER_REFLECT_QUALITY"] = "2",
-                ["BLOCK_REFLECT_QUALITY"] = "3",
-                ["LIGHTSHAFT_QUALI_DEFINE"] = "2",
-                ["SSAO_QUALI_DEFINE"] = "2",
-                ["FXAA_DEFINE"] = "1",
-                ["DETAIL_QUALITY"] = "3",
-                ["CLOUD_QUALITY"] = "3",
-                ["ANISOTROPIC_FILTER"] = "8",
-                ["COLORED_LIGHTING"] = "256",
-                ["WORLD_SPACE_REFLECTIONS"] = "1",
-                ["ENTITY_SHADOW"] = "1",
-                ["RAIN_PUDDLES"] = "2"
+                "Bliss_v2.1.2.zip",
+                "Sildurs-Vibrant-Shaders-Extreme-VL.zip"
             },
+            DistantHorizons = true,
+            EnableShaders = true,
+            ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
             {
                 "Sodium_Russian_Translation.zip",
@@ -304,7 +299,10 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
-                "Universal Bushy Leaves.zip"
+                "Universal Bushy Leaves.zip",
+                "SPBR.zip",
+                "Mels-3D-Items.zip",
+                "Even-Better-Enchants.zip"
             }
         };
     }
@@ -511,7 +509,10 @@ public class GraphicsPresetService : IGraphicsPresetService
             result.FinalRamMb = finalRam;
             result.JvmArgs = new List<string>(preset.JvmArgs);
 
-            // 2. Определение и проверка шейдерпака
+            // 2. Синхронизация шейдеров пресета и переключение Distant Horizons
+            SynchronizePresetShaders(gameDir, preset);
+            SynchronizeDistantHorizons(gameDir, preset.DistantHorizons);
+
             string chosenShader = "OFF";
             if (preset.EnableShaders)
             {
@@ -522,10 +523,18 @@ public class GraphicsPresetService : IGraphicsPresetService
                 }
                 else
                 {
-                    result.Warning = $"Шейдерпак '{preset.ShaderPack}' не найден на диске. Откат на Sildurs-Enhanced-Default-Fancy.zip";
-                    FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] {result.Warning}");
-                    string fallbackPath = Path.Combine(gameDir, "shaderpacks", "Sildurs-Enhanced-Default-Fancy.zip");
-                    chosenShader = File.Exists(fallbackPath) ? "Sildurs-Enhanced-Default-Fancy.zip" : "OFF";
+                    var fallback = preset.ShaderPacks?.FirstOrDefault(s => File.Exists(Path.Combine(gameDir, "shaderpacks", s)));
+                    if (fallback != null)
+                    {
+                        chosenShader = fallback;
+                    }
+                    else
+                    {
+                        result.Warning = $"Шейдерпак '{preset.ShaderPack}' не найден на диске. Откат на Sildurs-Enhanced-Default-Fancy.zip";
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] {result.Warning}");
+                        string fallbackPath = Path.Combine(gameDir, "shaderpacks", "Sildurs-Enhanced-Default-Fancy.zip");
+                        chosenShader = File.Exists(fallbackPath) ? "Sildurs-Enhanced-Default-Fancy.zip" : "OFF";
+                    }
                 }
             }
             result.ChosenShader = chosenShader;
@@ -747,5 +756,167 @@ public class GraphicsPresetService : IGraphicsPresetService
         }
 
         return result;
+    }
+
+    private void SynchronizePresetShaders(string gameDir, GraphicsPresetModel preset)
+    {
+        try
+        {
+            var shaderpacksDir = Path.Combine(gameDir, "shaderpacks");
+            Directory.CreateDirectory(shaderpacksDir);
+
+            var allowedShaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (preset.ShaderPacks != null && preset.ShaderPacks.Count > 0)
+            {
+                foreach (var s in preset.ShaderPacks) allowedShaders.Add(s);
+            }
+            if (!string.IsNullOrWhiteSpace(preset.ShaderPack) && !preset.ShaderPack.Equals("OFF", StringComparison.OrdinalIgnoreCase))
+            {
+                allowedShaders.Add(preset.ShaderPack);
+            }
+
+            // 1. Удаление всех лишних шейдеров (.zip и .zip.txt)
+            if (Directory.Exists(shaderpacksDir))
+            {
+                var existingZips = Directory.GetFiles(shaderpacksDir, "*.zip", SearchOption.TopDirectoryOnly);
+                foreach (var zipPath in existingZips)
+                {
+                    var fileName = Path.GetFileName(zipPath);
+                    if (!allowedShaders.Contains(fileName))
+                    {
+                        try
+                        {
+                            File.Delete(zipPath);
+                            var txtPath = zipPath + ".txt";
+                            if (File.Exists(txtPath)) File.Delete(txtPath);
+                            FabricGameLaunchService.LogLauncherEvent($"[PRESET] Удален шейдер другого пресета: {fileName}");
+                        }
+                        catch (Exception ex)
+                        {
+                            FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка удаления шейдера {fileName}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+
+            // 2. Добавление/копирование шейдеров выбранного пресета
+            var centralPoolDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "shaderpacks_pool");
+            Directory.CreateDirectory(centralPoolDir);
+
+            foreach (var shaderName in allowedShaders)
+            {
+                var destPath = Path.Combine(shaderpacksDir, shaderName);
+                if (File.Exists(destPath)) continue;
+
+                // Поиск в локальных пулах
+                var candidatePoolPaths = new[]
+                {
+                    Path.Combine(gameDir, "shaderpacks_pool", shaderName),
+                    Path.Combine(centralPoolDir, shaderName),
+                    Path.Combine(gameDir, "..", "shaderpacks_pool", shaderName),
+                    Path.Combine(gameDir, "..", "..", "shaderpacks_pool", shaderName),
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "shaderpacks_pool", shaderName)
+                };
+
+                string? poolSource = candidatePoolPaths.FirstOrDefault(File.Exists);
+                if (poolSource != null)
+                {
+                    try
+                    {
+                        File.Copy(poolSource, destPath, overwrite: true);
+                        if (!File.Exists(Path.Combine(centralPoolDir, shaderName)))
+                        {
+                            try { File.Copy(poolSource, Path.Combine(centralPoolDir, shaderName), overwrite: true); } catch { }
+                        }
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET] Шейдер {shaderName} скопирован в shaderpacks");
+                    }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка копирования {shaderName}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    // Скачивание из репозитория GitHub
+                    try
+                    {
+                        var repo = string.IsNullOrWhiteSpace(_configService.CurrentConfig.PackRepo)
+                            ? PackUpdateService.DefaultPackRepo
+                            : _configService.CurrentConfig.PackRepo.Trim();
+                        var branch = PackUpdateService.DefaultBranch;
+                        var url = $"https://raw.githubusercontent.com/{repo}/{branch}/shaderpacks_pool/{Uri.EscapeDataString(shaderName)}";
+
+                        using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                        http.DefaultRequestHeaders.UserAgent.ParseAdd("AuraLauncher/1.0");
+                        var bytes = http.GetByteArrayAsync(url).GetAwaiter().GetResult();
+                        if (bytes != null && bytes.Length > 0)
+                        {
+                            File.WriteAllBytes(destPath, bytes);
+                            try { File.WriteAllBytes(Path.Combine(centralPoolDir, shaderName), bytes); } catch { }
+                            FabricGameLaunchService.LogLauncherEvent($"[PRESET] Шейдер {shaderName} успешно загружен с GitHub");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Не удалось скачать шейдер {shaderName}: {ex.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка синхронизации шейдеров: {ex.Message}");
+        }
+    }
+
+    private void SynchronizeDistantHorizons(string gameDir, bool enable)
+    {
+        try
+        {
+            var modsDir = Path.Combine(gameDir, "mods");
+            if (!Directory.Exists(modsDir)) return;
+
+            if (enable)
+            {
+                var disabledFiles = Directory.GetFiles(modsDir, "DistantHorizons*.jar.disabled", SearchOption.TopDirectoryOnly);
+                foreach (var disabledPath in disabledFiles)
+                {
+                    var targetPath = disabledPath[..^".disabled".Length];
+                    try
+                    {
+                        if (File.Exists(targetPath)) File.Delete(targetPath);
+                        File.Move(disabledPath, targetPath);
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET] Distant Horizons включен для пресета Ultra: {Path.GetFileName(targetPath)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка включения Distant Horizons: {ex.Message}");
+                    }
+                }
+            }
+            else
+            {
+                var jarFiles = Directory.GetFiles(modsDir, "DistantHorizons*.jar", SearchOption.TopDirectoryOnly);
+                foreach (var jarPath in jarFiles)
+                {
+                    if (jarPath.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase)) continue;
+                    var targetDisabledPath = jarPath + ".disabled";
+                    try
+                    {
+                        if (File.Exists(targetDisabledPath)) File.Delete(targetDisabledPath);
+                        File.Move(jarPath, targetDisabledPath);
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET] Distant Horizons отключен: {Path.GetFileName(targetDisabledPath)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка отключения Distant Horizons: {ex.Message}");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка переключения Distant Horizons: {ex.Message}");
+        }
     }
 }

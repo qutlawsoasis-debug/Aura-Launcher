@@ -343,10 +343,10 @@ public class SettingsViewModel : ObservableObject
 
     public string GraphicsPresetDescription => GraphicsPreset.ToLowerInvariant() switch
     {
-        "low" => "Прорисовка 12 чанков, быстрая графика, легкие шейдеры",
-        "medium" => "Прорисовка 16 чанков, оптимальный баланс FPS и качества",
-        "high" => "Прорисовка 24 чанка, высокая детализация и шейдеры Complementary Reimagined",
-        "ultra" => "Прорисовка 32 чанка, ультра-графика: 3D PBR-текстуры Patrix 32x + шейдер Complementary Unbound (ULTRA)",
+        "low" => "Прорисовка 12 чанков, шейдеры Sildur's Enhanced Default / Builder's QOL",
+        "medium" => "Прорисовка 16 чанков, шейдеры Derivative / Nostalgia + SPBR 16x",
+        "high" => "Прорисовка 24 чанка, шейдеры ProjectLUMA / Noble + Classic 3D + SPBR",
+        "ultra" => "Прорисовка 32 чанка, шейдеры Bliss / Sildur's Vibrant + Distant Horizons + Mels 3D",
         _ => "Пользовательский профиль настроек"
     };
 

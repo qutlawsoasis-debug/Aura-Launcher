@@ -22,6 +22,11 @@
         "-XX:G1HeapRegionSize=16M"
       ],
       "shaderPack": "Sildurs-Enhanced-Default-Fancy.zip",
+      "shaderPacks": [
+        "Sildurs-Enhanced-Default-Fancy.zip",
+        "Builders-QOL.zip"
+      ],
+      "distantHorizons": false,
       "enableShaders": true,
       "shaderOptions": {},
       "resourcePacks": [
@@ -30,7 +35,8 @@
         "unobtrusive-grass-1.0.1.zip",
         "Drigo-3D-Lanterns-x-Punchy.zip",
         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
-        "FreshAnimations_v1.10.4.zip"
+        "FreshAnimations_v1.10.4.zip",
+        "Universal Bushy Leaves.zip"
       ]
     },
     "Medium": {
@@ -54,7 +60,12 @@
         "-XX:MaxGCPauseMillis=50",
         "-XX:G1HeapRegionSize=16M"
       ],
-      "shaderPack": "BSL_v10.1.8.zip",
+      "shaderPack": "Derivative.zip",
+      "shaderPacks": [
+        "Derivative.zip",
+        "Nostalgia_v5.1.zip"
+      ],
+      "distantHorizons": false,
       "enableShaders": true,
       "shaderOptions": {},
       "resourcePacks": [
@@ -64,7 +75,8 @@
         "Drigo-3D-Lanterns-x-Punchy.zip",
         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
         "FreshAnimations_v1.10.4.zip",
-        "Universal Bushy Leaves.zip"
+        "Universal Bushy Leaves.zip",
+        "SPBR.zip"
       ]
     },
     "High": {
@@ -88,25 +100,14 @@
         "-XX:MaxGCPauseMillis=50",
         "-XX:G1HeapRegionSize=16M"
       ],
-      "shaderPack": "ComplementaryReimagined_r5.9.3.zip",
+      "shaderPack": "ProjectLUMA.zip",
+      "shaderPacks": [
+        "ProjectLUMA.zip",
+        "Noble_v1.9.9.zip"
+      ],
+      "distantHorizons": false,
       "enableShaders": true,
-      "shaderOptions": {
-        "profile": "ULTRA",
-        "SHADOW_QUALITY": "2",
-        "shadowDistance": "224.0",
-        "WATER_REFLECT_QUALITY": "2",
-        "BLOCK_REFLECT_QUALITY": "3",
-        "LIGHTSHAFT_QUALI_DEFINE": "2",
-        "SSAO_QUALI_DEFINE": "2",
-        "FXAA_DEFINE": "1",
-        "DETAIL_QUALITY": "3",
-        "CLOUD_QUALITY": "3",
-        "ANISOTROPIC_FILTER": "8",
-        "COLORED_LIGHTING": "256",
-        "WORLD_SPACE_REFLECTIONS": "1",
-        "ENTITY_SHADOW": "1",
-        "RAIN_PUDDLES": "2"
-      },
+      "shaderOptions": {},
       "resourcePacks": [
         "Sodium_Russian_Translation.zip",
         "AnimatedDoors-RP-2.0.0.zip",
@@ -114,7 +115,10 @@
         "Drigo-3D-Lanterns-x-Punchy.zip",
         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
         "FreshAnimations_v1.10.4.zip",
-        "Universal Bushy Leaves.zip"
+        "Universal Bushy Leaves.zip",
+        "SPBR.zip",
+        "Classic-3D.zip",
+        "Even-Better-Enchants.zip"
       ]
     },
     "Ultra": {
@@ -138,25 +142,14 @@
         "-XX:MaxGCPauseMillis=50",
         "-XX:G1HeapRegionSize=32M"
       ],
-      "shaderPack": "ComplementaryUnbound_r5.9.3.zip",
+      "shaderPack": "Bliss_v2.1.2.zip",
+      "shaderPacks": [
+        "Bliss_v2.1.2.zip",
+        "Sildurs-Vibrant-Shaders-Extreme-VL.zip"
+      ],
+      "distantHorizons": true,
       "enableShaders": true,
-      "shaderOptions": {
-        "profile": "ULTRA",
-        "SHADOW_QUALITY": "2",
-        "shadowDistance": "224.0",
-        "WATER_REFLECT_QUALITY": "2",
-        "BLOCK_REFLECT_QUALITY": "3",
-        "LIGHTSHAFT_QUALI_DEFINE": "2",
-        "SSAO_QUALI_DEFINE": "2",
-        "FXAA_DEFINE": "1",
-        "DETAIL_QUALITY": "3",
-        "CLOUD_QUALITY": "3",
-        "ANISOTROPIC_FILTER": "8",
-        "COLORED_LIGHTING": "256",
-        "WORLD_SPACE_REFLECTIONS": "1",
-        "ENTITY_SHADOW": "1",
-        "RAIN_PUDDLES": "2"
-      },
+      "shaderOptions": {},
       "resourcePacks": [
         "Sodium_Russian_Translation.zip",
         "AnimatedDoors-RP-2.0.0.zip",
@@ -164,7 +157,10 @@
         "Drigo-3D-Lanterns-x-Punchy.zip",
         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
         "FreshAnimations_v1.10.4.zip",
-        "Universal Bushy Leaves.zip"
+        "Universal Bushy Leaves.zip",
+        "SPBR.zip",
+        "Mels-3D-Items.zip",
+        "Even-Better-Enchants.zip"
       ]
     }
   }
