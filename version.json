@@ -1,8 +1,8 @@
 {
-    "internalVersion":  "1.2.137",
-    "userFacingVersion":  "beta 1.0.129",
+    "internalVersion":  "1.2.138",
+    "userFacingVersion":  "beta 1.0.130",
     "changelog":  [
-                      "[Нововведение] Поддержка Minecraft 1.21.1 с модом VoxelMind (AI-компаньон)",
-                      "[Архитектура] Полная изоляция папок инстансов (.aura/instances/1.20.1 и 1.21.1) и выбор версии в настройках"
+                      "[Графика] 4 уровня графики: по 2 отобранных шейдера на пресет с автоочисткой лишних",
+                      "[Интерфейс] Стеклянный Transparent GUI (White Border) и плавная анимация Smooth Swapping"
                   ]
 }
