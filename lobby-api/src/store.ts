@@ -189,6 +189,7 @@ export interface UserRecord {
   tokenHash: string; // sha256(userToken)
   friendCode: string; // 8 chars (ABCDEFGHJKLMNPQRSTUVWXYZ23456789)
   createdAt: number;
+  lastSeen?: number;
 }
 
 export interface UserPresence {
@@ -605,8 +606,11 @@ export class InMemoryStore implements LobbyStore {
     this.lastSeens.set(userId, presence.lastSeen || now);
 
     const user = this.users.get(userId);
-    if (user && user.nick !== presence.nick) {
-      user.nick = presence.nick;
+    if (user) {
+      user.lastSeen = presence.lastSeen || now;
+      if (presence.nick && presence.nick !== 'Player' && presence.nick !== 'Unknown') {
+        user.nick = presence.nick;
+      }
     }
 
     // 2. Друзья
@@ -616,7 +620,7 @@ export class InMemoryStore implements LobbyStore {
       const fUser = this.users.get(fId);
       const fPres = this.presences.get(fId);
       const isOnline = Boolean(fPres && now <= fPres.expiresAt && fPres.presence.status !== 'offline');
-      const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.createdAt || 0;
+      const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.lastSeen || fUser?.createdAt || 0;
       const effectiveNick = (fPres?.presence?.nick && fPres.presence.nick !== 'Unknown') ? fPres.presence.nick : (fUser?.nick || 'Unknown');
       friends.push({
         id: fId,
@@ -1112,7 +1116,7 @@ export class UpstashStore implements LobbyStore {
       const u = usersMap.get(fId);
       const pres = presencesMap.get(fId);
       const isOnline = Boolean(pres && pres.status !== 'offline');
-      const recordedLastSeen = lastSeenMap.get(fId) || u?.createdAt || 0;
+      const recordedLastSeen = lastSeenMap.get(fId) || u?.lastSeen || u?.createdAt || 0;
       const effectiveNick = (pres?.nick && pres.nick !== 'Unknown') ? pres.nick : (u?.nick || 'Unknown');
       friends.push({
         id: fId,
@@ -1392,7 +1396,8 @@ export class MongoStore implements LobbyStore {
       nick: doc.nick,
       tokenHash: doc.tokenHash,
       friendCode: doc.friendCode,
-      createdAt: doc.createdAt
+      createdAt: doc.createdAt,
+      lastSeen: doc.lastSeen
     };
   }
 
@@ -1405,7 +1410,8 @@ export class MongoStore implements LobbyStore {
       nick: doc.nick,
       tokenHash: doc.tokenHash,
       friendCode: doc.friendCode,
-      createdAt: doc.createdAt
+      createdAt: doc.createdAt,
+      lastSeen: doc.lastSeen
     };
   }
 
@@ -1431,7 +1437,8 @@ export class MongoStore implements LobbyStore {
       nick: doc.nick,
       tokenHash: doc.tokenHash,
       friendCode: doc.friendCode,
-      createdAt: doc.createdAt
+      createdAt: doc.createdAt,
+      lastSeen: doc.lastSeen
     };
   }
 
@@ -1446,7 +1453,8 @@ export class MongoStore implements LobbyStore {
         nick: doc.nick,
         tokenHash: doc.tokenHash,
         friendCode: doc.friendCode,
-        createdAt: doc.createdAt
+        createdAt: doc.createdAt,
+        lastSeen: doc.lastSeen
       };
       map.set(u.id, u);
     }
@@ -1611,6 +1619,7 @@ export class MongoStore implements LobbyStore {
     const now = Date.now();
 
     // 1. Presences
+    const lastSeenTs = presence.lastSeen || now;
     if (presence.status === 'offline') {
       await this.db.collection('presences').deleteOne({ _id: userId as any });
     } else {
@@ -1621,20 +1630,27 @@ export class MongoStore implements LobbyStore {
           $set: {
             presence,
             expiresAt,
-            lastSeen: presence.lastSeen || now
+            lastSeen: lastSeenTs
           }
         },
         { upsert: true }
       );
     }
 
-    // Update user nick if changed
+    // Always persist lastSeen and updated nick to permanent users collection
+    const userUpdate: any = {
+      $set: {
+        lastSeen: lastSeenTs
+      }
+    };
     if (presence.nick && presence.nick !== 'Player' && presence.nick !== 'Unknown') {
-      await this.db.collection('users').updateOne(
-        { _id: userId as any, nick: { $ne: presence.nick } },
-        { $set: { nick: presence.nick, nickLower: presence.nick.toLowerCase() } }
-      ).catch(() => {});
+      userUpdate.$set.nick = presence.nick;
+      userUpdate.$set.nickLower = presence.nick.toLowerCase();
     }
+    await this.db.collection('users').updateOne(
+      { _id: userId as any },
+      userUpdate
+    ).catch(() => {});
 
     // 2. Friends
     const friendDocs = await this.db.collection('friends').find({ userId }).toArray();
@@ -1654,7 +1670,7 @@ export class MongoStore implements LobbyStore {
         const u = userMap.get(fId);
         const p = presMap.get(fId);
         const isOnline = Boolean(p && now <= new Date(p.expiresAt).getTime() && p.presence?.status !== 'offline');
-        const recordedLastSeen = p?.lastSeen || p?.presence?.lastSeen || u?.createdAt || 0;
+        const recordedLastSeen = p?.lastSeen || p?.presence?.lastSeen || u?.lastSeen || u?.createdAt || 0;
         const effectiveNick = (p?.presence?.nick && p.presence.nick !== 'Unknown')
           ? p.presence.nick
           : (u?.nick || 'Unknown');
@@ -1667,7 +1683,7 @@ export class MongoStore implements LobbyStore {
           lobbyCode: isOnline && (p!.presence.status === 'lobby' || p!.presence.status === 'playing') && p!.presence.lobbyCode
             ? p!.presence.lobbyCode
             : undefined,
-          lastSeen: isOnline ? p!.presence.lastSeen : recordedLastSeen
+          lastSeen: isOnline ? (p!.presence?.lastSeen || now) : recordedLastSeen
         });
       }
     }

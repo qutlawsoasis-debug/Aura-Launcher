@@ -369,8 +369,11 @@ export class InMemoryStore {
         }
         this.lastSeens.set(userId, presence.lastSeen || now);
         const user = this.users.get(userId);
-        if (user && user.nick !== presence.nick) {
-            user.nick = presence.nick;
+        if (user) {
+            user.lastSeen = presence.lastSeen || now;
+            if (presence.nick && presence.nick !== 'Player' && presence.nick !== 'Unknown') {
+                user.nick = presence.nick;
+            }
         }
         // 2. Друзья
         const friendIds = Array.from(this.friends.get(userId) || []);
@@ -379,7 +382,7 @@ export class InMemoryStore {
             const fUser = this.users.get(fId);
             const fPres = this.presences.get(fId);
             const isOnline = Boolean(fPres && now <= fPres.expiresAt && fPres.presence.status !== 'offline');
-            const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.createdAt || 0;
+            const recordedLastSeen = this.lastSeens.get(fId) || fPres?.presence?.lastSeen || fUser?.lastSeen || fUser?.createdAt || 0;
             const effectiveNick = (fPres?.presence?.nick && fPres.presence.nick !== 'Unknown') ? fPres.presence.nick : (fUser?.nick || 'Unknown');
             friends.push({
                 id: fId,
@@ -846,7 +849,7 @@ export class UpstashStore {
             const u = usersMap.get(fId);
             const pres = presencesMap.get(fId);
             const isOnline = Boolean(pres && pres.status !== 'offline');
-            const recordedLastSeen = lastSeenMap.get(fId) || u?.createdAt || 0;
+            const recordedLastSeen = lastSeenMap.get(fId) || u?.lastSeen || u?.createdAt || 0;
             const effectiveNick = (pres?.nick && pres.nick !== 'Unknown') ? pres.nick : (u?.nick || 'Unknown');
             friends.push({
                 id: fId,
@@ -1098,7 +1101,8 @@ export class MongoStore {
             nick: doc.nick,
             tokenHash: doc.tokenHash,
             friendCode: doc.friendCode,
-            createdAt: doc.createdAt
+            createdAt: doc.createdAt,
+            lastSeen: doc.lastSeen
         };
     }
     async getUserByNick(nick) {
@@ -1111,7 +1115,8 @@ export class MongoStore {
             nick: doc.nick,
             tokenHash: doc.tokenHash,
             friendCode: doc.friendCode,
-            createdAt: doc.createdAt
+            createdAt: doc.createdAt,
+            lastSeen: doc.lastSeen
         };
     }
     async updateUserNick(userId, newNick) {
@@ -1133,7 +1138,8 @@ export class MongoStore {
             nick: doc.nick,
             tokenHash: doc.tokenHash,
             friendCode: doc.friendCode,
-            createdAt: doc.createdAt
+            createdAt: doc.createdAt,
+            lastSeen: doc.lastSeen
         };
     }
     async getUsers(userIds) {
@@ -1148,7 +1154,8 @@ export class MongoStore {
                 nick: doc.nick,
                 tokenHash: doc.tokenHash,
                 friendCode: doc.friendCode,
-                createdAt: doc.createdAt
+                createdAt: doc.createdAt,
+                lastSeen: doc.lastSeen
             };
             map.set(u.id, u);
         }
@@ -1269,6 +1276,7 @@ export class MongoStore {
         await this.ensureInit();
         const now = Date.now();
         // 1. Presences
+        const lastSeenTs = presence.lastSeen || now;
         if (presence.status === 'offline') {
             await this.db.collection('presences').deleteOne({ _id: userId });
         }
@@ -1278,14 +1286,21 @@ export class MongoStore {
                 $set: {
                     presence,
                     expiresAt,
-                    lastSeen: presence.lastSeen || now
+                    lastSeen: lastSeenTs
                 }
             }, { upsert: true });
         }
-        // Update user nick if changed
+        // Always persist lastSeen and updated nick to permanent users collection
+        const userUpdate = {
+            $set: {
+                lastSeen: lastSeenTs
+            }
+        };
         if (presence.nick && presence.nick !== 'Player' && presence.nick !== 'Unknown') {
-            await this.db.collection('users').updateOne({ _id: userId, nick: { $ne: presence.nick } }, { $set: { nick: presence.nick, nickLower: presence.nick.toLowerCase() } }).catch(() => { });
+            userUpdate.$set.nick = presence.nick;
+            userUpdate.$set.nickLower = presence.nick.toLowerCase();
         }
+        await this.db.collection('users').updateOne({ _id: userId }, userUpdate).catch(() => { });
         // 2. Friends
         const friendDocs = await this.db.collection('friends').find({ userId }).toArray();
         const friendIds = friendDocs.map(d => d.friendId);
@@ -1301,7 +1316,7 @@ export class MongoStore {
                 const u = userMap.get(fId);
                 const p = presMap.get(fId);
                 const isOnline = Boolean(p && now <= new Date(p.expiresAt).getTime() && p.presence?.status !== 'offline');
-                const recordedLastSeen = p?.lastSeen || p?.presence?.lastSeen || u?.createdAt || 0;
+                const recordedLastSeen = p?.lastSeen || p?.presence?.lastSeen || u?.lastSeen || u?.createdAt || 0;
                 const effectiveNick = (p?.presence?.nick && p.presence.nick !== 'Unknown')
                     ? p.presence.nick
                     : (u?.nick || 'Unknown');
@@ -1313,7 +1328,7 @@ export class MongoStore {
                     lobbyCode: isOnline && (p.presence.status === 'lobby' || p.presence.status === 'playing') && p.presence.lobbyCode
                         ? p.presence.lobbyCode
                         : undefined,
-                    lastSeen: isOnline ? p.presence.lastSeen : recordedLastSeen
+                    lastSeen: isOnline ? (p.presence?.lastSeen || now) : recordedLastSeen
                 });
             }
         }
