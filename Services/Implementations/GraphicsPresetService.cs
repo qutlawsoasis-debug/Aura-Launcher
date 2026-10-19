@@ -148,7 +148,15 @@ public class GraphicsPresetService : IGraphicsPresetService
             },
             ShaderPack = "MakeUp-UltraFast-9.5f.zip",
             EnableShaders = true,
-            ShaderOptions = new Dictionary<string, string>()
+            ShaderOptions = new Dictionary<string, string>(),
+            ResourcePacks = new List<string>
+            {
+                "Sodium_Russian_Translation.zip",
+                "AnimatedDoors-RP-2.0.0.zip",
+                "unobtrusive-grass-1.0.1.zip",
+                "Drigo-3D-Lanterns-x-Punchy.zip",
+                "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip"
+            }
         };
 
         _presets["Medium"] = new GraphicsPresetModel
@@ -176,7 +184,17 @@ public class GraphicsPresetService : IGraphicsPresetService
             },
             ShaderPack = "BSL_v10.1.8.zip",
             EnableShaders = true,
-            ShaderOptions = new Dictionary<string, string>()
+            ShaderOptions = new Dictionary<string, string>(),
+            ResourcePacks = new List<string>
+            {
+                "Sodium_Russian_Translation.zip",
+                "AnimatedDoors-RP-2.0.0.zip",
+                "unobtrusive-grass-1.0.1.zip",
+                "Drigo-3D-Lanterns-x-Punchy.zip",
+                "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+                "FreshAnimations_v1.10.4.zip",
+                "Better-Leaves-9.6.zip"
+            }
         };
 
         _presets["High"] = new GraphicsPresetModel
@@ -221,6 +239,16 @@ public class GraphicsPresetService : IGraphicsPresetService
                 ["WORLD_SPACE_REFLECTIONS"] = "1",
                 ["ENTITY_SHADOW"] = "1",
                 ["RAIN_PUDDLES"] = "2"
+            },
+            ResourcePacks = new List<string>
+            {
+                "Sodium_Russian_Translation.zip",
+                "AnimatedDoors-RP-2.0.0.zip",
+                "unobtrusive-grass-1.0.1.zip",
+                "Drigo-3D-Lanterns-x-Punchy.zip",
+                "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+                "FreshAnimations_v1.10.4.zip",
+                "Better-Leaves-9.6.zip"
             }
         };
 
@@ -266,6 +294,20 @@ public class GraphicsPresetService : IGraphicsPresetService
                 ["WORLD_SPACE_REFLECTIONS"] = "1",
                 ["ENTITY_SHADOW"] = "1",
                 ["RAIN_PUDDLES"] = "2"
+            },
+            ResourcePacks = new List<string>
+            {
+                "Sodium_Russian_Translation.zip",
+                "AnimatedDoors-RP-2.0.0.zip",
+                "unobtrusive-grass-1.0.1.zip",
+                "Drigo-3D-Lanterns-x-Punchy.zip",
+                "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+                "FreshAnimations_v1.10.4.zip",
+                "Better-Leaves-9.6.zip",
+                "Patrix_1.20_models.zip",
+                "Patrix_1.20_32x_bonus.zip",
+                "Patrix_1.20_32x_basic.zip",
+                "Patrix_1.20_32x_addon.zip"
             }
         };
     }
@@ -564,21 +606,50 @@ public class GraphicsPresetService : IGraphicsPresetService
             string graphicsVal = preset.Graphics.Equals("fast", StringComparison.OrdinalIgnoreCase) ? "0" : "1";
 
             var rpDir = Path.Combine(gameDir, "resourcepacks");
-            var activePacks = new List<string> { "\"fabric\"" };
-            string[] candidatePacks = presetKey.Equals("Ultra", StringComparison.OrdinalIgnoreCase)
-                ? new[]
+            var activePacks = new List<string> { "\"vanilla\"", "\"fabric\"" };
+
+            // Сохраняем встроенные модовые паки (например, moonlight:merged_pack, punchy:punchy, serilum_mod_translations)
+            int existingRpIdx = lines.FindIndex(l => l.StartsWith("resourcePacks:", StringComparison.Ordinal));
+            if (existingRpIdx >= 0)
+            {
+                var existingList = FabricGameLaunchService.ParseOptionsList(lines[existingRpIdx]);
+                foreach (var p in existingList)
                 {
-                    "Sodium_Russian_Translation.zip",
-                    "Patrix_1.20_models.zip",
-                    "Patrix_1.20_32x_basic.zip",
-                    "Patrix_1.20_32x_addon.zip",
-                    "Patrix_1.20_32x_bonus.zip",
-                    "Better-Leaves-9.6.zip",
-                    "FreshAnimations_v1.10.4.zip"
+                    if (!p.StartsWith("file/", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(p, "vanilla", StringComparison.OrdinalIgnoreCase) &&
+                        !string.Equals(p, "fabric", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var esc = p.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                        activePacks.Add($"\"{esc}\"");
+                    }
                 }
-                : presetKey.Equals("Low", StringComparison.OrdinalIgnoreCase)
-                    ? new[] { "Sodium_Russian_Translation.zip" }
-                    : new[] { "Sodium_Russian_Translation.zip", "FreshAnimations_v1.10.4.zip" };
+            }
+
+            IEnumerable<string> candidatePacks = (preset.ResourcePacks != null && preset.ResourcePacks.Count > 0)
+                ? preset.ResourcePacks
+                : (presetKey.Equals("Ultra", StringComparison.OrdinalIgnoreCase)
+                    ? new[]
+                    {
+                        "Sodium_Russian_Translation.zip",
+                        "AnimatedDoors-RP-2.0.0.zip",
+                        "unobtrusive-grass-1.0.1.zip",
+                        "Drigo-3D-Lanterns-x-Punchy.zip",
+                        "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+                        "FreshAnimations_v1.10.4.zip",
+                        "Better-Leaves-9.6.zip",
+                        "Patrix_1.20_models.zip",
+                        "Patrix_1.20_32x_bonus.zip",
+                        "Patrix_1.20_32x_basic.zip",
+                        "Patrix_1.20_32x_addon.zip"
+                    }
+                    : new[]
+                    {
+                        "Sodium_Russian_Translation.zip",
+                        "AnimatedDoors-RP-2.0.0.zip",
+                        "unobtrusive-grass-1.0.1.zip",
+                        "Drigo-3D-Lanterns-x-Punchy.zip",
+                        "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip"
+                    });
 
             foreach (var cp in candidatePacks)
             {

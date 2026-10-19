@@ -349,6 +349,14 @@ public class FabricGameLaunchService : IGameLaunchService
                 LogLauncherEvent($"[OPTIONS] Создан файл настроек по умолчанию (options.txt): {optionsPath}");
                 ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Medium");
             }
+            else if (!string.IsNullOrWhiteSpace(graphicsPreset) && !string.Equals(graphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                var optionsShaders = Path.Combine(gameDir, "optionsshaders.txt");
+                if (!File.Exists(optionsShaders))
+                {
+                    ApplyGraphicsPreset(gameDir, graphicsPreset);
+                }
+            }
             EnsureDefaultResourcePacksEnabled(gameDir);
         }
         catch (Exception ex)
@@ -1493,8 +1501,15 @@ public class FabricGameLaunchService : IGameLaunchService
             }
         };
 
-        // Гарантированное включение ресурспаков в options.txt перед самым стартом клиента
-        EnsureDefaultResourcePacksEnabled(targetInstanceDir);
+        // Гарантированное применение настроек пресета графики перед стартом клиента
+        if (!string.IsNullOrWhiteSpace(config.GraphicsPreset) && !string.Equals(config.GraphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            ApplyGraphicsPreset(targetInstanceDir, config.GraphicsPreset);
+        }
+        else
+        {
+            EnsureDefaultResourcePacksEnabled(targetInstanceDir);
+        }
 
         process.Start();
         process.BeginOutputReadLine();

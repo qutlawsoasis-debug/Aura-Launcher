@@ -23,7 +23,14 @@
       ],
       "shaderPack": "MakeUp-UltraFast-9.5f.zip",
       "enableShaders": true,
-      "shaderOptions": {}
+      "shaderOptions": {},
+      "resourcePacks": [
+        "Sodium_Russian_Translation.zip",
+        "AnimatedDoors-RP-2.0.0.zip",
+        "unobtrusive-grass-1.0.1.zip",
+        "Drigo-3D-Lanterns-x-Punchy.zip",
+        "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip"
+      ]
     },
     "Medium": {
       "name": "Средний",
@@ -48,7 +55,16 @@
       ],
       "shaderPack": "BSL_v10.1.8.zip",
       "enableShaders": true,
-      "shaderOptions": {}
+      "shaderOptions": {},
+      "resourcePacks": [
+        "Sodium_Russian_Translation.zip",
+        "AnimatedDoors-RP-2.0.0.zip",
+        "unobtrusive-grass-1.0.1.zip",
+        "Drigo-3D-Lanterns-x-Punchy.zip",
+        "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+        "FreshAnimations_v1.10.4.zip",
+        "Better-Leaves-9.6.zip"
+      ]
     },
     "High": {
       "name": "Высокий",
@@ -89,7 +105,16 @@
         "WORLD_SPACE_REFLECTIONS": "1",
         "ENTITY_SHADOW": "1",
         "RAIN_PUDDLES": "2"
-      }
+      },
+      "resourcePacks": [
+        "Sodium_Russian_Translation.zip",
+        "AnimatedDoors-RP-2.0.0.zip",
+        "unobtrusive-grass-1.0.1.zip",
+        "Drigo-3D-Lanterns-x-Punchy.zip",
+        "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+        "FreshAnimations_v1.10.4.zip",
+        "Better-Leaves-9.6.zip"
+      ]
     },
     "Ultra": {
       "name": "Ультра",
@@ -130,7 +155,20 @@
         "WORLD_SPACE_REFLECTIONS": "1",
         "ENTITY_SHADOW": "1",
         "RAIN_PUDDLES": "2"
-      }
+      },
+      "resourcePacks": [
+        "Sodium_Russian_Translation.zip",
+        "AnimatedDoors-RP-2.0.0.zip",
+        "unobtrusive-grass-1.0.1.zip",
+        "Drigo-3D-Lanterns-x-Punchy.zip",
+        "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+        "FreshAnimations_v1.10.4.zip",
+        "Better-Leaves-9.6.zip",
+        "Patrix_1.20_models.zip",
+        "Patrix_1.20_32x_bonus.zip",
+        "Patrix_1.20_32x_basic.zip",
+        "Patrix_1.20_32x_addon.zip"
+      ]
     }
   }
 }

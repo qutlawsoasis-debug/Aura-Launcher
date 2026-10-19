@@ -221,6 +221,20 @@ public class SettingsViewModel : ObservableObject
         try
         {
             _graphicsPresetService.ApplyPreset(GameDir, presetKey);
+
+            try
+            {
+                var instancesDir = Path.Combine(GameDir, "instances");
+                if (Directory.Exists(instancesDir))
+                {
+                    foreach (var instDir in Directory.GetDirectories(instancesDir))
+                    {
+                        _graphicsPresetService.ApplyPreset(instDir, presetKey, persistConfig: false);
+                    }
+                }
+            }
+            catch { }
+
             OnPropertyChanged(nameof(GraphicsPreset));
             OnPropertyChanged(nameof(IsPresetLow));
             OnPropertyChanged(nameof(IsPresetMedium));

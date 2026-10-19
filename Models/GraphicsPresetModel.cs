@@ -21,6 +21,7 @@ public class GraphicsPresetModel
     public string ShaderPack { get; set; } = "MakeUp-UltraFast-9.5f.zip";
     public bool EnableShaders { get; set; } = true;
     public Dictionary<string, string> ShaderOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<string> ResourcePacks { get; set; } = new();
 }
 
 public class PresetsContainer
