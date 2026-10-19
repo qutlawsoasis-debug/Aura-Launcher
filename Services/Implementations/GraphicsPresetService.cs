@@ -163,7 +163,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
-                "Universal Bushy Leaves.zip"
+                "Universal Bushy Leaves.zip",
+                "Transparent-GUI-White-Border.zip"
             }
         };
 
@@ -208,7 +209,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
                 "Universal Bushy Leaves.zip",
-                "SPBR.zip"
+                "SPBR.zip",
+                "Transparent-GUI-White-Border.zip"
             }
         };
 
@@ -255,7 +257,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Universal Bushy Leaves.zip",
                 "SPBR.zip",
                 "Classic-3D.zip",
-                "Even-Better-Enchants.zip"
+                "Even-Better-Enchants.zip",
+                "Transparent-GUI-White-Border.zip"
             }
         };
 
@@ -302,7 +305,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Universal Bushy Leaves.zip",
                 "SPBR.zip",
                 "Mels-3D-Items.zip",
-                "Even-Better-Enchants.zip"
+                "Even-Better-Enchants.zip",
+                "Transparent-GUI-White-Border.zip"
             }
         };
     }
