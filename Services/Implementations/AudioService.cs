@@ -88,6 +88,7 @@ public sealed class AudioService : IAudioService
         _isMuted = _configService.CurrentConfig.AnthemMuted;
 
         _player = new MediaPlayer();
+        _player.Volume = 0.0;
         _player.MediaOpened += OnPlayerMediaOpened;
         _player.MediaEnded += OnPlayerMediaEnded;
         _player.MediaFailed += OnPlayerMediaFailed;
@@ -123,15 +124,21 @@ public sealed class AudioService : IAudioService
                 if (idx >= 0) _currentTrackIndex = idx;
             }
 
-            PrepareTrack(_currentTrackIndex);
-
             bool isTestMode = Program.StartupArgs.Any(a => a.StartsWith("--selftest", StringComparison.OrdinalIgnoreCase)
                                                         || a.StartsWith("--fake-update", StringComparison.OrdinalIgnoreCase));
             bool isUpdateRestart = Program.StartupArgs.Any(a => a.Equals("--update-restart", StringComparison.OrdinalIgnoreCase));
 
-            if (_configService.CurrentConfig.MusicOnStartup && !_isMuted && _volumePercent > 0 && !isTestMode && !isUpdateRestart)
+            bool shouldPlay = _configService.CurrentConfig.MusicOnStartup && !_isMuted && _volumePercent > 0 && !isTestMode && !isUpdateRestart;
+            PrepareTrack(_currentTrackIndex, autoOpen: shouldPlay);
+
+            if (shouldPlay)
             {
                 Play();
+            }
+            else
+            {
+                _player.Volume = 0.0;
+                _player.Stop();
             }
         }
     }
@@ -255,7 +262,7 @@ public sealed class AudioService : IAudioService
         return new AudioTrack(title, artist, filePath, coverPath);
     }
 
-    private void PrepareTrack(int index)
+    private void PrepareTrack(int index, bool autoOpen = true)
     {
         if (index < 0 || index >= _playlist.Count) return;
 
@@ -264,7 +271,12 @@ public sealed class AudioService : IAudioService
 
         try
         {
-            _player.Open(new Uri(track.Path, UriKind.Absolute));
+            if (autoOpen)
+            {
+                _player.Volume = 0.0;
+                _player.Open(new Uri(track.Path, UriKind.Absolute));
+                ApplyVolume();
+            }
             _duration = TimeSpan.Zero;
             PositionChanged?.Invoke(this, TimeSpan.Zero);
             TrackChanged?.Invoke(this, track);
@@ -282,8 +294,16 @@ public sealed class AudioService : IAudioService
 
         try
         {
-            _player.Play();
+            var track = CurrentTrack;
+            if (track != null && (_player.Source == null || !string.Equals(_player.Source.LocalPath, track.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                _player.Volume = 0.0;
+                _player.Open(new Uri(track.Path, UriKind.Absolute));
+            }
+
             _isPlaying = true;
+            ApplyVolume();
+            _player.Play();
             _progressTimer.Start();
             PlayStateChanged?.Invoke(this, true);
         }
@@ -299,8 +319,9 @@ public sealed class AudioService : IAudioService
 
         try
         {
-            _player.Pause();
             _isPlaying = false;
+            ApplyVolume();
+            _player.Pause();
             _progressTimer.Stop();
             PlayStateChanged?.Invoke(this, false);
         }
@@ -354,9 +375,10 @@ public sealed class AudioService : IAudioService
 
         try
         {
+            _isPlaying = false;
+            ApplyVolume();
             _progressTimer.Stop();
             _player.Stop();
-            _isPlaying = false;
             PlayStateChanged?.Invoke(this, false);
         }
         catch { }
@@ -365,7 +387,7 @@ public sealed class AudioService : IAudioService
     private void ApplyVolume()
     {
         if (_disposed) return;
-        _player.Volume = _isMuted ? 0.0 : (_volumePercent / 100.0);
+        _player.Volume = (_isPlaying && !_isMuted) ? (_volumePercent / 100.0) : 0.0;
     }
 
     private void SaveConfig()

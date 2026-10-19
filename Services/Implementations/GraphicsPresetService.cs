@@ -681,7 +681,40 @@ public class GraphicsPresetService : IGraphicsPresetService
             {
                 if (File.Exists(Path.Combine(rpDir, cp)))
                 {
-                    activePacks.Add($"\"file/{cp}\"");
+                    var entry = $"\"file/{cp}\"";
+                    if (!activePacks.Contains(entry, StringComparer.OrdinalIgnoreCase))
+                    {
+                        activePacks.Add(entry);
+                    }
+                }
+            }
+
+            // Синхронизация incompatibleResourcePacks для предотвращения сброса Майнкрафтом
+            int existingIncompIdx = lines.FindIndex(l => l.StartsWith("incompatibleResourcePacks:", StringComparison.Ordinal));
+            var incompPacks = existingIncompIdx >= 0
+                ? FabricGameLaunchService.ParseOptionsList(lines[existingIncompIdx])
+                : new List<string>();
+
+            if (Directory.Exists(rpDir))
+            {
+                foreach (var file in Directory.GetFiles(rpDir, "*.zip"))
+                {
+                    var fn = Path.GetFileName(file);
+                    var entry = $"file/{fn}";
+                    if (!incompPacks.Contains(entry, StringComparer.OrdinalIgnoreCase))
+                    {
+                        incompPacks.Add(entry);
+                    }
+                }
+            }
+
+            foreach (var packEntry in activePacks)
+            {
+                var trimmed = packEntry.Trim('"');
+                if (trimmed.StartsWith("file/", StringComparison.OrdinalIgnoreCase) &&
+                    !incompPacks.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                {
+                    incompPacks.Add(trimmed);
                 }
             }
 
@@ -696,7 +729,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 ["biomeBlendRadius"] = preset.BiomeBlendRadius.ToString(CultureInfo.InvariantCulture),
                 ["mipmapLevels"] = preset.MipmapLevels.ToString(CultureInfo.InvariantCulture),
                 ["ao"] = preset.Ao.ToString(CultureInfo.InvariantCulture),
-                ["resourcePacks"] = $"[{string.Join(",", activePacks)}]"
+                ["resourcePacks"] = $"[{string.Join(",", activePacks)}]",
+                ["incompatibleResourcePacks"] = FabricGameLaunchService.FormatOptionsList(incompPacks)
             };
             result.WrittenOptions = targetValues;
 
