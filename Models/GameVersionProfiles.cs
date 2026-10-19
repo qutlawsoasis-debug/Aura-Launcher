@@ -11,7 +11,7 @@ public static class GameVersionProfiles
     public const string Version121 = "1.21.1";
 
     public const string DefaultFabric120 = "0.19.5";
-    public const string DefaultFabric121 = "0.16.10";
+    public const string DefaultFabric121 = "0.19.5";
 
     public static readonly string[] SupportedVersions = new[] { Version120, Version121 };
 

@@ -45,6 +45,9 @@ public class MainViewModel : ObservableObject
     private Process? _gameProcess;
     private CancellationTokenSource? _launchCts;
     private System.Windows.Threading.DispatcherTimer? _backgroundUpdateTimer;
+    private System.Windows.Threading.DispatcherTimer? _loadingDotsTimer;
+    private int _dotsCount;
+    private string _baseStateTitle = string.Empty;
 
     // Свойства баннера/тоста обновления
     private bool _isUpdateBannerVisible;
@@ -1623,25 +1626,65 @@ public class MainViewModel : ObservableObject
         switch (state)
         {
             case LauncherState.Idle:
+                StopLoadingDotsAnimation();
                 StateTitle = "Готов к игре";
                 StatusText = customMessage ?? "Готов к запуску";
                 break;
             case LauncherState.Checking:
-                StateTitle = "Проверка обновлений...";
+                StartLoadingDotsAnimation("Проверка обновлений");
                 StatusText = customMessage ?? "Проверка обновлений сборки...";
                 break;
             case LauncherState.Downloading:
-                StateTitle = "Загрузка...";
+                StartLoadingDotsAnimation(string.IsNullOrWhiteSpace(customMessage) ? "Загрузка" : customMessage.TrimEnd('.'));
                 StatusText = customMessage ?? $"Загрузка: {ProgressPercentage:F0}% ({SpeedText})";
                 break;
             case LauncherState.Ready:
+                StopLoadingDotsAnimation();
                 StateTitle = "Всё готово";
                 StatusText = customMessage ?? "Клиент готов к запуску";
                 break;
             case LauncherState.Error:
+                StopLoadingDotsAnimation();
                 StateTitle = "Внимание";
                 StatusText = customMessage ?? "Произошла ошибка";
                 break;
+        }
+    }
+
+    private void StartLoadingDotsAnimation(string baseTitle)
+    {
+        _baseStateTitle = baseTitle;
+        if (_loadingDotsTimer == null)
+        {
+            _loadingDotsTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(400)
+            };
+            _loadingDotsTimer.Tick += (s, e) =>
+            {
+                if (!IsBusy || string.IsNullOrEmpty(_baseStateTitle))
+                {
+                    StopLoadingDotsAnimation();
+                    return;
+                }
+                _dotsCount = (_dotsCount % 3) + 1;
+                StateTitle = _baseStateTitle + new string('.', _dotsCount);
+            };
+        }
+        _dotsCount = 1;
+        StateTitle = _baseStateTitle + ".";
+        if (!_loadingDotsTimer.IsEnabled)
+        {
+            _loadingDotsTimer.Start();
+        }
+    }
+
+    private void StopLoadingDotsAnimation()
+    {
+        _baseStateTitle = string.Empty;
+        if (_loadingDotsTimer != null && _loadingDotsTimer.IsEnabled)
+        {
+            _loadingDotsTimer.Stop();
         }
     }
 
@@ -1777,14 +1820,14 @@ public class MainViewModel : ObservableObject
                 IsProgressVisible = true;
                 ProgressPercentage = report.Percentage;
                 SpeedText = report.FormattedSpeed;
-                StateTitle = $"Установка: {report.Stage}";
+                StartLoadingDotsAnimation($"Установка: {report.Stage}");
                 StatusText = string.IsNullOrWhiteSpace(report.FormattedSpeed)
                     ? report.DetailText
                     : $"{report.DetailText} • {report.FormattedSpeed}";
             });
 
             _gameSessionStartTime = DateTime.UtcNow;
-            _discordRpcService?.SetPlayingGame("Aura Pack (1.20.1)", _gameSessionStartTime);
+            _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
 
             var process = await _launchService.LaunchGameAsync(
                 config,
@@ -1908,6 +1951,7 @@ public class MainViewModel : ObservableObject
         }
         finally
         {
+            StopLoadingDotsAnimation();
             _isLaunching = false;
             IsProgressVisible = false;
             if (!IsGameRunning)

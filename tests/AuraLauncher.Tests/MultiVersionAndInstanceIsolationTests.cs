@@ -36,8 +36,8 @@ public class MultiVersionAndInstanceIsolationTests : IDisposable
 
     [Theory]
     [InlineData("1.20.1", "1.20.1", "manifest.json", 17, "java-runtime-gamma", "0.19.5")]
-    [InlineData("1.21.1", "1.21.1", "manifest-1.21.1.json", 21, "java-runtime-delta", "0.16.10")]
-    [InlineData("  1.21.1  ", "1.21.1", "manifest-1.21.1.json", 21, "java-runtime-delta", "0.16.10")]
+    [InlineData("1.21.1", "1.21.1", "manifest-1.21.1.json", 21, "java-runtime-delta", "0.19.5")]
+    [InlineData("  1.21.1  ", "1.21.1", "manifest-1.21.1.json", 21, "java-runtime-delta", "0.19.5")]
     [InlineData("invalid", "1.20.1", "manifest.json", 17, "java-runtime-gamma", "0.19.5")]
     [InlineData(null, "1.20.1", "manifest.json", 17, "java-runtime-gamma", "0.19.5")]
     public void GameVersionProfiles_Metadata_MatchesExpectations(
