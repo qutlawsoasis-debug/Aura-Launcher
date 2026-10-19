@@ -689,30 +689,36 @@ public class GraphicsPresetService : IGraphicsPresetService
                 }
             }
 
-            // Синхронизация incompatibleResourcePacks для предотвращения сброса Майнкрафтом
+            // Синхронизация incompatibleResourcePacks:
+            // Совместимые паки (с подходящим pack_format или supported_formats) НЕЛЬЗЯ держать в incompatibleResourcePacks,
+            // иначе валидатор Minecraft 1.21 удаляет их из списка активных при запуске!
             int existingIncompIdx = lines.FindIndex(l => l.StartsWith("incompatibleResourcePacks:", StringComparison.Ordinal));
             var incompPacks = existingIncompIdx >= 0
                 ? FabricGameLaunchService.ParseOptionsList(lines[existingIncompIdx])
                 : new List<string>();
 
-            if (Directory.Exists(rpDir))
+            // Удаляем активные совместимые паки из списка несовместимых
+            foreach (var packEntry in activePacks)
             {
-                foreach (var file in Directory.GetFiles(rpDir, "*.zip"))
-                {
-                    var fn = Path.GetFileName(file);
-                    var entry = $"file/{fn}";
-                    if (!incompPacks.Contains(entry, StringComparer.OrdinalIgnoreCase))
-                    {
-                        incompPacks.Add(entry);
-                    }
-                }
+                var trimmed = packEntry.Trim('"');
+                incompPacks.RemoveAll(p => string.Equals(p, trimmed, StringComparison.OrdinalIgnoreCase));
             }
+
+            // Добавляем только реально несовместимые с 1.21 паки (без supported_formats 34), если они выбраны
+            var knownIncompatible = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "file/Patrix_1.20_32x_addon.zip",
+                "file/Patrix_1.20_32x_basic.zip",
+                "file/Patrix_1.20_32x_bonus.zip",
+                "file/Patrix_1.20_models.zip",
+                "file/Dungeons Content UI.zip",
+                "file/Ancient City Panorama V2.zip"
+            };
 
             foreach (var packEntry in activePacks)
             {
                 var trimmed = packEntry.Trim('"');
-                if (trimmed.StartsWith("file/", StringComparison.OrdinalIgnoreCase) &&
-                    !incompPacks.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                if (knownIncompatible.Contains(trimmed) && !incompPacks.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
                 {
                     incompPacks.Add(trimmed);
                 }

@@ -1506,7 +1506,10 @@ public class FabricGameLaunchService : IGameLaunchService
         {
             ApplyGraphicsPreset(targetInstanceDir, config.GraphicsPreset);
         }
-        EnsureDefaultResourcePacksEnabled(targetInstanceDir);
+        else
+        {
+            EnsureDefaultResourcePacksEnabled(targetInstanceDir);
+        }
 
         process.Start();
         process.BeginOutputReadLine();
