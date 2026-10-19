@@ -133,26 +133,28 @@ public class OverviewViewModel : ObservableObject
     public void RefreshStats()
     {
         var config = _configService.CurrentConfig;
-        var gameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+        var rootGameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+        var mcVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
+        var instanceDir = _launchService.ResolveInstanceDirectory(rootGameDir, mcVersion);
 
-        // 1. "Minecraft 1.20.1 • Fabric <версия>" из константы и конфига, не сканируя диск
-        var fabricLoader = FabricGameLaunchService.ResolveFabricLoaderVersion(gameDir);
-        VersionInfo = $"Minecraft 1.20.1 • Fabric {fabricLoader}";
+        // 1. "Minecraft <версия> • Fabric <версия>" из константы и конфига инстанса
+        var fabricLoader = FabricGameLaunchService.ResolveFabricLoaderVersion(instanceDir, mcVersion);
+        VersionInfo = $"Minecraft {mcVersion} • Fabric {fabricLoader}";
 
         // 2. Проверка состояния установки окружения
-        bool isInstalled = _launchService.CheckEnvironmentInstalled(gameDir);
+        bool isInstalled = _launchService.CheckEnvironmentInstalled(rootGameDir, mcVersion);
         IsEnvironmentInstalled = isInstalled;
 
         int modCount = 0;
-        // 3. Моды: если папка mods есть, показывать число *.jar; если окружение не установлено, вместо строки писать "Сборка не установлена"
+        // 3. Моды: если папка mods есть в инстансе, показывать число *.jar; если окружение не установлено, вместо строки писать "Сборка не установлена"
         if (!isInstalled)
         {
             ModsCountText = "Сборка не установлена";
-            SpecLine = "Minecraft 1.20.1 • Fabric • Сборка не установлена";
+            SpecLine = $"Minecraft {mcVersion} • Fabric • Сборка не установлена";
         }
         else
         {
-            var modsDir = Path.Combine(gameDir, "mods");
+            var modsDir = Path.Combine(instanceDir, "mods");
             if (Directory.Exists(modsDir))
             {
                 try
@@ -171,8 +173,8 @@ public class OverviewViewModel : ObservableObject
             }
 
             SpecLine = modCount > 0
-                ? $"Minecraft 1.20.1, Fabric {fabricLoader}, модов: {modCount}"
-                : $"Minecraft 1.20.1, Fabric {fabricLoader}, модов: —";
+                ? $"Minecraft {mcVersion}, Fabric {fabricLoader}, модов: {modCount}"
+                : $"Minecraft {mcVersion}, Fabric {fabricLoader}, модов: —";
         }
 
         // 4. "Обновлено:": показывать LastUpdateUtc из конфига (или "—", если пусто)

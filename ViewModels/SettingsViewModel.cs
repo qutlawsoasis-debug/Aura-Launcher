@@ -477,6 +477,47 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
+    public string SelectedVersion
+    {
+        get => GameVersionProfiles.NormalizeVersion(_configService.CurrentConfig.SelectedVersion);
+        set
+        {
+            var normalized = GameVersionProfiles.NormalizeVersion(value);
+            if (_configService.CurrentConfig.SelectedVersion != normalized)
+            {
+                _configService.CurrentConfig.SelectedVersion = normalized;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsVersion120));
+                OnPropertyChanged(nameof(IsVersion121));
+                _ = SaveImmediatelyAsync();
+            }
+        }
+    }
+
+    public bool IsVersion120
+    {
+        get => SelectedVersion == GameVersionProfiles.Version120;
+        set
+        {
+            if (value && SelectedVersion != GameVersionProfiles.Version120)
+            {
+                SelectedVersion = GameVersionProfiles.Version120;
+            }
+        }
+    }
+
+    public bool IsVersion121
+    {
+        get => SelectedVersion == GameVersionProfiles.Version121;
+        set
+        {
+            if (value && SelectedVersion != GameVersionProfiles.Version121)
+            {
+                SelectedVersion = GameVersionProfiles.Version121;
+            }
+        }
+    }
+
     public string CurrentVersion
     {
         get

@@ -17,15 +17,20 @@ public interface IGameLaunchService
     string ResolveMinecraftDirectory(string? customPath = null);
 
     /// <summary>
-    /// Определение пути к исполняемому файлу Java 17+ (javaw.exe).
-    /// Приоритет: &lt;GameDir&gt;\runtime, затем системная Java 17+.
+    /// Определение изолированной папки инстанса для выбранной версии (.aura/instances/1.20.1 или 1.21.1).
     /// </summary>
-    string? ResolveJavaRuntime(string gameDir);
+    string ResolveInstanceDirectory(string? customPath = null, string? version = null);
+
+    /// <summary>
+    /// Определение пути к исполняемому файлу Java (javaw.exe) с проверкой минимальной версии.
+    /// Приоритет: &lt;GameDir&gt;\runtime, затем системная Java.
+    /// </summary>
+    string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17);
 
     /// <summary>
     /// Локальная проверка готовности окружения (Fabric profile, vanilla jar, Java runtime) без сети.
     /// </summary>
-    bool CheckEnvironmentInstalled(string gameDir);
+    bool CheckEnvironmentInstalled(string gameDir, string? version = null);
 
     /// <summary>
     /// Флаг активности запущенного процесса игры.
@@ -53,13 +58,14 @@ public interface IGameLaunchService
     Task<bool> StopGameProcessAsync(int timeoutMs = 6000);
 
     /// <summary>
-    /// Проверка и автоустановка окружения (Vanilla 1.20.1, Java 17, Fabric, библиотеки, ассеты).
+    /// Проверка и автоустановка окружения (Vanilla, Java, Fabric, библиотеки, ассеты).
     /// </summary>
     Task EnsureInstalledAsync(
         string gameDir,
         IProgress<InstallProgressReport>? progress = null,
         Action<string>? onLogReceived = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? version = null);
 
     /// <summary>
     /// Асинхронный запуск процесса игры с потоковым перенаправлением логов в файл и UI.

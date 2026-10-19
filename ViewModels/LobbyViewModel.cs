@@ -1070,7 +1070,7 @@ public class LobbyViewModel : ObservableObject
 
                     try
                     {
-                        var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig?.GameDir);
+                        var gameDir = GetGameDir();
                         var logPath = System.IO.Path.Combine(gameDir, "logs", "latest.log");
                         _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
                         bool isRunning = _launchService.IsGameRunning;
@@ -1190,7 +1190,7 @@ public class LobbyViewModel : ObservableObject
             }
 
             // Реальный режим: создаём быстрый авто-бэкап свежего мира перед хостингом и запускаем watcher на latest.log
-            var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+            var gameDir = GetGameDir();
             if (_workshopService != null && !_launchService.IsGameRunning)
             {
                 HostStatusText = "Резервная копия мира...";
@@ -2591,7 +2591,7 @@ public class LobbyViewModel : ObservableObject
         }
     }
 
-    private string GetGameDir() => _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+    private string GetGameDir() => _launchService.ResolveInstanceDirectory(_configService.CurrentConfig.GameDir, _configService.CurrentConfig.SelectedVersion);
 
     public void ShowSyncNotice(string text)
     {

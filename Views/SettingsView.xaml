@@ -119,6 +119,45 @@
                            Margin="0,0,0,6" />
                 <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,6" />
 
+                <!-- 1.1 "Версия игры" -->
+                <Grid MinHeight="56" Margin="0,6,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,16,0">
+                        <TextBlock Text="Версия игры"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="14"
+                                   FontWeight="Medium"
+                                   Foreground="{StaticResource InkBrush}" />
+                        <TextBlock Text="Выбор версии сборки модов и окружения"
+                                   FontFamily="{StaticResource MainFont}"
+                                   FontSize="12"
+                                   FontWeight="Normal"
+                                   Foreground="{StaticResource MuteBrush}"
+                                   Margin="0,2,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Right">
+                        <RadioButton x:Name="Version120Radio"
+                                     Content="1.20.1 (Стабильная)"
+                                     GroupName="MinecraftVersionTextGroup"
+                                     IsChecked="{Binding IsVersion120, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}"
+                                     Margin="0,0,4,0" />
+                        <RadioButton x:Name="Version121Radio"
+                                     Content="1.21.1 (VoxelMind)"
+                                     GroupName="MinecraftVersionTextGroup"
+                                     IsChecked="{Binding IsVersion121, Mode=TwoWay}"
+                                     Style="{StaticResource SubNavPillRadio}" />
+                    </StackPanel>
+                </Grid>
+                <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,4,0,4" />
 
                 <!-- 1.2 "Память для игры" -->
                 <Grid MinHeight="56" Margin="0,6,0,6">

@@ -21,15 +21,17 @@ public class TestLaunchService : IGameLaunchService
     public Task<bool> StopGameProcessAsync(int timeoutMs = 6000) => Task.FromResult(true);
 
     public string ResolveMinecraftDirectory(string? customPath = null) => customPath ?? "C:\\AuraTest";
-    public string? ResolveJavaRuntime(string gameDir) => null;
-    public bool CheckEnvironmentInstalled(string gameDir) => true;
+    public string ResolveInstanceDirectory(string? customPath = null, string? version = null) => customPath ?? "C:\\AuraTest";
+    public string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17) => null;
+    public bool CheckEnvironmentInstalled(string gameDir, string? version = null) => true;
     public Process? FindRunningGameProcess(string gameDir) => null;
 
     public Task EnsureInstalledAsync(
         string gameDir,
         IProgress<InstallProgressReport>? progress = null,
         Action<string>? onLogReceived = null,
-        CancellationToken cancellationToken = default) => Task.CompletedTask;
+        CancellationToken cancellationToken = default,
+        string? version = null) => Task.CompletedTask;
 
     public Task<Process> LaunchGameAsync(
         LauncherConfig config,

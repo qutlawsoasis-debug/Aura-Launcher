@@ -35,7 +35,14 @@ public class FabricGameLaunchService : IGameLaunchService
     public const string FabricLoaderVersion = "0.19.5";
     public const string MinecraftVersion = "1.20.1";
 
-    public static string ResolveFabricLoaderVersion(string gameDir)
+    private readonly IConfigService? _configService;
+
+    public FabricGameLaunchService(IConfigService? configService = null)
+    {
+        _configService = configService;
+    }
+
+    public static string ResolveFabricLoaderVersion(string gameDir, string? version = null)
     {
         try
         {
@@ -48,7 +55,7 @@ public class FabricGameLaunchService : IGameLaunchService
         catch
         {
         }
-        return FabricLoaderVersion;
+        return GameVersionProfiles.GetDefaultFabricLoader(version);
     }
 
     private Process? _gameProcess;
@@ -74,18 +81,140 @@ public class FabricGameLaunchService : IGameLaunchService
     }
 
     /// <summary>
+    /// Определение изолированной папки инстанса для выбранной версии (.aura/instances/1.20.1 или 1.21.1).
+    /// </summary>
+    public string ResolveInstanceDirectory(string? customPath = null, string? version = null)
+    {
+        var rootDir = ResolveMinecraftDirectory(customPath);
+        var targetVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
+
+        // Если customPath уже является явной папкой инстанса, возвращаем напрямую
+        if (!string.IsNullOrWhiteSpace(customPath) && customPath.Contains(Path.Combine("instances", targetVersion), StringComparison.OrdinalIgnoreCase))
+        {
+            return customPath.Trim();
+        }
+
+        var instancesDir = Path.Combine(rootDir, "instances");
+
+        // Безопасная фоновая миграция legacy 1.20.1 файлов из корня при наличии
+        EnsureInstanceMigrated(rootDir);
+
+        var instancePath = Path.Combine(instancesDir, targetVersion);
+        if (!Directory.Exists(instancePath))
+        {
+            try { Directory.CreateDirectory(instancePath); } catch { }
+        }
+        return instancePath;
+    }
+
+    /// <summary>
+    /// Бесшовная миграция одиночной сборки 1.20.1 из корня .aura в .aura/instances/1.20.1.
+    /// </summary>
+    public static void EnsureInstanceMigrated(string rootGameDir)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(rootGameDir) || !Directory.Exists(rootGameDir))
+                return;
+
+            var instancesDir = Path.Combine(rootGameDir, "instances");
+            var instance120 = Path.Combine(instancesDir, GameVersionProfiles.Version120);
+
+            if (Directory.Exists(instance120))
+                return;
+
+            var rootMods = Path.Combine(rootGameDir, "mods");
+            var rootState = Path.Combine(rootGameDir, "pack.state.json");
+
+            if (!Directory.Exists(rootMods) && !File.Exists(rootState))
+                return;
+
+            Directory.CreateDirectory(instance120);
+            LogLauncherEvent($"[MIGRATION] Начата миграция одиночного инстанса 1.20.1 в {instance120}");
+
+            var foldersToMove = new[]
+            {
+                "mods", "config", "shaderpacks", "resourcepacks",
+                "schematics", "saves", "CustomSkinLoader", "tlm_custom_pack", "logs"
+            };
+
+            foreach (var folder in foldersToMove)
+            {
+                var src = Path.Combine(rootGameDir, folder);
+                var dst = Path.Combine(instance120, folder);
+                if (Directory.Exists(src) && !Directory.Exists(dst))
+                {
+                    try
+                    {
+                        Directory.Move(src, dst);
+                        LogLauncherEvent($"[MIGRATION] Перемещена папка {folder} в инстанс 1.20.1");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogLauncherEvent($"[MIGRATION-COPY] Сбой Move для {folder}, копирование: {ex.Message}");
+                        CopyDirectory(src, dst);
+                    }
+                }
+            }
+
+            var filesToMove = new[] { "pack.state.json", "options.txt", "servers.dat" };
+            foreach (var file in filesToMove)
+            {
+                var src = Path.Combine(rootGameDir, file);
+                var dst = Path.Combine(instance120, file);
+                if (File.Exists(src) && !File.Exists(dst))
+                {
+                    try
+                    {
+                        File.Move(src, dst);
+                        LogLauncherEvent($"[MIGRATION] Перемещен файл {file} в инстанс 1.20.1");
+                    }
+                    catch
+                    {
+                        File.Copy(src, dst, true);
+                    }
+                }
+            }
+
+            LogLauncherEvent("[MIGRATION] Миграция 1.20.1 успешно завершена.");
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[MIGRATION-ERROR] Сбой миграции: {ex.Message}");
+        }
+    }
+
+    private static void CopyDirectory(string sourceDir, string targetDir)
+    {
+        Directory.CreateDirectory(targetDir);
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
+            File.Copy(file, targetFile, true);
+        }
+        foreach (var subDir in Directory.GetDirectories(sourceDir))
+        {
+            var targetSubDir = Path.Combine(targetDir, Path.GetFileName(subDir));
+            CopyDirectory(subDir, targetSubDir);
+        }
+    }
+
+    /// <summary>
     /// Локальная проверка готовности окружения (Fabric profile, vanilla jar, Java runtime) без сети.
     /// </summary>
-    public bool CheckEnvironmentInstalled(string gameDir)
+    public bool CheckEnvironmentInstalled(string gameDir, string? version = null)
     {
         try
         {
             var fullGameDir = ResolveMinecraftDirectory(gameDir);
-            var fabricLoader = ResolveFabricLoaderVersion(fullGameDir);
-            var fabricId = $"fabric-loader-{fabricLoader}-{MinecraftVersion}";
+            var mcVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
+            var targetInstanceDir = ResolveInstanceDirectory(fullGameDir, mcVersion);
+            var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
+            var fabricId = $"fabric-loader-{fabricLoader}-{mcVersion}";
             var fabricJson = Path.Combine(fullGameDir, "versions", fabricId, $"{fabricId}.json");
-            var vanillaJar = Path.Combine(fullGameDir, "versions", MinecraftVersion, $"{MinecraftVersion}.jar");
-            var javaRuntime = ResolveJavaRuntime(fullGameDir);
+            var vanillaJar = Path.Combine(fullGameDir, "versions", mcVersion, $"{mcVersion}.jar");
+            var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
+            var javaRuntime = ResolveJavaRuntime(fullGameDir, minJava);
 
             return File.Exists(fabricJson) && File.Exists(vanillaJar) && !string.IsNullOrWhiteSpace(javaRuntime);
         }
@@ -671,14 +800,27 @@ public class FabricGameLaunchService : IGameLaunchService
     }
 
     /// <summary>
-    /// Поиск установленной Java 17+.
+    /// Поиск установленной Java (17+ или 21+).
     /// Приоритет отдается локальной Java в &lt;GameDir&gt;\runtime, затем системным путям.
     /// </summary>
-    public string? ResolveJavaRuntime(string gameDir)
+    public string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17)
     {
         var candidates = new List<string>();
 
-        // 1. Приоритетный путь Mojang Java 17 (java-runtime-gamma) в папке игры
+        // 1. Приоритетный путь Mojang Java 21 (java-runtime-delta), если требуется >= 21
+        var deltaDefault = Path.Combine(gameDir, "runtime", "windows-x64", "java-runtime-delta", "bin", "javaw.exe");
+        if (File.Exists(deltaDefault))
+        {
+            candidates.Add(deltaDefault);
+        }
+
+        var deltaAlt = Path.Combine(gameDir, "runtime", "java-runtime-delta", "windows", "java-runtime-delta", "bin", "javaw.exe");
+        if (File.Exists(deltaAlt))
+        {
+            candidates.Add(deltaAlt);
+        }
+
+        // 2. Приоритетный путь Mojang Java 17 (java-runtime-gamma) в папке игры
         var gammaDefault = Path.Combine(gameDir, "runtime", "windows-x64", "java-runtime-gamma", "bin", "javaw.exe");
         if (File.Exists(gammaDefault))
         {
@@ -709,7 +851,7 @@ public class FabricGameLaunchService : IGameLaunchService
             catch { }
         }
 
-        // 2. Системные переменные окружения и директории (запасной вариант)
+        // 3. Системные переменные окружения и директории (запасной вариант)
         var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
         if (!string.IsNullOrWhiteSpace(javaHome))
         {
@@ -747,7 +889,7 @@ public class FabricGameLaunchService : IGameLaunchService
             if (candidate == "javaw.exe" || File.Exists(candidate))
             {
                 var major = GetJavaMajorVersion(candidate);
-                if (major >= 17)
+                if (major >= minMajorVersion)
                 {
                     return candidate;
                 }
@@ -840,19 +982,29 @@ public class FabricGameLaunchService : IGameLaunchService
 
     /// <summary>
     /// Автоматическая проверка и загрузка недостающего окружения Minecraft (5 этапов):
-    /// 1. "Minecraft 1.20.1" (Клиент и базовый манифест)
-    /// 2. "Java 17" (Официальный Mojang JRE java-runtime-gamma)
-    /// 3. "Fabric" (Профиль и загрузчик Fabric)
-    /// 4. "Библиотеки" (Объединенные библиотеки Vanilla и Fabric)
-    /// 5. "Ресурсы" (Индекс ассетов 5 и файлы объектов)
+    /// <summary>
+    /// Автоустановка и верификация всех этапов игрового окружения:
+    /// 1. Minecraft (Клиент и базовый манифест)
+    /// 2. Java (Официальный Mojang JRE: java-runtime-gamma для 1.20.1, java-runtime-delta для 1.21.1)
+    /// 3. Fabric (Профиль и загрузчик Fabric)
+    /// 4. Библиотеки (Объединенные библиотеки Vanilla и Fabric)
+    /// 5. Ресурсы (Индекс ассетов и файлы объектов)
     /// </summary>
     public async Task EnsureInstalledAsync(
         string gameDir,
         IProgress<InstallProgressReport>? progress = null,
         Action<string>? onLogReceived = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? version = null)
     {
-        LogLauncherEvent($"[INSTALL] Начало проверки/установки окружения в {gameDir}");
+        var mcVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
+        var targetInstanceDir = ResolveInstanceDirectory(gameDir, mcVersion);
+        var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
+        var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
+        var javaTitle = minJava >= 21 ? "Java 21" : "Java 17";
+        var javaRuntimeName = GameVersionProfiles.GetJavaRuntimeComponent(mcVersion);
+
+        LogLauncherEvent($"[INSTALL] Начало проверки/установки окружения Minecraft {mcVersion} в {gameDir}");
         var mcPath = new MinecraftPath(gameDir);
         var launcher = new MinecraftLauncher(mcPath);
         var rules = new RulesEvaluatorContext(LauncherOSRule.Current);
@@ -863,64 +1015,63 @@ public class FabricGameLaunchService : IGameLaunchService
         var javaExtractor = launcher.FileExtractors.OfType<JavaFileExtractor>().FirstOrDefault() ?? new JavaFileExtractor(_httpClient, launcher.JavaPathResolver);
         var logExtractor = launcher.FileExtractors.OfType<LogFileExtractor>().FirstOrDefault() ?? new LogFileExtractor();
 
-        // Этап 1: Minecraft 1.20.1 (базовый манифест и client.jar)
-        onLogReceived?.Invoke("[AURA-INSTALL] Этап 1/5: Проверка Minecraft 1.20.1...");
+        // Этап 1: Minecraft (базовый манифест и client.jar)
+        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 1/5: Проверка Minecraft {mcVersion}...");
         progress?.Report(new InstallProgressReport
         {
-            Stage = "Minecraft 1.20.1",
+            Stage = $"Minecraft {mcVersion}",
             StageIndex = 1,
             TotalStages = 5,
             Percentage = 0,
-            DetailText = "Проверка клиента Minecraft 1.20.1..."
+            DetailText = $"Проверка клиента Minecraft {mcVersion}..."
         });
 
         var vanillaVersion = await RetryAsync(async () =>
-            await launcher.GetVersionAsync(MinecraftVersion, cancellationToken),
-            "Загрузка манифеста Minecraft 1.20.1", onLogReceived, cancellationToken);
+            await launcher.GetVersionAsync(mcVersion, cancellationToken),
+            $"Загрузка манифеста Minecraft {mcVersion}", onLogReceived, cancellationToken);
 
         var clientFiles = (await clientExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
         var logFiles = (await logExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
         var stage1Files = clientFiles.Concat(logFiles).ToList();
 
         await InstallGameFilesStageAsync(
-            launcher, stage1Files, "Minecraft 1.20.1", 1, 5, progress, onLogReceived, cancellationToken);
+            launcher, stage1Files, $"Minecraft {mcVersion}", 1, 5, progress, onLogReceived, cancellationToken);
 
-        // Этап 2: Java 17 (Mojang java-runtime-gamma)
-        onLogReceived?.Invoke("[AURA-INSTALL] Этап 2/5: Проверка Java 17...");
+        // Этап 2: Java (Mojang runtime)
+        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 2/5: Проверка {javaTitle}...");
         progress?.Report(new InstallProgressReport
         {
-            Stage = "Java 17",
+            Stage = javaTitle,
             StageIndex = 2,
             TotalStages = 5,
             Percentage = 20,
-            DetailText = "Проверка среды выполнения Java 17..."
+            DetailText = $"Проверка среды выполнения {javaTitle}..."
         });
 
-        var existingJava = ResolveJavaRuntime(gameDir);
-        bool hasLocalJava17 = !string.IsNullOrWhiteSpace(existingJava) && existingJava.StartsWith(gameDir, StringComparison.OrdinalIgnoreCase);
+        var existingJava = ResolveJavaRuntime(gameDir, minJava);
+        bool hasLocalJava = !string.IsNullOrWhiteSpace(existingJava) && existingJava.StartsWith(gameDir, StringComparison.OrdinalIgnoreCase);
 
-        if (!hasLocalJava17)
+        if (!hasLocalJava)
         {
-            onLogReceived?.Invoke("[AURA-INSTALL] Локальная Java 17 не найдена в runtime. Загрузка java-runtime-gamma от Mojang...");
+            onLogReceived?.Invoke($"[AURA-INSTALL] Локальная {javaTitle} не найдена в runtime. Загрузка {javaRuntimeName} от Mojang...");
             var javaFiles = (await javaExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
             await InstallGameFilesStageAsync(
-                launcher, javaFiles, "Java 17", 2, 5, progress, onLogReceived, cancellationToken);
+                launcher, javaFiles, javaTitle, 2, 5, progress, onLogReceived, cancellationToken);
         }
         else
         {
-            onLogReceived?.Invoke($"[AURA-INSTALL] Найдена готовая Java 17 в runtime: {existingJava}");
+            onLogReceived?.Invoke($"[AURA-INSTALL] Найдена готовая {javaTitle} в runtime: {existingJava}");
             progress?.Report(new InstallProgressReport
             {
-                Stage = "Java 17",
+                Stage = javaTitle,
                 StageIndex = 2,
                 TotalStages = 5,
                 Percentage = 40,
-                DetailText = "Java 17 готова"
+                DetailText = $"{javaTitle} готова"
             });
         }
 
         // Этап 3: Fabric (профиль загрузчика)
-        var fabricLoader = ResolveFabricLoaderVersion(gameDir);
         onLogReceived?.Invoke($"[AURA-INSTALL] Этап 3/5: Проверка профиля Fabric Loader {fabricLoader}...");
         progress?.Report(new InstallProgressReport
         {
@@ -931,8 +1082,8 @@ public class FabricGameLaunchService : IGameLaunchService
             DetailText = $"Проверка профиля Fabric Loader {fabricLoader}..."
         });
 
-        var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoader}-{MinecraftVersion}");
-        var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoader}-{MinecraftVersion}.json");
+        var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoader}-{mcVersion}");
+        var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoader}-{mcVersion}.json");
 
         if (!File.Exists(fabricJson))
         {
@@ -940,14 +1091,14 @@ public class FabricGameLaunchService : IGameLaunchService
             var fabricInstaller = new FabricInstaller(_httpClient);
             await RetryAsync(async () =>
             {
-                await fabricInstaller.Install(MinecraftVersion, fabricLoader, mcPath);
+                await fabricInstaller.Install(mcVersion, fabricLoader, mcPath);
                 return true;
             }, "Загрузка профиля Fabric", onLogReceived, cancellationToken);
         }
 
-        await EnsureFabricClientJarAsync(gameDir, fabricLoader, onLogReceived, cancellationToken);
+        await EnsureFabricClientJarAsync(gameDir, fabricLoader, mcVersion, onLogReceived, cancellationToken);
 
-        var fabricVersionName = $"fabric-loader-{fabricLoader}-{MinecraftVersion}";
+        var fabricVersionName = $"fabric-loader-{fabricLoader}-{mcVersion}";
         var fabricVersion = await RetryAsync(async () =>
             await launcher.GetVersionAsync(fabricVersionName, cancellationToken),
             "Чтение профиля Fabric", onLogReceived, cancellationToken);
@@ -1154,23 +1305,27 @@ public class FabricGameLaunchService : IGameLaunchService
             throw new InvalidOperationException($"Игровой никнейм не соответствует правилам (3-16 символов, A-Z, 0-9, _): {nickResult.Error}");
         }
 
-        var gameDir = ResolveMinecraftDirectory(config.GameDir);
-        LogLauncherEvent($"[LAUNCH] Запуск игры для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {gameDir}");
+        var rootGameDir = ResolveMinecraftDirectory(config.GameDir);
+        var mcVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
+        var targetInstanceDir = ResolveInstanceDirectory(rootGameDir, mcVersion);
+        LogLauncherEvent($"[LAUNCH] Запуск игры Minecraft {mcVersion} для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {targetInstanceDir}");
 
         // 0. Настройки игры по умолчанию (options.txt, lsp.json) перед первым запуском
-        EnsureDefaultOptions(gameDir, config.GraphicsPreset);
-        EnsureDefaultLspConfig(gameDir);
+        EnsureDefaultOptions(targetInstanceDir, config.GraphicsPreset);
+        EnsureDefaultLspConfig(targetInstanceDir);
 
         // 1. Автоматическая проверка и докачка недостающих компонентов окружения
-        await EnsureInstalledAsync(gameDir, installProgress, onLogReceived, cancellationToken);
+        await EnsureInstalledAsync(rootGameDir, installProgress, onLogReceived, cancellationToken, mcVersion);
 
-        // 2. Определение пути к Java 17+
-        var javaPath = ResolveJavaRuntime(gameDir);
+        // 2. Определение пути к Java (17+ для 1.20.1, 21+ для 1.21.1)
+        var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
+        var javaTitle = minJava >= 21 ? "Java 21" : "Java 17";
+        var javaPath = ResolveJavaRuntime(rootGameDir, minJava);
         if (string.IsNullOrWhiteSpace(javaPath))
         {
-            throw new InvalidOperationException("Не найдена Java 17+ для запуска игры Minecraft 1.20.1.");
+            throw new InvalidOperationException($"Не найдена {javaTitle}+ для запуска игры Minecraft {mcVersion}.");
         }
-        onLogReceived?.Invoke($"[AURA-JAVA] Исполняемый файл Java 17: {javaPath}");
+        onLogReceived?.Invoke($"[AURA-JAVA] Исполняемый файл {javaTitle}: {javaPath}");
 
         // 3. Детерминированный offline UUID
         var playerUuid = GenerateOfflineUuid(config.Nickname);
@@ -1178,14 +1333,14 @@ public class FabricGameLaunchService : IGameLaunchService
         LogLauncherEvent($"[LAUNCH] Ник: {config.Nickname}, Offline UUID: {playerUuid}, Java: {javaPath}");
 
         // 4. Подготовка параметров запуска CmlLib.Core
-        var fabricLoader = ResolveFabricLoaderVersion(gameDir);
-        await EnsureFabricClientJarAsync(gameDir, fabricLoader, onLogReceived, cancellationToken);
-        var mcPath = new MinecraftPath(gameDir);
+        var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
+        await EnsureFabricClientJarAsync(rootGameDir, fabricLoader, mcVersion, onLogReceived, cancellationToken);
+        var mcPath = new MinecraftPath(rootGameDir);
         var launcher = new MinecraftLauncher(mcPath);
-        var fabricVersionName = $"fabric-loader-{fabricLoader}-{MinecraftVersion}";
+        var fabricVersionName = $"fabric-loader-{fabricLoader}-{mcVersion}";
 
         // Гарантируем распаковку нативных библиотек в папку, на которую указывает -Djava.library.path
-        EnsureNativesExtracted(gameDir, fabricVersionName);
+        EnsureNativesExtracted(rootGameDir, fabricVersionName);
 
         var launchOptions = new MLaunchOption
         {
@@ -1199,7 +1354,7 @@ public class FabricGameLaunchService : IGameLaunchService
             ExtraJvmArguments = BuildJvmArguments(config.JvmArgs)
         };
 
-        LogGameLaunchEvent(gameDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
+        LogGameLaunchEvent(targetInstanceDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
 
         var process = await launcher.CreateProcessAsync(fabricVersionName, launchOptions);
         process.StartInfo.UseShellExecute = false;
@@ -1213,6 +1368,19 @@ public class FabricGameLaunchService : IGameLaunchService
 
         // Убираем аргумент --fullscreen (игра прочитает из options.txt)
         tokens.RemoveAll(t => t.Equals("--fullscreen", StringComparison.OrdinalIgnoreCase));
+
+        // Подменяем --gameDir на targetInstanceDir для изоляции модов, конфигов и сохранений
+        if (!string.Equals(rootGameDir, targetInstanceDir, StringComparison.OrdinalIgnoreCase))
+        {
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Equals("--gameDir", StringComparison.OrdinalIgnoreCase) && i + 1 < tokens.Count)
+                {
+                    tokens[i + 1] = targetInstanceDir;
+                    break;
+                }
+            }
+        }
 
         // Если задан адрес сервера для быстрого подключения (P2P LAN / лобби)
         if (!string.IsNullOrWhiteSpace(config.QuickPlayMultiplayer))
@@ -1282,7 +1450,7 @@ public class FabricGameLaunchService : IGameLaunchService
             }
         }
 
-        var argsFilePath = Path.Combine(gameDir, "argsFile.txt");
+        var argsFilePath = Path.Combine(targetInstanceDir, "argsFile.txt");
         await File.WriteAllLinesAsync(argsFilePath, formattedLines, new UTF8Encoding(false), cancellationToken);
 
         // Запись содержимого argsFile в launcher.log с маскировкой accessToken
@@ -1297,8 +1465,8 @@ public class FabricGameLaunchService : IGameLaunchService
         LogLauncherEvent($"[ARGS] {process.StartInfo.FileName} {process.StartInfo.Arguments}");
         onLogReceived?.Invoke($"[AURA-ARGS] {process.StartInfo.FileName} {process.StartInfo.Arguments}");
 
-        // 5. Настройка логирования в файл <GameDir>\logs\launcher-game.log
-        var logsDir = Path.Combine(gameDir, "logs");
+        // 5. Настройка логирования в файл <targetInstanceDir>\logs\launcher-game.log
+        var logsDir = Path.Combine(targetInstanceDir, "logs");
         Directory.CreateDirectory(logsDir);
         var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
 
@@ -1326,7 +1494,7 @@ public class FabricGameLaunchService : IGameLaunchService
         };
 
         // Гарантированное включение ресурспаков в options.txt перед самым стартом клиента
-        EnsureDefaultResourcePacksEnabled(gameDir);
+        EnsureDefaultResourcePacksEnabled(targetInstanceDir);
 
         process.Start();
         process.BeginOutputReadLine();
@@ -1365,21 +1533,21 @@ public class FabricGameLaunchService : IGameLaunchService
 
     /// <summary>
     /// Обеспечивает корректность профиля Fabric и наличие клиентского jar в classpath:
-    /// 1. Добавляет "jar": "1.20.1" в fabric-loader-*.json (если meta.fabricmc.net не включила его).
-    /// 2. Гарантирует наличие fabric-loader-*.jar (копия vanilla 1.20.1.jar).
+    /// 1. Добавляет "jar": "<mcVersion>" в fabric-loader-*.json (если meta.fabricmc.net не включила его).
+    /// 2. Гарантирует наличие fabric-loader-*.jar (копия vanilla <mcVersion>.jar).
     /// </summary>
-    private static async Task EnsureFabricClientJarAsync(string gameDir, string fabricLoaderVersion, Action<string>? onLogReceived, CancellationToken cancellationToken)
+    private static async Task EnsureFabricClientJarAsync(string gameDir, string fabricLoaderVersion, string minecraftVersion, Action<string>? onLogReceived, CancellationToken cancellationToken)
     {
         try
         {
-            var vanillaDir = Path.Combine(gameDir, "versions", MinecraftVersion);
-            var vanillaJar = Path.Combine(vanillaDir, $"{MinecraftVersion}.jar");
+            var vanillaDir = Path.Combine(gameDir, "versions", minecraftVersion);
+            var vanillaJar = Path.Combine(vanillaDir, $"{minecraftVersion}.jar");
 
-            var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoaderVersion}-{MinecraftVersion}");
-            var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{MinecraftVersion}.json");
-            var fabricJar = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{MinecraftVersion}.jar");
+            var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}");
+            var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}.json");
+            var fabricJar = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}.jar");
 
-            // 1. Патч JSON профиля Fabric (добавление поля "jar": "1.20.1", если отсутствует)
+            // 1. Патч JSON профиля Fabric (добавление поля "jar": "<mcVersion>", если отсутствует)
             if (File.Exists(fabricJson))
             {
                 var jsonText = await File.ReadAllTextAsync(fabricJson, cancellationToken);
@@ -1390,9 +1558,9 @@ public class FabricGameLaunchService : IGameLaunchService
                         var node = System.Text.Json.Nodes.JsonNode.Parse(jsonText);
                         if (node is System.Text.Json.Nodes.JsonObject obj)
                         {
-                            obj["jar"] = MinecraftVersion;
+                            obj["jar"] = minecraftVersion;
                             await File.WriteAllTextAsync(fabricJson, obj.ToJsonString(), cancellationToken);
-                            LogLauncherEvent($"[FABRIC-FIX] Добавлено 'jar': '{MinecraftVersion}' в {fabricJson}");
+                            LogLauncherEvent($"[FABRIC-FIX] Добавлено 'jar': '{minecraftVersion}' в {fabricJson}");
                         }
                     }
                     catch (Exception ex)
@@ -1402,7 +1570,7 @@ public class FabricGameLaunchService : IGameLaunchService
                 }
             }
 
-            // 2. Копирование 1.20.1.jar в fabric-loader-*.jar, если файл отсутствует или размер отличается
+            // 2. Копирование <mcVersion>.jar в fabric-loader-*.jar, если файл отсутствует или размер отличается
             if (File.Exists(vanillaJar))
             {
                 Directory.CreateDirectory(fabricDir);
@@ -1420,7 +1588,7 @@ public class FabricGameLaunchService : IGameLaunchService
                 if (needsCopy)
                 {
                     File.Copy(vanillaJar, fabricJar, true);
-                    onLogReceived?.Invoke($"[AURA-INSTALL] Синхронизирован клиентский JAR ({MinecraftVersion}) для Fabric Loader.");
+                    onLogReceived?.Invoke($"[AURA-INSTALL] Синхронизирован клиентский JAR ({minecraftVersion}) для Fabric Loader.");
                     LogLauncherEvent($"[FABRIC-FIX] Скопирован {vanillaJar} -> {fabricJar}");
                 }
             }

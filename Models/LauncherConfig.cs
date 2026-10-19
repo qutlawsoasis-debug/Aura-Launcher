@@ -15,6 +15,7 @@ public class LauncherConfig
     public string SkinPath { get; set; } = "";
     public string SkinOriginalName { get; set; } = "";
     public string GameDir { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+    public string SelectedVersion { get; set; } = GameVersionProfiles.Version120;
     public string PackRepo { get; set; } = DefaultPackRepo;
     public DateTime? LastUpdateUtc { get; set; }
     public string? QuickPlayMultiplayer { get; set; }

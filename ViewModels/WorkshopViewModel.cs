@@ -221,6 +221,11 @@ public class WorkshopViewModel : ObservableObject
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
 
+        _configService.ConfigChanged += (s, cfg) =>
+        {
+            _ = RefreshAllAsync();
+        };
+
         SwitchSubTabCommand = new RelayCommand(p =>
         {
             if (p is string tab)
@@ -791,6 +796,6 @@ public class WorkshopViewModel : ObservableObject
     private string GetGameDir()
     {
         var config = _configService.CurrentConfig;
-        return _launchService.ResolveMinecraftDirectory(config.GameDir);
+        return _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
     }
 }

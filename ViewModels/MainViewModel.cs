@@ -583,7 +583,7 @@ public class MainViewModel : ObservableObject
             if (IsGameRunning) return "Игра запущена";
             if (IsBusy) return "Отмена";
             var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
-            return _launchService.CheckEnvironmentInstalled(gameDir) ? "Играть" : "Установить";
+            return _launchService.CheckEnvironmentInstalled(gameDir, _configService.CurrentConfig.SelectedVersion) ? "Играть" : "Установить";
         }
     }
 
@@ -1333,7 +1333,7 @@ public class MainViewModel : ObservableObject
                 OverviewVM.RefreshStats();
                 if (exitCode != 0)
                 {
-                    var resolvedGameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+                    var resolvedGameDir = _launchService.ResolveInstanceDirectory(_configService.CurrentConfig.GameDir);
                     var crashReport = GameCrashAnalyzer.AnalyzeCrash(resolvedGameDir, exitCode);
                     SetLauncherState(LauncherState.Error, $"{crashReport.Title}. {crashReport.UserAdvice}");
                     PromptGameCrashToast(exitCode, crashReport);
@@ -1348,6 +1348,7 @@ public class MainViewModel : ObservableObject
         _configService.ConfigChanged += (s, cfg) =>
         {
             OnPropertyChanged(nameof(PlayerNickname));
+            OnPropertyChanged(nameof(LaunchButtonText));
             OnPropertyChanged(nameof(RamFormatted));
             OnPropertyChanged(nameof(AllocatedRamText));
             OnPropertyChanged(nameof(AnthemVolume));
@@ -1492,12 +1493,13 @@ public class MainViewModel : ObservableObject
         }
 
         // Определение уже запущенной игры при старте лаунчера
-        var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
-        FabricGameLaunchService.EnsureDefaultOptions(gameDir);
-        FabricGameLaunchService.EnsureDefaultLspConfig(gameDir);
-        _skinService.EnsureCustomSkinLoaderConfig(gameDir);
-        _screenshotWatcher.StartWatching(gameDir);
-        var running = _launchService.FindRunningGameProcess(gameDir);
+        var rootGameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+        var instanceDir = _launchService.ResolveInstanceDirectory(rootGameDir, _configService.CurrentConfig.SelectedVersion);
+        FabricGameLaunchService.EnsureDefaultOptions(instanceDir);
+        FabricGameLaunchService.EnsureDefaultLspConfig(instanceDir);
+        _skinService.EnsureCustomSkinLoaderConfig(instanceDir);
+        _screenshotWatcher.StartWatching(instanceDir);
+        var running = _launchService.FindRunningGameProcess(rootGameDir);
         if (running != null)
         {
             _gameProcess = running;
@@ -1587,7 +1589,7 @@ public class MainViewModel : ObservableObject
             else
             {
                 var gameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
-                bool isInstalled = _launchService.CheckEnvironmentInstalled(gameDir);
+                bool isInstalled = _launchService.CheckEnvironmentInstalled(gameDir, _configService.CurrentConfig.SelectedVersion);
                 State = LauncherState.Idle;
                 if (isInstalled)
                 {
@@ -1731,7 +1733,7 @@ public class MainViewModel : ObservableObject
             // 1.5. Синхронизация управляемых серверов в servers.dat (перед запуском игры)
             try
             {
-                var targetGameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+                var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
                 await _serverListSyncService.SyncServersAsync(targetGameDir, updateResult.Servers, cancellationToken: ct);
             }
             catch (Exception ex)
@@ -1742,7 +1744,7 @@ public class MainViewModel : ObservableObject
             // 1.6. Конфигурация CustomSkinLoader: добавление AuraLobby первым источником и загрузка актуального скина
             try
             {
-                var targetGameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+                var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
                 _skinService.EnsureCustomSkinLoaderConfig(targetGameDir);
                 var uploadResult = await _skinService.UploadSkinToLobbyApiAsync(
                     config.SkinPath,
@@ -2197,7 +2199,7 @@ public class MainViewModel : ObservableObject
 
             // 2. Проверяем обновление сборки (манифеста)
             var config = _configService.CurrentConfig;
-            var gameDir = _launchService.ResolveMinecraftDirectory(config.GameDir);
+            var gameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
             if (!string.IsNullOrWhiteSpace(gameDir))
             {
                 var currentState = PackState.LoadValidState(gameDir);
@@ -2208,7 +2210,9 @@ public class MainViewModel : ObservableObject
                     using var client = new HttpClient();
                     client.DefaultRequestHeaders.UserAgent.Add(new System.Net.Http.Headers.ProductInfoHeaderValue("AuraLauncher", "1.0"));
                     client.DefaultRequestHeaders.CacheControl = new System.Net.Http.Headers.CacheControlHeaderValue { NoCache = true, NoStore = true };
-                    string manifestUrl = $"https://raw.githubusercontent.com/{repo}/{PackUpdateService.DefaultBranch}/manifest.json?t={DateTime.UtcNow.Ticks}";
+                    var targetVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
+                    var manifestFileName = GameVersionProfiles.GetManifestFileName(targetVersion);
+                    string manifestUrl = $"https://raw.githubusercontent.com/{repo}/{PackUpdateService.DefaultBranch}/{manifestFileName}?t={DateTime.UtcNow.Ticks}";
                     var resp = await client.GetAsync(manifestUrl, cts.Token);
                     if (resp.IsSuccessStatusCode)
                     {

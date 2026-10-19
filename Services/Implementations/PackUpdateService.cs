@@ -102,9 +102,9 @@ public class PackUpdateService : IPackUpdateService, IDisposable
     {
         var sw = Stopwatch.StartNew();
         var config = _configService.CurrentConfig;
-        var gameDir = config.GameDir;
+        var rawGameDir = config.GameDir;
 
-        if (string.IsNullOrWhiteSpace(gameDir))
+        if (string.IsNullOrWhiteSpace(rawGameDir))
         {
             return new PackUpdateResult
             {
@@ -113,6 +113,11 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 Duration = sw.Elapsed
             };
         }
+
+        var targetVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
+        var gameDir = _customStateFilePath != null
+            ? rawGameDir
+            : ResolveTargetInstanceDir(rawGameDir, targetVersion);
 
         var repo = string.IsNullOrWhiteSpace(config.PackRepo) ? DefaultPackRepo : config.PackRepo.Trim();
         if (!RepoRegex.IsMatch(repo))
@@ -128,9 +133,10 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         var currentState = PackState.LoadValidState(gameDir, _customStateFilePath);
         bool isInstalled = currentState != null;
 
-        // 1. Скачивание manifest.json
+        // 1. Скачивание манифеста сборки (manifest.json для 1.20.1, manifest-1.21.1.json для 1.21.1)
         string manifestJson;
-        var manifestUrl = $"https://raw.githubusercontent.com/{repo}/{DefaultBranch}/manifest.json?t={DateTime.UtcNow.Ticks}";
+        var manifestFileName = GameVersionProfiles.GetManifestFileName(targetVersion);
+        var manifestUrl = $"https://raw.githubusercontent.com/{repo}/{DefaultBranch}/{manifestFileName}?t={DateTime.UtcNow.Ticks}";
 
         using var ctsManifest = CancellationTokenSource.CreateLinkedTokenSource(ct);
         ctsManifest.CancelAfter(TimeSpan.FromSeconds(8));
@@ -454,6 +460,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             {
                 ct.ThrowIfCancellationRequested();
                 var targetFile = fullPathByEntry[file];
+                var repoPrefix = GameVersionProfiles.GetRepoPrefix(targetVersion);
                 await DownloadSingleFileWithRetryAsync(repo, file, targetFile, bytesRead =>
                 {
                     lock (progressLock)
@@ -461,7 +468,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                         completedBytesTotal += bytesRead;
                         ReportProgress(progress, completedBytesTotal, totalPlanBytes, completedFilesCount, toDownload.Count, downloadStopwatch);
                     }
-                }, ct).ConfigureAwait(false);
+                }, ct, repoPrefix).ConfigureAwait(false);
 
                 lock (progressLock)
                 {
@@ -568,7 +575,8 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         ManifestFileEntry file, 
         string targetPath, 
         Action<int> onBytesRead, 
-        CancellationToken ct)
+        CancellationToken ct,
+        string repoPrefix = "")
     {
         var targetDir = Path.GetDirectoryName(targetPath);
         if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir))
@@ -579,7 +587,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         var partPath = targetPath + ".part";
         var escapedSegments = file.Path.Split('/').Select(Uri.EscapeDataString);
         var escapedPath = string.Join('/', escapedSegments);
-        var fileUrl = $"https://raw.githubusercontent.com/{repo}/{DefaultBranch}/{escapedPath}";
+        var fileUrl = $"https://raw.githubusercontent.com/{repo}/{DefaultBranch}/{repoPrefix}{escapedPath}";
 
         for (int attempt = 1; attempt <= 3; attempt++)
         {
@@ -920,6 +928,24 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 throw new FormatException($"Сегмент пути содержит зарезервированное имя Windows: '{seg}'");
             }
         }
+    }
+
+    public static string ResolveTargetInstanceDir(string rootGameDir, string targetVersion)
+    {
+        if (string.IsNullOrWhiteSpace(rootGameDir))
+            return rootGameDir;
+
+        // Если rootGameDir уже явно указывает на папку инстанса
+        if (rootGameDir.Contains(Path.Combine("instances", targetVersion), StringComparison.OrdinalIgnoreCase))
+            return rootGameDir;
+
+        var instancesDir = Path.Combine(rootGameDir, "instances");
+        var instancePath = Path.Combine(instancesDir, targetVersion);
+        if (!Directory.Exists(instancePath))
+        {
+            try { Directory.CreateDirectory(instancePath); } catch { }
+        }
+        return instancePath;
     }
 
     public void Dispose()
