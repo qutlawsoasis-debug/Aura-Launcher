@@ -155,7 +155,8 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "AnimatedDoors-RP-2.0.0.zip",
                 "unobtrusive-grass-1.0.1.zip",
                 "Drigo-3D-Lanterns-x-Punchy.zip",
-                "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip"
+                "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
+                "FreshAnimations_v1.10.4.zip"
             }
         };
 
@@ -618,6 +619,26 @@ public class GraphicsPresetService : IGraphicsPresetService
                         var esc = p.Replace("\\", "\\\\").Replace("\"", "\\\"");
                         activePacks.Add($"\"{esc}\"");
                     }
+                }
+            }
+
+            // Гарантируем встроенные паки модов
+            var defaultBuiltinPacks = new[]
+            {
+                "punchy:punchy",
+                "moonlight:merged_pack",
+                "serilum_mod_translations",
+                "continuity:default",
+                "continuity:glass_pane_culling_fix",
+                "eatinganimation:supporteatinganimation",
+                "supplementaries:darker_ropes"
+            };
+            foreach (var bp in defaultBuiltinPacks)
+            {
+                var q = $"\"{bp}\"";
+                if (!activePacks.Contains(q, StringComparer.OrdinalIgnoreCase))
+                {
+                    activePacks.Add(q);
                 }
             }
 
