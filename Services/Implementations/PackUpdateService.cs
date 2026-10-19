@@ -269,7 +269,7 @@ public class PackUpdateService : IPackUpdateService, IDisposable
         }
 
         // Проверка версии Minecraft
-        if (!string.Equals(manifest.Minecraft, FabricGameLaunchService.MinecraftVersion, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(manifest.Minecraft, targetVersion, StringComparison.OrdinalIgnoreCase))
         {
             return new PackUpdateResult
             {

@@ -170,4 +170,27 @@ public class MultiVersionAndInstanceIsolationTests : IDisposable
         Assert.Equal(Path.Combine(_testRoot, "instances", "1.21.1"), dir121);
         Assert.NotEqual(dir120, dir121);
     }
+
+    [Fact]
+    public async Task PackUpdateService_WhenManifestMinecraftMatchesSelectedVersion_DoesNotFailVersionCheck()
+    {
+        var configService = new InMemoryConfigService(new LauncherConfig
+        {
+            GameDir = _testRoot,
+            SelectedVersion = "1.21.1"
+        });
+        var stateFile = Path.Combine(_testRoot, "state.json");
+        var handler = new MockHttpMessageHandler
+        {
+            Handler = req => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"name\":\"Aura 1.21.1\",\"version\":\"1.0.0\",\"minecraft\":\"1.21.1\",\"files\":[]}")
+            })
+        };
+        using var client = new HttpClient(handler);
+        using var service = new PackUpdateService(configService, client, stateFile);
+
+        var result = await service.CheckAndApplyAsync();
+        Assert.NotEqual("Сборка для другой версии Minecraft", result.Message);
+    }
 }

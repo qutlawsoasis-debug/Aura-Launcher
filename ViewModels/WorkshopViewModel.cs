@@ -223,7 +223,15 @@ public class WorkshopViewModel : ObservableObject
 
         _configService.ConfigChanged += (s, cfg) =>
         {
-            _ = RefreshAllAsync();
+            var app = Application.Current;
+            if (app != null && !app.Dispatcher.CheckAccess())
+            {
+                app.Dispatcher.InvokeAsync(async () => await RefreshAllAsync());
+            }
+            else
+            {
+                _ = RefreshAllAsync();
+            }
         };
 
         SwitchSubTabCommand = new RelayCommand(p =>
