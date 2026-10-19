@@ -21,7 +21,7 @@
         "-XX:MaxGCPauseMillis=50",
         "-XX:G1HeapRegionSize=16M"
       ],
-      "shaderPack": "MakeUp-UltraFast-9.5f.zip",
+      "shaderPack": "Sildurs-Enhanced-Default-Fancy.zip",
       "enableShaders": true,
       "shaderOptions": {},
       "resourcePacks": [

@@ -146,7 +146,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=16M"
             },
-            ShaderPack = "MakeUp-UltraFast-9.5f.zip",
+            ShaderPack = "Sildurs-Enhanced-Default-Fancy.zip",
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
@@ -522,10 +522,10 @@ public class GraphicsPresetService : IGraphicsPresetService
                 }
                 else
                 {
-                    result.Warning = $"Шейдерпак '{preset.ShaderPack}' не найден на диске. Откат на MakeUp-UltraFast-9.5f.zip";
+                    result.Warning = $"Шейдерпак '{preset.ShaderPack}' не найден на диске. Откат на Sildurs-Enhanced-Default-Fancy.zip";
                     FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] {result.Warning}");
-                    string fallbackPath = Path.Combine(gameDir, "shaderpacks", "MakeUp-UltraFast-9.5f.zip");
-                    chosenShader = File.Exists(fallbackPath) ? "MakeUp-UltraFast-9.5f.zip" : "OFF";
+                    string fallbackPath = Path.Combine(gameDir, "shaderpacks", "Sildurs-Enhanced-Default-Fancy.zip");
+                    chosenShader = File.Exists(fallbackPath) ? "Sildurs-Enhanced-Default-Fancy.zip" : "OFF";
                 }
             }
             result.ChosenShader = chosenShader;
