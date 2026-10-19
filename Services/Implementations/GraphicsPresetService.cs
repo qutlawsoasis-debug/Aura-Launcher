@@ -303,11 +303,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
-                "Better-Leaves-9.6.zip",
-                "Patrix_1.20_models.zip",
-                "Patrix_1.20_32x_bonus.zip",
-                "Patrix_1.20_32x_basic.zip",
-                "Patrix_1.20_32x_addon.zip"
+                "Better-Leaves-9.6.zip"
             }
         };
     }
@@ -636,11 +632,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                         "Drigo-3D-Lanterns-x-Punchy.zip",
                         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                         "FreshAnimations_v1.10.4.zip",
-                        "Better-Leaves-9.6.zip",
-                        "Patrix_1.20_models.zip",
-                        "Patrix_1.20_32x_bonus.zip",
-                        "Patrix_1.20_32x_basic.zip",
-                        "Patrix_1.20_32x_addon.zip"
+                        "Better-Leaves-9.6.zip"
                     }
                     : new[]
                     {
