@@ -1,0 +1,246 @@
+<section class="screen-view" id="screen-friends" aria-label="Экран Друзья">
+  <div class="screen-friends-layout">
+
+    <!-- Верхний ряд: Заголовок и карточка кода друга -->
+    <div class="friends-top-row">
+      <div class="friends-title-group">
+        <h2 class="friends-main-heading">Друзья</h2>
+        <p class="friends-subheading">Список контактов, статусы совместной игры и заявки</p>
+      </div>
+
+      <!-- Карточка "Мой код друга" -->
+      <div class="my-friend-code-card">
+        <div class="code-card-info">
+          <span class="code-card-label">Мой код профиля</span>
+          <div class="code-card-value" id="myFriendCodeVal">AURA-7821-X9M2</div>
+        </div>
+        <div class="code-card-actions">
+          <button type="button" class="btn-copy-friend-code" id="btnCopyFriendCode" title="Скопировать код профиля" data-code="AURA-7821-X9M2">
+            <svg class="icon icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span class="btn-copy-label">Код</span>
+          </button>
+          <button type="button" class="btn-copy-friend-link" id="btnCopyFriendLink" title="Скопировать ссылку-приглашение" data-link="aura://invite/AURA-7821-X9M2">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+            <span class="btn-copy-label">Ссылка</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Панель инструментов: Поиск, фильтры по статусу и добавление друга -->
+    <div class="friends-toolbar-island glass-island">
+      <div class="toolbar-left">
+        <!-- Поле быстрого поиска по нику -->
+        <div class="friends-search-box">
+          <svg class="icon search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="friendsSearchInput" class="search-input" placeholder="Поиск по нику..." spellcheck="false" autocomplete="off" aria-label="Поиск по нику">
+          <button type="button" id="friendsSearchClear" class="btn-search-clear" aria-label="Очистить поиск" title="Очистить поиск">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <!-- Фильтры по статусам -->
+        <div class="status-filter-pills" role="tablist" aria-label="Фильтр по статусу друзей">
+          <button type="button" class="filter-pill active" data-filter="all" role="tab" aria-selected="true">
+            <span>Все</span>
+            <span class="pill-counter" id="counterAll">5</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="in-game" role="tab" aria-selected="false">
+            <span class="status-dot in-game"></span>
+            <span>В игре</span>
+            <span class="pill-counter" id="counterInGame">2</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="online" role="tab" aria-selected="false">
+            <span class="status-dot online"></span>
+            <span>В сети</span>
+            <span class="pill-counter" id="counterOnline">1</span>
+          </button>
+          <button type="button" class="filter-pill" data-filter="offline" role="tab" aria-selected="false">
+            <span class="status-dot offline"></span>
+            <span>Не в сети</span>
+            <span class="pill-counter" id="counterOffline">2</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Быстрое добавление по коду -->
+      <div class="toolbar-right">
+        <form class="add-friend-form" id="addFriendForm" onsubmit="return false;">
+          <input type="text" id="addFriendCodeInput" class="add-code-input" placeholder="Код друга (AURA-XXXX)" maxlength="14" spellcheck="false" autocomplete="off" aria-label="Код друга">
+          <button type="submit" class="btn-add-friend" id="btnAddFriendSubmit">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Добавить</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Основной контент: Две колонки (Список друзей + Заявки и быстрый переход) -->
+    <div class="friends-content-grid">
+
+      <!-- Левая колонка: Карточки друзей -->
+      <div class="friends-list-column">
+        <div class="friends-cards-container" id="friendsCardsContainer">
+          <!-- Карточки друзей генерируются и фильтруются через friends.js -->
+        </div>
+
+        <!-- Пустое состояние при поиске / отсутствии контактов -->
+        <div class="friends-empty-search" id="friendsEmptyState" style="display: none;">
+          <div class="empty-icon-wrap">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </div>
+          <h3 class="empty-title">Друзья не найдены</h3>
+          <p class="empty-desc">Проверьте правильность написания ника или сбросьте фильтры поиска.</p>
+          <button type="button" class="btn-secondary" id="btnResetSearch">Сбросить поиск</button>
+        </div>
+      </div>
+
+      <!-- Правая колонка: Входящие заявки и плашка лобби -->
+      <div class="friends-sidebar-column">
+
+        <!-- Остров входящих заявок -->
+        <div class="glass-island requests-island" id="requestsIsland">
+          <div class="requests-header">
+            <div class="requests-title-group">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
+              <span class="requests-title">Входящие заявки</span>
+            </div>
+            <span class="requests-badge" id="requestsCountBadge">2</span>
+          </div>
+
+          <!-- Список активных заявок -->
+          <div class="requests-list" id="requestsList">
+            <!-- Заявка 1 -->
+            <div class="request-item" id="request-item-1" data-user="RedstonePro">
+              <div class="request-user-info">
+                <canvas class="request-avatar-canvas" id="reqAvatar1" width="36" height="36" aria-label="Скин RedstonePro"></canvas>
+                <div class="request-names">
+                  <span class="request-nickname">RedstonePro</span>
+                  <span class="request-code">ID: #9240</span>
+                </div>
+              </div>
+              <div class="request-actions">
+                <button type="button" class="btn-req-accept" data-req-id="request-item-1" title="Принять заявку" aria-label="Принять заявку">
+                  <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="btn-req-decline" data-req-id="request-item-1" title="Отклонить заявку" aria-label="Отклонить заявку">
+                  <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Заявка 2 -->
+            <div class="request-item" id="request-item-2" data-user="AuraPioneer">
+              <div class="request-user-info">
+                <canvas class="request-avatar-canvas" id="reqAvatar2" width="36" height="36" aria-label="Скин AuraPioneer"></canvas>
+                <div class="request-names">
+                  <span class="request-nickname">AuraPioneer</span>
+                  <span class="request-code">ID: #1184</span>
+                </div>
+              </div>
+              <div class="request-actions">
+                <button type="button" class="btn-req-accept" data-req-id="request-item-2" title="Принять заявку" aria-label="Принять заявку">
+                  <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="btn-req-decline" data-req-id="request-item-2" title="Отклонить заявку" aria-label="Отклонить заявку">
+                  <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Нейтральное состояние: Нет новых заявок -->
+          <div class="requests-empty" id="requestsEmptyState" style="display: none;">
+            <div class="requests-empty-icon">
+              <svg class="icon" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <span class="requests-empty-text">Нет новых заявок</span>
+            <span class="requests-empty-sub">Все входящие приглашения обработаны</span>
+          </div>
+        </div>
+
+        <!-- Остров совместной игры и лобби -->
+        <div class="glass-island lobby-promo-island">
+          <div class="lobby-promo-header">
+            <div class="lobby-promo-icon">
+              <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <div class="lobby-promo-text-wrap">
+              <span class="lobby-promo-title">Сетевое лобби</span>
+              <span class="lobby-promo-sub">Играйте вместе с друзьями в один клик</span>
+            </div>
+          </div>
+          <p class="lobby-promo-desc">Создайте приватную комнату или подключитесь по коду через P2P туннель Aura.</p>
+          <a href="#/lobby" class="btn-secondary btn-goto-lobby">
+            <span>Открыть лобби</span>
+            <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </a>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Модальное окно профиля друга -->
+  <div class="modal-backdrop" id="modalFriendProfile" aria-hidden="true" role="dialog" aria-labelledby="modalFriendProfileTitle">
+    <div class="glass-modal friend-profile-modal">
+      <div class="modal-header-row">
+        <h3 class="modal-title" id="modalFriendProfileTitle">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span>Профиль игрока</span>
+        </h3>
+        <button type="button" class="modal-close-btn" id="btnCloseFriendProfile" aria-label="Закрыть">
+          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="modal-body profile-modal-body">
+        <div class="profile-hero-section">
+          <div class="profile-avatar-large">
+            <canvas id="modalFriendAvatarCanvas" width="64" height="64" aria-label="Скин друга"></canvas>
+            <div class="modal-status-badge" id="modalFriendStatusDot"></div>
+          </div>
+          <div class="profile-main-data">
+            <div class="profile-nick-line">
+              <span class="profile-modal-nick" id="modalFriendNick">Steve_Miner</span>
+              <span class="badge-tag" id="modalFriendTag">Aura Pack</span>
+            </div>
+            <div class="profile-modal-status" id="modalFriendStatusText">В игре: Minecraft 1.20.1 · Aura</div>
+            <div class="profile-modal-id" id="modalFriendId">ID профиля: AURA-5491-MC88</div>
+          </div>
+        </div>
+
+        <div class="profile-stats-grid">
+          <div class="profile-stat-box">
+            <span class="stat-box-label">Сетевой пинг</span>
+            <span class="stat-box-val" id="modalFriendPing">28 ms</span>
+          </div>
+          <div class="profile-stat-box">
+            <span class="stat-box-label">Время в Aura</span>
+            <span class="stat-box-val" id="modalFriendPlaytime">184 ч</span>
+          </div>
+          <div class="profile-stat-box">
+            <span class="stat-box-label">Клиент игры</span>
+            <span class="stat-box-val" id="modalFriendClient">Fabric 1.20.1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer profile-modal-footer">
+        <button type="button" class="btn-danger-ghost" id="btnRemoveFriend">
+          <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <span>Удалить из друзей</span>
+        </button>
+        <div class="footer-right-actions">
+          <button type="button" class="btn-secondary" id="btnCloseFriendProfileBtn">Закрыть</button>
+          <button type="button" class="btn-primary-action" id="btnModalInviteLobby">
+            <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Пригласить в лобби</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>

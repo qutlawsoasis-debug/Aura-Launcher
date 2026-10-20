@@ -1,0 +1,179 @@
+<section class="screen-view" id="screen-workshop" aria-label="Экран Мастерская">
+  <div class="screen-workshop-layout">
+
+    <!-- Левая секция: Список модов с фильтрацией и поиском -->
+    <div class="workshop-main-column">
+      
+      <!-- Верхняя панель управления модами -->
+      <div class="glass-island elevated workshop-header-island">
+        <div class="workshop-header-top">
+          <div class="workshop-title-wrap">
+            <span class="glass-island-title">
+              <span class="glass-island-title-icon">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+              </span>
+              <span>Мастерская модификаций</span>
+            </span>
+            <span class="mod-count-badge" id="modCountBadge">15 модов активно</span>
+          </div>
+
+          <div class="workshop-header-actions">
+            <button type="button" class="btn-secondary" id="btnOpenModsFolder" title="Открыть локальную папку mods">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+              <span>Папка mods</span>
+            </button>
+            <button type="button" class="btn-secondary" id="btnSyncMods" title="Проверить целостность файлов по SHA-256">
+              <svg class="icon" id="syncModsIcon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+              <span id="syncModsText">Синхронизировать</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Фильтры категорий и строка поиска -->
+        <div class="workshop-controls-row">
+          <div class="workshop-category-tabs" role="tablist" aria-label="Категории модификаций">
+            <button type="button" class="category-pill-tab active" data-category="all" role="tab" aria-selected="true">
+              <span>Все моды</span>
+              <span class="tab-counter" id="countAll">15</span>
+            </button>
+            <button type="button" class="category-pill-tab" data-category="optimization" role="tab" aria-selected="false">
+              <span>Оптимизация</span>
+              <span class="tab-counter" id="countOpt">6</span>
+            </button>
+            <button type="button" class="category-pill-tab" data-category="graphics" role="tab" aria-selected="false">
+              <span>Графика и шейдеры</span>
+              <span class="tab-counter" id="countGfx">5</span>
+            </button>
+            <button type="button" class="category-pill-tab" data-category="gameplay" role="tab" aria-selected="false">
+              <span>Геймплей и звук</span>
+              <span class="tab-counter" id="countGame">4</span>
+            </button>
+          </div>
+
+          <div class="workshop-search-box">
+            <svg class="icon search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="modSearchInput" class="text-input-field mod-search-field" placeholder="Поиск модификаций..." autocomplete="off" spellcheck="false">
+            <button type="button" class="search-clear-btn" id="btnSearchClear" aria-label="Очистить поиск" style="display: none;">
+              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Список модов -->
+      <div class="mod-list-container" id="modListContainer" role="list">
+        <!-- Генерируется и управляется через workshop.js -->
+      </div>
+    </div>
+
+    <!-- Правая секция: Шейдерпаки и диагностика сборки -->
+    <div class="workshop-side-column">
+      
+      <!-- Карточка выбора шейдерпака -->
+      <div class="glass-island elevated shader-island">
+        <div class="glass-island-header">
+          <span class="glass-island-title">
+            <span class="glass-island-title-icon">
+              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+            </span>
+            <span>Шейдерпаки Iris</span>
+          </span>
+          <span class="shader-engine-badge">Sodium Core</span>
+        </div>
+
+        <div class="shader-description-note">
+          Поддержка PBR-освещения, объёмных облаков и лучей солнца через Iris Shaders.
+        </div>
+
+        <div class="shader-packs-list" id="shaderPacksList" role="radiogroup" aria-label="Выбор шейдерпака">
+          <!-- Complementary Reimagined -->
+          <div class="shader-card active" data-shader-id="complementary" role="radio" aria-checked="true" tabindex="0">
+            <div class="shader-radio-dot"></div>
+            <div class="shader-card-meta">
+              <div class="shader-name-row">
+                <span class="shader-title">Complementary Reimagined</span>
+                <span class="shader-tag recommended">Выбор Aura</span>
+              </div>
+              <p class="shader-info">r5.1.1 • Мягкие тени, фотореалистичная вода и атмосферный туман</p>
+            </div>
+          </div>
+
+          <!-- Sildurs Enhanced Default -->
+          <div class="shader-card" data-shader-id="sildurs" role="radio" aria-checked="false" tabindex="0">
+            <div class="shader-radio-dot"></div>
+            <div class="shader-card-meta">
+              <div class="shader-name-row">
+                <span class="shader-title">Sildurs Enhanced Default</span>
+                <span class="shader-tag">Легковесный</span>
+              </div>
+              <p class="shader-info">v1.3.2 Fancy • Ванильная эстетика, цветные тени и отражения</p>
+            </div>
+          </div>
+
+          <!-- Builders QoL -->
+          <div class="shader-card" data-shader-id="builders" role="radio" aria-checked="false" tabindex="0">
+            <div class="shader-radio-dot"></div>
+            <div class="shader-card-meta">
+              <div class="shader-name-row">
+                <span class="shader-title">Builders QoL</span>
+                <span class="shader-tag">Макс. FPS</span>
+              </div>
+              <p class="shader-info">v1.0 • Чистый свет и улучшенная вода без нагрузки на видеокарту</p>
+            </div>
+          </div>
+
+          <!-- Без шейдеров -->
+          <div class="shader-card" data-shader-id="none" role="radio" aria-checked="false" tabindex="0">
+            <div class="shader-radio-dot"></div>
+            <div class="shader-card-meta">
+              <div class="shader-name-row">
+                <span class="shader-title">Шейдеры отключены</span>
+                <span class="shader-tag vanilla">Vanilla</span>
+              </div>
+              <p class="shader-info">Стандартная отрисовка чанков через движок Sodium</p>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn-secondary btn-shader-folder" id="btnOpenShaderFolder">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <span>Папка shaderpacks</span>
+        </button>
+      </div>
+
+      <!-- Карточка информации о сборке -->
+      <div class="glass-island build-info-island">
+        <div class="glass-island-header">
+          <span class="glass-island-title">
+            <span class="glass-island-title-icon">
+              <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </span>
+            <span>Статус модпака</span>
+          </span>
+          <span class="status-indicator-badge live">Синхронизировано</span>
+        </div>
+
+        <div class="build-stats-grid">
+          <div class="build-stat-box">
+            <span class="build-stat-label">Манифест</span>
+            <span class="build-stat-val">20261019.2050</span>
+          </div>
+          <div class="build-stat-box">
+            <span class="build-stat-label">Целостность</span>
+            <span class="build-stat-val text-success">SHA-256 ОК</span>
+          </div>
+          <div class="build-stat-box">
+            <span class="build-stat-label">Размер файлов</span>
+            <span class="build-stat-val">342.8 МБ</span>
+          </div>
+          <div class="build-stat-box">
+            <span class="build-stat-label">Загрузчик</span>
+            <span class="build-stat-val">Fabric 0.19.5</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>

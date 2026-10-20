@@ -1,0 +1,283 @@
+/**
+ * Aura Launcher Design Tokens — Version 3 (Apple Liquid Glass + Gaming Precision)
+ * Preserves all v2 tokens and extends them with visionOS glass speculars and Apple spring curves.
+ */
+
+:root {
+  /* ================= 1. ШРИФТЫ ================= */
+  --font-family-main: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  --font-size-logo: 32px;
+  --font-size-hero: 44px;
+  --font-size-section: 18px;
+  --font-size-btn-play: 17px;
+  --font-size-title: 15px;
+  --font-size-title-sm: 14px;
+  --font-size-nav: 13.5px;
+  --font-size-body: 13px;
+  --font-size-secondary: 12px;
+  --font-size-badge: 11px;
+  --font-size-micro: 10px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+
+  /* Оптический кернинг и трекинг (Apple Typography guidelines) */
+  --tracking-tight: -0.025em;
+  --tracking-normal: -0.01em;
+  --tracking-loose: 0.02em;
+
+  /* ================= 2. ЦВЕТОВАЯ ПАЛИТРА ================= */
+  --accent: #F2A63C;
+  --accent-rgb: 242, 166, 60;
+  --accent-hover: #F7B44F;
+  --accent-active: #EB962B;
+  --accent-text: #170E04;
+  --accent-glass: rgba(242, 166, 60, 0.16);
+  --accent-glass-strong: rgba(242, 166, 60, 0.28);
+  --accent-glow: 0 0 24px rgba(242, 166, 60, 0.45);
+
+  --bg-base: #050B0F;
+  --bg-panel-solid: #0A131A;
+  --bg-raised-solid: #121F2B;
+  --bg-media-fallback: #0D161F;
+  --bg-world-image: url('../images/bg_1.jpg');
+
+  --color-danger: #FF3B30;
+  --color-danger-rgb: 255, 59, 48;
+  --color-danger-bg: rgba(255, 59, 48, 0.12);
+  --color-danger-border: rgba(255, 59, 48, 0.35);
+  --color-danger-text: #FF6961;
+
+  --color-success: #34C759;
+  --color-success-rgb: 52, 199, 89;
+  --color-success-bg: rgba(52, 199, 89, 0.12);
+  --color-success-glow: 0 0 10px rgba(52, 199, 89, 0.55);
+
+  --color-warning: #FF9F0A;
+  --color-warning-bg: rgba(255, 159, 10, 0.12);
+
+  --color-online: #30D158;
+  --color-in-game: #F2A63C;
+  --color-offline: rgba(255, 255, 255, 0.35);
+
+  --text-primary: #FFFFFF;
+  --text-secondary: rgba(245, 248, 255, 0.72);
+  --text-tertiary: rgba(245, 248, 255, 0.45);
+  --text-quaternary: rgba(245, 248, 255, 0.25);
+  --text-white: #FFFFFF;
+
+  /* ================= 3. APPLE LIQUID GLASS И СЛОИ ================= */
+  /* Базовый стеклянный остров */
+  --glass-panel: rgba(8, 16, 24, 0.52);
+  --glass-panel-elevated: rgba(12, 22, 32, 0.65);
+  --glass-panel-border: 1px solid rgba(255, 255, 255, 0.14);
+  --glass-panel-specular: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --glass-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --glass-blur: 28px;
+  --glass-saturate: 140%;
+
+  /* Вложенные стеклянные плашки (raised) */
+  --glass-raised: rgba(255, 255, 255, 0.06);
+  --glass-raised-hover: rgba(255, 255, 255, 0.11);
+  --glass-raised-active: rgba(255, 255, 255, 0.16);
+  --glass-raised-border: 1px solid rgba(255, 255, 255, 0.11);
+  --glass-raised-specular: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+  /* Навигационная капсула (pill) */
+  --nav-dock-bg: rgba(6, 12, 18, 0.62);
+  --nav-hover-bg: rgba(255, 255, 255, 0.08);
+  --nav-active-bg: rgba(255, 255, 255, 0.15);
+  --nav-active-border: 1px solid rgba(255, 255, 255, 0.3);
+  --nav-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 16px rgba(0, 0, 0, 0.3);
+
+  /* Интерактивные кнопки и контролы */
+  --win-btn-hover-bg: rgba(255, 255, 255, 0.12);
+  --card-hover-border: rgba(255, 255, 255, 0.28);
+  --card-hover-bg: rgba(255, 255, 255, 0.09);
+
+  /* Бейджи и статусы */
+  --badge-bg: rgba(5, 12, 18, 0.85);
+  --badge-border: 1px solid rgba(255, 255, 255, 0.14);
+  --blur-badge: 12px;
+
+  --border-divider: rgba(255, 255, 255, 0.08);
+  --border-subtle: 1px solid rgba(255, 255, 255, 0.07);
+  --border-avatar: 1px solid rgba(255, 255, 255, 0.22);
+
+  /* Контролы и поля ввода */
+  --control-height: 40px;
+  --control-height-lg: 48px;
+  --control-padding-x: 16px;
+  --min-tap-target: 38px;
+
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: 1px solid rgba(255, 255, 255, 0.13);
+  --input-border-hover: rgba(255, 255, 255, 0.25);
+  --input-border-focus: var(--accent);
+  --input-error-bg: rgba(255, 59, 48, 0.1);
+  --input-error-border: 1px solid rgba(255, 59, 48, 0.55);
+  --input-error-text: #FF6961;
+
+  --btn-secondary-bg: rgba(255, 255, 255, 0.08);
+  --btn-secondary-border: 1px solid rgba(255, 255, 255, 0.15);
+  --btn-secondary-hover-bg: rgba(255, 255, 255, 0.14);
+  --btn-secondary-active-bg: rgba(255, 255, 255, 0.2);
+
+  --btn-danger-bg: rgba(255, 59, 48, 0.12);
+  --btn-danger-border: 1px solid rgba(255, 59, 48, 0.35);
+  --btn-danger-hover-bg: rgba(255, 59, 48, 0.22);
+  --btn-danger-text: #FF6961;
+
+  --switch-width: 48px;
+  --switch-height: 26px;
+  --switch-knob-size: 20px;
+  --switch-bg: rgba(255, 255, 255, 0.16);
+  --switch-bg-checked: var(--accent);
+  --switch-border: 1px solid rgba(255, 255, 255, 0.14);
+
+  --slider-track-height: 6px;
+  --slider-track-bg: rgba(255, 255, 255, 0.14);
+  --slider-thumb-size: 22px;
+  --slider-thumb-shadow: 0 2px 10px rgba(0, 0, 0, 0.4), 0 0 12px rgba(242, 166, 60, 0.5);
+
+  --dropdown-bg: rgba(10, 18, 25, 0.94);
+  --dropdown-border: 1px solid rgba(255, 255, 255, 0.18);
+  --dropdown-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --dropdown-item-hover: rgba(255, 255, 255, 0.09);
+  --dropdown-item-active: rgba(242, 166, 60, 0.18);
+
+  --disabled-opacity: 0.38;
+
+  --scroll-thumb-bg: rgba(255, 255, 255, 0.22);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.4);
+  --segment-active-border: rgba(242, 166, 60, 0.45);
+  --segment-active-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  --preset-active-bg: rgba(242, 166, 60, 0.15);
+  --preset-active-shadow: 0 4px 16px rgba(242, 166, 60, 0.25);
+  --ram-chip-active-bg: rgba(242, 166, 60, 0.18);
+  --details-box-bg: rgba(255, 255, 255, 0.04);
+  --btn-danger-border-hover: rgba(255, 59, 48, 0.6);
+  --border-chip-hover: rgba(255, 255, 255, 0.24);
+  --border-track-hover: rgba(255, 255, 255, 0.26);
+  --border-preset-dot: rgba(255, 255, 255, 0.3);
+
+  --sunbeam-size: 600px;
+  --sunbeam-offset: -300px;
+  --status-dot-size: 7px;
+  --preset-dot-size: 8px;
+  --nav-indicator-size: 6px;
+
+  /* Атмосфера */
+  --overlay-vignette: radial-gradient(circle at 50% 40%, rgba(6, 12, 18, 0.25) 0%, rgba(3, 7, 10, 0.82) 100%);
+  --sunbeam-gradient: radial-gradient(circle, rgba(242, 166, 60, 0.14) 0%, rgba(242, 166, 60, 0.03) 45%, transparent 72%);
+
+  /* ================= 4. СКРУГЛЕНИЯ (CornerRadius) ================= */
+  --radius-screen: 24px;
+  --radius-panel: 20px;
+  --radius-card: 14px;
+  --radius-button: 12px;
+  --radius-chip: 10px;
+  --radius-btn-sm: 8px;
+  --radius-xs: 6px;
+  --radius-xxs: 4px;
+  --radius-pill-nav: 32px;
+  --radius-pill-tab: 24px;
+  --radius-pill-audio: 48px;
+  --radius-round: 50%;
+
+  /* ================= 5. СЕТКА И ОТСТУПЫ ================= */
+  --screen-offset-x: 52px;
+  --screen-offset-y: 44px;
+  --top-ribbon-top: 36px;
+  --content-top: 104px;
+
+  --gap-xl: 32px;
+  --gap-lg: 24px;
+  --gap-md: 16px;
+  --gap-sm: 12px;
+  --gap-xs: 8px;
+  --gap-6px: 6px;
+  --gap-xxs: 4px;
+  --gap-3px: 3px;
+  --gap-tiny: 2px;
+
+  /* ================= 6. КЛИКАБЕЛЬНЫЕ ЗОНЫ И РАЗМЕРЫ ================= */
+  --nav-tab-min-height: 40px;
+  --win-btn-size: 34px;
+  --audio-btn-size: 34px;
+  --play-btn-height: 54px;
+  --play-btn-min-width: 210px;
+  --avatar-size: 44px;
+  --audio-art-size: 40px;
+  --icon-size-default: 18px;
+  --icon-size-sm: 15px;
+  --icon-size-play: 22px;
+
+  /* ================= 7. ТАЙМИНГИ И APPLE SPRING CURVES ================= */
+  /* Apple WWDC Fluid Interfaces curve: responsive spring with slight overshoot */
+  --spring-duration: 400ms;
+  --spring-duration-snappy: 250ms;
+  --spring-duration-enter: 550ms;
+  --spring-curve: cubic-bezier(0.2, 0.85, 0.25, 1);
+  --spring-bounce: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --transition-speed: 220ms;
+  --transition-speed-fast: 140ms;
+  --transition-timing: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Stagger delays for entering islands */
+  --stagger-1: 60ms;
+  --stagger-2: 120ms;
+  --stagger-3: 180ms;
+  --stagger-4: 240ms;
+}
+
+/* ================= 8. РЕЖИМЫ ЭФФЕКТОВ ================= */
+/* Режим low: половинный блюр, без частиц и параллакса */
+html[data-effects="low"] {
+  --glass-blur: 14px;
+  --glass-saturate: 110%;
+}
+
+/* Режим off: полное отключение блюра, монолитные контрастные плашки */
+html[data-effects="off"] {
+  --glass-blur: 0px;
+  --glass-saturate: 100%;
+  --glass-panel: var(--bg-panel-solid);
+  --glass-panel-elevated: var(--bg-panel-solid);
+  --glass-raised: var(--bg-raised-solid);
+  --glass-raised-hover: #192735;
+  --glass-panel-border: 1px solid rgba(255, 255, 255, 0.16);
+  --glass-panel-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  --glass-panel-specular: none;
+  --transition-speed: 0ms;
+  --spring-duration: 0ms;
+  --spring-duration-enter: 0ms;
+}
+
+/* ================= 9. АДАПТИВНОСТЬ (1366x768) ================= */
+@media (max-width: 1400px), (max-height: 820px) {
+  :root {
+    --screen-offset-x: 36px;
+    --screen-offset-y: 28px;
+    --top-ribbon-top: 24px;
+    --content-top: 86px;
+
+    --font-size-logo: 28px;
+    --font-size-hero: 36px;
+    --font-size-section: 16px;
+    --font-size-btn-play: 16px;
+    --font-size-title: 14px;
+    --font-size-body: 12.5px;
+
+    --play-btn-height: 48px;
+    --play-btn-min-width: 180px;
+    --nav-tab-min-height: 36px;
+    --control-height: 36px;
+    --avatar-size: 38px;
+    --audio-art-size: 36px;
+  }
+}
