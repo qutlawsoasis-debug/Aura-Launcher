@@ -41,7 +41,7 @@
         <div class="launch-hero-header">
           <div class="game-version-badge-group">
             <span class="hero-tag">Aura Pack v1.2</span>
-            <span class="hero-spec">Minecraft 1.20.1 • Fabric 0.19.5 • 93 мода</span>
+            <span class="hero-spec">Minecraft 1.20.1 • Fabric 0.19.5 • 31 мод</span>
           </div>
           <button type="button" class="btn-changelog-link" id="btnChangelog" title="Посмотреть список изменений">
             <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -71,40 +71,21 @@
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Виджет аудиоплеера с винилом и эквалайзером -->
-      <div class="glass-island audio-player-island">
-        <div class="audio-player-widget">
-          <!-- Вращающийся диск винила с обложкой -->
-          <div class="vinyl-container" id="vinylContainer" title="Воспроизвести / Пауза">
-            <div class="vinyl-disc" id="vinylDisc">
-              <div class="vinyl-groove"></div>
-              <div class="vinyl-center-art" style="background-image: url('assets/audio/artist.jpg');"></div>
-            </div>
-            <button type="button" class="vinyl-play-trigger" id="audioToggleBtn" aria-label="Воспроизведение">
-              <svg class="icon icon-audio-state" id="audioStateIcon" viewBox="0 0 24 24">
-                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-              </svg>
-            </button>
+        <!-- Инфо-полоса характеристик сборки без пустого места -->
+        <div class="launch-hero-specs-row">
+          <div class="hero-spec-chip">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect></svg>
+            <span>Sodium + Iris активны</span>
           </div>
-
-          <!-- Метаданные трека -->
-          <div class="audio-info">
-            <div class="audio-track-title">Aura Anthem</div>
-            <div class="audio-artist-name">Aura Sound Team • Саундтрек лаунчера</div>
+          <div class="hero-spec-chip">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span>Целостность проверена</span>
           </div>
-
-          <!-- Анимированные полосы эквалайзера -->
-          <div class="audio-equalizer" id="audioEqualizer" aria-hidden="true">
-            <span class="eq-bar bar-1"></span>
-            <span class="eq-bar bar-2"></span>
-            <span class="eq-bar bar-3"></span>
-            <span class="eq-bar bar-4"></span>
-            <span class="eq-bar bar-5"></span>
+          <div class="hero-spec-chip">
+            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span>Время запуска: ~4 сек</span>
           </div>
-
-          <audio id="screenPlayAudio" src="assets/audio/anthem.mp3" preload="none"></audio>
         </div>
       </div>
 
@@ -164,5 +145,33 @@
         </article>
       </div>
     </aside>
+
+    <!-- 4. Отдельный компактный аудиоплеер-капсула (справа внизу как в v2) -->
+    <div class="audio-pill-widget" id="vinylContainer" title="Воспроизвести / Пауза" aria-label="Аудиоплеер">
+      <div class="audio-art-disc-wrap">
+        <div class="vinyl-disc" id="vinylDisc">
+          <div class="vinyl-center-art" style="background-image: url('assets/audio/artist.jpg');"></div>
+        </div>
+      </div>
+      <div class="audio-pill-meta">
+        <div class="audio-track-title">Aura</div>
+        <div class="audio-artist-line">
+          <span class="audio-artist">zxcursed</span>
+          <span class="meta-sep">•</span>
+          <span class="audio-time">2:38</span>
+        </div>
+      </div>
+      <div class="audio-equalizer" id="audioEqualizer" aria-hidden="true">
+        <span class="eq-bar bar-1"></span>
+        <span class="eq-bar bar-2"></span>
+        <span class="eq-bar bar-3"></span>
+      </div>
+      <button type="button" class="audio-pill-btn" id="audioToggleBtn" title="Воспроизвести трек" aria-label="Воспроизвести трек">
+        <svg class="icon icon-audio-state" id="audioStateIcon" viewBox="0 0 24 24">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      </button>
+      <audio id="screenPlayAudio" src="assets/audio/anthem.mp3" preload="none"></audio>
+    </div>
   </div>
 </section>

@@ -337,6 +337,39 @@ html, body {
   pointer-events: auto;
 }
 
+/* ================= 4.1 UNIFIED PAGE HEADER & CONTAINER ================= */
+.page-header-unified {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--gap-md);
+  padding: 0 var(--gap-xxs);
+  min-height: 48px;
+}
+
+.page-title-group-unified {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tiny);
+}
+
+.page-title-unified {
+  font-size: var(--font-size-hero);
+  font-weight: var(--font-weight-extrabold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-white);
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+}
+
+.page-subtitle-unified {
+  font-size: var(--font-size-secondary);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 /* ================= 5. APPLE LIQUID GLASS ISLANDS ================= */
 .glass-island {
   background: var(--glass-panel);

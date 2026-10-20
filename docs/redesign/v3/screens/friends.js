@@ -373,13 +373,16 @@
       });
     }
 
-    // Filter Pills
-    document.querySelectorAll('.filter-pill').forEach(pill => {
-      pill.addEventListener('click', () => {
-        const filter = pill.dataset.filter;
+    // Filter Pills with reliable container delegation
+    const filterContainer = document.querySelector('.status-filter-pills');
+    if (filterContainer) {
+      filterContainer.addEventListener('click', (e) => {
+        const pill = e.target.closest('.filter-pill');
+        if (!pill) return;
+        const filter = pill.dataset.filter || 'all';
         currentFilter = filter;
 
-        document.querySelectorAll('.filter-pill').forEach(p => {
+        filterContainer.querySelectorAll('.filter-pill').forEach(p => {
           const isActive = p === pill;
           p.classList.toggle('active', isActive);
           p.setAttribute('aria-selected', isActive ? 'true' : 'false');
@@ -387,7 +390,7 @@
 
         renderFriends();
       });
-    });
+    }
   }
 
   // Copy Friend Code & Link Handlers

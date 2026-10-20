@@ -228,8 +228,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--gap-6px);
-  height: 32px;
-  padding: 0 var(--gap-sm);
+  height: 38px;
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-md);
   border-radius: var(--radius-pill-tab);
   background: transparent;
   border: 1px solid transparent;

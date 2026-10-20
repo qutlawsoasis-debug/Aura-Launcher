@@ -392,10 +392,110 @@
   color: var(--text-tertiary);
 }
 
-/* Audio Player Island */
-.audio-player-island {
-  padding: var(--gap-md) var(--gap-lg);
-  margin-top: auto;
+/* Hero Specs Row (No dead space) */
+.launch-hero-specs-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  margin-top: var(--gap-sm);
+  padding-top: var(--gap-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: wrap;
+}
+
+.hero-spec-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-xs);
+  padding: 6px var(--gap-sm);
+  border-radius: var(--radius-pill-tab);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: var(--font-size-secondary);
+  color: var(--text-secondary);
+}
+
+.hero-spec-chip svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--accent);
+}
+
+/* 4. Floating Audio Pill Widget (Apple Liquid Glass Capsule at bottom right) */
+.audio-pill-widget {
+  position: absolute;
+  bottom: 24px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  background: rgba(10, 16, 24, 0.88);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-pill-nav);
+  padding: 6px 14px 6px 8px;
+  z-index: 45;
+  transition: transform var(--transition-speed-fast) var(--spring-curve), border-color var(--transition-speed);
+}
+
+.audio-pill-widget:hover {
+  transform: translateY(-2px);
+  border-color: rgba(242, 166, 60, 0.5);
+}
+
+.audio-art-disc-wrap {
+  width: 38px;
+  height: 38px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.audio-pill-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 110px;
+}
+
+.audio-pill-meta .audio-track-title {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-white);
+  line-height: 1.2;
+}
+
+.audio-pill-meta .audio-artist-line {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-6px);
+  font-size: var(--font-size-secondary);
+  color: var(--text-secondary);
+  line-height: 1.2;
+}
+
+.audio-pill-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: var(--radius-round);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-speed);
+}
+
+.audio-pill-btn:hover {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
 }
 
 .audio-player-widget {
