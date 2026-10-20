@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Launcher — Концепция A: Живой мир</title>
+  <style>
+    <!-- Концепция A: Живой мир — интерфейс растворяется в кинематографическом живом пейзаже с параллаксом, световой аурой и парящей консолью управления. -->
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-Medium.ttf') format('truetype');
+      font-weight: 500;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-Bold.ttf') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+      font-style: normal;
+    }
+
+    :root {
+      --accent: #F2A63C;
+      --accent-hover: #F7B44F;
+      --accent-text: #1C1106;
+      --glass-panel: rgba(10, 18, 24, 0.42);
+      --glass-panel-border: 1px solid rgba(255, 255, 255, 0.12);
+      --glass-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 12px 40px rgba(0, 0, 0, 0.45);
+      --glass-raised: rgba(255, 255, 255, 0.07);
+      --glass-raised-hover: rgba(255, 255, 255, 0.12);
+      --glass-raised-border: 1px solid rgba(255, 255, 255, 0.09);
+      --text-primary: #E8F0F8;
+      --text-secondary: rgba(232, 240, 248, 0.65);
+      --text-tertiary: rgba(232, 240, 248, 0.42);
+      --radius-panel: 16px;
+      --radius-card: 12px;
+      --radius-button: 10px;
+      --radius-chip: 8px;
+      --transition-speed: 200ms;
+      --transition-timing: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #050B0F;
+      color: var(--text-primary);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Холст окна 1920x1080 */
+    .viewport {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width: 1920px;
+      max-height: 1080px;
+      overflow: hidden;
+    }
+
+    /* Фоновый слой с параллаксом */
+    .world-bg {
+      position: absolute;
+      top: -5%;
+      left: -5%;
+      width: 110%;
+      height: 110%;
+      background-image: url('../../../Resources/Backgrounds/bg_1.jpg');
+      background-size: cover;
+      background-position: center;
+      transition: transform 0.1s ease-out;
+      will-change: transform;
+      z-index: 0;
+    }
+
+    /* Атмосферный градиент и виньетка */
+    .world-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 40%, rgba(7, 16, 23, 0.15) 0%, rgba(5, 11, 15, 0.65) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Динамический световой блик (солнечный зайчик от курсора) */
+    .sunbeam-light {
+      position: absolute;
+      width: 800px;
+      height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(242, 166, 60, 0.12) 0%, rgba(242, 166, 60, 0.02) 40%, transparent 70%);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      transition: transform 0.15s ease-out;
+      z-index: 2;
+    }
+
+    /* Canvas для светлячков и парящей пыльцы */
+    #ambientCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    /* Векторные иконки */
+    .icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 1.67;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    /* ================= 1. ТОП-ПАНЕЛЬ (Floating Glass Ribbon) ================= */
+    .top-ribbon {
+      position: absolute;
+      top: 36px;
+      left: 48px;
+      right: 48px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-aura {
+      font-size: 38px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #FFFFFF;
+      text-decoration: none;
+    }
+
+    .status-pill {
+      background: rgba(10, 18, 24, 0.5);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* Центральная парящая навигация */
+    .nav-pill-dock {
+      background: var(--glass-panel);
+      backdrop-filter: blur(28px) saturate(1.2);
+      -webkit-backdrop-filter: blur(28px) saturate(1.2);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: 32px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .nav-tab {
+      padding: 10px 22px;
+      border-radius: 24px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all var(--transition-speed) var(--transition-timing);
+    }
+
+    .nav-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .nav-tab.active {
+      color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    }
+
+    .nav-tab.active .nav-tab-indicator {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* Правая часть топ-бара: кнопки окна и версия */
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .version-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+    }
+
+    .win-controls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--glass-panel);
+      backdrop-filter: blur(20px);
+      border: var(--glass-panel-border);
+      padding: 4px;
+      border-radius: var(--radius-button);
+    }
+
+    .win-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-speed) var(--transition-timing);
+    }
+
+    .win-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .win-btn.close:hover {
+      background: #E81123;
+      color: #FFFFFF;
+    }
+
+    /* ================= 2. ПРАВЫЕ ОКНА-ВИДОИСКАТЕЛИ (Screenshots Viewport) ================= */
+    .world-moments-drawer {
+      position: absolute;
+      top: 130px;
+      right: 48px;
+      width: 310px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      z-index: 10;
+    }
+
+    .moments-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .moments-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .moments-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color var(--transition-speed);
+    }
+
+    .moments-link:hover {
+      color: var(--accent);
+    }
+
+    .moment-card {
+      position: relative;
+      height: 126px;
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      background: var(--glass-panel);
+      backdrop-filter: blur(20px);
+      cursor: pointer;
+      transition: transform var(--transition-speed) var(--transition-timing), border-color var(--transition-speed);
+    }
+
+    .moment-card:hover {
+      transform: translateX(-4px) scale(1.02);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .moment-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.85;
+      transition: opacity var(--transition-speed);
+    }
+
+    .moment-card:hover .moment-img {
+      opacity: 1;
+    }
+
+    .moment-badge {
+      position: absolute;
+      bottom: 8px;
+      left: 8px;
+      background: rgba(7, 16, 23, 0.8);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-chip);
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ================= 3. ПАРИРУЮЩАЯ КОНСОЛЬ УПРАВЛЕНИЯ (Hero Island Dock) ================= */
+    .hero-island {
+      position: absolute;
+      bottom: 44px;
+      left: 48px;
+      right: 48px;
+      background: var(--glass-panel);
+      backdrop-filter: blur(32px) saturate(1.2);
+      -webkit-backdrop-filter: blur(32px) saturate(1.2);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: var(--radius-panel);
+      padding: 20px 28px;
+      display: grid;
+      grid-template-columns: 260px 280px 1fr auto;
+      align-items: center;
+      gap: 32px;
+      z-index: 10;
+    }
+
+    /* Профиль игрока */
+    .profile-tile {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-right: 24px;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .profile-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      background-image: url('../../../steve.png');
+      background-size: 384px 384px;
+      background-position: -48px -48px;
+      image-rendering: pixelated;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      flex-shrink: 0;
+      background-color: #1a1a1a;
+    }
+
+    .profile-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .profile-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .profile-ram-badge {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Музыкальный плеер */
+    .audio-tile {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-right: 24px;
+      border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .audio-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .audio-art {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .audio-meta {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .audio-song {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .audio-artist {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .audio-btns {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .audio-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all var(--transition-speed);
+    }
+
+    .audio-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .audio-btn.play {
+      background: var(--glass-raised);
+      border: var(--glass-raised-border);
+      color: var(--text-primary);
+    }
+
+    .audio-btn.play:hover {
+      background: var(--accent);
+      color: var(--accent-text);
+      border-color: var(--accent);
+    }
+
+    .audio-timeline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .audio-track-line {
+      flex: 1;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .audio-track-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+    }
+
+    /* Информация о сборке */
+    .specs-tile {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .specs-main-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .changelog-chip {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      background: none;
+      border: none;
+      transition: color var(--transition-speed);
+    }
+
+    .changelog-chip:hover {
+      color: var(--accent);
+    }
+
+    .specs-sub-line {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    /* Главная кнопка запуска "Играть" */
+    .launch-btn-box {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .play-hero-btn {
+      background: var(--accent);
+      color: var(--accent-text);
+      font-family: inherit;
+      font-size: 17px;
+      font-weight: 800;
+      height: 56px;
+      min-width: 200px;
+      padding: 0 32px;
+      border-radius: var(--radius-button);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 24px rgba(242, 166, 60, 0.4);
+      transition: all var(--transition-speed) var(--transition-timing);
+    }
+
+    .play-hero-btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 30px rgba(242, 166, 60, 0.55);
+    }
+
+    .play-hero-btn:active {
+      transform: scale(0.98);
+    }
+
+    .play-hero-btn:focus-visible {
+      outline: 2px solid #FFFFFF;
+      outline-offset: 3px;
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport">
+    <!-- Фоновый мир с параллаксом -->
+    <div class="world-bg" id="worldBg"></div>
+    <div class="world-overlay"></div>
+    <div class="sunbeam-light" id="sunbeamLight"></div>
+    <canvas id="ambientCanvas"></canvas>
+
+    <!-- 1. Верхняя парящая лента -->
+    <header class="top-ribbon">
+      <div class="brand-section">
+        <a href="#" class="logo-aura">Aura</a>
+      </div>
+
+      <!-- Центральная навигация -->
+      <nav class="nav-pill-dock" aria-label="Главное меню">
+        <a href="#" class="nav-tab active">
+          <span class="nav-tab-indicator"></span>
+          <span>Играть</span>
+        </a>
+        <a href="#" class="nav-tab">Лобби</a>
+        <a href="#" class="nav-tab">Друзья</a>
+        <a href="#" class="nav-tab">Мастерская</a>
+        <a href="#" class="nav-tab">Профиль</a>
+        <a href="#" class="nav-tab">Настройки</a>
+      </nav>
+
+      <!-- Правая панель кнопок окна -->
+      <div class="top-actions">
+        <span class="version-badge">beta 1.0.132</span>
+        <div class="win-controls">
+          <button class="win-btn" title="Свернуть" aria-label="Свернуть">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+          <button class="win-btn" title="Развернуть" aria-label="Развернуть">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+          </button>
+          <button class="win-btn close" title="Закрыть" aria-label="Закрыть">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. Правые видоискатели скриншотов -->
+    <aside class="world-moments-drawer" aria-label="Снимки мира">
+      <div class="moments-header">
+        <div class="moments-title">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <span>Снимки мира</span>
+        </div>
+        <a href="#" class="moments-link">В Мастерскую →</a>
+      </div>
+
+      <div class="moment-card" title="Снимок от 13.10.2026 22:40">
+        <img class="moment-img" src="../../../Resources/Backgrounds/bg_4.jpg" alt="Скриншот 1">
+        <div class="moment-badge">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>13.10.2026 22:40</span>
+        </div>
+      </div>
+
+      <div class="moment-card" title="Снимок от 13.10.2026 20:10">
+        <img class="moment-img" src="../../../Resources/Backgrounds/bg_5.jpg" alt="Скриншот 2">
+        <div class="moment-badge">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>13.10.2026 20:10</span>
+        </div>
+      </div>
+
+      <div class="moment-card" title="Снимок от 13.10.2026 05:18">
+        <img class="moment-img" src="../../../Resources/Backgrounds/bg_6.jpg" alt="Скриншот 3">
+        <div class="moment-badge">
+          <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <span>13.10.2026 05:18</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 3. Парящая консоль запуска (Island Dock) -->
+    <footer class="hero-island">
+      <!-- Профиль игрока -->
+      <div class="profile-tile">
+        <div class="profile-avatar" title="Coock0ld"></div>
+        <div class="profile-info">
+          <div class="profile-name">Coock0ld</div>
+          <div class="profile-ram-badge">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+            <span>RAM: 6 ГБ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Музыкальный плеер -->
+      <div class="audio-tile">
+        <div class="audio-top">
+          <img class="audio-art" src="../../../Resources/Audio/artist.jpg" alt="zxcursed">
+          <div class="audio-meta">
+            <div class="audio-song">Aura</div>
+            <div class="audio-artist">zxcursed</div>
+          </div>
+          <div class="audio-btns">
+            <button class="audio-btn" title="Предыдущий" aria-label="Предыдущий">
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+            </button>
+            <button class="audio-btn play" title="Воспроизвести" aria-label="Воспроизвести">
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            <button class="audio-btn" title="Следующий" aria-label="Следующий">
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+            </button>
+          </div>
+        </div>
+        <div class="audio-timeline">
+          <span>0:00</span>
+          <div class="audio-track-line">
+            <div class="audio-track-fill"></div>
+          </div>
+          <span>0:00</span>
+        </div>
+      </div>
+
+      <!-- Спецификации сборки -->
+      <div class="specs-tile">
+        <div class="specs-main-line">
+          <span>Minecraft 1.21.1, Fabric 0.19.5, модов: 129</span>
+          <button class="changelog-chip">Список изменений</button>
+        </div>
+        <div class="specs-sub-line">
+          <span>В игре: 91 ч. 14 мин. • Запусков: 109</span>
+        </div>
+      </div>
+
+      <!-- Действие запуска -->
+      <div class="launch-btn-box">
+        <button class="play-hero-btn" id="playBtn">
+          <svg class="icon" viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: currentColor;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>Играть</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // 1. Интерактивный параллакс фона и луч солнца от мыши
+    const worldBg = document.getElementById('worldBg');
+    const sunbeam = document.getElementById('sunbeamLight');
+
+    window.addEventListener('mousemove', (e) => {
+      const xRatio = (e.clientX / window.innerWidth) - 0.5;
+      const yRatio = (e.clientY / window.innerHeight) - 0.5;
+
+      worldBg.style.transform = `translate(${xRatio * -28}px, ${yRatio * -20}px) scale(1.04)`;
+      sunbeam.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    });
+
+    // 2. Частицы пыльцы/светлячков в атмосфере
+    const canvas = document.getElementById('ambientCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
+
+    function resizeCanvas() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const particles = [];
+    for (let i = 0; i < 45; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        r: Math.random() * 2 + 0.8,
+        speedX: (Math.random() - 0.5) * 0.4,
+        speedY: -Math.random() * 0.5 - 0.15,
+        alpha: Math.random() * 0.5 + 0.2,
+        pulse: Math.random() * Math.PI
+      });
+    }
+
+    function renderParticles() {
+      ctx.clearRect(0, 0, width, height);
+      for (let p of particles) {
+        p.x += p.speedX;
+        p.y += p.speedY;
+        p.pulse += 0.02;
+
+        if (p.y < 0) p.y = height;
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+
+        const currentAlpha = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(242, 166, 60, ${currentAlpha})`;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(242, 166, 60, 0.6)';
+        ctx.fill();
+      }
+      requestAnimationFrame(renderParticles);
+    }
+    renderParticles();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura Launcher — Концепция B: Персонаж на сцене</title>
+  <!-- Концепция B: Персонаж на сцене — 3D-фигура героя в центре подиума, интерфейс образует тактильную арену вокруг него с интерактивным слежением за курсором. -->
+  <style>
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-Regular.ttf') format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-Medium.ttf') format('truetype');
+      font-weight: 500;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-SemiBold.ttf') format('truetype');
+      font-weight: 600;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-Bold.ttf') format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Manrope';
+      src: url('../../../Resources/Fonts/Manrope-ExtraBold.ttf') format('truetype');
+      font-weight: 800;
+      font-style: normal;
+    }
+
+    :root {
+      --accent: #F2A63C;
+      --accent-hover: #F7B44F;
+      --accent-text: #1C1106;
+      --glass-panel: rgba(10, 16, 22, 0.48);
+      --glass-panel-border: 1px solid rgba(255, 255, 255, 0.12);
+      --glass-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 16px 48px rgba(0, 0, 0, 0.5);
+      --glass-raised: rgba(255, 255, 255, 0.06);
+      --glass-raised-hover: rgba(255, 255, 255, 0.11);
+      --glass-raised-border: 1px solid rgba(255, 255, 255, 0.09);
+      --text-primary: #E8F0F8;
+      --text-secondary: rgba(232, 240, 248, 0.65);
+      --text-tertiary: rgba(232, 240, 248, 0.42);
+      --radius-panel: 16px;
+      --radius-card: 12px;
+      --radius-button: 10px;
+      --radius-chip: 8px;
+      --transition-speed: 200ms;
+      --transition-timing: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #04080B;
+      color: var(--text-primary);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .viewport {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width: 1920px;
+      max-height: 1080px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 360px 1fr 380px;
+      grid-template-rows: 60px 1fr 140px;
+      padding: 40px 48px;
+      gap: 20px 40px;
+    }
+
+    /* Задний фон арены со сценическим освещением */
+    .stage-bg {
+      position: absolute;
+      inset: 0;
+      background-image: url('../../../Resources/Backgrounds/bg_2.jpg');
+      background-size: cover;
+      background-position: center;
+      z-index: 0;
+    }
+
+    .stage-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 50%, rgba(4, 9, 13, 0.45) 0%, rgba(4, 9, 13, 0.85) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Конический свет прожектора на сцену */
+    .spotlight {
+      position: absolute;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 1100px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(242, 166, 60, 0.22) 0%, rgba(242, 166, 60, 0.04) 45%, transparent 70%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Иконки */
+    .icon {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 1.67;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+      flex-shrink: 0;
+    }
+
+    /* ================= ВЕРХНЯЯ ШАПКА ================= */
+    .stage-header {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+
+    .brand-logo {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #FFFFFF;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .version-tag {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+    }
+
+    .win-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--glass-panel);
+      backdrop-filter: blur(20px);
+      border: var(--glass-panel-border);
+      padding: 4px;
+      border-radius: var(--radius-button);
+    }
+
+    .win-btn {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-speed);
+    }
+
+    .win-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
+    .win-btn.close:hover {
+      background: #E81123;
+      color: #FFFFFF;
+    }
+
+    /* ================= ЛЕВАЯ КОЛОНКА (Навигация + Профиль) ================= */
+    .left-deck {
+      grid-column: 1;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 10;
+    }
+
+    .nav-card-stack {
+      background: var(--glass-panel);
+      backdrop-filter: blur(28px) saturate(1.2);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: var(--radius-panel);
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 18px;
+      border-radius: var(--radius-button);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: all var(--transition-speed) var(--transition-timing);
+    }
+
+    .nav-link:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+      transform: translateX(4px);
+    }
+
+    .nav-link.active {
+      color: #FFFFFF;
+      background: rgba(242, 166, 60, 0.12);
+      border: 1px solid rgba(242, 166, 60, 0.3);
+    }
+
+    .nav-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: all var(--transition-speed);
+    }
+
+    .nav-link.active .nav-dot {
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      transform: scale(1.3);
+    }
+
+    /* Профиль игрока */
+    .profile-banner {
+      background: var(--glass-panel);
+      backdrop-filter: blur(28px) saturate(1.2);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: var(--radius-panel);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .player-face {
+      width: 52px;
+      height: 52px;
+      border-radius: var(--radius-card);
+      background-image: url('../../../steve.png');
+      background-size: 416px 416px;
+      background-position: -52px -52px;
+      image-rendering: pixelated;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      flex-shrink: 0;
+      background-color: #1a1a1a;
+    }
+
+    .player-details {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .player-ign {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .player-specs {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ================= ЦЕНТРАЛЬНАЯ СЦЕНА (3D Герой на пьедестале) ================= */
+    .stage-center {
+      grid-column: 2;
+      grid-row: 2;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      z-index: 5;
+      padding-bottom: 24px;
+    }
+
+    /* Пьедестал платформы */
+    .podium-container {
+      position: absolute;
+      bottom: 20px;
+      width: 480px;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .podium-base {
+      position: absolute;
+      width: 420px;
+      height: 130px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(242, 166, 60, 0.35) 0%, rgba(10, 18, 24, 0.75) 60%, transparent 75%);
+      box-shadow: 0 0 60px rgba(242, 166, 60, 0.4), inset 0 0 24px rgba(242, 166, 60, 0.3);
+      border: 1.5px solid rgba(242, 166, 60, 0.45);
+      transform: rotateX(68deg);
+    }
+
+    .podium-ring-outer {
+      position: absolute;
+      width: 500px;
+      height: 160px;
+      border-radius: 50%;
+      border: 1px dashed rgba(242, 166, 60, 0.35);
+      transform: rotateX(68deg);
+      animation: spinPodium 36s linear infinite;
+    }
+
+    .character-contact-shadow {
+      position: absolute;
+      bottom: 60px;
+      width: 140px;
+      height: 40px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(0, 0, 0, 0.7) 0%, transparent 70%);
+      transform: rotateX(65deg);
+      pointer-events: none;
+    }
+
+    @keyframes spinPodium {
+      from { transform: rotateX(68deg) rotateZ(0deg); }
+      to { transform: rotateX(68deg) rotateZ(360deg); }
+    }
+
+    /* 3D-контейнер персонажа с перспективой */
+    .character-3d-scene {
+      position: relative;
+      width: 280px;
+      height: 380px;
+      perspective: 1200px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      margin-bottom: 25px;
+      z-index: 2;
+    }
+
+    .character-rig {
+      position: relative;
+      width: 128px;
+      height: 256px;
+      transform-style: preserve-3d;
+      transform: rotateY(-18deg) rotateX(2deg);
+      transition: transform 0.1s ease-out;
+      will-change: transform;
+      transform-origin: center bottom;
+    }
+
+    /* 3D-куб головы */
+    .char-head {
+      position: absolute;
+      top: 0;
+      left: 32px;
+      width: 64px;
+      height: 64px;
+      transform-style: preserve-3d;
+      animation: headBob 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes headBob {
+      0% { transform: translateY(0px) rotateX(0deg); }
+      100% { transform: translateY(2px) rotateX(2deg); }
+    }
+
+    .face {
+      position: absolute;
+      image-rendering: pixelated;
+      background-image: url('../../../steve.png');
+      background-size: 512px 512px;
+      backface-visibility: hidden;
+    }
+
+    /* Голова: грани */
+    .head-front  { width: 64px; height: 64px; transform: translateZ(32px); background-position: -64px -64px; }
+    .head-back   { width: 64px; height: 64px; transform: rotateY(180deg) translateZ(32px); background-position: -192px -64px; }
+    .head-right  { width: 64px; height: 64px; transform: rotateY(-90deg) translateZ(32px); background-position: 0px -64px; }
+    .head-left   { width: 64px; height: 64px; transform: rotateY(90deg) translateZ(32px); background-position: -128px -64px; }
+    .head-top    { width: 64px; height: 64px; transform: rotateX(90deg) translateZ(32px); background-position: -64px 0px; }
+    .head-bottom { width: 64px; height: 64px; transform: rotateX(-90deg) translateZ(32px); background-position: -128px 0px; }
+
+    /* Туловище */
+    .char-body {
+      position: absolute;
+      top: 64px;
+      left: 32px;
+      width: 64px;
+      height: 96px;
+      transform-style: preserve-3d;
+    }
+
+    .body-front { width: 64px; height: 96px; transform: translateZ(16px); background-position: -160px -160px; }
+    .body-back  { width: 64px; height: 96px; transform: rotateY(180deg) translateZ(16px); background-position: -256px -160px; }
+    .body-right { width: 32px; height: 96px; transform: rotateY(-90deg) translateZ(32px); background-position: -128px -160px; }
+    .body-left  { width: 32px; height: 96px; transform: rotateY(90deg) translateZ(32px); background-position: -224px -160px; }
+    .body-top   { width: 64px; height: 32px; transform: rotateX(90deg) translateZ(16px); background-position: -160px -128px; }
+
+    /* Правая рука */
+    .char-arm-right {
+      position: absolute;
+      top: 64px;
+      left: 0px;
+      width: 32px;
+      height: 96px;
+      transform-style: preserve-3d;
+      transform: rotateX(8deg) translateZ(4px);
+    }
+    .arm-r-front { width: 32px; height: 96px; transform: translateZ(16px); background-position: -352px -160px; }
+    .arm-r-right { width: 32px; height: 96px; transform: rotateY(-90deg) translateZ(16px); background-position: -320px -160px; }
+    .arm-r-left  { width: 32px; height: 96px; transform: rotateY(90deg) translateZ(16px); background-position: -384px -160px; }
+    .arm-r-top   { width: 32px; height: 32px; transform: rotateX(90deg) translateZ(16px); background-position: -352px -128px; }
+
+    /* Левая рука */
+    .char-arm-left {
+      position: absolute;
+      top: 64px;
+      left: 96px;
+      width: 32px;
+      height: 96px;
+      transform-style: preserve-3d;
+      transform: rotateX(-8deg) translateZ(4px);
+    }
+    .arm-l-front { width: 32px; height: 96px; transform: translateZ(16px); background-position: -288px -416px; }
+    .arm-l-left  { width: 32px; height: 96px; transform: rotateY(90deg) translateZ(16px); background-position: -256px -416px; }
+    .arm-l-right { width: 32px; height: 96px; transform: rotateY(-90deg) translateZ(16px); background-position: -320px -416px; }
+    .arm-l-top   { width: 32px; height: 32px; transform: rotateX(90deg) translateZ(16px); background-position: -288px -384px; }
+
+    /* Ноги */
+    .char-leg-right {
+      position: absolute;
+      top: 160px;
+      left: 32px;
+      width: 32px;
+      height: 96px;
+      transform-style: preserve-3d;
+      transform: translateZ(2px);
+    }
+    .leg-r-front { width: 32px; height: 96px; transform: translateZ(16px); background-position: -32px -160px; }
+    .leg-r-right { width: 32px; height: 96px; transform: rotateY(-90deg) translateZ(16px); background-position: 0px -160px; }
+
+    .char-leg-left {
+      position: absolute;
+      top: 160px;
+      left: 64px;
+      width: 32px;
+      height: 96px;
+      transform-style: preserve-3d;
+      transform: translateZ(-2px);
+    }
+    .leg-l-front { width: 32px; height: 96px; transform: translateZ(16px); background-position: -160px -416px; }
+    .leg-l-left  { width: 32px; height: 96px; transform: rotateY(90deg) translateZ(16px); background-position: -128px -416px; }
+
+    /* ================= ПРАВАЯ КОЛОНКА (Галерея + Плеер) ================= */
+    .right-deck {
+      grid-column: 3;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .gallery-deck {
+      background: var(--glass-panel);
+      backdrop-filter: blur(28px) saturate(1.2);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: var(--radius-panel);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .gallery-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .gallery-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .gallery-link {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+
+    .gallery-link:hover {
+      color: var(--accent);
+    }
+
+    .shots-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .shot-tile {
+      position: relative;
+      flex: 1;
+      min-height: 90px;
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      border: var(--glass-raised-border);
+      background: var(--glass-raised);
+      cursor: pointer;
+      transition: all var(--transition-speed);
+    }
+
+    .shot-tile:hover {
+      transform: translateX(-3px);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .shot-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.85;
+      transition: opacity var(--transition-speed);
+    }
+
+    .shot-tile:hover .shot-img {
+      opacity: 1;
+    }
+
+    .shot-tag {
+      position: absolute;
+      bottom: 6px;
+      left: 6px;
+      background: rgba(4, 9, 13, 0.8);
+      backdrop-filter: blur(8px);
+      border-radius: var(--radius-chip);
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Плеер */
+    .audio-card {
+      background: var(--glass-panel);
+      backdrop-filter: blur(28px);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: var(--radius-panel);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .audio-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .audio-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .audio-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .audio-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .audio-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .audio-ctrls {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .audio-act-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .audio-act-btn.play {
+      background: var(--glass-raised);
+      color: var(--text-primary);
+    }
+
+    .audio-act-btn.play:hover {
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+
+    .audio-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    .audio-track {
+      flex: 1;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .audio-track-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+    }
+
+    /* ================= НИЖНЯЯ ПЛИТА ЗАПУСКА (Центрированная) ================= */
+    .bottom-command-deck {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .launch-pod {
+      background: var(--glass-panel);
+      backdrop-filter: blur(32px) saturate(1.2);
+      border: var(--glass-panel-border);
+      box-shadow: var(--glass-panel-shadow);
+      border-radius: var(--radius-panel);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 36px;
+    }
+
+    .build-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .build-primary {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-changelog {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-changelog:hover {
+      color: var(--accent);
+    }
+
+    .build-secondary {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .launch-play-btn {
+      background: var(--accent);
+      color: var(--accent-text);
+      font-family: inherit;
+      font-size: 18px;
+      font-weight: 800;
+      height: 60px;
+      min-width: 220px;
+      padding: 0 36px;
+      border-radius: var(--radius-button);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      box-shadow: 0 6px 28px rgba(242, 166, 60, 0.45);
+      transition: all var(--transition-speed) var(--transition-timing);
+    }
+
+    .launch-play-btn:hover {
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 36px rgba(242, 166, 60, 0.6);
+    }
+
+    .launch-play-btn:active {
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body>
+  <div class="viewport">
+    <div class="stage-bg"></div>
+    <div class="stage-overlay"></div>
+    <div class="spotlight"></div>
+
+    <!-- Шапка -->
+    <header class="stage-header">
+      <div class="brand-group">
+        <h1 class="brand-logo">Aura</h1>
+      </div>
+
+      <div class="header-controls">
+        <span class="version-tag">beta 1.0.132</span>
+        <div class="win-group">
+          <button class="win-btn" title="Свернуть" aria-label="Свернуть">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+          <button class="win-btn" title="Развернуть" aria-label="Развернуть">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+          </button>
+          <button class="win-btn close" title="Закрыть" aria-label="Закрыть">
+            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Левая колонка -->
+    <aside class="left-deck">
+      <nav class="nav-card-stack" aria-label="Навигация">
+        <a href="#" class="nav-link active">
+          <span class="nav-dot"></span>
+          <span>Играть</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-dot"></span>
+          <span>Лобби</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-dot"></span>
+          <span>Друзья</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-dot"></span>
+          <span>Мастерская</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-dot"></span>
+          <span>Профиль</span>
+        </a>
+        <a href="#" class="nav-link">
+          <span class="nav-dot"></span>
+          <span>Настройки</span>
+        </a>
+      </nav>
+
+      <div class="profile-banner">
+        <div class="player-face" title="Coock0ld"></div>
+        <div class="player-details">
+          <div class="player-ign">Coock0ld</div>
+          <div class="player-specs">
+            <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+            <span>RAM: 6 ГБ</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Центральная 3D-сцена с персонажем -->
+    <main class="stage-center">
+      <div class="podium-container">
+        <div class="podium-base"></div>
+        <div class="podium-ring-outer"></div>
+        <div class="character-contact-shadow"></div>
+      </div>
+
+      <div class="character-3d-scene">
+        <div class="character-rig" id="charRig">
+          <!-- Голова -->
+          <div class="char-head">
+            <div class="face head-front"></div>
+            <div class="face head-back"></div>
+            <div class="face head-right"></div>
+            <div class="face head-left"></div>
+            <div class="face head-top"></div>
+            <div class="face head-bottom"></div>
+          </div>
+
+          <!-- Тело -->
+          <div class="char-body">
+            <div class="face body-front"></div>
+            <div class="face body-back"></div>
+            <div class="face body-right"></div>
+            <div class="face body-left"></div>
+            <div class="face body-top"></div>
+          </div>
+
+          <!-- Руки -->
+          <div class="char-arm-right">
+            <div class="face arm-r-front"></div>
+            <div class="face arm-r-right"></div>
+            <div class="face arm-r-left"></div>
+            <div class="face arm-r-top"></div>
+          </div>
+          <div class="char-arm-left">
+            <div class="face arm-l-front"></div>
+            <div class="face arm-l-left"></div>
+            <div class="face arm-l-right"></div>
+            <div class="face arm-l-top"></div>
+          </div>
+
+          <!-- Ноги -->
+          <div class="char-leg-right">
+            <div class="face leg-r-front"></div>
+            <div class="face leg-r-right"></div>
+          </div>
+          <div class="char-leg-left">
+            <div class="face leg-l-front"></div>
+            <div class="face leg-l-left"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Правая колонка -->
+    <aside class="right-deck">
+      <div class="gallery-deck">
+        <div class="gallery-top">
+          <span class="gallery-title">Снимки мира</span>
+          <a href="#" class="gallery-link">В Мастерскую →</a>
+        </div>
+        <div class="shots-stack">
+          <div class="shot-tile">
+            <img class="shot-img" src="../../../Resources/Backgrounds/bg_4.jpg" alt="Снимок 1">
+            <span class="shot-tag">13.10.2026 22:40</span>
+          </div>
+          <div class="shot-tile">
+            <img class="shot-img" src="../../../Resources/Backgrounds/bg_5.jpg" alt="Снимок 2">
+            <span class="shot-tag">13.10.2026 20:10</span>
+          </div>
+          <div class="shot-tile">
+            <img class="shot-img" src="../../../Resources/Backgrounds/bg_6.jpg" alt="Снимок 3">
+            <span class="shot-tag">13.10.2026 05:18</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="audio-card">
+        <div class="audio-row">
+          <img class="audio-thumb" src="../../../Resources/Audio/artist.jpg" alt="zxcursed">
+          <div class="audio-info">
+            <div class="audio-title">Aura</div>
+            <div class="audio-sub">zxcursed</div>
+          </div>
+          <div class="audio-ctrls">
+            <button class="audio-act-btn" title="Предыдущий" aria-label="Предыдущий">
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+            </button>
+            <button class="audio-act-btn play" title="Воспроизвести" aria-label="Воспроизвести">
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            </button>
+            <button class="audio-act-btn" title="Следующий" aria-label="Следующий">
+              <svg class="icon" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+            </button>
+          </div>
+        </div>
+        <div class="audio-bar">
+          <span>0:00</span>
+          <div class="audio-track">
+            <div class="audio-track-fill"></div>
+          </div>
+          <span>0:00</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Нижняя консоль запуска -->
+    <footer class="bottom-command-deck">
+      <div class="launch-pod">
+        <div class="build-meta">
+          <div class="build-primary">
+            <span>Minecraft 1.21.1, Fabric 0.19.5, модов: 129</span>
+            <button class="btn-changelog">Список изменений</button>
+          </div>
+          <div class="build-secondary">
+            <span>В игре: 91 ч. 14 мин. • Запусков: 109 • Выделено 6 ГБ памяти</span>
+          </div>
+        </div>
+
+        <button class="launch-play-btn" id="launchBtn">
+          <svg class="icon" viewBox="0 0 24 24" style="width: 22px; height: 22px; fill: currentColor;"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>Играть</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Интерактивное слежение персонажа за курсором мыши
+    const rig = document.getElementById('charRig');
+    window.addEventListener('mousemove', (e) => {
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      const deltaX = (e.clientX - centerX) / (window.innerWidth / 2);
+      const deltaY = (e.clientY - centerY) / (window.innerHeight / 2);
+
+      const rotY = deltaX * 35; // поворот влево-вправо до 35 градусов
+      const rotX = -deltaY * 15; // наклон вперед-назад до 15 градусов
+
+      rig.style.transform = `rotateY(${rotY}deg) rotateX(${rotX}deg)`;
+    });
+  </script>
+</body>
+</html>
