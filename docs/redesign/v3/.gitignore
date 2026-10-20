@@ -1,3 +1,2 @@
-
-.chrome_audit_profile/
-.chrome_profile/
+.chrome*/
+screenshots/

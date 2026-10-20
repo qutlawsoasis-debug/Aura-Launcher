@@ -193,7 +193,8 @@ ${combinedJs}
   `;
 
   console.log('6. Assembling single aura-v3-standalone.html...');
-  const standaloneHtml = `<!DOCTYPE html>
+  const standaloneHtml = `<!-- GENERATED — не редактировать, правь screens/* -->
+<!DOCTYPE html>
 <html lang="ru" data-effects="full">
 <head>
   <meta charset="UTF-8">

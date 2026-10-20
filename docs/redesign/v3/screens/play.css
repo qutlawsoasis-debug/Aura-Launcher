@@ -6,6 +6,7 @@
 .screen-play-layout {
   display: grid;
   grid-template-columns: 1fr 340px;
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--gap-lg);
   width: 100%;
   height: 100%;
@@ -58,12 +59,12 @@
 
 .player-status-indicator {
   position: absolute;
-  bottom: 0;
-  right: 0;
+  bottom: -2px;
+  right: -2px;
   width: var(--status-dot-size);
   height: var(--status-dot-size);
   border-radius: var(--radius-round);
-  border: 1px solid var(--bg-panel-solid);
+  border: 2px solid var(--bg-panel-solid);
 }
 
 .player-status-indicator.online {
@@ -424,9 +425,7 @@
 
 /* 4. Floating Audio Pill Widget (Apple Liquid Glass Capsule at bottom right) */
 .audio-pill-widget {
-  position: absolute;
-  bottom: 24px;
-  right: 28px;
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
@@ -437,7 +436,9 @@
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   border-radius: var(--radius-pill-nav);
   padding: 6px 14px 6px 8px;
-  z-index: 45;
+  margin-top: auto;
+  flex-shrink: 0;
+  align-self: stretch;
   transition: transform var(--transition-speed-fast) var(--spring-curve), border-color var(--transition-speed);
 }
 
@@ -663,6 +664,7 @@
   flex-direction: column;
   gap: var(--gap-md);
   overflow: hidden;
+  min-height: 0;
 }
 
 .stories-rail-header {
@@ -694,6 +696,8 @@
   gap: var(--gap-sm);
   overflow-y: auto;
   padding-right: var(--gap-xxs);
+  flex: 1;
+  min-height: 0;
 }
 
 .story-card {
@@ -778,4 +782,38 @@
 
 .btn-story-more:active {
   transform: scale(0.96);
+}
+
+.btn-changelog-link:focus-visible,
+.btn-story-more:focus-visible,
+.audio-pill-btn:focus-visible,
+.audio-pill-widget:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vinyl-disc,
+  .eq-bar,
+  .audio-equalizer.animating .bar-1,
+  .audio-equalizer.animating .bar-2,
+  .audio-equalizer.animating .bar-3 {
+    animation: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .screen-play-layout {
+    grid-template-columns: 1fr 300px;
+  }
+}
+
+@media (max-width: 860px) {
+  .screen-play-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .play-stories-rail {
+    max-height: 320px;
+  }
 }

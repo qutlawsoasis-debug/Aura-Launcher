@@ -133,14 +133,24 @@
           if (text) text.textContent = 'Играть';
           if (stateTitle) stateTitle.textContent = 'Готово к запуску';
           if (subtext) subtext.textContent = 'Выделено 6 ГБ ОЗУ • Java 17 Temurin';
-          if (progressBar) progressBar.style.width = '0%';
+          if (progressBar) {
+            progressBar.style.transition = 'none';
+            progressBar.style.width = '0%';
+          }
           btn.disabled = false;
+          btn.removeAttribute('aria-busy');
+          btn.removeAttribute('aria-disabled');
           break;
 
         case 'syncing':
           if (icon) icon.innerHTML = SVG_SPINNER;
           if (text) text.textContent = 'Синхронизация...';
+          if (progressBar) {
+            progressBar.style.transition = 'width 500ms linear';
+          }
           btn.disabled = false;
+          btn.setAttribute('aria-busy', 'true');
+          btn.removeAttribute('aria-disabled');
           break;
 
         case 'in-game':
@@ -149,6 +159,8 @@
           if (stateTitle) stateTitle.textContent = 'В игре (Minecraft 1.20.1)';
           if (subtext) subtext.textContent = 'PID: 14892 • Нажмите, чтобы остановить игру';
           btn.disabled = false;
+          btn.removeAttribute('aria-busy');
+          btn.removeAttribute('aria-disabled');
           break;
 
         case 'stopping':
@@ -157,6 +169,8 @@
           if (stateTitle) stateTitle.textContent = 'Остановка процесса...';
           if (subtext) subtext.textContent = 'Завершение сессии игры...';
           btn.disabled = true;
+          btn.setAttribute('aria-busy', 'true');
+          btn.setAttribute('aria-disabled', 'true');
           break;
       }
     }
@@ -181,6 +195,10 @@
       if (eq) eq.classList.toggle('animating', playing);
       if (audioIcon) {
         audioIcon.innerHTML = playing ? SVG_AUDIO_PAUSE : SVG_AUDIO_PLAY;
+      }
+      if (audioToggleBtn) {
+        audioToggleBtn.setAttribute('aria-label', playing ? 'Пауза' : 'Воспроизвести трек');
+        audioToggleBtn.setAttribute('title', playing ? 'Пауза' : 'Воспроизвести трек');
       }
     }
 
@@ -212,6 +230,12 @@
     if (vinylContainer) {
       vinylContainer.addEventListener('click', () => {
         togglePlayback();
+      });
+      vinylContainer.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          togglePlayback();
+        }
       });
     }
 
@@ -245,6 +269,8 @@
   }
 
   window.initPlayScreen = function () {
+    if (window._playScreenInited) return;
+    window._playScreenInited = true;
     drawPlayerAvatar();
     LaunchStateMachine.init();
     initAudioPlayer();

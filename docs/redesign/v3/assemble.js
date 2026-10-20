@@ -11,7 +11,8 @@ const wardrobeHtml = fs.readFileSync(path.join(screensDir, 'wardrobe.html'), 'ut
 const workshopHtml = fs.readFileSync(path.join(screensDir, 'workshop.html'), 'utf-8');
 const settingsHtml = fs.readFileSync(path.join(screensDir, 'settings.html'), 'utf-8');
 
-const template = `<!DOCTYPE html>
+const template = `<!-- GENERATED — не редактировать, правь screens/* -->
+<!DOCTYPE html>
 <html lang="ru" data-effects="full">
 <head>
   <meta charset="UTF-8">

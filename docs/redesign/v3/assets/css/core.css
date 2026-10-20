@@ -157,13 +157,19 @@ html, body {
   letter-spacing: var(--tracking-tight);
   color: var(--text-white);
   text-decoration: none;
-  line-height: 1;
+  line-height: 1.15;
   display: inline-flex;
   align-items: center;
   min-height: var(--min-tap-target, 38px);
-  padding: 0 var(--gap-xs);
+  padding: 0 var(--gap-sm) 0 var(--gap-xs);
   gap: var(--gap-xs);
+  overflow: visible;
   transition: transform var(--transition-speed-fast) var(--spring-curve);
+}
+
+.logo-aura span {
+  display: inline-block;
+  padding-right: 3px;
 }
 
 .logo-aura:hover {
@@ -323,6 +329,15 @@ html, body {
   background: linear-gradient(to top, rgba(5, 11, 15, 0.98) 0%, rgba(5, 11, 15, 0.5) 50%, transparent 100%);
   pointer-events: none;
   z-index: 30;
+}
+
+.screen-viewport:has(#screen-play.is-active)::after {
+  display: none;
+}
+
+/* Play screen fills the viewport - no bottom padding reserve for fade */
+#screen-play {
+  padding-bottom: 0;
 }
 
 .screen-view {
