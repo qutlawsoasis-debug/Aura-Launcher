@@ -443,7 +443,7 @@
         btnSync.disabled = true;
 
         if (syncIcon) syncIcon.classList.add('icon-spin');
-        if (syncText) syncText.textContent = 'Проверка SHA-256...';
+        if (syncText) syncText.textContent = 'Синхронизация...';
 
         setTimeout(() => {
           isSyncing = false;
@@ -452,7 +452,8 @@
           if (syncText) syncText.textContent = 'Синхронизировать';
 
           if (window.showToast) {
-            window.showToast('Все 93 файла сборки проверены и соответствуют SHA-256', 'success');
+            const count = (window.AURA_DEMO_DATA && window.AURA_DEMO_DATA.game) ? window.AURA_DEMO_DATA.game.modsCount : 31;
+            window.showToast(`Все ${count} модов сборки проверены и синхронизированы`, 'success');
           }
         }, 1400);
       });
@@ -597,7 +598,7 @@
               </div>
               <div class="build-stat-box">
                 <span class="build-stat-label">Целостность</span>
-                <span class="build-stat-val text-success">SHA-256 ОК</span>
+                <span class="build-stat-val text-success">Синхронизировано</span>
               </div>
               <div class="build-stat-box">
                 <span class="build-stat-label">Размер файлов</span>

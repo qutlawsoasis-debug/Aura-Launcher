@@ -44,7 +44,6 @@ const template = `<!DOCTYPE html>
       <div class="brand-section">
         <a href="#/play" class="logo-aura" aria-label="Aura Launcher">
           <span>Aura</span>
-          <span class="logo-badge">v3</span>
         </a>
       </div>
 
@@ -102,6 +101,7 @@ ${settingsHtml}
   </div>
 
   <!-- Базовые скрипты ядра и модулей -->
+  <script src="assets/js/demo-data.js"></script>
   <script src="assets/js/core.js"></script>
   <script src="screens/play.js"></script>
   <script src="screens/lobby.js"></script>

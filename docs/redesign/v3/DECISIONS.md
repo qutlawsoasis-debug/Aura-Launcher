@@ -25,3 +25,20 @@
 - Верхний тонкий specular-блик: `inset 0 1px 0 rgba(255, 255, 255, 0.22)`.
 - Никаких выдуманных неоновых радуг или кричащих цветов: фирменный янтарный акцент (`--accent: #F2A63C`), глубокая контрастная тёмно-синяя основа (`--bg-base: #050B0F`), чистые белые и полупрозрачные текстовые слои.
 - Живые пружинные переходы (`cubic-bezier(0.2, 0.8, 0.2, 1)` / spring-feel), плавающий параллакс, взвешенные микрочастицы пыли в воздухе.
+
+
+### 4. Экран «Друзья» — статус в реальном коде лаунчера
+- **Вопрос**: Есть ли функционал друзей в реальном коде лаунчера или это выдуманная фича?
+- **Аудит кодовой базы C# и TypeScript**:
+  - **C# Сервисы**: `Services/Interfaces/IFriendService.cs`, `Services/Implementations/FriendService.cs` — полноценный рабочий сервис.
+  - **WPF Представления**: `Views/FriendsView.xaml`, `Views/FriendsView.xaml.cs`, `ViewModels/FriendsViewModel.cs`.
+  - **Модели данных**: `Models/FriendModels.cs` (`FriendPresenceItem`, `FriendRequestItem`, `IncomingInviteItem`, `UserProfileSnapshotDto`).
+  - **Бэкенд**: `lobby-api/src/friendRoutes.ts` и `lobby-api/api/friends/` (маршруты на Vercel Serverless с хранилищем Upstash Redis KV).
+  - **Тесты**: `tests/AuraLauncher.Tests/FriendsAndLobbyScenarioTests.cs`.
+- **Фактические возможности в коде**:
+  - Генерация и привязка персонального кода друга (`CurrentFriendCode`);
+  - Отправка и принятие заявок в друзья (`SendFriendRequestAsync`, `RespondFriendRequestAsync`);
+  - Отслеживание статусов присутствия (`FriendPresenceItem`: в игре, в сети, не в сети, текущее лобби);
+  - Отправка приглашений в приватный P2P-туннель лобби (`SendInviteAsync`);
+  - Удаление из друзей (`RemoveFriendAsync`).
+- **Решение**: Экран «Друзья» в Aura Launcher v3 является 100% реальной функциональностью проекта. Для автономного HTML-прототипа тестовые сущности вынесены в `assets/js/demo-data.js` с явной отметкой `// DEMO`.

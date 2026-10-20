@@ -31,7 +31,6 @@
       <div class="brand-section">
         <a href="#/play" class="logo-aura" aria-label="Aura Launcher">
           <span>Aura</span>
-          <span class="logo-badge">v3</span>
         </a>
       </div>
 
@@ -197,11 +196,11 @@
         <!-- Карточка 2 -->
         <article class="glass-subcard story-card">
           <div class="story-tag-row">
-            <span class="story-badge success">Событие</span>
-            <time class="story-time">Суббота, 19:00</time>
+            <span class="story-badge success">Шейдеры</span>
+            <time class="story-time">18 окт</time>
           </div>
-          <h4 class="story-heading">Рейд в Бастионы Незера</h4>
-          <p class="story-snippet">Кооперативная экспедиция в измерение Незера. Сбор в центральном хабе лобби. Защита инвентаря включена.</p>
+          <h4 class="story-heading">Поддержка Complementary Shaders v5</h4>
+          <p class="story-snippet">Оптимизирован профиль освещения и рендеринг воды под видеокарты AMD и NVIDIA.</p>
           <button type="button" class="btn-story-more" data-story-id="2">
             <span>Подробнее</span>
             <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -214,8 +213,8 @@
             <span class="story-badge">Система</span>
             <time class="story-time">14 окт</time>
           </div>
-          <h4 class="story-heading">Синхронизация скинов v3</h4>
-          <p class="story-snippet">Обновлён локальный сервис рендеринга 3D-моделей. Поддержка Slim (Alex) и Classic (Steve) скинов.</p>
+          <h4 class="story-heading">Локальный рендеринг скинов</h4>
+          <p class="story-snippet">Интеграция прямого предпросмотра моделей Steve (4px) и Alex (3px) на базе Canvas.</p>
           <button type="button" class="btn-story-more" data-story-id="3">
             <span>Подробнее</span>
             <svg class="icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -745,7 +744,7 @@
           <span class="player-badge-nick" id="wardrobeBadgeNick">Coock0ld</span>
           <span class="player-badge-id">ID: AURA-7821-X9M2</span>
         </div>
-        <span class="badge-tag">Aura Founder</span>
+        <span class="badge-tag">Aura Core</span>
       </div>
     </div>
 
@@ -775,7 +774,7 @@
           
           <div class="viewport-hud-overlay">
             <span class="hud-angle-badge" id="hudAngleBadge">0°</span>
-            <span class="hud-cape-badge" id="hudCapeBadge">Плащ Aura Founder</span>
+            <span class="hud-cape-badge" id="hudCapeBadge">Плащ Aura</span>
           </div>
 
           <!-- Световой блик под ногами персонажа -->
@@ -867,18 +866,18 @@
               </span>
               <span>Плащ Aura</span>
             </span>
-            <span class="cape-status-tag" id="capeStatusTag">Активен: Founder</span>
+            <span class="cape-status-tag" id="capeStatusTag">Активен: Aura</span>
           </div>
 
           <div class="cape-cards-grid" role="radiogroup" aria-label="Выбор плаща">
-            <!-- Плащ Aura Founder -->
+            <!-- Плащ Aura -->
             <div class="cape-card active" data-cape="founder" role="radio" aria-checked="true">
               <div class="cape-card-preview cape-founder-preview">
                 <div class="cape-emblem-gold">A</div>
               </div>
               <div class="cape-card-info">
-                <span class="cape-card-name">Плащ Aura Founder</span>
-                <span class="cape-card-desc">Фирменный янтарный плащ основателя</span>
+                <span class="cape-card-name">Плащ Aura</span>
+                <span class="cape-card-desc">Фирменный янтарный плащ с эмблемой Aura</span>
               </div>
               <div class="cape-radio-dot"></div>
             </div>
@@ -980,7 +979,7 @@
               <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
               <span>Папка mods</span>
             </button>
-            <button type="button" class="btn-secondary" id="btnSyncMods" title="Проверить целостность файлов по SHA-256">
+            <button type="button" class="btn-secondary" id="btnSyncMods" title="Проверить синхронизацию файлов">
               <svg class="icon" id="syncModsIcon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
               <span id="syncModsText">Синхронизировать</span>
             </button>
@@ -1118,7 +1117,7 @@
           </div>
           <div class="build-stat-box">
             <span class="build-stat-label">Целостность</span>
-            <span class="build-stat-val text-success">SHA-256 ОК</span>
+            <span class="build-stat-val text-success">Синхронизировано</span>
           </div>
           <div class="build-stat-box">
             <span class="build-stat-label">Размер файлов</span>
@@ -1465,6 +1464,7 @@
   </div>
 
   <!-- Базовые скрипты ядра и модулей -->
+  <script src="assets/js/demo-data.js"></script>
   <script src="assets/js/core.js"></script>
   <script src="screens/play.js"></script>
   <script src="screens/lobby.js"></script>
