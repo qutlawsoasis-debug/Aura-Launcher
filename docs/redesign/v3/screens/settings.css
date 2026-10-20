@@ -83,7 +83,7 @@
   font-weight: var(--font-weight-bold);
   padding: 1px 6px;
   border-radius: var(--radius-xxs);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-raised);
   color: var(--text-secondary);
 }
 

@@ -322,7 +322,170 @@
     });
   };
 
-  // 8. Bootstrap on DOM ready
+  // 8. Adaptive Glass Tone Detection Engine
+  const offscreenCanvas = document.createElement('canvas');
+  offscreenCanvas.width = 64;
+  offscreenCanvas.height = 36;
+  const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+  let currentBgImage = null;
+  let bgImgLoaded = false;
+  let bgImgElement = null;
+  let detectDebounceTimer = null;
+
+  function getFallbackTone() {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const toneVal = rootStyle.getPropertyValue('--bg-world-tone').trim();
+    return (toneVal === 'light') ? 'light' : 'dark';
+  }
+
+  function extractBgImageUrl() {
+    const bgElem = document.getElementById('worldBg');
+    const rootStyle = getComputedStyle(document.documentElement);
+    let bgUrl = bgElem ? getComputedStyle(bgElem).backgroundImage : '';
+    if (!bgUrl || bgUrl === 'none') {
+      bgUrl = rootStyle.getPropertyValue('--bg-world-image').trim();
+    }
+    const match = bgUrl.match(/url\(['"]?(.*?)['"]?\)/);
+    return match ? match[1] : null;
+  }
+
+  function loadBgImage(url, callback) {
+    if (!url) {
+      bgImgLoaded = false;
+      callback(false);
+      return;
+    }
+    if (bgImgElement && currentBgImage === url && bgImgLoaded) {
+      callback(true);
+      return;
+    }
+    currentBgImage = url;
+    bgImgLoaded = false;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      bgImgElement = img;
+      bgImgLoaded = true;
+      if (offscreenCtx) {
+        offscreenCtx.clearRect(0, 0, 64, 36);
+        offscreenCtx.drawImage(img, 0, 0, 64, 36);
+      }
+      callback(true);
+    };
+    img.onerror = () => {
+      bgImgLoaded = false;
+      callback(false);
+    };
+    img.src = url;
+  }
+
+  window.detectGlassTone = function () {
+    const glassElements = document.querySelectorAll('[data-glass]');
+    if (!glassElements.length) return;
+
+    const bgUrl = extractBgImageUrl();
+    loadBgImage(bgUrl, (success) => {
+      if (!success || !offscreenCtx) {
+        const fallbackTone = getFallbackTone();
+        glassElements.forEach(el => el.setAttribute('data-tone', fallbackTone));
+        return;
+      }
+
+      let imgData = null;
+      try {
+        imgData = offscreenCtx.getImageData(0, 0, 64, 36);
+      } catch (e) {
+        // SecurityError on file:/// origin
+        const fallbackTone = getFallbackTone();
+        glassElements.forEach(el => el.setAttribute('data-tone', fallbackTone));
+        return;
+      }
+
+      const winW = window.innerWidth || 1920;
+      const winH = window.innerHeight || 1080;
+      const imgW = bgImgElement ? bgImgElement.naturalWidth : 1920;
+      const imgH = bgImgElement ? bgImgElement.naturalHeight : 1080;
+
+      // Calculate background-size: cover scaling and crop offsets
+      const scale = Math.max(winW / imgW, winH / imgH);
+      const renderedW = imgW * scale;
+      const renderedH = imgH * scale;
+      const cropX = (renderedW - winW) / 2;
+      const cropY = (renderedH - winH) / 2;
+
+      const pixels = imgData.data;
+
+      glassElements.forEach(el => {
+        // Skip hidden elements in inactive screen views
+        const screenParent = el.closest('.screen-view');
+        if (screenParent && !screenParent.classList.contains('is-active')) {
+          return;
+        }
+
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return;
+
+        // Map element bounding box into 64x36 canvas coordinates
+        const normLeft = (rect.left + cropX) / renderedW;
+        const normTop = (rect.top + cropY) / renderedH;
+        const normRight = (rect.right + cropX) / renderedW;
+        const normBottom = (rect.bottom + cropY) / renderedH;
+
+        const startX = Math.max(0, Math.min(63, Math.floor(normLeft * 64)));
+        const endX = Math.max(0, Math.min(63, Math.ceil(normRight * 64)));
+        const startY = Math.max(0, Math.min(35, Math.floor(normTop * 36)));
+        const endY = Math.max(0, Math.min(35, Math.ceil(normBottom * 36)));
+
+        let totalL = 0;
+        let count = 0;
+
+        for (let y = startY; y <= endY; y++) {
+          for (let x = startX; x <= endX; x++) {
+            const idx = (y * 64 + x) * 4;
+            const r = pixels[idx] / 255;
+            const g = pixels[idx + 1] / 255;
+            const b = pixels[idx + 2] / 255;
+            // Relative luminance (W3C formula)
+            const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            totalL += lum;
+            count++;
+          }
+        }
+
+        const avgL = count > 0 ? (totalL / count) : 0;
+        const determinedTone = (avgL > 0.5) ? 'light' : 'dark';
+        el.setAttribute('data-tone', determinedTone);
+      });
+    });
+  };
+
+  function scheduleGlassToneDetection() {
+    if (detectDebounceTimer) clearTimeout(detectDebounceTimer);
+    detectDebounceTimer = setTimeout(() => {
+      window.detectGlassTone();
+    }, 150);
+  }
+
+  function initGlassToneDetection() {
+    window.detectGlassTone();
+    window.addEventListener('resize', scheduleGlassToneDetection);
+
+    // Re-detect when route changes (new screen becomes active)
+    window.addEventListener('hashchange', () => {
+      setTimeout(() => window.detectGlassTone(), 50);
+    });
+
+    // Observe background image changes on #worldBg if mutated
+    const bgElem = document.getElementById('worldBg');
+    if (bgElem && window.MutationObserver) {
+      const observer = new MutationObserver(() => {
+        scheduleGlassToneDetection();
+      });
+      observer.observe(bgElem, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+  }
+
+  // 9. Bootstrap on DOM ready
   document.addEventListener('DOMContentLoaded', () => {
     window.setEffectsMode(currentEffectsMode);
     handleHashChange();
@@ -335,6 +498,8 @@
         navigateTo(tab.dataset.route);
       });
     });
+
+    initGlassToneDetection();
   });
 
 })();

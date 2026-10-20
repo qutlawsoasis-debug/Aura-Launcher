@@ -411,8 +411,8 @@
   gap: var(--gap-xs);
   padding: 6px var(--gap-sm);
   border-radius: var(--radius-pill-tab);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--glass-raised);
+  border: var(--glass-raised-border);
   font-size: var(--font-size-secondary);
   color: var(--text-secondary);
 }
@@ -432,8 +432,8 @@
   background: rgba(10, 16, 24, 0.88);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border: var(--glass-panel-border);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), var(--glass-panel-specular);
   border-radius: var(--radius-pill-nav);
   padding: 6px 14px 6px 8px;
   margin-top: auto;
@@ -483,8 +483,8 @@
   min-width: 38px;
   min-height: 38px;
   border-radius: var(--radius-round);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--glass-raised-hover);
+  border: var(--glass-raised-border);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -759,8 +759,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--gap-xs);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--glass-raised);
+  border: var(--glass-raised-border);
   border-radius: var(--radius-pill-tab);
   color: var(--accent);
   font-family: inherit;

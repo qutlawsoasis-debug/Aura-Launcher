@@ -518,7 +518,7 @@
 }
 
 .cape-none-preview {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--glass-raised);
   color: var(--text-tertiary);
 }
 

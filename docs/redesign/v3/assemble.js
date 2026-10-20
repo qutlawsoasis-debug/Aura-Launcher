@@ -49,7 +49,7 @@ const template = `<!-- GENERATED — не редактировать, правь
       </div>
 
       <!-- Центральный стеклянный навигационный док -->
-      <nav class="nav-pill-dock" aria-label="Главная навигация">
+      <nav class="nav-pill-dock" data-glass aria-label="Главная навигация">
         <button type="button" class="nav-tab active" data-route="play" aria-current="page">
           <span class="nav-tab-indicator"></span>
           <span>Играть</span>

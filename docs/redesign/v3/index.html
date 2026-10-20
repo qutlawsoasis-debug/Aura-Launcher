@@ -36,7 +36,7 @@
       </div>
 
       <!-- Центральный стеклянный навигационный док -->
-      <nav class="nav-pill-dock" aria-label="Главная навигация">
+      <nav class="nav-pill-dock" data-glass aria-label="Главная навигация">
         <button type="button" class="nav-tab active" data-route="play" aria-current="page">
           <span class="nav-tab-indicator"></span>
           <span>Играть</span>
@@ -82,7 +82,7 @@
     <div class="play-main-hub">
       
       <!-- Карточка профиля игрока -->
-      <div class="glass-island profile-widget-island">
+      <div class="glass-island profile-widget-island" data-glass>
         <div class="profile-widget">
           <div class="profile-avatar-wrap">
             <div class="profile-avatar-frame">
@@ -115,7 +115,7 @@
       </div>
 
       <!-- Центральный Hero-блок запуска игры -->
-      <div class="glass-island elevated launch-hero-island">
+      <div class="glass-island elevated launch-hero-island" data-glass>
         <div class="launch-hero-header">
           <div class="game-version-badge-group">
             <span class="hero-tag">Aura Pack v1.2</span>
@@ -170,7 +170,7 @@
     </div>
 
     <!-- Правая колонка: События и новости сервера (Stories) -->
-    <aside class="play-stories-rail glass-island">
+    <aside class="play-stories-rail glass-island" data-glass>
       <div class="stories-rail-header">
         <div class="stories-title">
           <svg class="icon" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9"></path><path d="M4 4a16 16 0 0 1 16 16"></path><circle cx="5" cy="19" r="1"></circle></svg>
@@ -222,7 +222,7 @@
           </button>
         </article>
       </div>
-      <div class="audio-pill-widget" id="vinylContainer" role="button" tabindex="0" title="Воспроизвести / Пауза" aria-label="Аудиоплеер">
+      <div class="audio-pill-widget" id="vinylContainer" data-glass role="button" tabindex="0" title="Воспроизвести / Пауза" aria-label="Аудиоплеер">
         <div class="audio-art-disc-wrap">
           <div class="vinyl-disc" id="vinylDisc">
             <div class="vinyl-center-art" style="background-image: url('assets/audio/artist.jpg');"></div>
@@ -263,7 +263,7 @@
       </div>
 
       <!-- Статус P2P-туннеля (Playit / UPnP) -->
-      <div class="tunnel-status-card" id="tunnelStatusCard">
+      <div class="tunnel-status-card" id="tunnelStatusCard" data-glass>
         <div class="tunnel-indicator-wrap">
           <div class="tunnel-led active" id="tunnelLed" title="Туннель активен"></div>
         </div>
@@ -286,7 +286,7 @@
     </div>
 
     <!-- Карточка активной комнаты с кодом лобби -->
-    <div class="glass-island elevated active-room-island">
+    <div class="glass-island elevated active-room-island" data-glass>
       <div class="room-card-header">
         <div class="room-header-left">
           <span class="glass-island-title">
@@ -326,7 +326,7 @@
     </div>
 
     <!-- Сетка слотов игроков в лобби -->
-    <div class="glass-island lobby-slots-section">
+    <div class="glass-island lobby-slots-section" data-glass>
       <div class="slots-section-header">
         <div class="slots-heading">
           <svg class="icon" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
@@ -493,7 +493,7 @@
       </div>
 
       <!-- Карточка "Мой код друга" -->
-      <div class="my-friend-code-card">
+      <div class="my-friend-code-card" data-glass>
         <div class="code-card-info">
           <span class="code-card-label">Мой код профиля</span>
           <div class="code-card-value" id="myFriendCodeVal">AURA-7821-X9M2</div>
@@ -512,7 +512,7 @@
     </div>
 
     <!-- Панель инструментов: Поиск, фильтры по статусу и добавление друга -->
-    <div class="friends-toolbar-island glass-island">
+    <div class="friends-toolbar-island glass-island" data-glass>
       <div class="toolbar-left">
         <!-- Поле быстрого поиска по нику -->
         <div class="friends-search-box">
@@ -583,7 +583,7 @@
       <div class="friends-sidebar-column">
 
         <!-- Остров входящих заявок -->
-        <div class="glass-island requests-island" id="requestsIsland">
+        <div class="glass-island requests-island" id="requestsIsland" data-glass>
           <div class="requests-header">
             <div class="requests-title-group">
               <svg class="icon" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>
@@ -644,7 +644,7 @@
         </div>
 
         <!-- Остров совместной игры и лобби -->
-        <div class="glass-island lobby-promo-island">
+        <div class="glass-island lobby-promo-island" data-glass>
           <div class="lobby-promo-header">
             <div class="lobby-promo-icon">
               <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
@@ -751,7 +751,7 @@
     <div class="wardrobe-content-grid">
 
       <!-- Левая колонка: 3D Сцена персонажа -->
-      <div class="glass-island elevated wardrobe-stage-island">
+      <div class="glass-island elevated wardrobe-stage-island" data-glass>
         <div class="stage-header">
           <div class="stage-title-wrap">
             <svg class="icon stage-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
@@ -800,7 +800,7 @@
       <div class="wardrobe-controls-column">
 
         <!-- Секция 1: Ник и ID профиля -->
-        <div class="glass-island">
+        <div class="glass-island" data-glass>
           <div class="glass-island-header">
             <span class="glass-island-title">
               <span class="glass-island-title-icon">
@@ -832,7 +832,7 @@
         </div>
 
         <!-- Секция 2: Модель персонажа (Alex 3px / Steve 4px) -->
-        <div class="glass-island">
+        <div class="glass-island" data-glass>
           <div class="glass-island-header">
             <span class="glass-island-title">
               <span class="glass-island-title-icon">
@@ -857,7 +857,7 @@
         </div>
 
         <!-- Секция 3: Выбор плаща -->
-        <div class="glass-island">
+        <div class="glass-island" data-glass>
           <div class="glass-island-header">
             <span class="glass-island-title">
               <span class="glass-island-title-icon">
@@ -908,7 +908,7 @@
         </div>
 
         <!-- Секция 4: Загрузка скина (.png) -->
-        <div class="glass-island">
+        <div class="glass-island" data-glass>
           <div class="glass-island-header">
             <span class="glass-island-title">
               <span class="glass-island-title-icon">
@@ -961,7 +961,7 @@
     <div class="workshop-main-column">
       
       <!-- Верхняя панель управления модами -->
-      <div class="glass-island elevated workshop-header-island">
+      <div class="glass-island elevated workshop-header-island" data-glass>
         <div class="workshop-header-top">
           <div class="workshop-title-wrap">
             <span class="glass-island-title">
@@ -1026,7 +1026,7 @@
     <div class="workshop-side-column">
       
       <!-- Карточка выбора шейдерпака -->
-      <div class="glass-island elevated shader-island">
+      <div class="glass-island elevated shader-island" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">
@@ -1098,7 +1098,7 @@
       </div>
 
       <!-- Карточка информации о сборке -->
-      <div class="glass-island build-info-island">
+      <div class="glass-island build-info-island" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">
@@ -1140,7 +1140,7 @@
     <div class="settings-main-column">
 
       <!-- Карточка: Клиент и среда запуска -->
-      <div class="glass-island elevated">
+      <div class="glass-island elevated" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">
@@ -1246,7 +1246,7 @@
       </div>
 
       <!-- Карточка: Пресеты графики Minecraft -->
-      <div class="glass-island elevated">
+      <div class="glass-island elevated" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">
@@ -1318,7 +1318,7 @@
     <div class="settings-side-column">
 
       <!-- Карточка: Визуальные эффекты интерфейса -->
-      <div class="glass-island">
+      <div class="glass-island" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">
@@ -1344,7 +1344,7 @@
       </div>
 
       <!-- Карточка: Поведение при запуске и обновления -->
-      <div class="glass-island">
+      <div class="glass-island" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">
@@ -1394,7 +1394,7 @@
       </div>
 
       <!-- Карточка: Системные действия и диагностика -->
-      <div class="glass-island">
+      <div class="glass-island" data-glass>
         <div class="glass-island-header">
           <span class="glass-island-title">
             <span class="glass-island-title-icon">

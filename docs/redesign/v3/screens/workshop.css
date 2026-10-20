@@ -263,8 +263,8 @@
   font-weight: var(--font-weight-semibold);
   padding: 1px var(--gap-6px);
   border-radius: var(--radius-xxs);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--glass-raised);
+  border: var(--glass-raised-border);
   color: var(--text-tertiary);
 }
 
@@ -301,7 +301,7 @@
   font-weight: var(--font-weight-medium);
   padding: 2px var(--gap-xs);
   border-radius: var(--radius-pill-tab);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-raised);
   color: var(--text-tertiary);
 }
 
@@ -443,7 +443,7 @@
   font-weight: var(--font-weight-semibold);
   padding: 1px var(--gap-6px);
   border-radius: var(--radius-xxs);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--glass-raised);
   color: var(--text-secondary);
 }
 
@@ -455,7 +455,7 @@
 }
 
 .shader-tag.vanilla {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--glass-raised);
   color: var(--text-tertiary);
 }
 

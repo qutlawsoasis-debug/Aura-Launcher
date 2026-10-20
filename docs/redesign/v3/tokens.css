@@ -45,6 +45,7 @@
   --bg-raised-solid: #121F2B;
   --bg-media-fallback: #0D161F;
   --bg-world-image: url('../images/bg_1.jpg');
+  --bg-world-tone: dark;
 
   --color-danger: #FF3B30;
   --color-danger-rgb: 255, 59, 48;
@@ -71,7 +72,7 @@
   --text-white: #FFFFFF;
 
   /* ================= 3. APPLE LIQUID GLASS И СЛОИ ================= */
-  /* Базовый стеклянный остров */
+  /* Базовый стеклянный остров (тон dark по умолчанию) */
   --glass-panel: rgba(255, 255, 255, 0.08);
   --glass-panel-elevated: rgba(255, 255, 255, 0.12);
   --glass-panel-border: 1px solid rgba(255, 255, 255, 0.16);
@@ -79,6 +80,7 @@
   --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
   --glass-blur: 28px;
   --glass-saturate: 160%;
+  --text-shadow-on-glass: none;
 
   /* Вложенные стеклянные плашки (raised) */
   --glass-raised: rgba(255, 255, 255, 0.06);
@@ -236,6 +238,26 @@
 }
 
 /* ================= 8. РЕЖИМЫ ЭФФЕКТОВ ================= */
+/* Адаптивный тон стекла: светлый фон -> темный тинт стекла */
+[data-tone="light"] {
+  --glass-panel: rgba(10, 14, 20, 0.55);
+  --glass-panel-elevated: rgba(10, 14, 20, 0.65);
+  --glass-panel-border: 1px solid rgba(255, 255, 255, 0.10);
+  --glass-panel-specular: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35);
+
+  --glass-raised: rgba(10, 14, 20, 0.45);
+  --glass-raised-hover: rgba(10, 14, 20, 0.55);
+  --glass-raised-active: rgba(10, 14, 20, 0.65);
+  --glass-raised-border: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-raised-specular: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  --nav-dock-bg: rgba(8, 12, 18, 0.88);
+  --badge-bg: rgba(8, 12, 18, 0.92);
+
+  --text-shadow-on-glass: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
 /* Режим low: половинный блюр, без частиц и параллакса */
 html[data-effects="low"] {
   --glass-blur: 14px;
@@ -256,6 +278,17 @@ html[data-effects="off"] {
   --transition-speed: 0ms;
   --spring-duration: 0ms;
   --spring-duration-enter: 0ms;
+}
+
+html[data-effects="off"] [data-tone="light"],
+html[data-effects="off"][data-tone="light"] {
+  --glass-panel: var(--bg-panel-solid);
+  --glass-panel-elevated: var(--bg-panel-solid);
+  --glass-raised: var(--bg-raised-solid);
+  --glass-raised-hover: #192735;
+  --glass-panel-border: 1px solid rgba(255, 255, 255, 0.16);
+  --glass-panel-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+  --glass-panel-specular: none;
 }
 
 /* ================= 9. АДАПТИВНОСТЬ (1366x768) ================= */

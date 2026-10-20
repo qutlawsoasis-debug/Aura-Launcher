@@ -220,7 +220,7 @@ ${combinedJs}
       </div>
 
       <!-- Центральная парящая капсула навигации -->
-      <nav class="nav-pill-dock" role="navigation" aria-label="Основная навигация">
+      <nav class="nav-pill-dock" data-glass role="navigation" aria-label="Основная навигация">
         <button type="button" class="nav-tab active" data-route="play" aria-current="page">
           <span>Играть</span>
         </button>

@@ -408,7 +408,20 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: var(--gap-md);
-  transition: border-color var(--transition-speed), box-shadow var(--transition-speed);
+  color: var(--text-primary);
+  text-shadow: var(--text-shadow-on-glass);
+  transition: background var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed);
+}
+
+[data-glass] {
+  color: var(--text-primary);
+  text-shadow: var(--text-shadow-on-glass);
+}
+
+[data-glass] h1, [data-glass] h2, [data-glass] h3, [data-glass] h4,
+[data-glass] p, [data-glass] span, [data-glass] div, [data-glass] label,
+[data-glass] button, [data-glass] time {
+  text-shadow: var(--text-shadow-on-glass);
 }
 
 .glass-island.elevated {
