@@ -379,15 +379,32 @@
     img.src = url;
   }
 
+  window.setWorldBackground = function (url) {
+    const bgElem = document.getElementById('worldBg');
+    if (bgElem) {
+      if (url) {
+        bgElem.style.backgroundImage = `url("${url}")`;
+      } else {
+        bgElem.style.backgroundImage = 'none';
+      }
+    }
+    if (url) {
+      document.documentElement.style.setProperty('--bg-world-image', `url("${url}")`);
+    }
+    window.detectGlassTone();
+  };
+
   window.detectGlassTone = function () {
     const glassElements = document.querySelectorAll('[data-glass]');
-    if (!glassElements.length) return;
 
     const bgUrl = extractBgImageUrl();
     loadBgImage(bgUrl, (success) => {
       if (!success || !offscreenCtx) {
         const fallbackTone = getFallbackTone();
-        glassElements.forEach(el => el.setAttribute('data-tone', fallbackTone));
+        document.documentElement.setAttribute('data-bg-tone', fallbackTone);
+        if (glassElements.length) {
+          glassElements.forEach(el => el.setAttribute('data-tone', fallbackTone));
+        }
         return;
       }
 
@@ -397,9 +414,29 @@
       } catch (e) {
         // SecurityError on file:/// origin
         const fallbackTone = getFallbackTone();
-        glassElements.forEach(el => el.setAttribute('data-tone', fallbackTone));
+        document.documentElement.setAttribute('data-bg-tone', fallbackTone);
+        if (glassElements.length) {
+          glassElements.forEach(el => el.setAttribute('data-tone', fallbackTone));
+        }
         return;
       }
+
+      const pixels = imgData.data;
+
+      // 1. Calculate overall background tone across the entire image
+      let wholeL = 0;
+      let totalPixels = 64 * 36;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i] / 255;
+        const g = pixels[i + 1] / 255;
+        const b = pixels[i + 2] / 255;
+        wholeL += (0.2126 * r + 0.7152 * g + 0.0722 * b);
+      }
+      const overallAvgL = wholeL / totalPixels;
+      const overallTone = (overallAvgL > 0.5) ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-bg-tone', overallTone);
+
+      if (!glassElements.length) return;
 
       const winW = window.innerWidth || 1920;
       const winH = window.innerHeight || 1080;
@@ -412,8 +449,6 @@
       const renderedH = imgH * scale;
       const cropX = (renderedW - winW) / 2;
       const cropY = (renderedH - winH) / 2;
-
-      const pixels = imgData.data;
 
       glassElements.forEach(el => {
         // Skip hidden elements in inactive screen views
@@ -482,6 +517,19 @@
         scheduleGlassToneDetection();
       });
       observer.observe(bgElem, { attributes: true, attributeFilter: ['style', 'class'] });
+    }
+
+    // Observe changes to style attribute on <html> (:root style)
+    if (window.MutationObserver) {
+      const htmlObserver = new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          if (m.type === 'attributes' && m.attributeName === 'style') {
+            scheduleGlassToneDetection();
+            break;
+          }
+        }
+      });
+      htmlObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
     }
   }
 

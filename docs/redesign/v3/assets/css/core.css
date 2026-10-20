@@ -3,33 +3,9 @@
  */
 
 @font-face {
-  font-family: 'Manrope';
-  src: url('../fonts/Manrope-Regular.ttf') format('truetype');
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('../fonts/Manrope-Medium.ttf') format('truetype');
-  font-weight: 500;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('../fonts/Manrope-SemiBold.ttf') format('truetype');
-  font-weight: 600;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('../fonts/Manrope-Bold.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('../fonts/Manrope-ExtraBold.ttf') format('truetype');
-  font-weight: 800;
+  font-family: 'Onest';
+  src: url('../fonts/Onest.ttf') format('truetype');
+  font-weight: 100 900;
   font-style: normal;
 }
 
@@ -107,7 +83,11 @@ html, body {
 }
 
 .world-overlay {
-  display: none;
+  position: absolute;
+  inset: 0;
+  background: var(--overlay-vignette);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .sunbeam-light {
@@ -155,7 +135,8 @@ html, body {
   font-size: var(--font-size-logo);
   font-weight: var(--font-weight-extrabold);
   letter-spacing: var(--tracking-tight);
-  color: var(--text-white);
+  color: var(--text-on-world);
+  text-shadow: var(--text-shadow-on-world);
   text-decoration: none;
   line-height: 1.15;
   display: inline-flex;
@@ -164,7 +145,7 @@ html, body {
   padding: 0 var(--gap-sm) 0 var(--gap-xs);
   gap: var(--gap-xs);
   overflow: visible;
-  transition: transform var(--transition-speed-fast) var(--spring-curve);
+  transition: transform var(--transition-speed-fast) var(--spring-curve), color var(--transition-speed);
 }
 
 .logo-aura span {
@@ -382,17 +363,27 @@ html, body {
   font-size: var(--font-size-hero);
   font-weight: var(--font-weight-extrabold);
   letter-spacing: var(--tracking-tight);
-  color: var(--text-white);
+  color: var(--text-on-world);
+  text-shadow: var(--text-shadow-on-world);
   line-height: 1.15;
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
+  transition: color var(--transition-speed);
 }
 
 .page-subtitle-unified {
   font-size: var(--font-size-secondary);
-  color: var(--text-secondary);
+  color: var(--text-on-world-secondary);
+  text-shadow: var(--text-shadow-on-world);
   line-height: 1.4;
+  transition: color var(--transition-speed);
+}
+
+.page-title-group-unified {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tiny);
 }
 
 /* ================= 5. APPLE LIQUID GLASS ISLANDS ================= */

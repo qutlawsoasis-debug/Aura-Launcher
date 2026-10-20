@@ -31,13 +31,15 @@
   font-size: var(--font-size-hero);
   font-weight: var(--font-weight-extrabold);
   letter-spacing: var(--tracking-tight);
-  color: var(--text-white);
+  color: var(--text-on-world);
+  text-shadow: var(--text-shadow-on-world);
   line-height: 1.1;
 }
 
 .wardrobe-subheading {
   font-size: var(--font-size-title-sm);
-  color: var(--text-secondary);
+  color: var(--text-on-world-secondary);
+  text-shadow: var(--text-shadow-on-world);
   font-weight: var(--font-weight-regular);
 }
 

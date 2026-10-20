@@ -113,14 +113,9 @@ async function build() {
   const coock0ldBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'Coock0ld.png')).toString('base64');
   const coock0ldDataUrl = `data:image/png;base64,${coock0ldBase64}`;
 
-  console.log('2. Base64 encoding used Manrope fonts (Regular, Medium, SemiBold, Bold, ExtraBold)...');
-  const fonts = {
-    'Manrope-Regular.ttf': fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Manrope-Regular.ttf')).toString('base64'),
-    'Manrope-Medium.ttf': fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Manrope-Medium.ttf')).toString('base64'),
-    'Manrope-SemiBold.ttf': fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Manrope-SemiBold.ttf')).toString('base64'),
-    'Manrope-Bold.ttf': fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Manrope-Bold.ttf')).toString('base64'),
-    'Manrope-ExtraBold.ttf': fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Manrope-ExtraBold.ttf')).toString('base64')
-  };
+  console.log('2. Base64 encoding used Onest font...');
+  const onestBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Onest.ttf')).toString('base64');
+  const onestDataUrl = `data:font/ttf;base64,${onestBase64}`;
 
   console.log('3. Concatenating and inlining CSS stylesheets...');
   let tokensCss = fs.readFileSync(path.join(BASE_DIR, 'tokens.css'), 'utf-8');
@@ -128,11 +123,8 @@ async function build() {
   tokensCss = tokensCss.replace(/url\(['"]?\.\.\/images\/bg_1\.jpg['"]?\)/g, `url('${bgDataUrl}')`);
 
   let coreCss = fs.readFileSync(path.join(BASE_DIR, 'assets', 'css', 'core.css'), 'utf-8');
-  // Replace fonts URLs with data URIs
-  for (const [fontFile, b64] of Object.entries(fonts)) {
-    const re = new RegExp(`url\\(['"]?\\.\\./fonts/${fontFile}['"]?\\)\\s+format\\(['"]truetype['"]\\)`, 'g');
-    coreCss = coreCss.replace(re, `url('data:font/truetype;charset=utf-8;base64,${b64}') format('truetype')`);
-  }
+  // Replace font URLs with data URIs
+  coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.ttf['"]?\)\s+format\(['"]truetype['"]\)/g, `url('data:font/truetype;charset=utf-8;base64,${onestBase64}') format('truetype')`);
 
   const screenCssFiles = ['play.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];
   let screensCombinedCss = '';

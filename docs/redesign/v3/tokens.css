@@ -5,7 +5,7 @@
 
 :root {
   /* ================= 1. ШРИФТЫ ================= */
-  --font-family-main: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-main: 'Onest', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   
   --font-size-logo: 32px;
   --font-size-hero: 44px;
@@ -70,6 +70,11 @@
   --text-tertiary: rgba(245, 248, 255, 0.45);
   --text-quaternary: rgba(245, 248, 255, 0.25);
   --text-white: #FFFFFF;
+
+  /* Текст прямо на фоне мира (вне стекла) по умолчанию (dark) */
+  --text-on-world: #FFFFFF;
+  --text-on-world-secondary: rgba(245, 248, 255, 0.72);
+  --text-shadow-on-world: 0 1px 2px rgba(0, 0, 0, 0.45);
 
   /* ================= 3. APPLE LIQUID GLASS И СЛОИ ================= */
   /* Базовый стеклянный остров (тон dark по умолчанию) */
@@ -173,8 +178,16 @@
   --preset-dot-size: 8px;
   --nav-indicator-size: 6px;
 
+  --drawer-width: 260px;
+  --drawer-top: 104px;
+  --moment-card-height: 140px;
+  --underline-changelog: rgba(255, 255, 255, 0.35);
+  --shadow-play-btn: 0 4px 20px rgba(242, 166, 60, 0.38);
+  --shadow-play-btn-hover: 0 6px 28px rgba(242, 166, 60, 0.55);
+  --shadow-avatar: 0 2px 8px rgba(0, 0, 0, 0.4);
+
   /* Атмосфера */
-  --overlay-vignette: transparent;
+  --overlay-vignette: radial-gradient(circle at 45% 45%, rgba(7, 16, 23, 0.2) 0%, rgba(5, 11, 15, 0.72) 100%);
   --sunbeam-gradient: radial-gradient(circle, rgba(242, 166, 60, 0.14) 0%, rgba(242, 166, 60, 0.03) 45%, transparent 72%);
 
   /* ================= 4. СКРУГЛЕНИЯ (CornerRadius) ================= */
@@ -238,17 +251,24 @@
 }
 
 /* ================= 8. РЕЖИМЫ ЭФФЕКТОВ ================= */
+/* Текст на светлом фоне мира (вне стекла) */
+html[data-bg-tone="light"] {
+  --text-on-world: #12161C;
+  --text-on-world-secondary: rgba(18, 22, 28, 0.72);
+  --text-shadow-on-world: 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
 /* Адаптивный тон стекла: светлый фон -> темный тинт стекла */
 [data-tone="light"] {
-  --glass-panel: rgba(10, 14, 20, 0.55);
-  --glass-panel-elevated: rgba(10, 14, 20, 0.65);
+  --glass-panel: rgba(10, 14, 20, 0.62);
+  --glass-panel-elevated: rgba(10, 14, 20, 0.72);
   --glass-panel-border: 1px solid rgba(255, 255, 255, 0.10);
   --glass-panel-specular: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
   --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35);
 
-  --glass-raised: rgba(10, 14, 20, 0.45);
-  --glass-raised-hover: rgba(10, 14, 20, 0.55);
-  --glass-raised-active: rgba(10, 14, 20, 0.65);
+  --glass-raised: rgba(10, 14, 20, 0.58);
+  --glass-raised-hover: rgba(10, 14, 20, 0.68);
+  --glass-raised-active: rgba(10, 14, 20, 0.78);
   --glass-raised-border: 1px solid rgba(255, 255, 255, 0.08);
   --glass-raised-specular: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 
