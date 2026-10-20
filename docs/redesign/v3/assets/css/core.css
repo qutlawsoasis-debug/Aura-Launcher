@@ -100,11 +100,7 @@ html, body {
 }
 
 .world-overlay {
-  position: absolute;
-  inset: 0;
-  background: var(--overlay-vignette);
-  z-index: 2;
-  pointer-events: none;
+  display: none;
 }
 
 .sunbeam-light {

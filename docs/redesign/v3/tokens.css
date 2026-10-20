@@ -72,13 +72,13 @@
 
   /* ================= 3. APPLE LIQUID GLASS И СЛОИ ================= */
   /* Базовый стеклянный остров */
-  --glass-panel: rgba(8, 16, 24, 0.52);
-  --glass-panel-elevated: rgba(12, 22, 32, 0.65);
-  --glass-panel-border: 1px solid rgba(255, 255, 255, 0.14);
-  --glass-panel-specular: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --glass-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --glass-panel: rgba(255, 255, 255, 0.08);
+  --glass-panel-elevated: rgba(255, 255, 255, 0.12);
+  --glass-panel-border: 1px solid rgba(255, 255, 255, 0.16);
+  --glass-panel-specular: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --glass-panel-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
   --glass-blur: 28px;
-  --glass-saturate: 140%;
+  --glass-saturate: 160%;
 
   /* Вложенные стеклянные плашки (raised) */
   --glass-raised: rgba(255, 255, 255, 0.06);
@@ -172,7 +172,7 @@
   --nav-indicator-size: 6px;
 
   /* Атмосфера */
-  --overlay-vignette: radial-gradient(circle at 50% 40%, rgba(6, 12, 18, 0.25) 0%, rgba(3, 7, 10, 0.82) 100%);
+  --overlay-vignette: transparent;
   --sunbeam-gradient: radial-gradient(circle, rgba(242, 166, 60, 0.14) 0%, rgba(242, 166, 60, 0.03) 45%, transparent 72%);
 
   /* ================= 4. СКРУГЛЕНИЯ (CornerRadius) ================= */
