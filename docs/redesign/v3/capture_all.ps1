@@ -1,5 +1,9 @@
+param(
+    [string]$Iteration = "iteration-02"
+)
+
 $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-$outDir = "$PSScriptRoot\screenshots\iteration-01"
+$outDir = "$PSScriptRoot\screenshots\$Iteration"
 $tempUserDir = "$env:TEMP\chrome_shot_v3"
 
 if (-not (Test-Path $outDir)) {

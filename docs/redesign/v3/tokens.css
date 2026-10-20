@@ -275,8 +275,8 @@ html[data-effects="off"] {
 
     --play-btn-height: 48px;
     --play-btn-min-width: 180px;
-    --nav-tab-min-height: 36px;
-    --control-height: 36px;
+    --nav-tab-min-height: 38px;
+    --control-height: 38px;
     --avatar-size: 38px;
     --audio-art-size: 36px;
   }

@@ -227,7 +227,9 @@
   font-size: var(--font-size-section);
   font-weight: var(--font-weight-extrabold);
   letter-spacing: var(--tracking-loose);
-  color: var(--accent);
+  color: var(--text-white);
+  text-shadow: 0 0 12px rgba(242, 166, 60, 0.4);
+}
   background: var(--accent-glass);
   border: 1px solid rgba(242, 166, 60, 0.4);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -454,20 +456,24 @@
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: var(--gap-xxs);
-  background: transparent;
-  border: none;
+  gap: var(--gap-xs);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill-tab);
   color: var(--accent);
   font-family: inherit;
   font-size: var(--font-size-secondary);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  padding: 0;
-  transition: color var(--transition-speed-fast), transform var(--transition-speed-fast) var(--spring-curve);
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-sm);
+  transition: all var(--transition-speed-fast);
 }
 
 .btn-invite-slot:hover {
-  color: var(--accent-hover);
+  background: var(--accent-glass);
+  border-color: var(--accent);
+  color: #ffffff;
   transform: translateX(2px);
 }
 

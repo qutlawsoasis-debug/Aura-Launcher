@@ -130,14 +130,20 @@
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: var(--slider-track-height);
-  background: var(--slider-track-bg);
-  border-radius: var(--radius-pill-nav);
+  height: 38px;
+  min-height: var(--min-tap-target, 38px);
+  background: transparent;
   outline: none;
   position: relative;
   z-index: 2;
   cursor: pointer;
   margin: 0;
+}
+
+.ram-range-slider::-webkit-slider-runnable-track {
+  height: var(--slider-track-height);
+  background: var(--slider-track-bg);
+  border-radius: var(--radius-pill-nav);
 }
 
 .ram-range-slider::-webkit-slider-thumb {
@@ -352,9 +358,10 @@
 }
 
 .preset-badge.recommended {
-  background: var(--accent-glass);
-  border: 1px solid rgba(242, 166, 60, 0.4);
-  color: var(--accent);
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #050B0F;
+  font-weight: var(--font-weight-bold);
 }
 
 .preset-specs {

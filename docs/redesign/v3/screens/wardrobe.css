@@ -117,8 +117,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--gap-6px);
-  height: 32px;
-  padding: 0 var(--gap-sm);
+  height: 38px;
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-md);
   background: var(--btn-secondary-bg);
   border: var(--btn-secondary-border);
   box-shadow: var(--glass-raised-specular);
@@ -248,7 +249,8 @@
 }
 
 .btn-angle {
-  height: 32px;
+  height: 38px;
+  min-height: var(--min-tap-target, 38px);
   padding: 0 var(--gap-md);
   border-radius: var(--radius-pill-tab);
   background: transparent;
@@ -348,16 +350,17 @@
 .btn-copy-id {
   display: inline-flex;
   align-items: center;
-  gap: var(--gap-tiny);
-  height: 28px;
-  padding: 0 var(--gap-sm);
+  gap: var(--gap-xs);
+  height: 38px;
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-md);
   background: var(--btn-secondary-bg);
   border: var(--btn-secondary-border);
   box-shadow: var(--glass-raised-specular);
   border-radius: var(--radius-btn-sm);
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: var(--font-size-micro);
+  font-size: var(--font-size-secondary);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: background var(--transition-speed), color var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);

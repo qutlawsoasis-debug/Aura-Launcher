@@ -211,7 +211,8 @@
   border: var(--glass-raised-border);
   box-shadow: var(--glass-raised-specular);
   border-radius: var(--radius-pill-tab);
-  padding: var(--gap-xxs) var(--gap-sm);
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-md);
   color: var(--accent);
   font-family: inherit;
   font-size: var(--font-size-secondary);
@@ -753,21 +754,25 @@
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: var(--gap-xxs);
-  background: transparent;
-  border: none;
+  gap: var(--gap-xs);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill-tab);
   color: var(--accent);
   font-family: inherit;
   font-size: var(--font-size-secondary);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  padding: 0;
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-sm);
   margin-top: var(--gap-xxs);
-  transition: color var(--transition-speed-fast), transform var(--transition-speed-fast) var(--spring-curve);
+  transition: all var(--transition-speed-fast);
 }
 
 .btn-story-more:hover {
-  color: var(--accent-hover);
+  background: var(--accent-glass);
+  border-color: var(--accent);
+  color: #ffffff;
   transform: translateX(2px);
 }
 

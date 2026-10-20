@@ -115,7 +115,7 @@
 
 .category-pill-tab.active {
   background: var(--glass-raised-hover);
-  color: var(--accent);
+  color: var(--text-white);
   border-color: var(--segment-active-border);
   box-shadow: var(--segment-active-shadow);
 }
@@ -130,8 +130,8 @@
 }
 
 .category-pill-tab.active .tab-counter {
-  background: var(--accent-glass-strong);
-  color: var(--accent);
+  background: var(--accent);
+  color: #050B0F;
 }
 
 /* Search Box */
@@ -448,9 +448,10 @@
 }
 
 .shader-tag.recommended {
-  background: var(--accent-glass);
-  border: 1px solid rgba(242, 166, 60, 0.4);
-  color: var(--accent);
+  background: var(--accent);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #050B0F;
+  font-weight: var(--font-weight-bold);
 }
 
 .shader-tag.vanilla {

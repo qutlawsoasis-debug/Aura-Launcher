@@ -44,6 +44,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+button {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  color: inherit;
+}
+
 html, body {
   width: 100vw;
   height: 100vh;
@@ -84,19 +91,19 @@ html, body {
 
 .world-bg {
   position: absolute;
-  top: -5%;
-  left: -5%;
-  width: 110%;
-  height: 110%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
   background-image: var(--bg-world-image);
   background-position: center center;
   background-size: cover;
   background-repeat: no-repeat;
   background-color: var(--bg-base);
-  transform: scale(1.02);
-  transition: transform var(--spring-duration) var(--spring-curve);
   z-index: 1;
-  will-change: transform;
 }
 
 .world-overlay {
@@ -153,6 +160,8 @@ html, body {
   line-height: 1;
   display: inline-flex;
   align-items: center;
+  min-height: var(--min-tap-target, 38px);
+  padding: 0 var(--gap-xs);
   gap: var(--gap-xs);
   transition: transform var(--transition-speed-fast) var(--spring-curve);
 }
@@ -206,6 +215,7 @@ html, body {
   font-size: var(--font-size-nav);
   font-weight: var(--font-weight-semibold);
   color: rgba(255, 255, 255, 0.88);
+  background: transparent;
   border: 1px solid transparent;
   transition: color var(--transition-speed), background var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
   cursor: pointer;

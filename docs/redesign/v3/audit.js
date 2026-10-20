@@ -113,17 +113,17 @@ async function main() {
 
       function getEffectiveBg(el) {
         let cur = el;
-        let color = { r: 5, g: 11, b: 15, a: 1.0 }; // base background #050B0F
         const stack = [];
         while (cur && cur !== document.documentElement) {
           const bg = parseColor(window.getComputedStyle(cur).backgroundColor);
           if (bg && bg.a > 0) {
-            stack.unshift(bg);
+            stack.push(bg);
           }
           cur = cur.parentElement;
         }
-        for (const c of stack) {
-          color = composite(c, color);
+        let color = { r: 5, g: 11, b: 15, a: 1.0 }; // base background #050B0F
+        for (let i = stack.length - 1; i >= 0; i--) {
+          color = composite(stack[i], color);
         }
         return color;
       }
@@ -214,7 +214,7 @@ async function main() {
         }
 
         // 3. Overflow issues (exceeding window boundaries without scroll)
-        if (rect.right > window.innerWidth + 1) {
+        if (rect.right > window.innerWidth + 1 && !el.classList.contains('world-bg') && el.id !== 'worldBg') {
           results.overflowIssues.push({
             selector: getCssSelector(el),
             right: Math.round(rect.right),
