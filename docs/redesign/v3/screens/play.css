@@ -9,6 +9,7 @@
   top: var(--drawer-top, 104px);
   right: var(--screen-offset-x, 32px);
   width: var(--drawer-width, 260px);
+  max-height: calc(100vh - var(--drawer-top, 104px) - var(--screen-offset-y, 32px) - 54px - 16px);
   display: flex;
   flex-direction: column;
   gap: var(--gap-sm, 12px);
@@ -20,6 +21,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 2px;
+  flex-shrink: 0;
 }
 
 .moments-title {
@@ -54,6 +56,8 @@
   position: relative;
   width: 100%;
   height: var(--moment-card-height, 140px);
+  min-height: 0;
+  flex: 1 1 auto;
   border-radius: var(--radius-card, 16px);
   overflow: hidden;
   border: var(--glass-panel-border);
@@ -484,13 +488,18 @@
 }
 
 /* ================= 4. АДАПТИВНОСТЬ ДЛЯ ЭКРАНОВ 1366x768 ================= */
-@media (max-width: 1400px), (max-height: 800px) {
+@media (max-width: 1400px), (max-height: 820px) {
   .hero-dock {
     padding: 12px 18px;
     gap: var(--gap-lg, 20px);
   }
   .world-moments-drawer {
     gap: var(--gap-sm, 12px);
+    max-height: calc(100vh - var(--drawer-top, 104px) - var(--screen-offset-y, 28px) - 54px - 16px);
+  }
+  /* Скрываем 3-ю карточку скриншота при нехватке высоты */
+  .world-moments-drawer .moment-card:nth-of-type(3) {
+    display: none;
   }
   .play-hero-btn {
     padding: 0 24px;

@@ -191,7 +191,7 @@
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = `bold ${Math.floor(w * 0.42)}px Manrope, sans-serif`;
+    ctx.font = `bold ${Math.floor(w * 0.42)}px Onest, sans-serif`;
 
     if (isFounder) {
       ctx.fillStyle = '#f2a63c';

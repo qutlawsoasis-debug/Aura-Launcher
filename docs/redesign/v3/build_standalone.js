@@ -114,8 +114,8 @@ async function build() {
   const coock0ldDataUrl = `data:image/png;base64,${coock0ldBase64}`;
 
   console.log('2. Base64 encoding used Onest font...');
-  const onestBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Onest.ttf')).toString('base64');
-  const onestDataUrl = `data:font/ttf;base64,${onestBase64}`;
+  const onestBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Onest.woff2')).toString('base64');
+  const onestDataUrl = `data:font/woff2;base64,${onestBase64}`;
 
   console.log('3. Concatenating and inlining CSS stylesheets...');
   let tokensCss = fs.readFileSync(path.join(BASE_DIR, 'tokens.css'), 'utf-8');
@@ -124,7 +124,7 @@ async function build() {
 
   let coreCss = fs.readFileSync(path.join(BASE_DIR, 'assets', 'css', 'core.css'), 'utf-8');
   // Replace font URLs with data URIs
-  coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.ttf['"]?\)\s+format\(['"]truetype['"]\)/g, `url('data:font/truetype;charset=utf-8;base64,${onestBase64}') format('truetype')`);
+  coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.woff2['"]?\)\s+format\(['"]woff2['"]\)/g, `url('data:font/woff2;charset=utf-8;base64,${onestBase64}') format('woff2')`);
 
   const screenCssFiles = ['play.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];
   let screensCombinedCss = '';
