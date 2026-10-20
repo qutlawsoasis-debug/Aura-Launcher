@@ -16,8 +16,8 @@
   --font-size-nav: 13.5px;
   --font-size-body: 13px;
   --font-size-secondary: 12px;
-  --font-size-badge: 11px;
-  --font-size-micro: 10px;
+  --font-size-badge: 12px;
+  --font-size-micro: 12px;
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
@@ -88,11 +88,11 @@
   --glass-raised-specular: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 
   /* Навигационная капсула (pill) */
-  --nav-dock-bg: rgba(6, 12, 18, 0.62);
-  --nav-hover-bg: rgba(255, 255, 255, 0.08);
-  --nav-active-bg: rgba(255, 255, 255, 0.15);
-  --nav-active-border: 1px solid rgba(255, 255, 255, 0.3);
-  --nav-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --nav-dock-bg: rgba(8, 14, 22, 0.88);
+  --nav-hover-bg: rgba(255, 255, 255, 0.12);
+  --nav-active-bg: rgba(255, 255, 255, 0.22);
+  --nav-active-border: 1px solid rgba(255, 255, 255, 0.35);
+  --nav-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 16px rgba(0, 0, 0, 0.35);
 
   /* Интерактивные кнопки и контролы */
   --win-btn-hover-bg: rgba(255, 255, 255, 0.12);
@@ -207,7 +207,7 @@
 
   /* ================= 6. КЛИКАБЕЛЬНЫЕ ЗОНЫ И РАЗМЕРЫ ================= */
   --nav-tab-min-height: 40px;
-  --win-btn-size: 34px;
+  --win-btn-size: 38px;
   --audio-btn-size: 34px;
   --play-btn-height: 54px;
   --play-btn-min-width: 210px;

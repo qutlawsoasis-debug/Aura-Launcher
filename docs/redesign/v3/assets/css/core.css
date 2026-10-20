@@ -209,7 +209,7 @@ html, body {
   text-decoration: none;
   font-size: var(--font-size-nav);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.88);
   border: 1px solid transparent;
   transition: color var(--transition-speed), background var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
   cursor: pointer;
@@ -217,7 +217,7 @@ html, body {
 }
 
 .nav-tab:hover {
-  color: var(--text-primary);
+  color: #ffffff;
   background: var(--nav-hover-bg);
 }
 
@@ -226,7 +226,8 @@ html, body {
 }
 
 .nav-tab.active {
-  color: var(--text-white);
+  color: #ffffff;
+  font-weight: var(--font-weight-bold);
   background: var(--nav-active-bg);
   border: var(--nav-active-border);
   box-shadow: var(--nav-active-shadow);
@@ -306,6 +307,18 @@ html, body {
   overflow: hidden;
 }
 
+.screen-viewport::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(to top, rgba(5, 11, 15, 0.98) 0%, rgba(5, 11, 15, 0.5) 50%, transparent 100%);
+  pointer-events: none;
+  z-index: 30;
+}
+
 .screen-view {
   position: absolute;
   inset: 0;
@@ -316,6 +329,7 @@ html, body {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: var(--gap-xxs);
+  padding-bottom: 56px;
   pointer-events: none;
 }
 
@@ -582,7 +596,8 @@ html, body {
 
 .switch-input:checked + .switch-track .switch-thumb {
   transform: translateX(calc(var(--switch-width) - var(--switch-knob-size) - 4px));
-  background: var(--accent-text);
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 /* Text Input Fields */

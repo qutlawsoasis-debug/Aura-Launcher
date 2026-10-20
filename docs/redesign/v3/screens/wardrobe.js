@@ -46,6 +46,14 @@
   let customSkinLoaded = false;
   let customSkinImage = null;
 
+  // Load default skin texture from assets
+  const defaultSkinImg = new Image();
+  defaultSkinImg.onload = () => {
+    customSkinLoaded = true;
+    customSkinImage = defaultSkinImg;
+  };
+  defaultSkinImg.src = 'assets/images/Coock0ld.png';
+
   // 2. 3D Renderer Setup
   const canvas = document.getElementById('skinCanvas3D');
   const ctx = canvas ? canvas.getContext('2d') : null;
@@ -284,6 +292,50 @@
     ctx.restore();
   }
 
+  // Draw 3D Glowing Glass Pedestal under feet
+  function drawPedestal(radY, radX, scale, fov) {
+    if (!ctx || !canvas) return;
+    const segments = 28;
+    const radius = 17;
+    const pts = [];
+    for (let i = 0; i < segments; i++) {
+      const a = (i / segments) * Math.PI * 2;
+      const wx = Math.cos(a) * radius;
+      const wy = 28; // ground level under feet
+      const wz = Math.sin(a) * radius;
+      const r1 = rotateY(wx, wy, wz, radY);
+      const r2 = rotateX(r1.x, r1.y, r1.z, radX);
+      pts.push(project(r2, canvas.width, canvas.height, scale, fov));
+    }
+
+    ctx.save();
+    // Glass disc base
+    ctx.beginPath();
+    pts.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+
+    const grad = ctx.createRadialGradient(canvas.width / 2, canvas.height * 0.82, 10, canvas.width / 2, canvas.height * 0.82, 160);
+    grad.addColorStop(0, 'rgba(242, 166, 60, 0.35)');
+    grad.addColorStop(0.35, 'rgba(20, 36, 52, 0.7)');
+    grad.addColorStop(1, 'rgba(8, 14, 22, 0.95)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Specular border
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Inner glowing ring
+    ctx.strokeStyle = 'rgba(242, 166, 60, 0.6)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Render Full 3D Character Scene
   function render3DScene() {
     if (!ctx || !canvas) return;
@@ -292,8 +344,11 @@
 
     const radY = rotationY * DEG_TO_RAD;
     const radX = rotationX * DEG_TO_RAD;
-    const scale = 5.2;
+    const scale = 11.2;
     const fov = 42;
+
+    // Draw glowing glass pedestal under character
+    drawPedestal(radY, radX, scale, fov);
 
     const armWidth = modelType === 'slim' ? 3.0 : 4.0;
     const armOffset = 4.0 + armWidth / 2;
