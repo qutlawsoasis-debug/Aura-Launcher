@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -105,7 +105,7 @@ public class WebBridgeTests
         public GraphicsPresetModel? GetPreset(string presetKey) => null;
         public string AutoDetectPreset() => "Medium";
 
-        public PresetApplyResult ApplyPreset(string gameDir, string presetKey, bool persistConfig = true)
+        public virtual PresetApplyResult ApplyPreset(string gameDir, string presetKey, bool persistConfig = true)
         {
             LastAppliedPresetKey = presetKey;
             return new PresetApplyResult
@@ -129,7 +129,7 @@ public class WebBridgeTests
         configService.CurrentConfig.VisualEffectsMode = "low";
 
         var sessionService = new TestGameSessionService();
-        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -156,7 +156,7 @@ public class WebBridgeTests
     {
         var configService = new TestConfigService("C:\\test\\dir");
         var sessionService = new TestGameSessionService();
-        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -190,7 +190,7 @@ public class WebBridgeTests
     {
         var configService = new TestConfigService("C:\\test\\dir");
         var sessionService = new TestGameSessionService();
-        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -224,6 +224,14 @@ public class WebBridgeTests
         public bool ToggleMod(ModItem mod, bool enable)
         {
             mod.IsEnabled = enable;
+            if (enable && mod.FileName.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                mod.FileName = mod.FileName[..^9];
+            }
+            else if (!enable && !mod.FileName.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                mod.FileName += ".disabled";
+            }
             return true;
         }
 
@@ -277,7 +285,7 @@ public class WebBridgeTests
             }
         };
 
-        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -315,7 +323,7 @@ public class WebBridgeTests
             }
         };
 
-        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -334,7 +342,7 @@ public class WebBridgeTests
         var sessionService = new TestGameSessionService();
         var workshopService = new TestWorkshopService();
 
-        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -358,7 +366,7 @@ public class WebBridgeTests
             DelayTcs = delayTcs
         };
 
-        using var bridge = new WebBridge(null, sessionService, configService, null, null, packUpdateService, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, packUpdateService, logger: _ => {});
 
         var responses = new List<BridgeMessage>();
         bridge.MessagePosted += msg => responses.Add(msg);
@@ -382,7 +390,7 @@ public class WebBridgeTests
         var configService = new TestConfigService("C:\\test\\dir");
         var sessionService = new TestGameSessionService();
         var presetService = new TestPresetService();
-        using var bridge = new WebBridge(null, sessionService, configService, presetService, null, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, presetService, null, null, logger: _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -398,5 +406,99 @@ public class WebBridgeTests
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         Assert.True(doc.RootElement.GetProperty("Success").GetBoolean());
         Assert.Equal("Ultra", doc.RootElement.GetProperty("PresetKey").GetString());
+    }
+
+    private class TestBridgeLaunchService : IGameLaunchService
+    {
+        public string InstanceDirToReturn { get; set; } = @"C:\custom\instance\dir";
+        public bool IsGameRunning => false;
+        public System.Diagnostics.Process? CurrentGameProcess => null;
+        public event EventHandler<int>? GameExited { add { } remove { } }
+        public Task<bool> StopGameProcessAsync(int timeoutMs = 6000) => Task.FromResult(true);
+        public string ResolveMinecraftDirectory(string? customPath = null) => customPath ?? @"C:\test";
+        public string ResolveInstanceDirectory(string? customPath = null, string? version = null) => InstanceDirToReturn;
+        public string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17) => null;
+        public bool CheckEnvironmentInstalled(string gameDir, string? version = null) => true;
+        public System.Diagnostics.Process? FindRunningGameProcess(string gameDir) => null;
+        public Task EnsureInstalledAsync(string gameDir, IProgress<InstallProgressReport>? progress = null, Action<string>? onLogReceived = null, CancellationToken cancellationToken = default, string? version = null) => Task.CompletedTask;
+        public Task<System.Diagnostics.Process> LaunchGameAsync(LauncherConfig config, Action<string>? onLogReceived = null, Action<int, string>? onGameExited = null, IProgress<InstallProgressReport>? installProgress = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+    }
+
+    private class TestPresetServiceWithDir : TestPresetService
+    {
+        public string? LastGameDir { get; private set; }
+
+        public override PresetApplyResult ApplyPreset(string gameDir, string presetKey, bool persistConfig = true)
+        {
+            LastGameDir = gameDir;
+            return base.ApplyPreset(gameDir, presetKey, persistConfig);
+        }
+    }
+
+    [Fact]
+    public async Task Handle_InstanceDir_IsUsedFromLaunchService()
+    {
+        var configService = new TestConfigService(@"C:\root\.aura");
+        var sessionService = new TestGameSessionService();
+        var presetService = new TestPresetServiceWithDir();
+        var launchService = new TestBridgeLaunchService { InstanceDirToReturn = @"C:\root\.aura\instances\1.20.1" };
+
+        using var bridge = new WebBridge(null, sessionService, configService, presetService, null, null, launchService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_pdir","type":"command","name":"preset.apply","payload":{"presetKey":"High"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        Assert.Equal(@"C:\root\.aura\instances\1.20.1", presetService.LastGameDir);
+    }
+
+    [Fact]
+    public async Task Handle_WorkshopToggleMod_DisableThenReEnable_ByBaseName()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var modItem = new ModItem
+        {
+            FileName = "testmod.jar",
+            DisplayName = "Test Mod",
+            IsEnabled = true
+        };
+        var workshopService = new TestWorkshopService
+        {
+            Mods = new List<ModItem> { modItem }
+        };
+
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        // 1. Disable mod using original name
+        await bridge.ProcessRawMessageAsync("""{"id":"req_dis","type":"command","name":"workshop.toggleMod","payload":{"fileName":"testmod.jar","enabled":false}}""");
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        Assert.False(modItem.IsEnabled);
+        Assert.Equal("testmod.jar.disabled", modItem.FileName);
+
+        // 2. Re-enable mod using base name ("testmod.jar")
+        await bridge.ProcessRawMessageAsync("""{"id":"req_en","type":"command","name":"workshop.toggleMod","payload":{"fileName":"testmod.jar","enabled":true}}""");
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        Assert.True(modItem.IsEnabled);
+        Assert.Equal("testmod.jar", modItem.FileName);
+
+        // 3. Disable again, then re-enable using actual current filename ("testmod.jar.disabled")
+        await bridge.ProcessRawMessageAsync("""{"id":"req_dis2","type":"command","name":"workshop.toggleMod","payload":{"fileName":"testmod.jar","enabled":false}}""");
+        Assert.False(modItem.IsEnabled);
+        Assert.Equal("testmod.jar.disabled", modItem.FileName);
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_en2","type":"command","name":"workshop.toggleMod","payload":{"fileName":"testmod.jar.disabled","enabled":true}}""");
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        Assert.True(modItem.IsEnabled);
+        Assert.Equal("testmod.jar", modItem.FileName);
     }
 }

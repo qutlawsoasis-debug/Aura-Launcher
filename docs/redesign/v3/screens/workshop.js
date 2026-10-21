@@ -148,10 +148,14 @@
           sendBridge('workshop.toggleMod', { fileName: mod.fileName, enabled: nextState })
             .then(res => {
               if (res) {
+                if (res.fileName) {
+                  mod.fileName = res.fileName;
+                  toggle.dataset.mod = res.fileName;
+                }
                 mod.enabled = res.enabled;
                 toggle.classList.toggle('on', res.enabled);
                 if (typeof window.showToast === 'function') {
-                  window.showToast(`${mod.name}: ${res.enabled ? 'включён' : 'отключён'}`, 'info');
+                  window.showToast(`${mod.name || mod.fileName}: ${res.enabled ? 'включён' : 'отключён'}`, 'info');
                 }
               }
             })

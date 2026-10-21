@@ -20,6 +20,7 @@ public class WebBridge : IDisposable
     private readonly IGraphicsPresetService? _presetService;
     private readonly IWorkshopService? _workshopService;
     private readonly IPackUpdateService? _packUpdateService;
+    private readonly IGameLaunchService? _launchService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -33,6 +34,7 @@ public class WebBridge : IDisposable
         IGraphicsPresetService? presetService = null,
         IWorkshopService? workshopService = null,
         IPackUpdateService? packUpdateService = null,
+        IGameLaunchService? launchService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -41,6 +43,7 @@ public class WebBridge : IDisposable
         _presetService = presetService;
         _workshopService = workshopService;
         _packUpdateService = packUpdateService;
+        _launchService = launchService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
@@ -435,6 +438,16 @@ public class WebBridge : IDisposable
         });
     }
 
+    private string GetInstanceDir()
+    {
+        var cfg = _configService.CurrentConfig;
+        if (_launchService != null)
+        {
+            return _launchService.ResolveInstanceDirectory(cfg.GameDir, cfg.SelectedVersion);
+        }
+        return cfg.GameDir;
+    }
+
     private void HandlePresetApply(BridgeMessage msg)
     {
         if (_presetService == null)
@@ -459,8 +472,8 @@ public class WebBridge : IDisposable
 
         _logger($"[WEBBRIDGE] preset.apply: {presetKey}");
 
-        var cfg = _configService.CurrentConfig;
-        var result = _presetService.ApplyPreset(cfg.GameDir, presetKey, persistConfig: true);
+        string instanceDir = GetInstanceDir();
+        var result = _presetService.ApplyPreset(instanceDir, presetKey, persistConfig: true);
 
         _logger($"[WEBBRIDGE] preset.apply result: success={result.Success}, ram={result.FinalRamMb}, shader={result.ChosenShader}");
         SendResponse(msg.Id, msg.Name, result);
@@ -507,11 +520,11 @@ public class WebBridge : IDisposable
             return;
         }
 
-        string gameDir = _configService.CurrentConfig.GameDir;
-        _logger($"[WEBBRIDGE] workshop.list requesting for {gameDir}");
+        string instanceDir = GetInstanceDir();
+        _logger($"[WEBBRIDGE] workshop.list requesting for {instanceDir}");
 
-        var shaderPacks = await _workshopService.GetShaderPacksAsync(gameDir);
-        var mods = await _workshopService.GetModsAsync(gameDir);
+        var shaderPacks = await _workshopService.GetShaderPacksAsync(instanceDir);
+        var mods = await _workshopService.GetModsAsync(instanceDir);
 
         var shaderList = shaderPacks.Select(s => new
         {
@@ -551,18 +564,18 @@ public class WebBridge : IDisposable
             fileName = fnProp.GetString() ?? string.Empty;
         }
 
-        string gameDir = _configService.CurrentConfig.GameDir;
+        string instanceDir = GetInstanceDir();
         _logger($"[WEBBRIDGE] workshop.setShader fileName='{fileName}'");
 
         if (string.IsNullOrWhiteSpace(fileName) || fileName.Equals("none", StringComparison.OrdinalIgnoreCase) || fileName.Equals("off", StringComparison.OrdinalIgnoreCase))
         {
-            _workshopService.SetActiveShaderPack(gameDir, "OFF");
+            _workshopService.SetActiveShaderPack(instanceDir, "OFF");
             _logger("[WEBBRIDGE] workshop.setShader disabled shaders (OFF)");
             SendResponse(msg.Id, msg.Name, new { fileName = "", active = false });
             return;
         }
 
-        var packs = await _workshopService.GetShaderPacksAsync(gameDir);
+        var packs = await _workshopService.GetShaderPacksAsync(instanceDir);
         var targetPack = packs.FirstOrDefault(p => string.Equals(p.FileName, fileName, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Name, fileName, StringComparison.OrdinalIgnoreCase));
         if (targetPack == null)
         {
@@ -571,7 +584,7 @@ public class WebBridge : IDisposable
             return;
         }
 
-        _workshopService.SetActiveShaderPack(gameDir, targetPack.FileName);
+        _workshopService.SetActiveShaderPack(instanceDir, targetPack.FileName);
         _logger($"[WEBBRIDGE] workshop.setShader activated '{targetPack.FileName}'");
         SendResponse(msg.Id, msg.Name, new { fileName = targetPack.FileName, active = true });
     }
@@ -613,11 +626,23 @@ public class WebBridge : IDisposable
             return;
         }
 
-        string gameDir = _configService.CurrentConfig.GameDir;
+        string instanceDir = GetInstanceDir();
         _logger($"[WEBBRIDGE] workshop.toggleMod fileName='{fileName}', targetEnabled={enabled}");
 
-        var mods = await _workshopService.GetModsAsync(gameDir);
+        static string GetBaseName(string name)
+        {
+            if (name.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase))
+            {
+                return name[..^9];
+            }
+            return name;
+        }
+
+        string baseSearchName = GetBaseName(fileName);
+
+        var mods = await _workshopService.GetModsAsync(instanceDir);
         var mod = mods.FirstOrDefault(m => string.Equals(m.FileName, fileName, StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(GetBaseName(m.FileName), baseSearchName, StringComparison.OrdinalIgnoreCase)
                                         || string.Equals(m.DisplayName, fileName, StringComparison.OrdinalIgnoreCase));
 
         if (mod == null)
@@ -698,8 +723,8 @@ public class WebBridge : IDisposable
 
     private void HandleFsOpenModsFolder(BridgeMessage msg)
     {
-        string gameDir = _configService.CurrentConfig.GameDir;
-        string modsDir = Path.Combine(gameDir, "mods");
+        string instanceDir = GetInstanceDir();
+        string modsDir = Path.Combine(instanceDir, "mods");
         Directory.CreateDirectory(modsDir);
 
         _logger($"[WEBBRIDGE] fs.openModsFolder: {modsDir}");
