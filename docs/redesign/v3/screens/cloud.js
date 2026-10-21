@@ -19,6 +19,7 @@
     const layer = document.querySelector('.layer[data-l="lobby"]');
     const newName = document.getElementById('cloudNewName');
     const newSeed = document.getElementById('cloudNewSeed');
+    const versionSeg = document.getElementById('cloudVersionSeg');
     const createBtn = document.getElementById('btnCloudCreate');
     const uploadOpen = document.getElementById('btnCloudUploadOpen');
     const uploadSelect = document.getElementById('cloudUploadSelect');
@@ -207,13 +208,24 @@
       }
     }
 
+    // --- Выбор версии для облачного мира ---
+    let selectedVersion = '1.21.1';
+    if (versionSeg) {
+      versionSeg.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => {
+        versionSeg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+        selectedVersion = btn.dataset.v || '1.21.1';
+        if (window.updateSegmentedLens) window.updateSegmentedLens(versionSeg);
+      }));
+    }
+
     // --- Создать мир ---
     if (createBtn) createBtn.addEventListener('click', async () => {
       const name = newName.value.trim();
       if (!name) { newName.setAttribute('aria-invalid', 'true'); toast('Укажите название мира', 'error'); return; }
       createBtn.disabled = true;
       try {
-        const res = await send('cloud.create', { name, seed: newSeed.value.trim() });
+        const res = await send('cloud.create', { name, seed: newSeed.value.trim(), version: selectedVersion });
         newName.value = ''; newSeed.value = '';
         document.getElementById('cloudCreateBox').classList.remove('open');
         toast(`Мир «${name}» создаётся`, 'success');

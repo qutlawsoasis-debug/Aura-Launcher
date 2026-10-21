@@ -78,14 +78,15 @@ public partial class WebBridge
 
         string name = ReadString(msg, "name");
         string seed = ReadString(msg, "seed");
+        string version = ReadString(msg, "version");
         if (string.IsNullOrWhiteSpace(name))
         {
             SendError(msg.Id, msg.Name, "Укажите название мира");
             return;
         }
 
-        _logger($"[WEBBRIDGE] cloud.create '{name}'");
-        var res = await _cloudLobbyService!.CreateOrStartWorldAsync(nick, name, string.IsNullOrWhiteSpace(seed) ? null : seed);
+        _logger($"[WEBBRIDGE] cloud.create '{name}' (version={version})");
+        var res = await _cloudLobbyService!.CreateOrStartWorldAsync(nick, name, string.IsNullOrWhiteSpace(seed) ? null : seed, version: string.IsNullOrWhiteSpace(version) ? null : version);
         if (res == null || !res.Port.HasValue)
         {
             SendError(msg.Id, msg.Name, res?.Error ?? "Не удалось создать мир");
