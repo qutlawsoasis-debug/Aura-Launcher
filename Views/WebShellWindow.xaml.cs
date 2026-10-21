@@ -36,6 +36,11 @@ public partial class WebShellWindow : Window
             await WebViewControl.EnsureCoreWebView2Async(env);
 
             WebViewControl.CoreWebView2.Settings.IsNonClientRegionSupportEnabled = true;
+#if DEBUG
+            WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = true;
+#else
+            WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
+#endif
 
             _bridge = new WebBridge(this, _gameLaunchService, _configService);
             _bridge.Attach(WebViewControl.CoreWebView2);

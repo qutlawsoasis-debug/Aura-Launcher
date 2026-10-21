@@ -9,6 +9,13 @@
         WindowStyle="None"
         ResizeMode="CanResize"
         Background="{DynamicResource BgBase}">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0"
+                      ResizeBorderThickness="6"
+                      GlassFrameThickness="0"
+                      CornerRadius="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
     <Grid Background="{DynamicResource BgBase}">
         <wv2:WebView2 x:Name="WebViewControl" />
     </Grid>
