@@ -60,6 +60,22 @@
     <span class="up-bar"><i id="updateBar"></i></span>
   </div>
 
+  <!-- Достижения: витрина и всплывашки разблокировки -->
+  <div class="ach-sheet" id="achSheet" hidden>
+    <div class="ach-panel">
+      <div class="ach-head">
+        <div class="ach-ring" id="achRing"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19" class="bg"/><circle cx="22" cy="22" r="19" class="fg" id="achRingFg"/></svg><b id="achRingText">0</b></div>
+        <div style="flex:1">
+          <h2 style="margin:0">Достижения</h2>
+          <div class="small dim" id="achSub"></div>
+        </div>
+        <button type="button" class="close" id="achClose" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="ach-grid" id="achGrid"></div>
+    </div>
+  </div>
+  <div class="ach-pops" id="achPops" aria-live="polite"></div>
+
   <div class="island" id="island" data-glass>
     <!-- покой -->
     <div class="layer on" data-l="idle">
@@ -360,6 +376,11 @@
     <div class="row">
       <span>Ник</span>
       <input class="field" id="inputPlayerNickname" value="" placeholder="Ваш ник" maxlength="16" autocomplete="off" spellcheck="false" style="width:170px;height:40px">
+    </div>
+
+    <div class="row">
+      <span>Достижения<span class="hint" id="achHint">—</span></span>
+      <button type="button" class="btn sm" id="btnAchOpen">Открыть</button>
     </div>
   </div>
 </div>

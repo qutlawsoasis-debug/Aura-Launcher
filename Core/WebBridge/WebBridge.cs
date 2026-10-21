@@ -28,6 +28,7 @@ public partial class WebBridge : IDisposable
     private readonly ILobbySessionService? _lobbySession;
     private readonly ILauncherUpdateService? _launcherUpdateService;
     private readonly ICloudLobbyService? _cloudLobbyService;
+    private readonly IAchievementService? _achievementService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -49,6 +50,7 @@ public partial class WebBridge : IDisposable
         ILobbySessionService? lobbySession = null,
         ILauncherUpdateService? launcherUpdateService = null,
         ICloudLobbyService? cloudLobbyService = null,
+        IAchievementService? achievementService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -80,6 +82,8 @@ public partial class WebBridge : IDisposable
 
         _lobbySession = lobbySession;
         SubscribeLobby();
+        _achievementService = achievementService;
+        SubscribeAchievements();
         _launcherUpdateService = launcherUpdateService;
         _cloudLobbyService = cloudLobbyService;
     }
@@ -145,6 +149,7 @@ public partial class WebBridge : IDisposable
     private void OnSessionGameExited(object? sender, GameExitedEventArgs e)
     {
         _logger($"[WEBBRIDGE] GameExited -> exitCode={e.ExitCode}");
+        ReportAchievement("game_exit");
         SendEvent("game.status", new
         {
             state = e.ExitCode == 0 ? "idle" : "failed",
@@ -271,6 +276,10 @@ public partial class WebBridge : IDisposable
 
                 case "logs.export":
                     await HandleLogsExportAsync(msg);
+                    break;
+
+                case "achievements.get":
+                    HandleAchievementsGet(msg);
                     break;
 
                 case "cloud.list":
@@ -1178,7 +1187,8 @@ public partial class WebBridge : IDisposable
                 _logger($"[WEBBRIDGE: WARN] skin.upload lobby-api exception: {ex.Message}");
             }
 
-            _logger($"[WEBBRIDGE] skin.upload finished: ok=true, fileName={safeFileName}, uploadError={uploadError}");
+            ReportAchievement("custom_skin");
+        _logger($"[WEBBRIDGE] skin.upload finished: ok=true, fileName={safeFileName}, uploadError={uploadError}");
             SendResponse(msg.Id, msg.Name, new
             {
                 ok = true,
@@ -1285,6 +1295,7 @@ public partial class WebBridge : IDisposable
             _friendService.InviteReceived -= OnInviteReceived;
         }
         UnsubscribeLobby();
+        UnsubscribeAchievements();
         StopUpdatePolling();
         if (_coreWebView2 != null)
         {
@@ -1297,6 +1308,7 @@ public partial class WebBridge : IDisposable
     private void OnFriendsListUpdated(IReadOnlyList<FriendPresenceItem> friends)
     {
         _cachedFriends = friends ?? Array.Empty<FriendPresenceItem>();
+        ReportAchievement("friends_count", _cachedFriends.Count);
         SendEvent("friends.presence", new
         {
             friends = _cachedFriends.Select(f => new

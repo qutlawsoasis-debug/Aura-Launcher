@@ -10,6 +10,7 @@ import '../screens/workshop.css';
 import '../screens/settings.css';
 import '../screens/update.css';
 import '../screens/boot.css';
+import '../screens/achievements.css';
 
 // JS modules in exact tag order
 import './perf-hud.js';
@@ -27,4 +28,5 @@ import '../screens/friends.js';
 import '../screens/wardrobe.js';
 import '../screens/workshop.js';
 import '../screens/worlds.js';
+import '../screens/achievements.js';
 import '../screens/settings.js';

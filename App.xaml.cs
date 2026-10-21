@@ -275,7 +275,8 @@ public partial class App : Application
                 Services.GetRequiredService<IReportService>(),
                 Services.GetRequiredService<ILobbySessionService>(),
                 Services.GetRequiredService<ILauncherUpdateService>(),
-                Services.GetRequiredService<ICloudLobbyService>())
+                Services.GetRequiredService<ICloudLobbyService>(),
+                Services.GetRequiredService<IAchievementService>())
             {
                 IsUpdatedRestart = isUpdatedRestart
             };

@@ -89,7 +89,11 @@ public partial class WebBridge
         SendLobbySnapshotEvent();
     }
 
-    private void OnLobbyUpdated(object? sender, LobbyStatusDto dto) => SendLobbySnapshotEvent();
+    private void OnLobbyUpdated(object? sender, LobbyStatusDto dto)
+    {
+        SendLobbySnapshotEvent();
+        ReportLobbyAchievements();
+    }
 
     private void OnLobbyPingUpdated(object? sender, int ms) => SendLobbySnapshotEvent();
 

@@ -449,6 +449,26 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
+    // Достижения: ?ach=1 — через 4 с приходит «получено»
+    if (name === 'achievements.get') {
+      const defs = [
+        ['first_launch', 'Искра', 'Первый запуск игры', 1, 1], ['ten_launches', 'Постоялец', '10 запусков игры', 10, 7],
+        ['hundred_hours', 'Сто часов', '100 часов в игре', 100, 23.4], ['marathon', 'Марафон', '5 часов в одной сессии', 5, 2.1],
+        ['night_shift', 'Ночная смена', 'Запуск с 03:00 до 05:00', 1, 1], ['first_lobby', 'Хост', 'Создать первое лобби', 1, 1],
+        ['full_table', 'Полный стол', '4 игрока в лобби', 4, 2], ['first_friend', 'Свой человек', 'Первый друг', 1, 1],
+        ['five_friends', 'Компания', '5 друзей', 5, 3], ['first_backup', 'Страховка', 'Первый бэкап мира', 1, 0],
+        ['photographer', 'Фотограф', '10 скриншотов', 10, 6], ['own_style', 'Свой стиль', 'Загрузить свой скин', 1, 1]
+      ];
+      const items = defs.map(([id, title, description, target, current]) => ({
+        id, title, description, target, current, unlocked: current >= target, unlockedAt: current >= target ? '19.10.2026' : null
+      }));
+      if (typeof location !== 'undefined' && /[?&]ach=1/.test(location.search) && !scope.__achPopped) {
+        scope.__achPopped = true;
+        setTimeout(() => emit('achievement.unlocked', { id: 'first_backup', title: 'Страховка', description: 'Первый бэкап мира' }), 4000);
+      }
+      return Promise.resolve({ unlocked: items.filter(i => i.unlocked).length, total: items.length, items });
+    }
+
     if (name.startsWith('cloud.') || name.startsWith('worlds.') || name.startsWith('screenshots.')) {
       return handleMockCloud(name, payload || {});
     }

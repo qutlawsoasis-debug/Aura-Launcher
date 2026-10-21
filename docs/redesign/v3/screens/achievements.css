@@ -1,0 +1,161 @@
+/* ============ Достижения ============ */
+
+/* Витрина */
+.ach-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(6, 8, 12, 0.6);
+  opacity: 0;
+  transition: opacity var(--dur-3) var(--ease-out);
+}
+.ach-sheet.show { opacity: 1; }
+.ach-sheet[hidden] { display: none; }
+.ach-panel {
+  width: min(860px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 28px;
+  border-radius: 32px;
+  background: var(--glass-sheen), rgba(30, 32, 40, 0.9);
+  border: var(--glass-panel-border);
+  box-shadow: var(--glass-panel-shadow);
+  transform: translateY(24px) scale(0.96);
+  transition: transform var(--dur-morph) var(--spring);
+}
+.ach-sheet.show .ach-panel { transform: none; }
+.ach-head { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; }
+.ach-head h2 { font-size: 34px; }
+
+.ach-ring { position: relative; width: 64px; height: 64px; flex: none; }
+.ach-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ach-ring circle { fill: none; stroke-width: 4; }
+.ach-ring .bg { stroke: var(--fill-2); }
+.ach-ring .fg {
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-dasharray: 119.4;
+  stroke-dashoffset: 119.4;
+  filter: drop-shadow(0 0 4px rgba(100, 210, 255, 0.6));
+  transition: stroke-dashoffset 1.2s var(--ease-out);
+}
+.ach-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 17px; }
+
+.ach-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.ach {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--fill);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+}
+.ach-sheet.show .ach {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-spring-m) var(--spring);
+  transition-delay: calc(var(--i, 0) * 40ms + 150ms);
+}
+.ach-icon {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: var(--fill-2);
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+.ach.on .ach-icon {
+  filter: none;
+  opacity: 1;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.35), transparent 60%), linear-gradient(135deg, #64D2FF, #7B6CFF);
+  box-shadow: 0 6px 20px rgba(100, 210, 255, 0.35);
+}
+.ach.on::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.08) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: ach-sheen 5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.3s);
+}
+@keyframes ach-sheen { 0%, 70% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+.ach-body { flex: 1; min-width: 0; }
+.ach-title { font-weight: 600; font-size: 16px; }
+.ach:not(.on) .ach-title { color: var(--ink-2); }
+.ach-desc { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+.ach-prog { height: 4px; margin-top: 9px; border-radius: 2px; background: var(--fill-2); overflow: hidden; }
+.ach-prog i { display: block; height: 100%; background: var(--accent); transform-origin: 0 50%; }
+.ach-date { font-size: 12px; color: var(--accent); margin-top: 6px; }
+
+/* Всплывашка «Достижение получено» */
+.ach-pops {
+  position: fixed;
+  top: 64px;
+  right: 22px;
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.ach-pop {
+  position: relative;
+  width: 330px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px 14px 14px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--glass-sheen), rgba(30, 32, 40, 0.88);
+  border: 1px solid rgba(100, 210, 255, 0.35);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 0 40px rgba(100, 210, 255, 0.25);
+  pointer-events: auto;
+  animation: ach-in 700ms var(--spring) both;
+}
+.ach-pop.out { animation: ach-out 400ms var(--ease-out) forwards; }
+@keyframes ach-in { from { opacity: 0; transform: translateX(60px) scale(0.9); } to { opacity: 1; transform: none; } }
+@keyframes ach-out { to { opacity: 0; transform: translateX(40px) scale(0.95); } }
+.ach-pop .ach-icon { filter: none; opacity: 1; background: linear-gradient(135deg, #64D2FF, #7B6CFF); animation: ach-pulse 1.6s ease-in-out 2; }
+@keyframes ach-pulse { 50% { transform: scale(1.12) rotate(-6deg); box-shadow: 0 0 26px rgba(100, 210, 255, 0.8); } }
+.ach-pop .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); text-transform: uppercase; }
+.ach-pop .t { font-size: 16px; font-weight: 600; margin-top: 2px; }
+.ach-pop .d { font-size: 13px; color: var(--ink-2); }
+.ach-pop::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  animation: ach-timer 5s linear forwards;
+}
+@keyframes ach-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+html[data-effects="off"] .ach-sheet,
+html[data-effects="off"] .ach-panel,
+html[data-effects="off"] .ach,
+html[data-effects="off"] .ach-ring .fg { transition: none !important; }
+html[data-effects="off"] .ach::before,
+html[data-effects="off"] .ach-pop,
+html[data-effects="off"] .ach-pop .ach-icon { animation: none; }

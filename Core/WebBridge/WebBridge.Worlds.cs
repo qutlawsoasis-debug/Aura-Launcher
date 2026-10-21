@@ -46,6 +46,7 @@ public partial class WebBridge
         if (save == null) return;
         _logger($"[WEBBRIDGE] worlds.backup '{save.FolderName}'");
         string zip = await _workshopService!.CreateWorldBackupAsync(save);
+        ReportAchievement("backup_created");
         SendResponse(msg.Id, msg.Name, new { ok = true, file = Path.GetFileName(zip) });
     }
 
@@ -198,6 +199,7 @@ public partial class WebBridge
         RunOnUi(() => _coreWebView2?.SetVirtualHostNameToFolderMapping(ShotsHost, dir, CoreWebView2HostResourceAccessKind.Allow));
 
         var shots = await _workshopService.GetScreenshotsAsync(GetInstanceDir());
+        ReportAchievement("screenshots_count", shots.Count);
         SendResponse(msg.Id, msg.Name, new
         {
             shots = shots.OrderByDescending(s => s.CreatedDate).Select(s => new
