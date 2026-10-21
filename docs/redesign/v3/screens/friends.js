@@ -13,47 +13,67 @@
     const submitAdd = document.getElementById('btnSubmitAddFriend');
     const myCodeCopy = document.getElementById('btnCopyMyFriendCode');
 
-    // 1. Filter Friends
+    // 1. Filter Friends with smooth stagger transition
     segButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
         if (!list) return;
 
-        const rows = list.querySelectorAll('.person');
-        rows.forEach(r => {
-          const st = r.dataset.st;
-          if (tab === 'all') {
-            r.hidden = false;
-          } else if (tab === 'game') {
-            r.hidden = st !== 'game';
-          } else if (tab === 'online') {
-            r.hidden = st !== 'game' && st !== 'online';
-          }
-        });
+        const rows = Array.from(list.querySelectorAll('.person'));
+        rows.forEach(r => r.classList.add('content-fade-out'));
+
+        setTimeout(() => {
+          let visibleIdx = 0;
+          rows.forEach(r => {
+            r.classList.remove('content-fade-out');
+            r.classList.remove('stagger-in');
+            const st = r.dataset.st;
+            let show = false;
+            if (tab === 'all') show = true;
+            else if (tab === 'game') show = (st === 'game');
+            else if (tab === 'online') show = (st === 'game' || st === 'online');
+
+            r.hidden = !show;
+            if (show) {
+              const idx = Math.min(visibleIdx++, 7);
+              r.style.setProperty('--stagger-idx', idx);
+              r.classList.add('stagger-in');
+            }
+          });
+        }, 120);
       });
     });
 
-    // 2. Accept / Reject Requests
+    // 2. Accept / Reject Requests with collapse animation
     document.querySelectorAll('.btn-accept-req').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const person = e.target.closest('.person');
+        if (!person) return;
         const name = person.querySelector('.name')?.textContent || 'Друг';
-        person.remove();
-        updateRequestsCount();
-        if (typeof window.showToast === 'function') {
-          window.showToast(`${name} добавлен в друзья`, 'success');
-        }
+        person.classList.add('is-dismissing');
+        setTimeout(() => {
+          person.remove();
+          updateRequestsCount();
+          if (typeof window.showToast === 'function') {
+            window.showToast(`${name} добавлен в друзья`, 'success');
+          }
+        }, 200);
       });
     });
 
     document.querySelectorAll('.btn-reject-req').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const person = e.target.closest('.person');
-        person.remove();
-        updateRequestsCount();
-        if (typeof window.showToast === 'function') {
-          window.showToast('Заявка отклонена', 'info');
-        }
+        if (!person) return;
+        const name = person.querySelector('.name')?.textContent || 'Заявка';
+        person.classList.add('is-dismissing');
+        setTimeout(() => {
+          person.remove();
+          updateRequestsCount();
+          if (typeof window.showToast === 'function') {
+            window.showToast(`${name} отклонена`, 'info');
+          }
+        }, 200);
       });
     });
 

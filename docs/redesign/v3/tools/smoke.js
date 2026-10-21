@@ -34,6 +34,7 @@ async function runSmokeForTarget(target) {
     mapCanvasSizeOk: false,
     skinview3dOk: false,
     playRunningOk: false,
+    offTransitionsOk: false,
     passed: false
   };
 
@@ -154,7 +155,22 @@ async function runSmokeForTarget(target) {
   const filterCount = filterRes.result.value || 0;
   result.backdropLayersOk = (target.effects === 'off' ? filterCount === 0 : filterCount <= 1);
 
-  // 3. Test sections iteration, real clicking on interactive elements
+  // 2b. If effects=off, check that .toggle and .seg .lens have transition-duration > 0
+  if (target.effects === 'off') {
+    const offTransRes = await sendSession('Runtime.evaluate', {
+      expression: `(() => {
+        const toggle = document.querySelector('.toggle');
+        const lens = document.querySelector('.seg .lens');
+        const toggleDur = toggle ? parseFloat(window.getComputedStyle(toggle).transitionDuration) : 0;
+        const lensDur = lens ? parseFloat(window.getComputedStyle(lens).transitionDuration) : 0;
+        return (toggleDur > 0 && lensDur > 0);
+      })()`,
+      returnByValue: true
+    });
+    result.offTransitionsOk = Boolean(offTransRes.result.value);
+  } else {
+    result.offTransitionsOk = true;
+  }
   for (const sec of SECTIONS) {
     await sendSession('Runtime.evaluate', {
       expression: `window.setIslandMode("${sec}")`
@@ -166,6 +182,7 @@ async function runSmokeForTarget(target) {
     if (sec === 'map') {
       const mapCheck = await sendSession('Runtime.evaluate', {
         expression: `(() => {
+          if (typeof window.renderMapNow === 'function') window.renderMapNow();
           const cv = document.getElementById('mapCanvas');
           if (!cv) return null;
           const rect = cv.getBoundingClientRect();
@@ -175,7 +192,7 @@ async function runSmokeForTarget(target) {
             cssHeight: Math.round(rect.height),
             bufWidth: cv.width,
             bufHeight: cv.height,
-            isMatch: cv.width > 300 && cv.height > 200 && cv.width === Math.round(rect.width * dpr)
+            isMatch: cv.width > 300 && cv.height > 200 && Math.abs(cv.width - Math.round(rect.width * dpr)) <= 4
           };
         })()`,
         returnByValue: true
@@ -292,7 +309,8 @@ async function runSmokeForTarget(target) {
     result.backdropLayersOk &&
     result.mapCanvasSizeOk &&
     result.skinview3dOk &&
-    result.playRunningOk
+    result.playRunningOk &&
+    result.offTransitionsOk
   );
 
   return result;

@@ -137,6 +137,9 @@
     requestAnimationFrame(() => {
       document.querySelectorAll(`[data-l="${m}"] .seg`).forEach(window.placeLens);
       syncPreBlurBackground();
+      if (m === 'map' && typeof window.renderMapNow === 'function') {
+        window.renderMapNow();
+      }
     });
   };
 

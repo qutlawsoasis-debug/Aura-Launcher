@@ -11,12 +11,27 @@
     const paneShaders = document.getElementById('paneShaders');
     const paneMods = document.getElementById('paneMods');
 
-    // 1. Switch between Shaders & Mods panes
+    // 1. Switch between Shaders & Mods panes with fade
     segButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
-        if (paneShaders) paneShaders.hidden = (tab !== 'shaders');
-        if (paneMods) paneMods.hidden = (tab !== 'mods');
+        const outPane = tab === 'shaders' ? paneMods : paneShaders;
+        const inPane = tab === 'shaders' ? paneShaders : paneMods;
+
+        if (outPane && !outPane.hidden) {
+          outPane.classList.add('content-fade-out');
+          setTimeout(() => {
+            outPane.hidden = true;
+            outPane.classList.remove('content-fade-out');
+            if (inPane) {
+              inPane.hidden = false;
+              inPane.classList.add('content-fade-in');
+              setTimeout(() => inPane.classList.remove('content-fade-in'), 200);
+            }
+          }, 120);
+        } else if (inPane) {
+          inPane.hidden = false;
+        }
       });
     });
 

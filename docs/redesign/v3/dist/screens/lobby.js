@@ -18,11 +18,27 @@
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).catch(() => {});
         }
+        codeDisplay.classList.add('flash');
+        setTimeout(() => codeDisplay.classList.remove('flash'), 300);
         if (typeof window.showToast === 'function') {
           window.showToast('Код комнаты скопирован', 'success');
         }
       });
     }
+
+    // 2. Interactive invite slots
+    document.querySelectorAll('#lobbySlotsContainer .slot').forEach(slot => {
+      slot.addEventListener('click', () => {
+        if (!slot.classList.contains('full')) {
+          slot.classList.remove('slot-invited');
+          void slot.offsetWidth; // trigger reflow
+          slot.classList.add('slot-invited');
+          if (typeof window.showToast === 'function') {
+            window.showToast('Приглашение отправлено другу', 'info');
+          }
+        }
+      });
+    });
 
     if (submitJoin && inputJoin) {
       submitJoin.addEventListener('click', () => {

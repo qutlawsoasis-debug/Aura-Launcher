@@ -34,11 +34,16 @@
       updateRam();
     }
 
-    // 2. Graphics Preset Segmented Buttons
+    // 2. Graphics Preset Segmented Buttons with crossfade hint
     document.querySelectorAll('#presetSegmented button').forEach((btn, idx) => {
       btn.addEventListener('click', () => {
         if (presetHint && PRESETS_INFO[idx]) {
-          presetHint.textContent = PRESETS_INFO[idx];
+          presetHint.style.transition = 'opacity var(--dur-1) var(--ease-out)';
+          presetHint.style.opacity = '0';
+          setTimeout(() => {
+            presetHint.textContent = PRESETS_INFO[idx];
+            presetHint.style.opacity = '1';
+          }, 120);
         }
       });
     });
