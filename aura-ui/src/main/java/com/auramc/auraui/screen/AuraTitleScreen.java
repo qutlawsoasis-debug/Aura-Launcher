@@ -114,14 +114,15 @@ public class AuraTitleScreen extends Screen {
 
         int fbWidth = client.getWindow().getFramebufferWidth();
         int fbHeight = client.getWindow().getFramebufferHeight();
-        double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) guiScale;
+        int winWidth = client.getWindow().getWidth();
+        int winHeight = client.getWindow().getHeight();
+        float scale = AuraRenderer.uiScale();
 
-        float winW = (float) (fbWidth / scale);
-        float winH = (float) (fbHeight / scale);
+        float winW = fbWidth / scale;
+        float winH = fbHeight / scale;
 
-        float realMouseX = (float) (client.mouse.getX() / scale);
-        float realMouseY = (float) (client.mouse.getY() / scale);
+        float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
+        float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
         // Target mouse parallax
         float targetPx = (realMouseX / winW - 0.5f) * 20.0f;
@@ -171,12 +172,13 @@ public class AuraTitleScreen extends Screen {
         AuraRenderer.roundRect(badgeX, badgeY, badgeW, badgeH, badgeH * 0.5f, Theme.PANEL_GLASS);
         AuraRenderer.outline(badgeX, badgeY, badgeW, badgeH, badgeH * 0.5f, 1.0f, Theme.PANEL_BORDER);
 
-        // Avatar circle
+        // Avatar circle with first letter of nickname
         float avSize = badgeH - 8.0f;
         float avX = badgeX + 4.0f;
         float avY = badgeY + 4.0f;
         AuraRenderer.roundRect(avX, avY, avSize, avSize, avSize * 0.5f, Theme.FILL_2);
-        AuraRenderer.text("👤", avX + avSize * 0.5f, avY + avSize * 0.5f + 4.0f, 12.0f,
+        String initial = playerNick.length() > 0 ? playerNick.substring(0, 1).toUpperCase() : "P";
+        AuraRenderer.text(initial, avX + avSize * 0.5f, avY + avSize * 0.5f + 4.5f, 13.0f,
                 Theme.ACCENT, NanoVG.NVG_ALIGN_CENTER);
 
         AuraRenderer.text(playerNick, avX + avSize + 8.0f, badgeY + badgeH * 0.5f + 4.5f,
@@ -304,12 +306,14 @@ public class AuraTitleScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (client == null || button != 0) return super.mouseClicked(mouseX, mouseY, button);
 
+        int fbWidth = client.getWindow().getFramebufferWidth();
         int fbHeight = client.getWindow().getFramebufferHeight();
-        double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) guiScale;
+        int winWidth = client.getWindow().getWidth();
+        int winHeight = client.getWindow().getHeight();
+        float scale = AuraRenderer.uiScale();
 
-        float realMouseX = (float) (client.mouse.getX() / scale);
-        float realMouseY = (float) (client.mouse.getY() / scale);
+        float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
+        float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
         float leftPad = 80.0f;
         float brandY = (fbHeight / scale) * 0.28f;

@@ -73,6 +73,16 @@ public final class AuraRenderer {
         return vg;
     }
 
+    public static float uiScale() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc == null || mc.getWindow() == null) return 1.0f;
+        int fbHeight = mc.getWindow().getFramebufferHeight();
+        float scale = fbHeight / 1080.0f;
+        if (scale < 0.6f) return 0.6f;
+        if (scale > 2.0f) return 2.0f;
+        return scale;
+    }
+
     private static int savedVao = 0;
 
     public static boolean beginFrame(float width, float height, float devicePixelRatio) {

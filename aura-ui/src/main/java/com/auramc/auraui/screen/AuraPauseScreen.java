@@ -93,14 +93,15 @@ public class AuraPauseScreen extends Screen {
 
         int fbWidth = client.getWindow().getFramebufferWidth();
         int fbHeight = client.getWindow().getFramebufferHeight();
-        double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) guiScale;
+        int winWidth = client.getWindow().getWidth();
+        int winHeight = client.getWindow().getHeight();
+        float scale = AuraRenderer.uiScale();
 
-        float winW = (float) (fbWidth / scale);
-        float winH = (float) (fbHeight / scale);
+        float winW = fbWidth / scale;
+        float winH = fbHeight / scale;
 
-        float realMouseX = (float) (client.mouse.getX() / scale);
-        float realMouseY = (float) (client.mouse.getY() / scale);
+        float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
+        float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
         // 1. Two-pass GPU Blur of the in-game world
         Blur.renderBlur(44.0f);
@@ -163,10 +164,13 @@ public class AuraPauseScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (client == null) return false;
-        double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) guiScale;
-        float realMouseX = (float) (client.mouse.getX() / scale);
-        float realMouseY = (float) (client.mouse.getY() / scale);
+        int fbWidth = client.getWindow().getFramebufferWidth();
+        int fbHeight = client.getWindow().getFramebufferHeight();
+        int winWidth = client.getWindow().getWidth();
+        int winHeight = client.getWindow().getHeight();
+        float scale = AuraRenderer.uiScale();
+        float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
+        float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
         for (Button btn : buttons) {
             if (btn.mouseClicked(realMouseX, realMouseY, button)) return true;
@@ -177,10 +181,13 @@ public class AuraPauseScreen extends Screen {
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (client == null) return false;
-        double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) guiScale;
-        float realMouseX = (float) (client.mouse.getX() / scale);
-        float realMouseY = (float) (client.mouse.getY() / scale);
+        int fbWidth = client.getWindow().getFramebufferWidth();
+        int fbHeight = client.getWindow().getFramebufferHeight();
+        int winWidth = client.getWindow().getWidth();
+        int winHeight = client.getWindow().getHeight();
+        float scale = AuraRenderer.uiScale();
+        float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
+        float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
         for (Button btn : buttons) {
             if (btn.mouseReleased(realMouseX, realMouseY, button)) return true;
