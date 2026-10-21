@@ -901,7 +901,7 @@ body.is-open .world {
 }
 
 .skin-anim-seg {
-  width: 240px;
+  width: 220px;
 }
 
 .capes {
@@ -934,6 +934,28 @@ body.is-open .world {
   width: 28px;
   height: 48px;
   border-radius: 4px;
+}
+
+@media (max-height: 820px) {
+  #skinCanvas3D {
+    width: 220px !important;
+    height: 320px !important;
+  }
+
+  .wardrobe-controls-col .row {
+    min-height: 52px;
+    padding: 6px 0;
+  }
+
+  .wardrobe-controls-col .capes .cape {
+    height: 64px;
+    width: 44px;
+  }
+
+  .wardrobe-controls-col .capes .cape .sw {
+    height: 38px;
+    width: 22px;
+  }
 }
 
 /* === SCREEN CSS: workshop.css === */
@@ -1186,20 +1208,24 @@ body.is-open .world {
           <div class="wardrobe">
   <div class="wardrobe-viewer-col">
     <canvas id="skinCanvas3D" width="260" height="380" title="Потяните для вращения, колёсико — зум"></canvas>
-    <div class="seg skin-anim-seg" data-seg="anim" style="margin-top:8px">
-      <span class="lens"></span>
-      <button type="button" class="on" data-anim="idle">Стоит</button>
-      <button type="button" data-anim="walk">Идёт</button>
-      <button type="button" data-anim="run">Бежит</button>
-    </div>
   </div>
 
   <div class="wardrobe-controls-col" style="flex:1">
-    <div class="small dim" style="margin-bottom:10px">Плащ</div>
+    <div class="small dim" style="margin-bottom:8px">Плащ</div>
     <div class="capes" id="capeSelector">
       <button type="button" class="cape on" data-cape="cyan" title="Лазурный плащ"><span class="sw" style="background:linear-gradient(160deg,#5FD4E8,#2A6F8E)"></span></button>
       <button type="button" class="cape" data-cape="silver" title="Серебряный плащ"><span class="sw" style="background:linear-gradient(160deg,#C9CDD6,#6B7280)"></span></button>
       <button type="button" class="cape" data-cape="none" title="Без плаща">нет</button>
+    </div>
+
+    <div class="row">
+      <span>Анимация</span>
+      <div class="seg skin-anim-seg" data-seg="anim" id="animModeSeg">
+        <span class="lens"></span>
+        <button type="button" class="on" data-anim="idle">Стоит</button>
+        <button type="button" data-anim="walk">Идёт</button>
+        <button type="button" data-anim="run">Бежит</button>
+      </div>
     </div>
 
     <div class="row">
@@ -4639,17 +4665,37 @@ window.AURA_DEMO_DATA = (function () {
     });
 
     // 3. Effects Mode Segment
+    const syncEffectsSegment = () => {
+      const currentMode = document.documentElement.dataset.effects || 'full';
+      const seg = document.getElementById('effectsSegmented');
+      if (seg) {
+        seg.querySelectorAll('button').forEach(btn => {
+          const isActive = btn.dataset.fx === currentMode;
+          btn.classList.toggle('on', isActive);
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+        });
+        if (typeof window.placeLens === 'function') {
+          window.placeLens(seg);
+        }
+      }
+    };
+
     document.querySelectorAll('#effectsSegmented button').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const fx = btn.dataset.fx;
         if (typeof window.setEffectsMode === 'function') {
           window.setEffectsMode(fx);
         }
+        syncEffectsSegment();
         if (typeof window.updateWardrobeRenderState === 'function') {
           window.updateWardrobeRenderState();
         }
       });
     });
+
+    syncEffectsSegment();
 
     // 4. Game version and Folder actions
     const changeVerBtn = document.getElementById('btnChangeVersion');

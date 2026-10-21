@@ -44,17 +44,37 @@
     });
 
     // 3. Effects Mode Segment
+    const syncEffectsSegment = () => {
+      const currentMode = document.documentElement.dataset.effects || 'full';
+      const seg = document.getElementById('effectsSegmented');
+      if (seg) {
+        seg.querySelectorAll('button').forEach(btn => {
+          const isActive = btn.dataset.fx === currentMode;
+          btn.classList.toggle('on', isActive);
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+        });
+        if (typeof window.placeLens === 'function') {
+          window.placeLens(seg);
+        }
+      }
+    };
+
     document.querySelectorAll('#effectsSegmented button').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const fx = btn.dataset.fx;
         if (typeof window.setEffectsMode === 'function') {
           window.setEffectsMode(fx);
         }
+        syncEffectsSegment();
         if (typeof window.updateWardrobeRenderState === 'function') {
           window.updateWardrobeRenderState();
         }
       });
     });
+
+    syncEffectsSegment();
 
     // 4. Game version and Folder actions
     const changeVerBtn = document.getElementById('btnChangeVersion');

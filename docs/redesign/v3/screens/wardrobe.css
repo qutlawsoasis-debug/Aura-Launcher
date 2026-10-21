@@ -25,7 +25,7 @@
 }
 
 .skin-anim-seg {
-  width: 240px;
+  width: 220px;
 }
 
 .capes {
@@ -58,4 +58,26 @@
   width: 28px;
   height: 48px;
   border-radius: 4px;
+}
+
+@media (max-height: 820px) {
+  #skinCanvas3D {
+    width: 220px !important;
+    height: 320px !important;
+  }
+
+  .wardrobe-controls-col .row {
+    min-height: 52px;
+    padding: 6px 0;
+  }
+
+  .wardrobe-controls-col .capes .cape {
+    height: 64px;
+    width: 44px;
+  }
+
+  .wardrobe-controls-col .capes .cape .sw {
+    height: 38px;
+    width: 22px;
+  }
 }
