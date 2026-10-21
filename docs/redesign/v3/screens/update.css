@@ -1,0 +1,77 @@
+/* Плашка «Вышло обновление» — выезжает сверху по центру */
+.update-pill {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px 7px 16px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(30, 32, 40, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 12px 36px rgba(0, 0, 0, 0.4);
+  font-size: 15px;
+  white-space: nowrap;
+  translate: -50% 0;
+  opacity: 0;
+  transform: translateY(-140%) scale(0.92);
+  pointer-events: none;
+  transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-spring-m) var(--spring);
+}
+.update-pill.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.update-pill .up-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: up-pulse 1.8s ease-in-out infinite;
+}
+@keyframes up-pulse {
+  50% { transform: scale(1.5); opacity: 0.55; }
+}
+.update-pill .up-close {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
+}
+.update-pill .up-close:hover { background: var(--fill); color: #fff; }
+.update-pill .up-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.update-pill .up-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  transition: transform var(--dur-3) var(--ease-out);
+}
+.update-pill.busy .up-bar { opacity: 1; }
+.update-pill.busy #btnApplyUpdate,
+.update-pill.busy .up-close { pointer-events: none; opacity: 0.6; }
+
+/* Пока плашка видна, тосты опускаются под неё */
+body.has-update .toast-container { top: 66px; }
+
+html[data-effects="off"] .update-pill,
+html[data-effects="off"] .update-pill .up-bar i { transition: none; }
+html[data-effects="off"] .update-pill .up-dot { animation: none; }

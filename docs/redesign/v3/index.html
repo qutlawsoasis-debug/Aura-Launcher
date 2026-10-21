@@ -27,6 +27,14 @@
     </button>
   </div>
 
+  <div class="update-pill" id="updatePill" role="status" aria-live="polite">
+    <span class="up-dot"></span>
+    <span class="up-text" id="updateText">Вышло обновление</span>
+    <button type="button" class="btn sm primary" id="btnApplyUpdate">Обновить</button>
+    <button type="button" class="up-close" id="btnDismissUpdate" aria-label="Позже">✕</button>
+    <span class="up-bar"><i id="updateBar"></i></span>
+  </div>
+
   <div class="island" id="island" data-glass>
     <!-- покой -->
     <div class="layer on" data-l="idle">

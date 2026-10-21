@@ -21,6 +21,7 @@ public partial class WebShellWindow : Window
     private readonly IFriendService? _friendService;
     private readonly IReportService? _reportService;
     private readonly ILobbySessionService? _lobbySession;
+    private readonly ILauncherUpdateService? _launcherUpdateService;
     private WebBridge? _bridge;
 
     public WebShellWindow(
@@ -33,7 +34,8 @@ public partial class WebShellWindow : Window
         ISkinService? skinService = null,
         IFriendService? friendService = null,
         IReportService? reportService = null,
-        ILobbySessionService? lobbySession = null)
+        ILobbySessionService? lobbySession = null,
+        ILauncherUpdateService? launcherUpdateService = null)
     {
         InitializeComponent();
         _gameSessionService = gameSessionService;
@@ -46,6 +48,7 @@ public partial class WebShellWindow : Window
         _friendService = friendService;
         _reportService = reportService;
         _lobbySession = lobbySession;
+        _launcherUpdateService = launcherUpdateService;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -66,7 +69,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession);
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService);
             _bridge.Attach(WebViewControl.CoreWebView2);
 
             _friendService?.Start();

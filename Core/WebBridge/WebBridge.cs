@@ -26,6 +26,7 @@ public partial class WebBridge : IDisposable
     private readonly IFriendService? _friendService;
     private readonly IReportService? _reportService;
     private readonly ILobbySessionService? _lobbySession;
+    private readonly ILauncherUpdateService? _launcherUpdateService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -45,6 +46,7 @@ public partial class WebBridge : IDisposable
         IFriendService? friendService = null,
         IReportService? reportService = null,
         ILobbySessionService? lobbySession = null,
+        ILauncherUpdateService? launcherUpdateService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -76,6 +78,7 @@ public partial class WebBridge : IDisposable
 
         _lobbySession = lobbySession;
         SubscribeLobby();
+        _launcherUpdateService = launcherUpdateService;
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -102,6 +105,7 @@ public partial class WebBridge : IDisposable
 
         // Отправка начального статуса окна
         SendWindowState();
+        StartUpdatePolling();
 
         // Отправка начального статуса
         SendEvent("game.status", new
@@ -264,6 +268,14 @@ public partial class WebBridge : IDisposable
 
                 case "logs.export":
                     await HandleLogsExportAsync(msg);
+                    break;
+
+                case "launcher.updateGet":
+                    HandleLauncherUpdateGet(msg);
+                    break;
+
+                case "launcher.applyUpdate":
+                    await HandleLauncherApplyUpdateAsync(msg);
                     break;
 
                 case "nickname.set":
@@ -1159,6 +1171,7 @@ public partial class WebBridge : IDisposable
             _friendService.InviteReceived -= OnInviteReceived;
         }
         UnsubscribeLobby();
+        StopUpdatePolling();
         if (_coreWebView2 != null)
         {
             _coreWebView2.WebMessageReceived -= OnWebMessageReceived;

@@ -449,6 +449,19 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
+    // Обновление лаунчера: в dev показываем плашку только с ?update=1
+    if (name === 'launcher.updateGet') {
+      const on = typeof location !== 'undefined' && /[?&]update=1/.test(location.search);
+      return Promise.resolve(on
+        ? { current: '1.2.140', available: true, version: '1.2.141', display: 'beta 1.0.133' }
+        : { current: '1.2.140', available: false });
+    }
+
+    if (name === 'launcher.applyUpdate') {
+      [20, 55, 85, 100].forEach((p, i) => setTimeout(() => emit('launcher.updateProgress', { percentage: p }), 300 * (i + 1)));
+      return new Promise(resolve => setTimeout(() => resolve({ status: 'restarting' }), 1500));
+    }
+
     if (name === 'nickname.set') {
       const nick = String((payload && payload.nickname) || '').trim();
       if (!/^[A-Za-z0-9_]{3,16}$/.test(nick)) {

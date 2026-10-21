@@ -1120,6 +1120,20 @@ public class WebBridgeTests
     }
 
     [Fact]
+    public async Task Handle_LauncherApplyUpdate_NotInstalled_ReturnsError()
+    {
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), logger: _ => {});
+        var posted = new List<BridgeMessage>();
+        bridge.MessagePosted += m => posted.Add(m);
+
+        await bridge.ProcessRawMessageAsync("""{"id":"u1","type":"command","name":"launcher.updateGet"}""");
+        await bridge.ProcessRawMessageAsync("""{"id":"u2","type":"command","name":"launcher.applyUpdate"}""");
+
+        Assert.False(PayloadOf(posted[0]).GetProperty("available").GetBoolean());
+        Assert.NotNull(posted[1].Error);
+    }
+
+    [Fact]
     public void LobbyEvents_AreForwarded_AndDisposeUnsubscribes()
     {
         var lobby = new FakeLobbySession();
