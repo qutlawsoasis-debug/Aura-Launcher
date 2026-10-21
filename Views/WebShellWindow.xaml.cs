@@ -18,6 +18,7 @@ public partial class WebShellWindow : Window
     private readonly IPackUpdateService? _packUpdateService;
     private readonly IGameLaunchService? _launchService;
     private readonly ISkinService? _skinService;
+    private readonly IFriendService? _friendService;
     private WebBridge? _bridge;
 
     public WebShellWindow(
@@ -27,7 +28,8 @@ public partial class WebShellWindow : Window
         IWorkshopService? workshopService = null,
         IPackUpdateService? packUpdateService = null,
         IGameLaunchService? launchService = null,
-        ISkinService? skinService = null)
+        ISkinService? skinService = null,
+        IFriendService? friendService = null)
     {
         InitializeComponent();
         _gameSessionService = gameSessionService;
@@ -37,6 +39,7 @@ public partial class WebShellWindow : Window
         _packUpdateService = packUpdateService;
         _launchService = launchService;
         _skinService = skinService;
+        _friendService = friendService;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -57,8 +60,10 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService);
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService);
             _bridge.Attach(WebViewControl.CoreWebView2);
+
+            _friendService?.Start();
 
             string targetUrl = await ResolveTargetUrlAsync();
             WebViewControl.CoreWebView2.Navigate(targetUrl);
@@ -89,9 +94,14 @@ public partial class WebShellWindow : Window
         string uiFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ui");
         if (!Directory.Exists(uiFolder))
         {
-            // Фолбэк на репозиторий docs/redesign/v3
+            // Фолбэк на docs/redesign/v3/dist (собранный бандл) либо docs/redesign/v3
+            string repoDocsDist = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "docs", "redesign", "v3", "dist"));
             string repoDocsV3 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "docs", "redesign", "v3"));
-            if (Directory.Exists(repoDocsV3))
+            if (Directory.Exists(repoDocsDist))
+            {
+                uiFolder = repoDocsDist;
+            }
+            else if (Directory.Exists(repoDocsV3))
             {
                 uiFolder = repoDocsV3;
             }

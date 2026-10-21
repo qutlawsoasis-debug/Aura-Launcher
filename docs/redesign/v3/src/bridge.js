@@ -365,6 +365,49 @@
       });
     }
 
+    if (!scope.__mockFriendsData) {
+      scope.__mockFriendsData = {
+        myCode: 'AURA-7821-X9M2',
+        registered: true,
+        friends: [
+          { id: 'f-1', nick: 'zxcursed', online: true, status: 'playing', lobbyCode: 'AURA-LOBBY-1' },
+          { id: 'f-2', nick: 'Steve_Miner', online: true, status: 'online', lobbyCode: null },
+          { id: 'f-3', nick: 'Lumi', online: false, status: 'online', lobbyCode: null }
+        ],
+        requests: [
+          { id: 'req-1', nick: 'RedstonePro' }
+        ]
+      };
+    }
+
+    if (name === 'friends.get') {
+      return Promise.resolve({
+        myCode: scope.__mockFriendsData.myCode,
+        registered: scope.__mockFriendsData.registered,
+        friends: scope.__mockFriendsData.friends
+      });
+    }
+
+    if (name === 'friends.setTabActive') {
+      scope.__mockFriendsTabActive = Boolean(payload && payload.active);
+      return Promise.resolve({ ok: true });
+    }
+
+    if (name === 'friends.add') {
+      const code = payload && payload.code;
+      if (!code || code === 'AURA-0000') {
+        return Promise.resolve({ ok: false, error: 'Игрок с таким кодом не найден' });
+      }
+      return Promise.resolve({ ok: true });
+    }
+
+    if (name === 'friends.respond') {
+      const fromId = payload && payload.fromId;
+      const accept = Boolean(payload && payload.accept);
+      scope.__mockFriendsData.requests = scope.__mockFriendsData.requests.filter(r => r.id !== fromId);
+      return Promise.resolve({ ok: true });
+    }
+
     return Promise.resolve({ success: true, mock: true });
   }
 

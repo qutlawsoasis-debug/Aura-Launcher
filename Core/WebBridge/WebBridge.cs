@@ -22,11 +22,13 @@ public class WebBridge : IDisposable
     private readonly IPackUpdateService? _packUpdateService;
     private readonly IGameLaunchService? _launchService;
     private readonly ISkinService? _skinService;
+    private readonly IFriendService? _friendService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
     private CancellationTokenSource? _packSyncCts;
     private bool _isSyncing;
+    private IReadOnlyList<FriendPresenceItem> _cachedFriends = Array.Empty<FriendPresenceItem>();
 
     public WebBridge(
         Window? window,
@@ -37,6 +39,7 @@ public class WebBridge : IDisposable
         IPackUpdateService? packUpdateService = null,
         IGameLaunchService? launchService = null,
         ISkinService? skinService = null,
+        IFriendService? friendService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -47,6 +50,7 @@ public class WebBridge : IDisposable
         _packUpdateService = packUpdateService;
         _launchService = launchService;
         _skinService = skinService;
+        _friendService = friendService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
@@ -54,6 +58,14 @@ public class WebBridge : IDisposable
         if (_window != null)
         {
             _window.StateChanged += OnWindowStateChanged;
+        }
+
+        if (_friendService != null)
+        {
+            _cachedFriends = _friendService.CachedFriends ?? Array.Empty<FriendPresenceItem>();
+            _friendService.FriendsListUpdated += OnFriendsListUpdated;
+            _friendService.FriendRequestReceived += OnFriendRequestReceived;
+            _friendService.InviteReceived += OnInviteReceived;
         }
     }
 
@@ -215,6 +227,22 @@ public class WebBridge : IDisposable
 
                 case "skin.setModel":
                     await HandleSkinSetModelAsync(msg);
+                    break;
+
+                case "friends.get":
+                    HandleFriendsGet(msg);
+                    break;
+
+                case "friends.setTabActive":
+                    HandleFriendsSetTabActive(msg);
+                    break;
+
+                case "friends.add":
+                    await HandleFriendsAddAsync(msg);
+                    break;
+
+                case "friends.respond":
+                    await HandleFriendsRespondAsync(msg);
                     break;
 
                 default:
@@ -1056,11 +1084,157 @@ public class WebBridge : IDisposable
         {
             _window.StateChanged -= OnWindowStateChanged;
         }
+        if (_friendService != null)
+        {
+            _friendService.FriendsListUpdated -= OnFriendsListUpdated;
+            _friendService.FriendRequestReceived -= OnFriendRequestReceived;
+            _friendService.InviteReceived -= OnInviteReceived;
+        }
         if (_coreWebView2 != null)
         {
             _coreWebView2.WebMessageReceived -= OnWebMessageReceived;
         }
         _gameLaunchCts?.Cancel();
         _gameLaunchCts?.Dispose();
+    }
+
+    private void OnFriendsListUpdated(IReadOnlyList<FriendPresenceItem> friends)
+    {
+        _cachedFriends = friends ?? Array.Empty<FriendPresenceItem>();
+        SendEvent("friends.presence", new
+        {
+            friends = _cachedFriends.Select(f => new
+            {
+                id = f.Id,
+                nick = f.Nick,
+                online = f.Online,
+                status = f.Status,
+                lobbyCode = f.LobbyCode
+            })
+        });
+    }
+
+    private void OnFriendRequestReceived(FriendRequestItem req)
+    {
+        SendEvent("friends.requestReceived", new
+        {
+            id = req.Id,
+            nick = req.Nick
+        });
+    }
+
+    private void OnInviteReceived(IncomingInviteItem inv)
+    {
+        SendEvent("friends.inviteReceived", new
+        {
+            inviteId = inv.InviteId,
+            fromId = inv.FromId,
+            fromNick = inv.FromNick
+        });
+    }
+
+    private void HandleFriendsGet(BridgeMessage msg)
+    {
+        string? myCode = _friendService?.CurrentFriendCode;
+        bool registered = _friendService?.IsRegistered ?? false;
+
+        SendResponse(msg.Id, msg.Name, new
+        {
+            myCode = myCode,
+            registered = registered,
+            friends = _cachedFriends.Select(f => new
+            {
+                id = f.Id,
+                nick = f.Nick,
+                online = f.Online,
+                status = f.Status,
+                lobbyCode = f.LobbyCode
+            })
+        });
+    }
+
+    private void HandleFriendsSetTabActive(BridgeMessage msg)
+    {
+        bool active = false;
+        if (msg.Payload is JsonElement elem)
+        {
+            if (elem.TryGetProperty("active", out var activeProp))
+            {
+                active = activeProp.GetBoolean();
+            }
+        }
+
+        _logger($"[WEBBRIDGE] friends.setTabActive: active={active}");
+
+        if (_friendService != null)
+        {
+            _friendService.IsFriendsTabActive = active;
+        }
+
+        SendResponse(msg.Id, msg.Name, new { ok = true });
+    }
+
+    private async Task HandleFriendsAddAsync(BridgeMessage msg)
+    {
+        if (_friendService == null)
+        {
+            SendError(msg.Id, msg.Name, "friend_service_unavailable");
+            return;
+        }
+
+        string code = string.Empty;
+        if (msg.Payload is JsonElement elem && elem.TryGetProperty("code", out var codeProp))
+        {
+            code = codeProp.GetString()?.Trim() ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            SendError(msg.Id, msg.Name, "invalid_code");
+            return;
+        }
+
+        var (success, error) = await _friendService.SendFriendRequestAsync(code);
+        if (success)
+        {
+            SendResponse(msg.Id, msg.Name, new { ok = true });
+        }
+        else
+        {
+            SendResponse(msg.Id, msg.Name, new { ok = false, error = error ?? "unknown_error" });
+        }
+    }
+
+    private async Task HandleFriendsRespondAsync(BridgeMessage msg)
+    {
+        if (_friendService == null)
+        {
+            SendError(msg.Id, msg.Name, "friend_service_unavailable");
+            return;
+        }
+
+        string fromId = string.Empty;
+        bool accept = false;
+
+        if (msg.Payload is JsonElement elem)
+        {
+            if (elem.TryGetProperty("fromId", out var idProp))
+            {
+                fromId = idProp.GetString() ?? string.Empty;
+            }
+            if (elem.TryGetProperty("accept", out var acceptProp))
+            {
+                accept = acceptProp.GetBoolean();
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(fromId))
+        {
+            SendError(msg.Id, msg.Name, "invalid_from_id");
+            return;
+        }
+
+        bool success = await _friendService.RespondFriendRequestAsync(fromId, accept);
+        SendResponse(msg.Id, msg.Name, new { ok = success });
     }
 }

@@ -673,4 +673,122 @@ public class WebBridgeTests
         Assert.True(modItem.IsEnabled);
         Assert.Equal("testmod.jar", modItem.FileName);
     }
+    private class FakeFriendService : IFriendService
+    {
+        public bool IsRegistered { get; set; } = true;
+        public string? CurrentUserId { get; set; } = "user_1";
+        public string? CurrentFriendCode { get; set; } = "AURA-1234-5678";
+        public IReadOnlyList<FriendPresenceItem> CachedFriends { get; set; } = Array.Empty<FriendPresenceItem>();
+        public bool IsFriendsTabActive { get; set; }
+        public bool IsInLobby { get; set; }
+        public string? CurrentLobbyCode { get; set; }
+        public string? CurrentHostToken { get; set; }
+        public bool IsGameRunning { get; set; }
+
+        public event Action<SyncResponse>? SyncUpdated;
+        public event Action<IReadOnlyList<FriendPresenceItem>>? FriendsListUpdated;
+        public event Action<IncomingInviteItem>? InviteReceived;
+        public event Action<FriendRequestItem>? FriendRequestReceived;
+
+        public void TriggerFriendsListUpdated(IReadOnlyList<FriendPresenceItem> items) => FriendsListUpdated?.Invoke(items);
+        public bool HasFriendsListUpdatedSubscribers => FriendsListUpdated != null;
+        public bool HasRequestReceivedSubscribers => FriendRequestReceived != null;
+        public bool HasInviteReceivedSubscribers => InviteReceived != null;
+
+        public void UpdateLobbyState(bool isInLobby, string? lobbyCode) { }
+        public void Start() { }
+        public void Stop() { }
+        public Task EnsureRegisteredAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<SyncResponse?> SyncNowAsync(CancellationToken cancellationToken = default) => Task.FromResult<SyncResponse?>(null);
+
+        public Task<(bool Success, string? ErrorMessage)> SendFriendRequestAsync(string friendCode, CancellationToken cancellationToken = default)
+        {
+            if (friendCode == "AURA-0000")
+            {
+                return Task.FromResult((false, (string?)"Игрок с таким кодом не найден"));
+            }
+            return Task.FromResult((true, (string?)null));
+        }
+
+        public Task<bool> RespondFriendRequestAsync(string fromId, bool accept, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<bool> RemoveFriendAsync(string friendId, CancellationToken cancellationToken = default) => Task.FromResult(true);
+        public Task<(bool Success, string? InviteId, string? ErrorMessage)> SendInviteAsync(string friendId, string lobbyCode, string? hostToken, CancellationToken cancellationToken = default) => Task.FromResult((true, (string?)"inv_1", (string?)null));
+        public Task<(bool Success, string? ErrorMessage)> ChangeNicknameAsync(string newNick, CancellationToken cancellationToken = default) => Task.FromResult((true, (string?)null));
+        public Task<(bool Success, string? LobbyCode, string? ErrorMessage)> RespondInviteAsync(string inviteId, bool accept, CancellationToken cancellationToken = default) => Task.FromResult((true, (string?)"lob_1", (string?)null));
+        public Task ReportOfflineAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task SendProfileSnapshotAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<UserProfileSnapshotDto?> GetFriendProfileAsync(string friendId, CancellationToken cancellationToken = default) => Task.FromResult<UserProfileSnapshotDto?>(null);
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task Handle_FriendsAdd_InvalidCode_ReturnsErrorInResponse()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var friendService = new FakeFriendService();
+
+        using var bridge = new WebBridge(null, sessionService, configService, friendService: friendService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_fa","type":"command","name":"friends.add","payload":{"code":"AURA-0000"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        var json = System.Text.Json.JsonSerializer.Serialize(lastResponse.Payload);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.False(doc.RootElement.GetProperty("ok").GetBoolean());
+        Assert.Equal("Игрок с таким кодом не найден", doc.RootElement.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public void Handle_FriendsListUpdated_SendsPresenceEvent()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var friendService = new FakeFriendService();
+
+        using var bridge = new WebBridge(null, sessionService, configService, friendService: friendService, logger: _ => {});
+
+        BridgeMessage? lastEvent = null;
+        bridge.MessagePosted += msg => lastEvent = msg;
+
+        friendService.TriggerFriendsListUpdated(new List<FriendPresenceItem>
+        {
+            new FriendPresenceItem { Id = "f_1", Nick = "BestFriend", Online = true, Status = "playing", LobbyCode = "LOBBY1" }
+        });
+
+        Assert.NotNull(lastEvent);
+        Assert.Equal("event", lastEvent.Type);
+        Assert.Equal("friends.presence", lastEvent.Name);
+        var json = System.Text.Json.JsonSerializer.Serialize(lastEvent.Payload);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var friendsArr = doc.RootElement.GetProperty("friends");
+        Assert.Equal(1, friendsArr.GetArrayLength());
+        Assert.Equal("BestFriend", friendsArr[0].GetProperty("nick").GetString());
+        Assert.Equal("playing", friendsArr[0].GetProperty("status").GetString());
+        Assert.Equal("LOBBY1", friendsArr[0].GetProperty("lobbyCode").GetString());
+    }
+
+    [Fact]
+    public void Dispose_UnsubscribesFromFriendServiceEvents()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var friendService = new FakeFriendService();
+
+        var bridge = new WebBridge(null, sessionService, configService, friendService: friendService, logger: _ => {});
+        Assert.True(friendService.HasFriendsListUpdatedSubscribers);
+        Assert.True(friendService.HasRequestReceivedSubscribers);
+        Assert.True(friendService.HasInviteReceivedSubscribers);
+
+        bridge.Dispose();
+
+        Assert.False(friendService.HasFriendsListUpdatedSubscribers);
+        Assert.False(friendService.HasRequestReceivedSubscribers);
+        Assert.False(friendService.HasInviteReceivedSubscribers);
+    }
+
 }
