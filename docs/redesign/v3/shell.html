@@ -1,0 +1,163 @@
+<!-- GENERATED — не редактировать, правь shell.html и screens/* -->
+<!doctype html>
+<html lang="ru" data-effects="full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aura — Остров</title>
+  <!-- SHELL_STYLES_PLACEHOLDER -->
+</head>
+<body>
+  <div class="world" id="world"></div>
+  <div class="shade"></div>
+  <div class="brand">Aura</div>
+  <div class="wincontrols">
+    <button type="button" class="win-btn" aria-label="Свернуть">—</button>
+    <button type="button" class="win-btn" aria-label="Развернуть">□</button>
+    <button type="button" class="win-btn" aria-label="Закрыть">✕</button>
+  </div>
+
+  <div class="island" id="island" data-glass>
+    <!-- покой -->
+    <div class="layer on" data-l="idle">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <div class="meta"><b>Coock0ld</b><span class="small dim">Aura Pack 1.2</span></div>
+        <button class="play" data-play><div class="fill"></div><span><span class="tri"></span>Играть</span></button>
+      </div>
+    </div>
+
+    <!-- навигация -->
+    <div class="layer" data-l="nav">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <nav class="navrow">
+          <button type="button" data-open="map">Карта</button>
+          <button type="button" data-open="lobby">Лобби</button>
+          <button type="button" data-open="friends">Друзья</button>
+          <button type="button" data-open="wardrobe">Гардероб</button>
+          <button type="button" data-open="workshop">Мастерская</button>
+          <button type="button" data-open="settings">Настройки</button>
+        </nav>
+        <button class="play" data-play><div class="fill"></div><span><span class="tri"></span>Играть</span></button>
+      </div>
+    </div>
+
+    <!-- в игре -->
+    <div class="layer" data-l="running">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <div class="meta"><b>Coock0ld</b><span class="small dim">00:00:12</span></div>
+        <button class="play" data-stop><span><span class="live"></span>В игре</span></button>
+      </div>
+    </div>
+
+    <!-- КАРТА -->
+    <div class="layer" data-l="map">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Карта</h2>
+            <div class="sub">Мир Coock0ld · изученная область</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body mapwrap">
+          <canvas id="mapCanvas" style="width:100%;height:100%;display:block;min-height:300px;background:#0b1622;border-radius:18px;"></canvas>
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- ЛОББИ -->
+    <div class="layer" data-l="lobby">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Лобби</h2>
+            <div class="sub"><span class="acc">●</span> Туннель активен · 34 мс</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <!-- SCREEN_LOBBY_PLACEHOLDER -->
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- ДРУЗЬЯ -->
+    <div class="layer" data-l="friends">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Друзья</h2>
+            <div class="sub">2 в игре · 1 в сети</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <!-- SCREEN_FRIENDS_PLACEHOLDER -->
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- ГАРДЕРОБ -->
+    <div class="layer" data-l="wardrobe">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Гардероб</h2>
+            <div class="sub">Так вас видят в игре</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <!-- SCREEN_WARDROBE_PLACEHOLDER -->
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- МАСТЕРСКАЯ -->
+    <div class="layer" data-l="workshop">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Мастерская</h2>
+            <div class="sub"><span class="acc">●</span> Сборка синхронизирована · 342.8 МБ</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <!-- SCREEN_WORKSHOP_PLACEHOLDER -->
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- НАСТРОЙКИ -->
+    <div class="layer" data-l="settings">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Настройки</h2>
+            <div class="sub">Параметры графики, памяти и клиента</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <!-- SCREEN_SETTINGS_PLACEHOLDER -->
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint-key" id="hintKey">Наведите на капсулу</div>
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <!-- SHELL_SCRIPTS_PLACEHOLDER -->
+</body>
+</html>

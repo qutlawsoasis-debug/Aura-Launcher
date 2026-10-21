@@ -1,5 +1,6 @@
 /**
- * Aura Launcher v3 — Core Framework Stylesheet (Apple Liquid Glass + Precision)
+ * Aura Launcher v3 — Core CSS (Island Concept)
+ * World + shade background, brand, wincontrols, and dynamic Island container.
  */
 
 @font-face {
@@ -9,867 +10,465 @@
   font-style: normal;
 }
 
-/* ================= 1. BASE & RESET ================= */
-*, *::before, *::after {
+* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
   user-select: none;
   -webkit-user-select: none;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-button {
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  color: inherit;
 }
 
 html, body {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  background-color: var(--bg-base);
-  color: var(--text-primary);
-  font-family: var(--font-family-main);
-  font-size: var(--font-size-body);
-  line-height: 1.5;
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: var(--gap-6px);
-  height: var(--gap-6px);
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--scroll-thumb-bg);
-  border-radius: var(--radius-pill-nav);
-  transition: background var(--transition-speed-fast);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--scroll-thumb-hover);
-}
-
-/* ================= 2. VIEWPORT & BACKGROUND ================= */
-.app-viewport {
-  position: relative;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.world-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
   height: 100%;
-  max-width: 100vw;
-  max-height: 100vh;
+  width: 100vw;
+  background: var(--bg-base);
+  color: var(--ink);
+  font-family: var(--font-family-main);
   overflow: hidden;
-  background-image: var(--bg-world-image);
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-color: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ================= 1. МИР И ЗАТЕМНЕНИЕ ================= */
+.world {
+  position: absolute;
+  inset: -3%;
+  background: var(--bg-world-image) center/cover no-repeat;
+  transition: transform 1.4s var(--smooth), filter 0.8s var(--smooth);
+  z-index: 0;
+}
+
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(4, 8, 14, 0.4), transparent 20%, transparent 62%, rgba(4, 8, 14, 0.55));
+  transition: background 0.6s;
   z-index: 1;
 }
 
-.world-overlay {
+body.is-open .world {
+  transform: scale(1.04);
+  filter: brightness(0.82);
+}
+
+.brand {
   position: absolute;
-  inset: 0;
-  background: var(--overlay-vignette);
-  pointer-events: none;
-  z-index: 2;
-}
-
-.sunbeam-light {
-  position: absolute;
-  top: var(--sunbeam-offset);
-  left: var(--sunbeam-offset);
-  width: var(--sunbeam-size);
-  height: var(--sunbeam-size);
-  border-radius: var(--radius-round);
-  background: var(--sunbeam-gradient);
-  pointer-events: none;
-  z-index: 3;
-  transform: translate(-50%, -50%);
-  will-change: transform;
-  mix-blend-mode: screen;
-}
-
-#ambientCanvas {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-}
-
-/* ================= 3. FLOATING TOP NAVIGATION RIBBON ================= */
-.top-ribbon {
-  position: absolute;
-  top: var(--top-ribbon-top);
-  left: var(--screen-offset-x);
-  right: var(--screen-offset-x);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  z-index: 50;
-  gap: var(--gap-lg);
-}
-
-.brand-section {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-}
-
-.logo-aura {
+  top: 26px;
+  left: 34px;
   font-size: var(--font-size-logo);
-  font-weight: var(--font-weight-extrabold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--text-on-world);
-  text-shadow: var(--text-shadow-on-world);
-  text-decoration: none;
-  line-height: 1.15;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--min-tap-target, 38px);
-  padding: 0 var(--gap-sm) 0 var(--gap-xs);
-  gap: var(--gap-xs);
-  overflow: visible;
-  transition: transform var(--transition-speed-fast) var(--spring-curve), color var(--transition-speed);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
+  z-index: 5;
 }
 
-.logo-aura span {
-  display: inline-block;
-  padding-right: 3px;
-}
-
-.logo-aura:hover {
-  transform: scale(1.02);
-}
-
-.logo-aura:active {
-  transform: scale(0.97);
-}
-
-.logo-badge {
-  font-size: var(--font-size-micro);
-  font-weight: var(--font-weight-bold);
-  padding: 2px var(--gap-6px);
-  border-radius: var(--radius-xxs);
-  background: var(--accent-glass);
-  border: 1px solid rgba(242, 166, 60, 0.4);
-  color: var(--accent);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-/* Floating Navigation Dock (Apple Capsule) */
-.nav-pill-dock {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-xxs);
-  background: var(--nav-dock-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: var(--glass-panel-border);
-  box-shadow: var(--glass-panel-shadow), var(--glass-panel-specular);
-  border-radius: var(--radius-pill-nav);
-  padding: var(--gap-xxs);
-  position: relative;
-}
-
-.nav-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-xs);
-  height: var(--nav-tab-min-height);
-  min-height: var(--min-tap-target);
-  padding: 0 var(--gap-md);
-  border-radius: var(--radius-pill-tab);
-  text-decoration: none;
-  font-size: var(--font-size-nav);
-  font-weight: var(--font-weight-semibold);
-  color: rgba(255, 255, 255, 0.88);
-  background: transparent;
-  border: 1px solid transparent;
-  transition: color var(--transition-speed), background var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
-  cursor: pointer;
-  z-index: 2;
-}
-
-.nav-tab:hover {
-  color: #ffffff;
-  background: var(--nav-hover-bg);
-}
-
-.nav-tab:active {
-  transform: scale(0.96);
-}
-
-.nav-tab.active {
-  color: #ffffff;
-  font-weight: var(--font-weight-bold);
-  background: var(--nav-active-bg);
-  border: var(--nav-active-border);
-  box-shadow: var(--nav-active-shadow);
-}
-
-.nav-tab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.nav-tab-indicator {
-  width: var(--nav-indicator-size);
-  height: var(--nav-indicator-size);
-  border-radius: var(--radius-round);
-  background: var(--accent);
-  box-shadow: var(--accent-glow);
-}
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-}
-
-/* Window Control Buttons */
-.win-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-tiny);
-  background: var(--nav-dock-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: var(--glass-panel-border);
-  box-shadow: var(--glass-panel-specular);
-  padding: var(--gap-xxs);
-  border-radius: var(--radius-button);
-}
-
-.win-btn {
-  width: var(--win-btn-size);
-  height: var(--win-btn-size);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-btn-sm);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background var(--transition-speed-fast), color var(--transition-speed-fast), transform var(--transition-speed-fast);
-}
-
-.win-btn:hover {
-  background: var(--win-btn-hover-bg);
-  color: var(--text-primary);
-}
-
-.win-btn:active {
-  transform: scale(0.92);
-}
-
-.win-btn.close:hover {
-  background: var(--color-danger);
-  color: var(--text-white);
-}
-
-/* ================= 4. SCREEN VIEWPORT & CONTAINERS ================= */
-.screen-viewport {
+.wincontrols {
   position: absolute;
-  top: var(--content-top);
-  bottom: var(--screen-offset-y);
-  left: var(--screen-offset-x);
-  right: var(--screen-offset-x);
-  z-index: 10;
+  top: 18px;
+  right: 20px;
   display: flex;
-  flex-direction: column;
+  gap: 2px;
+  z-index: 5;
+}
+
+.wincontrols .win-btn {
+  width: 40px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--ink-2);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.wincontrols .win-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+}
+
+/* ================= 2. ОСТРОВ-КАПСУЛА ================= */
+.island {
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  width: 400px;
+  height: 76px;
+  transform: translateX(-50%);
+  border-radius: 38px;
   overflow: hidden;
+  background: var(--glass-solid);
+  border: var(--glass-panel-border);
+  box-shadow: var(--glass-panel-shadow);
+  transition: width 0.75s var(--spring), height 0.75s var(--spring), border-radius 0.75s var(--spring), bottom 0.75s var(--spring);
+  z-index: 10;
 }
 
-.screen-viewport::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 48px;
-  background: linear-gradient(to top, rgba(5, 11, 15, 0.98) 0%, rgba(5, 11, 15, 0.5) 50%, transparent 100%);
-  pointer-events: none;
-  z-index: 30;
+.island.nav {
+  width: 840px;
 }
 
-.screen-viewport:has(#screen-play.is-active)::after {
-  display: none;
+.island.running {
+  width: 340px;
 }
 
-/* Play screen fills the viewport - no bottom padding reserve for fade */
-#screen-play {
-  padding-bottom: 0;
+.island.open {
+  border-radius: 34px;
 }
 
-.screen-view {
+/* Слои острова */
+.layer {
   position: absolute;
   inset: 0;
-  display: none;
   opacity: 0;
-  transform: scale(0.98) translateY(12px);
-  transition: opacity var(--spring-duration) var(--spring-curve), transform var(--spring-duration) var(--spring-curve);
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: var(--gap-xxs);
-  padding-bottom: 56px;
+  transform: scale(0.97);
   pointer-events: none;
+  transition: opacity 0.25s, transform 0.5s var(--spring);
 }
 
-.screen-view.is-active {
-  display: flex;
-  flex-direction: column;
+.layer.on {
   opacity: 1;
-  transform: scale(1) translateY(0);
+  transform: none;
   pointer-events: auto;
+  transition: opacity 0.35s 0.14s, transform 0.6s var(--spring) 0.1s;
 }
 
-/* ================= 4.1 UNIFIED PAGE HEADER & CONTAINER ================= */
-.page-header-unified {
+/* Горизонтальная плашка бара */
+.bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--gap-md);
-  padding: 0 var(--gap-xxs);
-  min-height: 48px;
-}
-
-.page-title-group-unified {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-tiny);
-}
-
-.page-title-unified {
-  font-size: var(--font-size-hero);
-  font-weight: var(--font-weight-extrabold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--text-on-world);
-  text-shadow: var(--text-shadow-on-world);
-  line-height: 1.15;
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  transition: color var(--transition-speed);
-}
-
-.page-subtitle-unified {
-  font-size: var(--font-size-secondary);
-  color: var(--text-on-world-secondary);
-  text-shadow: var(--text-shadow-on-world);
-  line-height: 1.4;
-  transition: color var(--transition-speed);
-}
-
-.page-title-group-unified {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-tiny);
-}
-
-/* ================= 5. APPLE LIQUID GLASS ISLANDS ================= */
-.glass-island {
-  background: var(--glass-panel);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: var(--glass-panel-border);
-  box-shadow: var(--glass-panel-shadow), var(--glass-panel-specular);
-  border-radius: var(--radius-panel);
-  padding: var(--gap-lg);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-md);
-  color: var(--text-primary);
-  text-shadow: var(--text-shadow-on-glass);
-  transition: background var(--transition-speed), border-color var(--transition-speed), box-shadow var(--transition-speed);
-}
-
-[data-glass] {
-  color: var(--text-primary);
-  text-shadow: var(--text-shadow-on-glass);
-}
-
-[data-glass] h1, [data-glass] h2, [data-glass] h3, [data-glass] h4,
-[data-glass] p, [data-glass] span, [data-glass] div, [data-glass] label,
-[data-glass] button, [data-glass] time {
-  text-shadow: var(--text-shadow-on-glass);
-}
-
-.glass-island.elevated {
-  background: var(--glass-panel-elevated);
-}
-
-.glass-island-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: var(--gap-sm);
-  border-bottom: var(--border-subtle);
-}
-
-.glass-island-title {
-  font-size: var(--font-size-section);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--tracking-normal);
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: var(--gap-xs);
-}
-
-.glass-island-title-icon {
-  color: var(--accent);
-  display: flex;
-  align-items: center;
-}
-
-/* Raised Sub-Panels */
-.glass-subcard {
-  background: var(--glass-raised);
-  border: var(--glass-raised-border);
-  box-shadow: var(--glass-raised-specular);
-  border-radius: var(--radius-card);
-  padding: var(--gap-md);
-  transition: background var(--transition-speed), border-color var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
-}
-
-.glass-subcard:hover {
-  background: var(--glass-raised-hover);
-  border-color: var(--card-hover-border);
-}
-
-/* ================= 6. INTERACTIVE CONTROLS ================= */
-/* Primary Play Button */
-.btn-primary-action {
-  height: var(--play-btn-height);
-  min-width: var(--play-btn-min-width);
-  padding: 0 var(--gap-lg);
-  border-radius: var(--radius-button);
-  background: var(--accent);
-  color: var(--accent-text);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 24px rgba(242, 166, 60, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  font-family: inherit;
-  font-size: var(--font-size-btn-play);
-  font-weight: var(--font-weight-extrabold);
-  letter-spacing: var(--tracking-tight);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-sm);
-  transition: background var(--transition-speed-fast), transform var(--transition-speed-fast) var(--spring-curve), box-shadow var(--transition-speed-fast);
-}
-
-.btn-primary-action:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 6px 32px rgba(242, 166, 60, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  transform: translateY(-1px);
-}
-
-.btn-primary-action:active {
-  transform: scale(0.96) translateY(1px);
-  background: var(--accent-active);
-  box-shadow: 0 2px 14px rgba(242, 166, 60, 0.35);
-}
-
-.btn-primary-action:focus-visible {
-  outline: 2px solid var(--text-white);
-  outline-offset: 3px;
-}
-
-/* Secondary Button */
-.btn-secondary {
-  height: var(--control-height);
-  min-height: var(--min-tap-target);
-  padding: 0 var(--gap-md);
-  background: var(--btn-secondary-bg);
-  border: var(--btn-secondary-border);
-  box-shadow: var(--glass-raised-specular);
-  border-radius: var(--radius-button);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--gap-xs);
-  transition: background var(--transition-speed), border-color var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
+  gap: 14px;
+  height: 76px;
+  padding: 0 12px 0 16px;
   white-space: nowrap;
 }
 
-.btn-secondary:hover {
-  background: var(--btn-secondary-hover-bg);
-  border-color: var(--card-hover-border);
+.bar .meta b {
+  display: block;
+  font-size: 16px;
 }
 
-.btn-secondary:active {
-  background: var(--btn-secondary-active-bg);
-  transform: scale(0.96);
+.navrow {
+  display: flex;
+  gap: 2px;
+  margin-left: 6px;
 }
 
-.btn-secondary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.navrow button {
+  padding: 10px 15px;
+  border-radius: 99px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s;
 }
 
-/* Danger Button */
-.btn-danger {
-  height: var(--control-height);
-  min-height: var(--min-tap-target);
-  padding: 0 var(--gap-md);
-  background: var(--btn-danger-bg);
-  border: var(--btn-danger-border);
-  box-shadow: var(--glass-raised-specular);
-  border-radius: var(--radius-button);
-  color: var(--btn-danger-text);
-  font-family: inherit;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
+.navrow button:hover {
+  background: var(--fill-2);
+  color: #FFFFFF;
+}
+
+/* Кнопка запуска «Играть» */
+.play {
+  margin-left: auto;
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--gap-xs);
-  transition: background var(--transition-speed), border-color var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
+  height: 52px;
+  min-width: 150px;
+  padding: 0 26px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 17px;
+  flex: none;
+  box-shadow: var(--accent-glow);
+  transition: transform 0.4s var(--spring), min-width 0.6s var(--spring), background 0.4s, color 0.4s, box-shadow 0.4s;
 }
 
-.btn-danger:hover {
-  background: var(--btn-danger-hover-bg);
-  border-color: var(--btn-danger-border-hover);
+.play:hover {
+  transform: scale(1.04);
 }
 
-.btn-danger:active {
-  transform: scale(0.96);
+.play:active {
+  transform: scale(0.97);
 }
 
-/* Segmented Control */
-.segmented-control {
-  display: inline-flex;
-  background: var(--input-bg);
-  border: var(--glass-raised-border);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
-  border-radius: var(--radius-button);
-  padding: var(--gap-3px);
-  gap: var(--gap-3px);
-}
-
-.segment-btn {
-  min-height: var(--min-tap-target);
-  padding: 0 var(--control-padding-x);
-  border-radius: var(--radius-btn-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color var(--transition-speed), background var(--transition-speed), transform var(--transition-speed-fast) var(--spring-curve);
-}
-
-.segment-btn:hover {
-  color: var(--text-primary);
-  background: var(--nav-hover-bg);
-}
-
-.segment-btn:active {
-  transform: scale(0.96);
-}
-
-.segment-btn.active {
-  background: var(--glass-raised-hover);
-  color: var(--accent);
-  border-color: var(--segment-active-border);
-  box-shadow: var(--segment-active-shadow);
-}
-
-/* Toggle Switch (Apple-style pill spring) */
-.switch-label-wrap {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--min-tap-target);
-  cursor: pointer;
-}
-
-.switch-input {
+.play .fill {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.switch-track {
-  position: relative;
-  width: var(--switch-width);
-  height: var(--switch-height);
-  background: var(--switch-bg);
-  border: var(--switch-border);
-  border-radius: var(--switch-height);
-  transition: background var(--transition-speed) var(--spring-curve), border-color var(--transition-speed);
-}
-
-.switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: var(--switch-knob-size);
-  height: var(--switch-knob-size);
-  background: var(--text-white);
-  border-radius: var(--radius-round);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  transition: transform var(--spring-duration-snappy) var(--spring-curve), background var(--transition-speed);
-}
-
-.switch-input:checked + .switch-track {
-  background: var(--switch-bg-checked);
-  border-color: var(--accent);
-}
-
-.switch-input:checked + .switch-track .switch-thumb {
-  transform: translateX(calc(var(--switch-width) - var(--switch-knob-size) - 4px));
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-/* Text Input Fields */
-.text-input-field {
-  width: 100%;
-  height: var(--control-height);
-  min-height: var(--min-tap-target);
-  padding: 0 var(--control-padding-x);
-  background: var(--input-bg);
-  border: var(--input-border);
-  box-shadow: var(--glass-raised-specular);
-  border-radius: var(--radius-button);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-  outline: none;
-  transition: border-color var(--transition-speed), background var(--transition-speed), box-shadow var(--transition-speed);
-}
-
-.text-input-field:hover {
-  border-color: var(--input-border-hover);
-}
-
-.text-input-field:focus {
-  border-color: var(--input-border-focus);
-  box-shadow: 0 0 0 2px var(--accent-glass-strong);
-}
-
-/* Dropdown */
-.custom-dropdown {
-  position: relative;
-  min-width: 220px;
-}
-
-.custom-dropdown-trigger {
-  width: 100%;
-  height: var(--control-height);
-  min-height: var(--min-tap-target);
-  padding: 0 var(--control-padding-x);
-  background: var(--input-bg);
-  border: var(--input-border);
-  box-shadow: var(--glass-raised-specular);
-  border-radius: var(--radius-button);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-semibold);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  transition: border-color var(--transition-speed), background var(--transition-speed), transform var(--transition-speed-fast);
-}
-
-.custom-dropdown-trigger:hover {
-  background: var(--nav-hover-bg);
-  border-color: var(--input-border-hover);
-}
-
-.custom-dropdown-trigger:active {
-  transform: scale(0.98);
-}
-
-.custom-dropdown.is-open .custom-dropdown-trigger {
-  border-color: var(--accent);
-}
-
-.dropdown-arrow {
-  color: var(--text-secondary);
-  transition: transform var(--transition-speed) var(--spring-curve);
-}
-
-.custom-dropdown.is-open .dropdown-arrow {
-  transform: rotate(180deg);
-  color: var(--accent);
-}
-
-.custom-dropdown-list {
-  position: absolute;
-  top: calc(100% + var(--gap-6px));
-  left: 0;
-  right: 0;
-  background: var(--dropdown-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: var(--dropdown-border);
-  box-shadow: var(--dropdown-shadow);
-  border-radius: var(--radius-button);
-  padding: var(--gap-xxs);
-  display: none;
-  flex-direction: column;
-  gap: var(--gap-tiny);
-  z-index: 100;
-}
-
-.custom-dropdown.is-open .custom-dropdown-list {
-  display: flex;
-}
-
-.dropdown-item {
-  min-height: var(--min-tap-target);
-  padding: 0 var(--gap-sm);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-radius: var(--radius-btn-sm);
-  color: var(--text-secondary);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  width: 100%;
-  text-align: left;
-  font-family: inherit;
-  transition: background var(--transition-speed-fast), color var(--transition-speed-fast);
-}
-
-.dropdown-item:hover {
-  background: var(--dropdown-item-hover);
-  color: var(--text-primary);
-}
-
-.dropdown-item.active {
-  background: var(--dropdown-item-active);
-  color: var(--accent);
-  font-weight: var(--font-weight-bold);
-}
-
-/* ================= 7. MODALS & TOAST NOTIFICATIONS ================= */
-.modal-backdrop {
-  position: fixed;
   inset: 0;
-  background: rgba(3, 7, 10, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  display: none;
+  transform-origin: left;
+  transform: scaleX(0);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.play > span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tri {
+  width: 0;
+  height: 0;
+  border-left: 12px solid currentColor;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+}
+
+.island.running .play {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+  min-width: 140px;
+}
+
+.live {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.35; }
+}
+
+/* ================= 3. РАСКРЫТЫЙ РАЗДЕЛ (SECTION) ================= */
+.sec {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 26px 28px 0;
+}
+
+.sec-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.sec-head h2 {
+  font-size: var(--font-size-title);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.sec-head .sub {
+  font-size: 15px;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+
+.close {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--fill);
+  font-size: 16px;
+  flex: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  transition: background 0.2s, transform 0.4s var(--spring);
+}
+
+.close:hover {
+  background: var(--fill-3);
+  transform: rotate(90deg);
+}
+
+.sec-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: none;
+  margin: 0 -28px;
+  padding: 0 28px 10px;
+}
+
+.sec-body::-webkit-scrollbar {
+  display: none;
+}
+
+.sec-foot {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 72px;
+  margin: 0 -28px;
+  padding: 0 12px;
+  border-top: 1px solid var(--hair);
+}
+
+.sec-foot button {
+  padding: 9px 12px;
+  border-radius: 99px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-3);
+  transition: background 0.2s, color 0.2s;
+}
+
+.sec-foot button:hover {
+  color: #FFFFFF;
+  background: var(--fill);
+}
+
+.sec-foot button.on {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.sec-foot .play {
+  height: 46px;
+  min-width: 120px;
+  padding: 0 20px;
+  font-size: 15px;
+  color: var(--accent-ink);
+}
+
+.sec-foot .play:hover {
+  color: var(--accent-ink);
+  background: var(--accent-hover);
+}
+
+/* ================= 4. ОБЩИЕ ВСПОМОГАТЕЛЬНЫЕ ЭЛЕМЕНТЫ ================= */
+.group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 22px 0 4px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 62px;
+  padding: 10px 0;
+  font-size: 17px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row .hint {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+
+.muted { color: var(--ink-2); }
+.dim { color: var(--ink-3); }
+.small { font-size: 13px; }
+.acc { color: var(--accent); }
+
+.face {
+  --s: 40px;
+  width: var(--s);
+  height: var(--s);
+  border-radius: calc(var(--s) * 0.28);
+  flex: none;
+  image-rendering: pixelated;
+  background: var(--skin), var(--skin);
+  background-size: calc(var(--s) * 8), calc(var(--s) * 8);
+  background-position: calc(var(--s) * -5) calc(var(--s) * -1), calc(var(--s) * -1) calc(var(--s) * -1);
+}
+
+.status {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  flex: none;
+}
+
+.status.idle { background: #9FE08A; box-shadow: 0 0 10px #9FE08A; }
+.status.off { background: rgba(255, 255, 255, 0.22); box-shadow: none; }
+
+.hint-key {
+  position: absolute;
+  left: 50%;
+  bottom: 122px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: var(--ink-2);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+  transition: opacity 0.4s;
+  pointer-events: none;
+  z-index: 5;
+}
+
+body:not(.is-idle) .hint-key {
   opacity: 0;
-  transition: opacity var(--spring-duration) var(--spring-curve);
 }
 
-.modal-backdrop.is-open {
-  display: flex;
-  opacity: 1;
-}
-
-.glass-modal {
-  width: 90%;
-  max-width: 480px;
-  background: var(--glass-panel-elevated);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-  border: var(--glass-panel-border);
-  box-shadow: var(--glass-panel-shadow), var(--glass-panel-specular);
-  border-radius: var(--radius-panel);
-  padding: var(--gap-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-md);
-  transform: scale(0.94) translateY(16px);
-  transition: transform var(--spring-duration) var(--spring-curve);
-}
-
-.modal-backdrop.is-open .glass-modal {
-  transform: scale(1) translateY(0);
-}
-
+/* Тосты */
 .toast-container {
-  position: fixed;
-  bottom: var(--screen-offset-y);
-  right: var(--screen-offset-x);
+  position: absolute;
+  left: 50%;
+  top: 30px;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  gap: var(--gap-sm);
-  z-index: 2000;
+  gap: 8px;
+  z-index: 100;
   pointer-events: none;
 }
 
 .toast-item {
-  min-width: 280px;
-  background: var(--nav-dock-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: var(--glass-panel-border);
-  box-shadow: var(--glass-panel-shadow), var(--glass-panel-specular);
-  border-radius: var(--radius-card);
-  padding: var(--gap-sm) var(--gap-md);
-  display: flex;
-  align-items: center;
-  gap: var(--gap-sm);
-  font-size: var(--font-size-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  transform: translateX(120%);
-  transition: transform var(--spring-duration) var(--spring-curve), opacity var(--transition-speed);
-  pointer-events: auto;
+  padding: 11px 20px;
+  border-radius: 99px;
+  background: var(--glass-solid);
+  border: 1px solid var(--line);
+  font-size: 15px;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.3s, transform 0.5s var(--spring);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .toast-item.is-visible {
-  transform: translateX(0);
-}
-
-/* ================= 8. SVG ICONS ================= */
-.icon {
-  width: var(--icon-size-default);
-  height: var(--icon-size-default);
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  fill: none;
-  flex-shrink: 0;
+  opacity: 1;
+  transform: translateY(0);
 }

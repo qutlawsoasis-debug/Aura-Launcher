@@ -1,26 +1,32 @@
+/**
+ * Standalone Single-File HTML Builder for Aura Launcher v3 (Island Concept)
+ * Inlines Onest font, CSS stylesheets, screen components, and JS modules using shell.html.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
+const BASE_DIR = path.resolve(__dirname);
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const TEMP_USER_DATA = path.join(__dirname, '.chrome_standalone_profile');
-const BASE_DIR = __dirname;
-const OUT_FILE = path.join(BASE_DIR, 'aura-v3-standalone.html');
+const TEMP_USER_DATA = path.join(BASE_DIR, '.chrome_standalone_profile');
 
-async function getCompressedWebp(filePath, quality = 0.82) {
+async function getCompressedWebp(filePath, quality = 0.8) {
   const chromeProcess = spawn(CHROME_PATH, [
     '--headless=new',
-    '--remote-debugging-port=9911',
+    '--remote-debugging-port=9444',
     `--user-data-dir=${TEMP_USER_DATA}`,
     '--disable-gpu',
+    '--no-first-run',
+    '--no-default-browser-check',
     'about:blank'
   ]);
 
   let wsUrl = null;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 40; i++) {
     await new Promise(r => setTimeout(r, 200));
     try {
-      const res = await fetch('http://127.0.0.1:9911/json/version');
+      const res = await fetch('http://127.0.0.1:9444/json/version');
       if (res.ok) {
         const data = await res.json();
         wsUrl = data.webSocketDebuggerUrl;
@@ -30,8 +36,10 @@ async function getCompressedWebp(filePath, quality = 0.82) {
   }
 
   if (!wsUrl) {
+    console.warn('Chrome CDP not available, using raw base64');
     chromeProcess.kill();
-    throw new Error('Failed to connect to Chrome on port 9911');
+    const bytes = fs.readFileSync(filePath);
+    return `data:image/jpeg;base64,${bytes.toString('base64')}`;
   }
 
   const ws = new WebSocket(wsUrl);
@@ -105,25 +113,23 @@ async function getCompressedWebp(filePath, quality = 0.82) {
 
 async function build() {
   console.log('1. Compressing and encoding background and assets to Data URLs...');
-  const bgDataUrl = await getCompressedWebp(path.join(BASE_DIR, 'assets', 'images', 'bg_1.jpg'), 0.82);
+  const bgPath = path.resolve(BASE_DIR, 'assets', 'images', 'bg_1.jpg');
+  const bgDataUrl = await getCompressedWebp(bgPath, 0.82);
   const bgSizeKb = Math.round((bgDataUrl.length * 0.75) / 1024);
   console.log(`   Background WebP Data URL size: ${bgSizeKb} KB (Target: <= 400 KB)`);
 
-  const artistDataUrl = await getCompressedWebp(path.join(BASE_DIR, 'assets', 'audio', 'artist.jpg'), 0.85);
-  const coock0ldBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'Coock0ld.png')).toString('base64');
-  const coock0ldDataUrl = `data:image/png;base64,${coock0ldBase64}`;
+  const steveBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'steve.png')).toString('base64');
+  const steveDataUrl = `data:image/png;base64,${steveBase64}`;
 
-  console.log('2. Base64 encoding used Onest font...');
+  console.log('2. Base64 encoding Onest woff2 font...');
   const onestBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Onest.woff2')).toString('base64');
-  const onestDataUrl = `data:font/woff2;base64,${onestBase64}`;
 
   console.log('3. Concatenating and inlining CSS stylesheets...');
   let tokensCss = fs.readFileSync(path.join(BASE_DIR, 'tokens.css'), 'utf-8');
-  // Replace background image URL with data URI
-  tokensCss = tokensCss.replace(/url\(['"]?\.\.\/images\/bg_1\.jpg['"]?\)/g, `url('${bgDataUrl}')`);
+  tokensCss = tokensCss.replace(/--bg-world-image:\s*url\([^)]+\);/g, `--bg-world-image: url('${bgDataUrl}');`);
+  tokensCss = tokensCss.replace(/--skin:\s*url\([^)]+\);/g, `--skin: url('${steveDataUrl}');`);
 
   let coreCss = fs.readFileSync(path.join(BASE_DIR, 'assets', 'css', 'core.css'), 'utf-8');
-  // Replace font URLs with data URIs
   coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.woff2['"]?\)\s+format\(['"]woff2['"]\)/g, `url('data:font/woff2;charset=utf-8;base64,${onestBase64}') format('woff2')`);
 
   const screenCssFiles = ['play.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];
@@ -146,16 +152,13 @@ ${screensCombinedCss}
 </style>
   `;
 
-  console.log('4. Reading screen HTML views...');
-  const screenHtmlFiles = ['play.html', 'lobby.html', 'friends.html', 'wardrobe.html', 'workshop.html', 'settings.html'];
-  let combinedViewsHtml = '';
-  for (const sh of screenHtmlFiles) {
-    let htmlContent = fs.readFileSync(path.join(BASE_DIR, 'screens', sh), 'utf-8');
-    // Replace artist.jpg and Coock0ld.png image references with data URLs
-    htmlContent = htmlContent.replace(/assets\/audio\/artist\.jpg/g, artistDataUrl);
-    htmlContent = htmlContent.replace(/assets\/images\/Coock0ld\.png/g, coock0ldDataUrl);
-    combinedViewsHtml += `\n<!-- === SCREEN VIEW: ${sh} === -->\n` + htmlContent;
-  }
+  console.log('4. Reading screen HTML views from shell.html...');
+  const shellHtml = fs.readFileSync(path.join(BASE_DIR, 'shell.html'), 'utf-8');
+  const lobbyHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'lobby.html'), 'utf-8');
+  const friendsHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'friends.html'), 'utf-8');
+  const wardrobeHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'wardrobe.html'), 'utf-8');
+  const workshopHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'workshop.html'), 'utf-8');
+  const settingsHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'settings.html'), 'utf-8');
 
   console.log('5. Concatenating and inlining JavaScript modules...');
   const jsFiles = [
@@ -172,9 +175,6 @@ ${screensCombinedCss}
   let combinedJs = '';
   for (const jf of jsFiles) {
     let jsContent = fs.readFileSync(jf, 'utf-8');
-    // Replace local asset paths with data URLs
-    jsContent = jsContent.replace(/assets\/images\/Coock0ld\.png/g, coock0ldDataUrl);
-    jsContent = jsContent.replace(/assets\/audio\/artist\.jpg/g, artistDataUrl);
     combinedJs += `\n// === MODULE: ${path.basename(jf)} ===\n` + jsContent;
   }
 
@@ -184,103 +184,32 @@ ${combinedJs}
 </script>
   `;
 
-  console.log('6. Assembling single aura-v3-standalone.html...');
-  const standaloneHtml = `<!-- GENERATED — не редактировать, правь screens/* -->
-<!DOCTYPE html>
-<html lang="ru" data-effects="full">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Aura Launcher — Next-Gen Client Shell (Standalone)</title>
-  ${combinedStyle}
-</head>
-<body>
+  console.log('6. Assembling single aura-v3-standalone.html from shell.html...');
+  let standaloneHtml = shellHtml
+    .replace('<!-- SHELL_STYLES_PLACEHOLDER -->', combinedStyle)
+    .replace('<!-- SHELL_SCRIPTS_PLACEHOLDER -->', combinedScript)
+    .replace('<!-- SCREEN_LOBBY_PLACEHOLDER -->', lobbyHtml)
+    .replace('<!-- SCREEN_FRIENDS_PLACEHOLDER -->', friendsHtml)
+    .replace('<!-- SCREEN_WARDROBE_PLACEHOLDER -->', wardrobeHtml)
+    .replace('<!-- SCREEN_WORKSHOP_PLACEHOLDER -->', workshopHtml)
+    .replace('<!-- SCREEN_SETTINGS_PLACEHOLDER -->', settingsHtml);
 
-  <div class="app-viewport">
-    <!-- Живой фоновый мир Minecraft с шейдерами и параллаксом -->
-    <div class="world-bg" id="worldBg"></div>
-    <div class="world-overlay"></div>
-    <div class="sunbeam-light" id="sunbeamLight"></div>
-    <canvas id="ambientCanvas"></canvas>
+  const outPath = path.join(BASE_DIR, 'aura-v3-standalone.html');
+  fs.writeFileSync(outPath, standaloneHtml, 'utf-8');
 
-    <!-- 1. ВЕРХНЯЯ ПАРЯЩАЯ ЛЕНТА НАВИГАЦИИ (Apple Liquid Glass Capsule) -->
-    <header class="top-ribbon" role="banner">
-      <div class="brand-section">
-        <a href="#/play" class="logo-aura" aria-label="Aura Launcher">
-          <span>Aura</span>
-        </a>
-      </div>
-
-      <!-- Центральная парящая капсула навигации -->
-      <nav class="nav-pill-dock" data-glass role="navigation" aria-label="Основная навигация">
-        <button type="button" class="nav-tab active" data-route="play" aria-current="page">
-          <span>Играть</span>
-        </button>
-        <button type="button" class="nav-tab" data-route="lobby">
-          <span>Лобби</span>
-        </button>
-        <button type="button" class="nav-tab" data-route="friends">
-          <span>Друзья</span>
-        </button>
-        <button type="button" class="nav-tab" data-route="wardrobe">
-          <span>Гардероб</span>
-        </button>
-        <button type="button" class="nav-tab" data-route="workshop">
-          <span>Мастерская</span>
-        </button>
-        <button type="button" class="nav-tab" data-route="settings">
-          <span>Настройки</span>
-        </button>
-      </nav>
-
-      <!-- Оконные кнопки управления (минимизировать, развернуть, закрыть) -->
-      <div class="top-actions">
-        <div class="win-controls" aria-label="Управление окном">
-          <button type="button" class="win-btn" title="Свернуть" aria-label="Свернуть окно">
-            <svg class="icon" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          </button>
-          <button type="button" class="win-btn" title="Развернуть" aria-label="Развернуть окно">
-            <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
-          </button>
-          <button type="button" class="win-btn close" title="Закрыть" aria-label="Закрыть приложение">
-            <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <!-- 2. ОСНОВНОЙ ВЬЮПОРТ ДЛЯ ЭКРАНОВ -->
-    <main class="screen-viewport" id="screenViewport" role="main">
-${combinedViewsHtml}
-    </main>
-
-    <!-- СИСТЕМНЫЙ ТОСТ-КОНТЕЙНЕР -->
-    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
-  </div>
-
-  ${combinedScript}
-
-</body>
-</html>
-  `;
-
-  fs.writeFileSync(OUT_FILE, standaloneHtml, 'utf-8');
-
-  const stats = fs.statSync(OUT_FILE);
-  const sizeKb = Math.round(stats.size / 1024);
+  const stats = fs.statSync(outPath);
   const sizeMb = (stats.size / (1024 * 1024)).toFixed(2);
+  const sizeKb = Math.round(stats.size / 1024);
 
   console.log('----------------------------------------------------');
   console.log(`✅ Standalone build completed successfully!`);
-  console.log(`   Output file: ${OUT_FILE}`);
+  console.log(`   Output file: ${outPath}`);
   console.log(`   Total file size: ${sizeKb} KB (${sizeMb} MB)`);
-  console.log(`   Max limit: 8.00 MB -> ${stats.size <= 8 * 1024 * 1024 ? 'PASSED ✅' : 'FAILED ❌'}`);
+  console.log(`   Max limit: 8.00 MB -> ${stats.size < 8 * 1024 * 1024 ? 'PASSED ✅' : 'FAILED ❌'}`);
   console.log('----------------------------------------------------');
-
-  return { sizeKb, sizeMb, bytes: stats.size };
 }
 
 build().catch(err => {
-  console.error('Build standalone failed:', err);
+  console.error('Build failed with error:', err);
   process.exit(1);
 });

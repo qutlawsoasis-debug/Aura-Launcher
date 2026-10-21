@@ -22,9 +22,9 @@
     jacketDark: '#0e1722',
     jacketMid: '#162334',
     jacketLight: '#1f3148',
-    amberTrim: '#f2a63c',
-    amberGlow: '#f7b44f',
-    amberBelt: '#d98b25',
+    founderTrim: '#64D2FF',
+    founderGlow: '#8EDEFF',
+    founderBelt: '#50BCE8',
 
     // Pants & Boots
     pantsDark: '#12161f',
@@ -167,7 +167,7 @@
     const isFounder = capeType === 'founder';
     const backColor = isFounder ? '#0d1017' : '#0e1520';
     const frontColor = isFounder ? '#161a24' : '#1c2738';
-    const trimColor = isFounder ? '#f2a63c' : '#b0bec5';
+    const trimColor = isFounder ? '#64D2FF' : '#b0bec5';
 
     return [
       { v: [1, 0, 3, 2], color: backColor, normal: { x: 0, y: 0, z: -1 }, isCapeBack: true, isFounder: isFounder },
@@ -194,8 +194,8 @@
     ctx.font = `bold ${Math.floor(w * 0.42)}px Onest, sans-serif`;
 
     if (isFounder) {
-      ctx.fillStyle = '#f2a63c';
-      ctx.shadowColor = 'rgba(242, 166, 60, 0.65)';
+      ctx.fillStyle = '#64D2FF';
+      ctx.shadowColor = 'rgba(100, 210, 255, 0.65)';
       ctx.shadowBlur = 8;
       ctx.fillText('A', midX, midY - 6);
     } else {
@@ -261,20 +261,20 @@
     ctx.restore();
   }
 
-  // Draw Amber Founder Trim on Jacket Front
+  // Draw Cyan Founder Trim on Jacket Front
   function drawJacketTrim(pts) {
     if (!ctx) return;
     const w = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
     if (w < 20) return;
 
     ctx.save();
-    // Center amber zipper line
+    // Center cyan zipper line
     const midTopX = (pts[0].x + pts[1].x) / 2;
     const midTopY = (pts[0].y + pts[1].y) / 2;
     const midBotX = (pts[3].x + pts[2].x) / 2;
     const midBotY = (pts[3].y + pts[2].y) / 2;
 
-    ctx.strokeStyle = '#f2a63c';
+    ctx.strokeStyle = '#64D2FF';
     ctx.lineWidth = 2.2;
     ctx.beginPath();
     ctx.moveTo(midTopX, midTopY);
@@ -282,7 +282,7 @@
     ctx.stroke();
 
     // Collar trim
-    ctx.fillStyle = '#f2a63c';
+    ctx.fillStyle = '#64D2FF';
     ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
     ctx.lineTo(midTopX, midTopY + 12);
