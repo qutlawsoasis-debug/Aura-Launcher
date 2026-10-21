@@ -16,6 +16,7 @@ import '../screens/achievements.css';
 import './perf-hud.js';
 import './bridge.js';
 import './profile.js';
+import './skins.js';
 import './update.js';
 import './boot.js';
 import '../assets/js/demo-data.js';

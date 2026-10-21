@@ -93,6 +93,7 @@
         const acceptBtn = item.querySelector('.btn-accept-req');
         const rejectBtn = item.querySelector('.btn-reject-req');
 
+        if (window.AuraSkins) window.AuraSkins.apply(item.querySelector('.face'), req.nick);
         acceptBtn.addEventListener('click', () => handleRespond(req.id, req.nick, true, item));
         rejectBtn.addEventListener('click', () => handleRespond(req.id, req.nick, false, item));
 
@@ -189,6 +190,7 @@
           ${statusBadge}
         `;
 
+        if (window.AuraSkins) window.AuraSkins.apply(item.querySelector('.face'), f.nick);
         const inviteBtn = item.querySelector('.btn-invite-friend');
         if (inviteBtn) {
           inviteBtn.addEventListener('click', async () => {

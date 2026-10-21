@@ -390,6 +390,10 @@ public partial class WebBridge : IDisposable
                     await HandleLauncherApplyUpdateAsync(msg);
                     break;
 
+                case "skin.setCape":
+                    await HandleSkinSetCapeAsync(msg);
+                    break;
+
                 case "nickname.set":
                     await HandleNicknameSetAsync(msg);
                     break;
@@ -1048,7 +1052,8 @@ public partial class WebBridge : IDisposable
             nickname = cfg.Nickname,
             model = cfg.SkinModel,
             fileName = fileName,
-            dataUrl = dataUrl
+            dataUrl = dataUrl,
+            cape = string.IsNullOrWhiteSpace(cfg.CapeId) ? "none" : cfg.CapeId
         });
     }
 

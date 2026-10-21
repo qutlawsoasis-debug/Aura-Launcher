@@ -334,7 +334,8 @@
         nickname: scope.__mockSkinData.nickname,
         model: scope.__mockSkinData.model,
         fileName: scope.__mockSkinData.fileName,
-        dataUrl: scope.__mockSkinData.dataUrl
+        dataUrl: scope.__mockSkinData.dataUrl,
+        cape: scope.__mockSkinData.cape || 'cyan'
       });
     }
 
@@ -352,6 +353,13 @@
         fileName: fn,
         uploadError: null
       });
+    }
+
+    if (name === 'skin.setCape') {
+      const cape = payload && payload.cape;
+      if (!['cyan', 'silver', 'none'].includes(cape)) return Promise.reject(new Error('invalid_value'));
+      scope.__mockSkinData.cape = cape;
+      return Promise.resolve({ cape });
     }
 
     if (name === 'skin.setModel') {

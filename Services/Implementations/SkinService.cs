@@ -632,43 +632,7 @@ public class SkinService : ISkinService
                 Content = content
             };
 
-            // Read auth tokens from %APPDATA%\.aura\config.json via DPAPI if available
-            try
-            {
-                string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                string cfgPath = Path.Combine(appData, ".aura", "config.json");
-                if (!File.Exists(cfgPath))
-                {
-                    cfgPath = Path.Combine(appData, "Aura", "config.json");
-                }
-                if (File.Exists(cfgPath))
-                {
-                    var cfgJson = File.ReadAllText(cfgPath);
-                    using var doc = System.Text.Json.JsonDocument.Parse(cfgJson);
-                    if (doc.RootElement.TryGetProperty("UserId", out var uidElem) && uidElem.GetString() is { } uid && !string.IsNullOrWhiteSpace(uid))
-                    {
-                        req.Headers.TryAddWithoutValidation("X-User-Id", uid);
-                    }
-                    if (doc.RootElement.TryGetProperty("UserTokenEncrypted", out var tokElem) && tokElem.GetString() is { } tokEnc && !string.IsNullOrWhiteSpace(tokEnc))
-                    {
-                        try
-                        {
-                            var cipherBytes = Convert.FromBase64String(tokEnc);
-                            var plainBytes = System.Security.Cryptography.ProtectedData.Unprotect(cipherBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
-                            var plainToken = System.Text.Encoding.UTF8.GetString(plainBytes);
-                            req.Headers.TryAddWithoutValidation("X-User-Token", plainToken);
-                        }
-                        catch
-                        {
-                            req.Headers.TryAddWithoutValidation("X-User-Token", tokEnc);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка извлечения учетных данных из config.json: {ex.Message}");
-            }
+            AddUserAuthHeaders(req);
 
             using var response = await _httpClient.SendAsync(req, cancellationToken);
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -749,6 +713,49 @@ public class SkinService : ISkinService
         catch (Exception ex)
         {
             return new SkinUploadResult(false, null, $"Сетевая ошибка при загрузке скина: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Заголовки X-User-Id / X-User-Token из %APPDATA%\.aura\config.json (токен расшифровывается DPAPI):
+    /// без них lobby-api не даёт менять скин и плащ зарегистрированного ника.
+    /// </summary>
+    public static void AddUserAuthHeaders(System.Net.Http.HttpRequestMessage req)
+    {
+        try
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string cfgPath = Path.Combine(appData, ".aura", "config.json");
+            if (!File.Exists(cfgPath))
+            {
+                cfgPath = Path.Combine(appData, "Aura", "config.json");
+            }
+            if (!File.Exists(cfgPath)) return;
+
+            var cfgJson = File.ReadAllText(cfgPath);
+            using var doc = System.Text.Json.JsonDocument.Parse(cfgJson);
+            if (doc.RootElement.TryGetProperty("UserId", out var uidElem) && uidElem.GetString() is { } uid && !string.IsNullOrWhiteSpace(uid))
+            {
+                req.Headers.TryAddWithoutValidation("X-User-Id", uid);
+            }
+            if (doc.RootElement.TryGetProperty("UserTokenEncrypted", out var tokElem) && tokElem.GetString() is { } tokEnc && !string.IsNullOrWhiteSpace(tokEnc))
+            {
+                try
+                {
+                    var cipherBytes = Convert.FromBase64String(tokEnc);
+                    var plainBytes = System.Security.Cryptography.ProtectedData.Unprotect(cipherBytes, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                    var plainToken = System.Text.Encoding.UTF8.GetString(plainBytes);
+                    req.Headers.TryAddWithoutValidation("X-User-Token", plainToken);
+                }
+                catch
+                {
+                    req.Headers.TryAddWithoutValidation("X-User-Token", tokEnc);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка извлечения учетных данных из config.json: {ex.Message}");
         }
     }
 

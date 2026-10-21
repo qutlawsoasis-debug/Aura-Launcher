@@ -110,6 +110,7 @@
             (isHost && !p.isHost ? `<button type="button" class="slot-kick" aria-label="Выгнать ${escapeHtml(p.nick)}">✕</button>` : '');
           const kick = el.querySelector('.slot-kick');
           if (kick) kick.addEventListener('click', () => kickPlayer(p.nick, el));
+          if (window.AuraSkins) window.AuraSkins.apply(el.querySelector('.face'), p.nick);
           slots.appendChild(el);
         });
 
@@ -299,6 +300,7 @@
     function showInvite(inv) {
       pendingInvite = inv;
       if (inviteFrom) inviteFrom.textContent = inv.fromNick || 'Друг';
+      if (window.AuraSkins && inviteCard) window.AuraSkins.apply(inviteCard.querySelector('.face'), inv.fromNick);
       if (inviteCard) inviteCard.hidden = false;
     }
 

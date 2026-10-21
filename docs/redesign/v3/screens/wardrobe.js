@@ -198,6 +198,17 @@
       }
     }
 
+    let currentCape = 'none';
+    let savedCape = null; // плащ из конфига; применяется, когда картинки плащей загрузятся
+
+    function applyCape(type) {
+      currentCape = type || 'none';
+      document.querySelectorAll('#capeSelector .cape').forEach(b => b.classList.toggle('on', b.dataset.cape === currentCape));
+      if (currentCape === 'none') viewer.resetCape();
+      else if (capeImages[currentCape]) viewer.loadCape(capeImages[currentCape]);
+      viewer.render();
+    }
+
     function syncModelButtons(model) {
       const seg = document.getElementById('modelTypeSeg');
       if (!seg) return;
@@ -221,16 +232,15 @@
         }
         syncModelButtons(model);
         updateSkinUI(res && res.dataUrl, fn, model);
+        savedCape = (res && res.cape) || 'none';
+        if (Object.keys(capeImages).length) applyCape(savedCape);
         return viewer.loadSkin(skinUrl);
       })
       .then(() => viewer.render())
       .catch(() => {
         viewer.loadSkin(DEFAULT_SKIN).then(() => viewer.render()).catch(() => {});
       });
-    preloadCapes().then(() => {
-      if (capeImages.cyan) viewer.loadCape(capeImages.cyan);
-      viewer.render();
-    });
+    preloadCapes().then(() => applyCape(savedCape || 'none'));
 
     if (window.ResizeObserver) {
       new ResizeObserver(() => {
@@ -294,12 +304,22 @@
 
     document.querySelectorAll('#capeSelector .cape').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('#capeSelector .cape').forEach(b => b.classList.remove('on'));
-        btn.classList.add('on');
         const capeType = btn.dataset.cape;
-        if (capeType === 'none') viewer.resetCape();
-        else if (capeImages[capeType]) viewer.loadCape(capeImages[capeType]);
+        const prev = currentCape;
+        if (capeType === prev) return;
+        applyCape(capeType);
         showCapeSide();
+        // Плащ сохраняется на сервере скинов — в игре его видят все
+        sendBridge('skin.setCape', { cape: capeType })
+          .then(() => {
+            if (typeof window.showToast === 'function') {
+              window.showToast(capeType === 'none' ? 'Плащ снят' : 'Плащ надет — его видят все в игре', 'success');
+            }
+          })
+          .catch(err => {
+            applyCape(prev);
+            if (typeof window.showToast === 'function') window.showToast(err.message || 'Не удалось сменить плащ', 'error');
+          });
       });
     });
 

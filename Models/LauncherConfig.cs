@@ -46,6 +46,8 @@ public class LauncherConfig
     public bool AutoRotateBackgrounds { get; set; } = true;
     public string GraphicsPreset { get; set; } = "Medium";
     public string VisualEffectsMode { get; set; } = "full";
+    /// <summary>Плащ Aura: "cyan" | "silver" | "none" (виден всем через lobby-api / CustomSkinLoader).</summary>
+    public string CapeId { get; set; } = "none";
     public string? JvmArgs { get; set; }
     public bool ShareStatsWithFriends { get; set; } = true;
     public bool ShareAchievementsWithFriends { get; set; } = true;
