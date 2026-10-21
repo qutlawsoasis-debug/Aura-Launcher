@@ -266,6 +266,10 @@ public partial class WebBridge : IDisposable
                     await HandleLogsExportAsync(msg);
                     break;
 
+                case "nickname.set":
+                    await HandleNicknameSetAsync(msg);
+                    break;
+
                 case "lobby.get":
                     HandleLobbyGet(msg);
                     break;

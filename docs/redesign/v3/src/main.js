@@ -12,6 +12,7 @@ import '../screens/settings.css';
 // JS modules in exact tag order
 import './perf-hud.js';
 import './bridge.js';
+import './profile.js';
 import '../assets/js/demo-data.js';
 import '../assets/js/core.js';
 import '../screens/play.js';

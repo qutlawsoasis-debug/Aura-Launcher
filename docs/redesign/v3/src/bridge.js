@@ -449,6 +449,19 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
+    if (name === 'nickname.set') {
+      const nick = String((payload && payload.nickname) || '').trim();
+      if (!/^[A-Za-z0-9_]{3,16}$/.test(nick)) {
+        return Promise.reject(new Error('Ник: от 3 до 16 символов, латиница, цифры и _'));
+      }
+      try {
+        const cfg = JSON.parse(localStorage.getItem('aura_mock_config') || '{}');
+        cfg.nickname = nick;
+        localStorage.setItem('aura_mock_config', JSON.stringify(cfg));
+      } catch (e) { /* без localStorage — только в памяти */ }
+      return Promise.resolve({ nickname: nick, uploadError: null });
+    }
+
     if (name.startsWith('lobby.') || name === 'friends.invite' || name === 'friends.respondInvite') {
       return handleMockLobby(name, payload || {});
     }

@@ -1072,6 +1072,53 @@ public class WebBridgeTests
         Assert.Equal("lob_1", lobby.CurrentLobbyCode);
     }
 
+    [Theory]
+    [InlineData("ab")]
+    [InlineData("bad nick")]
+    [InlineData("Ник")]
+    public async Task Handle_NicknameSet_Invalid_ReturnsRuleError(string nick)
+    {
+        var config = new TestConfigService(@"C:\test\dir");
+        using var bridge = new WebBridge(null, new TestGameSessionService(), config, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        string json = $$"""{"id":"n1","type":"command","name":"nickname.set","payload":{"nickname":"{{nick}}"} }""";
+        await bridge.ProcessRawMessageAsync(json);
+
+        Assert.Contains("от 3 до 16", last!.Error);
+        Assert.Equal("TestPlayer", config.CurrentConfig.Nickname);
+    }
+
+    [Fact]
+    public async Task Handle_NicknameSet_Valid_SavesConfig()
+    {
+        var config = new TestConfigService(@"C:\test\dir");
+        using var bridge = new WebBridge(null, new TestGameSessionService(), config, friendService: new FakeFriendService(), logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"n2","type":"command","name":"nickname.set","payload":{"nickname":"New_Nick"}}""");
+
+        Assert.Null(last!.Error);
+        Assert.Equal("New_Nick", config.CurrentConfig.Nickname);
+    }
+
+    [Fact]
+    public async Task Handle_NicknameSet_WhileInLobby_IsRejected()
+    {
+        var config = new TestConfigService(@"C:\test\dir");
+        using var bridge = new WebBridge(null, new TestGameSessionService(), config,
+            lobbySession: new FakeLobbySession { Role = LobbySessionRole.Host }, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"n3","type":"command","name":"nickname.set","payload":{"nickname":"Other_Nick"}}""");
+
+        Assert.NotNull(last!.Error);
+        Assert.Equal("TestPlayer", config.CurrentConfig.Nickname);
+    }
+
     [Fact]
     public void LobbyEvents_AreForwarded_AndDisposeUnsubscribes()
     {
