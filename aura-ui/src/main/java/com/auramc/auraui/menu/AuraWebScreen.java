@@ -40,6 +40,8 @@ public class AuraWebScreen extends Screen {
     private MCEFBrowser browser;
     private CefMessageRouter router;
     private CefMessageRouterHandlerAdapter queryHandler;
+    private int lastFbWidth = -1;
+    private int lastFbHeight = -1;
 
     public AuraWebScreen(String pageName, boolean isPauseMenu) {
         super(Text.literal(pageName));
@@ -58,16 +60,19 @@ public class AuraWebScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        if (!isSupported()) {
+            AuraUi.LOGGER.warn("[aura-ui] MCEF is not initialized during AuraWebScreen.init()");
+            return;
+        }
+
         if (browser == null) {
             String url = WebAssetManager.getFileUrl(pageName);
             AuraUi.LOGGER.info("[aura-ui] Creating MCEFBrowser for {}", url);
             // transparent = true
             browser = MCEF.createBrowser(url, true);
 
-            // MCEF has a bug on Windows where invalid standard cursor 0x00000000 crashes GLFW in headless/virtual desktop
-            browser.setCursorChangeListener(cursor -> {
-                // Ignore cursor changes to prevent GLFW error 65539
-            });
+            // Ignore cursor changes to prevent GLFW error 65539 on virtual desktops
+            browser.setCursorChangeListener(cursor -> {});
 
             // Register cefQuery router for JS -> Java commands
             router = CefMessageRouter.create();
@@ -85,7 +90,7 @@ public class AuraWebScreen extends Screen {
             router.addHandler(queryHandler, true);
             browser.getClient().addMessageRouter(router);
 
-            // Send player info and build version on load end
+            // Send player info and build version on load end (main frame only)
             browser.getClient().addLoadHandler(new CefLoadHandlerAdapter() {
                 @Override
                 public void onLoadEnd(CefBrowser b, CefFrame frame, int httpStatusCode) {
@@ -189,8 +194,10 @@ public class AuraWebScreen extends Screen {
         if (client == null || browser == null) return;
         int fbWidth = client.getWindow().getFramebufferWidth();
         int fbHeight = client.getWindow().getFramebufferHeight();
-        if (fbWidth > 0 && fbHeight > 0) {
+        if (fbWidth > 0 && fbHeight > 0 && (fbWidth != lastFbWidth || fbHeight != lastFbHeight)) {
             browser.resize(fbWidth, fbHeight);
+            lastFbWidth = fbWidth;
+            lastFbHeight = fbHeight;
         }
     }
 
@@ -217,6 +224,8 @@ public class AuraWebScreen extends Screen {
             if (router != null && queryHandler != null) {
                 router.removeHandler(queryHandler);
                 browser.getClient().removeMessageRouter(router);
+                router = null;
+                queryHandler = null;
             }
             browser.close();
             browser = null;
@@ -297,6 +306,8 @@ public class AuraWebScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        resizeBrowser();
+
         if (browser != null) {
             MCEFRenderer renderer = browser.getRenderer();
             if (renderer != null) {

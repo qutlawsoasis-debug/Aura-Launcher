@@ -3,7 +3,7 @@
   "id": "aura-ui",
   "version": "${version}",
   "name": "Aura UI",
-  "description": "Интерфейс сборки Aura в стиле лаунчера: экран загрузки игры.",
+  "description": "Интерфейс сборки Aura: экран загрузки, главное меню и пауза",
   "authors": ["Aura"],
   "license": "All-Rights-Reserved",
   "environment": "client",

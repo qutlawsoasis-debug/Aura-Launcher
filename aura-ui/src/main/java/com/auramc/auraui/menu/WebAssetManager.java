@@ -7,6 +7,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
+import java.util.stream.Stream;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 
@@ -54,27 +56,33 @@ public final class WebAssetManager {
         Path versionFile = targetDir.resolve(".version");
 
         try {
-            Files.createDirectories(targetDir);
             boolean needExtract = true;
-            if (Files.exists(versionFile)) {
+            if (Files.exists(targetDir) && Files.exists(versionFile)) {
                 String existing = Files.readString(versionFile).trim();
                 if (existing.equals(currentVersion)) {
                     needExtract = false;
-                }
-            }
-
-            if (!needExtract) {
-                // Verify all files exist
-                for (String file : ASSET_FILES) {
-                    if (!Files.exists(targetDir.resolve(file))) {
-                        needExtract = true;
-                        break;
+                    // Also verify all files exist and are not empty
+                    for (String file : ASSET_FILES) {
+                        Path f = targetDir.resolve(file);
+                        if (!Files.exists(f) || Files.size(f) == 0) {
+                            needExtract = true;
+                            break;
+                        }
                     }
                 }
             }
 
             if (needExtract) {
                 AuraUi.LOGGER.info("[aura-ui] Extracting web assets (v{}) to {}", currentVersion, targetDir);
+                if (Files.exists(targetDir)) {
+                    try (Stream<Path> walk = Files.walk(targetDir)) {
+                        walk.sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                    }
+                }
+                Files.createDirectories(targetDir);
+
                 for (String file : ASSET_FILES) {
                     Path dest = targetDir.resolve(file);
                     Files.createDirectories(dest.getParent());
