@@ -85,6 +85,17 @@ body.is-open .world-dim {
   opacity: 1;
 }
 
+.drag-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  -webkit-app-region: drag;
+  app-region: drag;
+  z-index: 4;
+}
+
 .brand {
   position: absolute;
   top: 26px;
@@ -94,31 +105,52 @@ body.is-open .world-dim {
   letter-spacing: -0.02em;
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
   z-index: 5;
+  pointer-events: none;
 }
 
 .wincontrols {
   position: absolute;
-  top: 18px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   display: flex;
-  gap: 2px;
-  z-index: 5;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 99px;
+  background: var(--glass-solid);
+  border: 1px solid var(--line);
+  box-shadow: var(--glass-panel-shadow);
+  z-index: 20;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+html[data-effects="full"] .wincontrols {
+  background: var(--glass-sheen), rgba(40, 42, 50, 0.75);
 }
 
 .wincontrols .win-btn {
-  width: 40px;
-  height: 32px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   color: var(--ink-2);
-  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s, transform 0.15s var(--spring);
 }
 
 .wincontrols .win-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fill-2);
+  color: #FFFFFF;
+}
+
+.wincontrols .win-btn:active {
+  transform: scale(0.92);
+}
+
+.wincontrols .win-btn.win-close:hover {
+  background: rgba(255, 69, 58, 0.9);
   color: #FFFFFF;
 }
 

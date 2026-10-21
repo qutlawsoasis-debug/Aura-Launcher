@@ -221,6 +221,17 @@ body.is-open .world-dim {
   opacity: 1;
 }
 
+.drag-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  -webkit-app-region: drag;
+  app-region: drag;
+  z-index: 4;
+}
+
 .brand {
   position: absolute;
   top: 26px;
@@ -230,31 +241,52 @@ body.is-open .world-dim {
   letter-spacing: -0.02em;
   text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
   z-index: 5;
+  pointer-events: none;
 }
 
 .wincontrols {
   position: absolute;
-  top: 18px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   display: flex;
-  gap: 2px;
-  z-index: 5;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 99px;
+  background: var(--glass-solid);
+  border: 1px solid var(--line);
+  box-shadow: var(--glass-panel-shadow);
+  z-index: 20;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+html[data-effects="full"] .wincontrols {
+  background: var(--glass-sheen), rgba(40, 42, 50, 0.75);
 }
 
 .wincontrols .win-btn {
-  width: 40px;
-  height: 32px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   color: var(--ink-2);
-  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.15s, color 0.15s, transform 0.15s var(--spring);
 }
 
 .wincontrols .win-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fill-2);
+  color: #FFFFFF;
+}
+
+.wincontrols .win-btn:active {
+  transform: scale(0.92);
+}
+
+.wincontrols .win-btn.win-close:hover {
+  background: rgba(255, 69, 58, 0.9);
   color: #FFFFFF;
 }
 
@@ -1010,11 +1042,19 @@ body.is-open .world-dim {
   <div class="world" id="world"></div>
   <div class="world-dim"></div>
   <div class="shade"></div>
+  <div class="drag-bar" id="dragBar"></div>
   <div class="brand">Aura</div>
-  <div class="wincontrols">
-    <button type="button" class="win-btn" aria-label="Свернуть">—</button>
-    <button type="button" class="win-btn" aria-label="Развернуть">□</button>
-    <button type="button" class="win-btn" aria-label="Закрыть">✕</button>
+  <div class="wincontrols" id="winControls">
+    <button type="button" class="win-btn" data-win="minimize" aria-label="Свернуть">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
+    <button type="button" class="win-btn" data-win="maximize" aria-label="Развернуть">
+      <svg class="icon-max" width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="2" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <svg class="icon-restore" width="12" height="12" viewBox="0 0 12 12" fill="none" style="display:none"><path d="M4 2.5h5.5a1 1 0 011 1V9M2 4.5h6a1 1 0 011 1V10a1 1 0 01-1 1H2a1 1 0 01-1-1V5.5a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3"/></svg>
+    </button>
+    <button type="button" class="win-btn win-close" data-win="close" aria-label="Закрыть">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </button>
   </div>
 
   <div class="island" id="island" data-glass>
@@ -3685,14 +3725,17 @@ float contrastN=contrast(rgbaM,rgbaN);float contrastS=contrast(rgbaM,rgbaS);floa
         payload
       };
 
-      window.chrome.webview.postMessage(JSON.stringify(message));
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(message);
+      }
 
+      const timeoutMs = name === 'game.launch' ? 10000 : 30000;
       setTimeout(() => {
         if (pendingRequests.has(id)) {
           pendingRequests.delete(id);
           reject(new Error(`[Bridge] Timeout waiting for response to ${name}`));
         }
-      }, 30000);
+      }, timeoutMs);
     });
   }
 
@@ -3731,7 +3774,9 @@ float contrastN=contrast(rgbaM,rgbaN);float contrastS=contrast(rgbaM,rgbaS);floa
       }
 
       mockGameRunning = true;
-      emit('game.status', { state: 'preparing', isRunning: false });
+      setTimeout(() => {
+        emit('game.status', { state: 'preparing', isRunning: false });
+      }, 0);
 
       let p = 0;
       const effects = document.documentElement.dataset.effects;
@@ -4249,6 +4294,49 @@ window.AURA_DEMO_DATA = (function () {
     });
   }
 
+  // 4b. Window Chrome Controls & Dragging
+  function initWindowControls() {
+    const bridge = window.AuraBridge;
+    const winControls = document.getElementById('winControls');
+    const dragBar = document.getElementById('dragBar');
+
+    function sendWinAction(action) {
+      if (bridge && typeof bridge.send === 'function') {
+        bridge.send('window.action', { action }).catch(() => {});
+      }
+    }
+
+    if (winControls) {
+      winControls.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-win]');
+        if (!btn) return;
+        const action = btn.dataset.win;
+        sendWinAction(action);
+      });
+    }
+
+    if (dragBar) {
+      dragBar.addEventListener('dblclick', () => {
+        sendWinAction('maximize');
+      });
+    }
+
+    if (bridge && typeof bridge.on === 'function') {
+      bridge.on('window.state', (data) => {
+        const state = (data?.state || '').toLowerCase();
+        const maxBtn = document.querySelector('[data-win="maximize"]');
+        if (maxBtn) {
+          const isMax = state === 'maximized';
+          const iconMax = maxBtn.querySelector('.icon-max');
+          const iconRestore = maxBtn.querySelector('.icon-restore');
+          if (iconMax) iconMax.style.display = isMax ? 'none' : 'block';
+          if (iconRestore) iconRestore.style.display = isMax ? 'block' : 'none';
+          maxBtn.setAttribute('aria-label', isMax ? 'Восстановить' : 'Развернуть');
+        }
+      });
+    }
+  }
+
   // 5. Toast System
   window.showToast = function (message, type = 'info') {
     const container = document.getElementById('toastContainer');
@@ -4284,6 +4372,7 @@ window.AURA_DEMO_DATA = (function () {
     initSectionFooters();
     initIslandInteractions();
     initComponentInteractions();
+    initWindowControls();
     handleHashChange();
     window.detectGlassTone();
   });
@@ -4412,9 +4501,13 @@ window.AURA_DEMO_DATA = (function () {
 
     const bridge = getBridge();
     if (bridge && typeof bridge.send === 'function') {
-      bridge.send('game.launch').catch(err => {
-        setGameState('idle', { error: err.message });
-      });
+      bridge.send('game.launch')
+        .then(res => {
+          // Accepted by launcher backend
+        })
+        .catch(err => {
+          setGameState('idle', { error: err.message });
+        });
     }
   };
 

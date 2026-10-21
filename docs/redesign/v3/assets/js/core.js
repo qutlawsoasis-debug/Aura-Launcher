@@ -309,6 +309,49 @@
     });
   }
 
+  // 4b. Window Chrome Controls & Dragging
+  function initWindowControls() {
+    const bridge = window.AuraBridge;
+    const winControls = document.getElementById('winControls');
+    const dragBar = document.getElementById('dragBar');
+
+    function sendWinAction(action) {
+      if (bridge && typeof bridge.send === 'function') {
+        bridge.send('window.action', { action }).catch(() => {});
+      }
+    }
+
+    if (winControls) {
+      winControls.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-win]');
+        if (!btn) return;
+        const action = btn.dataset.win;
+        sendWinAction(action);
+      });
+    }
+
+    if (dragBar) {
+      dragBar.addEventListener('dblclick', () => {
+        sendWinAction('maximize');
+      });
+    }
+
+    if (bridge && typeof bridge.on === 'function') {
+      bridge.on('window.state', (data) => {
+        const state = (data?.state || '').toLowerCase();
+        const maxBtn = document.querySelector('[data-win="maximize"]');
+        if (maxBtn) {
+          const isMax = state === 'maximized';
+          const iconMax = maxBtn.querySelector('.icon-max');
+          const iconRestore = maxBtn.querySelector('.icon-restore');
+          if (iconMax) iconMax.style.display = isMax ? 'none' : 'block';
+          if (iconRestore) iconRestore.style.display = isMax ? 'block' : 'none';
+          maxBtn.setAttribute('aria-label', isMax ? 'Восстановить' : 'Развернуть');
+        }
+      });
+    }
+  }
+
   // 5. Toast System
   window.showToast = function (message, type = 'info') {
     const container = document.getElementById('toastContainer');
@@ -344,6 +387,7 @@
     initSectionFooters();
     initIslandInteractions();
     initComponentInteractions();
+    initWindowControls();
     handleHashChange();
     window.detectGlassTone();
   });

@@ -120,9 +120,13 @@
 
     const bridge = getBridge();
     if (bridge && typeof bridge.send === 'function') {
-      bridge.send('game.launch').catch(err => {
-        setGameState('idle', { error: err.message });
-      });
+      bridge.send('game.launch')
+        .then(res => {
+          // Accepted by launcher backend
+        })
+        .catch(err => {
+          setGameState('idle', { error: err.message });
+        });
     }
   };
 
