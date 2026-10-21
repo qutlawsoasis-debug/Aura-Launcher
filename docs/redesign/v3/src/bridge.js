@@ -318,6 +318,53 @@
       return Promise.resolve({ success: true, path: 'mock/mods' });
     }
 
+    if (!scope.__mockSkinData) {
+      scope.__mockSkinData = {
+        nickname: 'Player',
+        model: 'default',
+        fileName: 'steve.png',
+        dataUrl: null
+      };
+    }
+
+    if (name === 'skin.get') {
+      return Promise.resolve({
+        nickname: scope.__mockSkinData.nickname,
+        model: scope.__mockSkinData.model,
+        fileName: scope.__mockSkinData.fileName,
+        dataUrl: scope.__mockSkinData.dataUrl
+      });
+    }
+
+    if (name === 'skin.upload') {
+      const fn = (payload && payload.fileName) || 'custom_skin.png';
+      const b64 = payload && payload.base64Data;
+      if (!b64) {
+        return Promise.reject(new Error('invalid_payload'));
+      }
+      const dataUrl = b64.startsWith('data:') ? b64 : `data:image/png;base64,${b64}`;
+      scope.__mockSkinData.fileName = fn;
+      scope.__mockSkinData.dataUrl = dataUrl;
+      return Promise.resolve({
+        ok: true,
+        fileName: fn,
+        uploadError: null
+      });
+    }
+
+    if (name === 'skin.setModel') {
+      const model = payload && payload.model;
+      if (model !== 'default' && model !== 'slim') {
+        return Promise.reject(new Error('invalid_value'));
+      }
+      scope.__mockSkinData.model = model;
+      return Promise.resolve({
+        ok: true,
+        model: model,
+        uploadError: null
+      });
+    }
+
     return Promise.resolve({ success: true, mock: true });
   }
 

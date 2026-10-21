@@ -263,7 +263,8 @@ public partial class App : Application
                 Services.GetRequiredService<IGraphicsPresetService>(),
                 Services.GetRequiredService<IWorkshopService>(),
                 Services.GetRequiredService<IPackUpdateService>(),
-                Services.GetRequiredService<IGameLaunchService>());
+                Services.GetRequiredService<IGameLaunchService>(),
+                Services.GetRequiredService<ISkinService>());
             activeWindow = webShell;
         }
         else

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Aura Launcher v3 — Wardrobe Section Controller (skinview3d 3D Viewer)
  * 3D-модель скина: плавное смешивание анимаций, вращение с инерцией, плащи без подгрузки на лету,
  * рендер только пока раздел открыт.
@@ -6,6 +6,13 @@
 
 (function () {
   'use strict';
+
+  function sendBridge(name, payload) {
+    if (window.AuraBridge && typeof window.AuraBridge.send === 'function') {
+      return window.AuraBridge.send(name, payload);
+    }
+    return Promise.resolve(null);
+  }
 
   let viewer = null;
   let activeAnimationMode = 'idle'; // 'idle', 'walk', 'run'
@@ -174,7 +181,52 @@
     blend.to = animations.idle;
     viewer.animation = makeBlendedAnimation();
 
-    viewer.loadSkin(DEFAULT_SKIN).then(() => viewer.render()).catch(() => {});
+    function updateSkinUI(dataUrl, fileName, model) {
+      if (skinNameLabel && fileName) skinNameLabel.textContent = fileName;
+      const effectiveUrl = dataUrl || DEFAULT_SKIN;
+      if (skinFacePreview) {
+        skinFacePreview.style.backgroundImage = 'url(\'' + effectiveUrl + '\'), url(\'' + effectiveUrl + '\')';
+      }
+      document.querySelectorAll('.bar .face').forEach(el => {
+        el.style.backgroundImage = 'url(\'' + effectiveUrl + '\'), url(\'' + effectiveUrl + '\')';
+      });
+      if (model) {
+        syncModelButtons(model);
+        if (viewer && viewer.playerObject && viewer.playerObject.skin) {
+          viewer.playerObject.skin.modelType = model;
+        }
+      }
+    }
+
+    function syncModelButtons(model) {
+      const seg = document.getElementById('modelTypeSeg');
+      if (!seg) return;
+      seg.querySelectorAll('button').forEach(btn => {
+        const isMatch = (btn.dataset.model || 'default') === (model || 'default');
+        btn.classList.toggle('on', isMatch);
+        btn.setAttribute('aria-checked', isMatch ? 'true' : 'false');
+      });
+      if (typeof window.placeLens === 'function') {
+        window.placeLens(seg);
+      }
+    }
+
+    sendBridge('skin.get')
+      .then(res => {
+        const skinUrl = (res && res.dataUrl) ? res.dataUrl : DEFAULT_SKIN;
+        const model = (res && res.model) || 'default';
+        const fn = (res && res.fileName) || 'steve.png';
+        if (viewer.playerObject && viewer.playerObject.skin) {
+          viewer.playerObject.skin.modelType = model;
+        }
+        syncModelButtons(model);
+        updateSkinUI(res && res.dataUrl, fn, model);
+        return viewer.loadSkin(skinUrl);
+      })
+      .then(() => viewer.render())
+      .catch(() => {
+        viewer.loadSkin(DEFAULT_SKIN).then(() => viewer.render()).catch(() => {});
+      });
     preloadCapes().then(() => {
       if (capeImages.cyan) viewer.loadCape(capeImages.cyan);
       viewer.render();
@@ -209,8 +261,34 @@
 
     document.querySelectorAll('#modelTypeSeg button').forEach(btn => {
       btn.addEventListener('click', () => {
-        viewer.playerObject.skin.modelType = btn.dataset.model || 'default';
+        const nextModel = btn.dataset.model || 'default';
+        const prevOnBtn = document.querySelector('#modelTypeSeg button.on');
+        const prevModel = (prevOnBtn && prevOnBtn.dataset.model) || 'default';
+        if (nextModel === prevModel) return;
+
+        syncModelButtons(nextModel);
+        if (viewer.playerObject && viewer.playerObject.skin) {
+          viewer.playerObject.skin.modelType = nextModel;
+        }
         if (effects() === 'off') viewer.render();
+
+        sendBridge('skin.setModel', { model: nextModel })
+          .then(res => {
+            if (res && res.uploadError && typeof window.showToast === 'function') {
+              window.showToast('Модель сохранена локально (' + res.uploadError + ')', 'info');
+            } else if (typeof window.showToast === 'function') {
+              window.showToast('Модель рук: ' + (nextModel === 'slim' ? 'Alex (3px)' : 'Steve (4px)'), 'success');
+            }
+          })
+          .catch(err => {
+            syncModelButtons(prevModel);
+            if (viewer.playerObject && viewer.playerObject.skin) {
+              viewer.playerObject.skin.modelType = prevModel;
+            }
+            if (typeof window.showToast === 'function') {
+              window.showToast('Ошибка смены модели: ' + err.message, 'error');
+            }
+          });
       });
     });
 

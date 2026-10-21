@@ -455,6 +455,178 @@ public class WebBridgeTests
         Assert.Equal(@"C:\root\.aura\instances\1.20.1", presetService.LastGameDir);
     }
 
+    private class TestBridgeSkinService : ISkinService
+    {
+        public bool IsValid { get; set; } = true;
+        public string? ValidationError { get; set; }
+        public bool UploadSuccess { get; set; } = true;
+        public string? UploadError { get; set; }
+        public string? LastUploadedModel { get; private set; }
+        public string? LastUploadedSkinPath { get; private set; }
+        public string? LastSyncedSkinPath { get; private set; }
+
+        public SkinValidationResult ValidateSkinFile(string? filePath)
+            => new(IsValid, IsValid ? null : (ValidationError ?? "Invalid skin file"), IsValid ? 64 : 0, IsValid ? 64 : 0);
+
+        public System.Windows.Media.ImageSource LoadSkinImage(string? skinPath) => null!;
+        public System.Windows.Media.ImageSource ExtractHeadAvatar(string? skinPath) => null!;
+        public System.Windows.Media.ImageSource ExtractFrontSkinPreview(string? skinPath) => null!;
+        public System.Windows.Media.ImageSource ExtractBackSkinPreview(string? skinPath) => null!;
+
+        public Task SyncSkinToGameAsync(string? skinPath, string nickname, string gameDir, CancellationToken cancellationToken = default)
+        {
+            LastSyncedSkinPath = skinPath;
+            return Task.CompletedTask;
+        }
+
+        public Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task<SkinUploadResult> UploadSkinToLobbyApiAsync(string? skinPath, string nickname, string model, string? ownerToken, string? baseUrl = null, CancellationToken cancellationToken = default)
+        {
+            LastUploadedSkinPath = skinPath;
+            LastUploadedModel = model;
+            return Task.FromResult(new SkinUploadResult(UploadSuccess, UploadSuccess ? "tok_test_owner" : null, UploadError));
+        }
+
+        public Task<System.Windows.Media.ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default) => Task.FromResult<System.Windows.Media.ImageSource>(null!);
+        public Task<(System.Windows.Media.ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default) => Task.FromResult<(System.Windows.Media.ImageSource, bool)>((null!, false));
+        public void EnsureCustomSkinLoaderConfig(string gameDir) { }
+        public void ClearCustomSkinLoaderCache(string gameDir) { }
+    }
+
+    [Fact]
+    public async Task Handle_SkinGet_ReturnsConfigData()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        configService.CurrentConfig.Nickname = "AlexUser";
+        configService.CurrentConfig.SkinModel = "slim";
+        configService.CurrentConfig.SkinOriginalName = "my_cool_skin.png";
+        configService.CurrentConfig.SkinPath = ""; // No file on disk -> dataUrl: null
+
+        var sessionService = new TestGameSessionService();
+        using var bridge = new WebBridge(null, sessionService, configService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_sg","type":"command","name":"skin.get"}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        var json = System.Text.Json.JsonSerializer.Serialize(lastResponse.Payload);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.Equal("AlexUser", doc.RootElement.GetProperty("nickname").GetString());
+        Assert.Equal("slim", doc.RootElement.GetProperty("model").GetString());
+        Assert.Equal("my_cool_skin.png", doc.RootElement.GetProperty("fileName").GetString());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, doc.RootElement.GetProperty("dataUrl").ValueKind);
+    }
+
+    [Fact]
+    public async Task Handle_SkinUpload_InvalidFormat_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var skinService = new TestBridgeSkinService();
+        using var bridge = new WebBridge(null, sessionService, configService, skinService: skinService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        // Base64 of plain text "not a png"
+        string notPngB64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("Hello World!"));
+        await bridge.ProcessRawMessageAsync("{\"id\":\"req_up1\",\"type\":\"command\",\"name\":\"skin.upload\",\"payload\":{\"fileName\":\"test.png\",\"base64Data\":\"" + notPngB64 + "\"}}");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("invalid_format", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_SkinUpload_TooLarge_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var skinService = new TestBridgeSkinService();
+        using var bridge = new WebBridge(null, sessionService, configService, skinService: skinService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        // 1MB + 10 bytes dummy byte array
+        byte[] large = new byte[1024 * 1024 + 10];
+        string largeB64 = Convert.ToBase64String(large);
+        await bridge.ProcessRawMessageAsync("{\"id\":\"req_up2\",\"type\":\"command\",\"name\":\"skin.upload\",\"payload\":{\"fileName\":\"large.png\",\"base64Data\":\"" + largeB64 + "\"}}");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("file_too_large", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_SkinUpload_LobbyApiError_ReturnsOkWithUploadError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var skinService = new TestBridgeSkinService
+        {
+            UploadSuccess = false,
+            UploadError = "lobby_api_down"
+        };
+        using var bridge = new WebBridge(null, sessionService, configService, skinService: skinService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        // Valid 8-byte PNG header + dummy data
+        byte[] fakePng = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00 };
+        string pngB64 = Convert.ToBase64String(fakePng);
+        await bridge.ProcessRawMessageAsync("{\"id\":\"req_up3\",\"type\":\"command\",\"name\":\"skin.upload\",\"payload\":{\"fileName\":\"custom.png\",\"base64Data\":\"" + pngB64 + "\"}}");
+
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        var json = System.Text.Json.JsonSerializer.Serialize(lastResponse.Payload);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.True(doc.RootElement.GetProperty("ok").GetBoolean());
+        Assert.Equal("lobby_api_down", doc.RootElement.GetProperty("uploadError").GetString());
+    }
+
+    [Fact]
+    public async Task Handle_SkinSetModel_InvalidValue_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        using var bridge = new WebBridge(null, sessionService, configService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_sm1","type":"command","name":"skin.setModel","payload":{"model":"unknown"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("invalid_value", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_SkinSetModel_ValidValue_UpdatesConfigAndReturnsOk()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        configService.CurrentConfig.SkinModel = "default";
+        var sessionService = new TestGameSessionService();
+        var skinService = new TestBridgeSkinService();
+        using var bridge = new WebBridge(null, sessionService, configService, skinService: skinService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_sm2","type":"command","name":"skin.setModel","payload":{"model":"slim"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        Assert.Equal("slim", configService.CurrentConfig.SkinModel);
+        var json = System.Text.Json.JsonSerializer.Serialize(lastResponse.Payload);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        Assert.True(doc.RootElement.GetProperty("ok").GetBoolean());
+        Assert.Equal("slim", doc.RootElement.GetProperty("model").GetString());
+    }
+
     [Fact]
     public async Task Handle_WorkshopToggleMod_DisableThenReEnable_ByBaseName()
     {

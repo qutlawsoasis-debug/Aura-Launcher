@@ -17,6 +17,7 @@ public partial class WebShellWindow : Window
     private readonly IWorkshopService? _workshopService;
     private readonly IPackUpdateService? _packUpdateService;
     private readonly IGameLaunchService? _launchService;
+    private readonly ISkinService? _skinService;
     private WebBridge? _bridge;
 
     public WebShellWindow(
@@ -25,7 +26,8 @@ public partial class WebShellWindow : Window
         IGraphicsPresetService? presetService = null,
         IWorkshopService? workshopService = null,
         IPackUpdateService? packUpdateService = null,
-        IGameLaunchService? launchService = null)
+        IGameLaunchService? launchService = null,
+        ISkinService? skinService = null)
     {
         InitializeComponent();
         _gameSessionService = gameSessionService;
@@ -34,6 +36,7 @@ public partial class WebShellWindow : Window
         _workshopService = workshopService;
         _packUpdateService = packUpdateService;
         _launchService = launchService;
+        _skinService = skinService;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -54,7 +57,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService);
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService);
             _bridge.Attach(WebViewControl.CoreWebView2);
 
             string targetUrl = await ResolveTargetUrlAsync();
