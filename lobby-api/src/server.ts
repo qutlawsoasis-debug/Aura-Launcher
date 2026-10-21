@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import url from 'url';
 import { getStore, Lobby, SkinRecord, computeLobbyModSync, computeModManifestHash } from './store.js';
 import { validatePngSkin, isValidNickname, getClientIp } from './skinUtils.js';
+import { CAPES, isCapeId } from './capes.js';
 import {
   handleRegister,
   handleSync,
@@ -555,6 +556,13 @@ export const server = http.createServer(async (req, res) => {
 
       const body = await parseBody(req);
       const { nickname, skinBase64, model, ownerToken } = body;
+      // Плащ: 'cyan' | 'silver' — выбрать, 'none' — снять, нет поля — не менять
+      const capeProvided = Object.prototype.hasOwnProperty.call(body, 'cape');
+      if (capeProvided && body.cape !== 'none' && !isCapeId(body.cape)) {
+        sendJson(res, 400, { error: 'Invalid cape (cyan | silver | none)' });
+        return;
+      }
+      const capeValue: 'cyan' | 'silver' | null = isCapeId(body.cape) ? body.cape : null;
 
       if (!isValidNickname(nickname)) {
         sendJson(res, 400, { error: 'Invalid nickname format (3-16 chars, a-zA-Z0-9_)' });
@@ -604,6 +612,19 @@ export const server = http.createServer(async (req, res) => {
         }
       }
 
+      // Только смена плаща, без загрузки скина
+      if (capeProvided && !skinBase64) {
+        if (!existing) {
+          sendJson(res, 404, { error: 'Сначала загрузите скин' });
+          return;
+        }
+        existing.cape = capeValue;
+        existing.updatedAt = Date.now();
+        await store.setSkin(existing, 30 * 24 * 3600);
+        sendJson(res, 200, { success: true, nickname: existing.nickname, cape: capeValue });
+        return;
+      }
+
       const skinModel: 'default' | 'slim' = model === 'slim' ? 'slim' : 'default';
       const validation = validatePngSkin(skinBase64);
       if (!validation.valid || !validation.buffer || !validation.sha1) {
@@ -620,7 +641,8 @@ export const server = http.createServer(async (req, res) => {
         model: skinModel,
         sha1: validation.sha1,
         skinBase64: validation.buffer.toString('base64'),
-        updatedAt: Date.now()
+        updatedAt: Date.now(),
+        cape: capeProvided ? capeValue : (existing?.cape ?? null)
       };
 
       const TTL_30_DAYS = 30 * 24 * 3600;
@@ -634,6 +656,20 @@ export const server = http.createServer(async (req, res) => {
         sha1: validation.sha1,
         ownerToken: token
       });
+      return;
+    }
+
+    // 7b. GET/HEAD /csl/textures/cape_{id} — плащи Aura
+    const capeMatch = pathname.match(/^(?:\/(?:api\/)?csl)?\/+(?:raw|textures)\/+(cape_[a-z]+)(?:\.png)?$/);
+    if ((req.method === 'GET' || req.method === 'HEAD') && capeMatch && CAPES[capeMatch[1]]) {
+      const capeBuffer = Buffer.from(CAPES[capeMatch[1]], 'base64');
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': capeBuffer.length,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(req.method === 'HEAD' ? undefined : capeBuffer);
       return;
     }
 
@@ -680,7 +716,7 @@ export const server = http.createServer(async (req, res) => {
           default: isSlim ? null : textureHash,
           slim: isSlim ? textureHash : null
         },
-        cape: null
+        cape: skinRecord.cape ? `cape_${skinRecord.cape}` : null
       });
       return;
     }
