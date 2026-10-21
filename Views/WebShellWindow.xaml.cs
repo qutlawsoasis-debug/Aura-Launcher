@@ -83,6 +83,41 @@ public partial class WebShellWindow : Window
         }
     }
 
+    /// <summary>
+    /// Папка собранного интерфейса: ui рядом с exe (релиз) или docs/redesign/v3/dist в репозитории (Debug).
+    /// </summary>
+    private static string? ResolveUiFolder()
+    {
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string[] candidates =
+        {
+            Path.Combine(baseDir, "ui"),
+            Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "docs", "redesign", "v3", "dist"))
+        };
+        foreach (var dir in candidates)
+        {
+            if (File.Exists(Path.Combine(dir, "index.html"))) return dir;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Есть ли из чего показать новый интерфейс (собранный бандл или, в Debug, dev-сервер Vite).
+    /// </summary>
+    public static bool HasUiBundle()
+    {
+        if (ResolveUiFolder() != null) return true;
+#if DEBUG
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+            return client.GetAsync("http://localhost:5173").GetAwaiter().GetResult().IsSuccessStatusCode;
+        }
+        catch { }
+#endif
+        return false;
+    }
+
     private Task<string> ResolveTargetUrlAsync()
     {
 #if DEBUG
@@ -100,23 +135,8 @@ public partial class WebShellWindow : Window
 #endif
 
         // Режим виртуального хоста aura.local
-        string uiFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "ui");
-        if (!Directory.Exists(uiFolder))
-        {
-            // Фолбэк на docs/redesign/v3/dist (собранный бандл) либо docs/redesign/v3
-            string repoDocsDist = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "docs", "redesign", "v3", "dist"));
-            string repoDocsV3 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "docs", "redesign", "v3"));
-            if (Directory.Exists(repoDocsDist))
-            {
-                uiFolder = repoDocsDist;
-            }
-            else if (Directory.Exists(repoDocsV3))
-            {
-                uiFolder = repoDocsV3;
-            }
-        }
-
-        if (Directory.Exists(uiFolder))
+        string? uiFolder = ResolveUiFolder();
+        if (uiFolder != null)
         {
             WebViewControl.CoreWebView2.SetVirtualHostNameToFolderMapping(
                 "aura.local",

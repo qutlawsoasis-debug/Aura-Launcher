@@ -1,6 +1,7 @@
 /**
  * Подключение к реальному окну лаунчера (WebView2) по CDP.
- * Лаунчер запускается с WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<порт> и --webui.
+ * Лаунчер запускается с WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=<порт>
+ * (новое окно открывается по умолчанию, старое — по --classic).
  *
  * node tools/qa-webview.js <порт> <папка-для-кадров> <сценарий.js>
  * Сценарию передаётся тот же объект qa, что и в tools/qa.js (evaluate, click, shot, wait…).

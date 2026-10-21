@@ -251,8 +251,13 @@ public partial class App : Application
         }
         catch { }
 
-        bool useWebUi = Array.Exists(args, a => a.Equals("--webui", StringComparison.OrdinalIgnoreCase)) ||
-                        Environment.GetEnvironmentVariable("AURA_WEBUI") == "1";
+        // Новый интерфейс «Остров» по умолчанию; старое окно — по --classic или AURA_WEBUI=0,
+        // а также автоматически, если в сборке нет папки с интерфейсом.
+        bool forceClassic = isSelfTest ||
+                            Array.Exists(args, a => a.Equals("--classic", StringComparison.OrdinalIgnoreCase)) ||
+                            Environment.GetEnvironmentVariable("AURA_WEBUI") == "0";
+        bool useWebUi = !forceClassic && WebShellWindow.HasUiBundle();
+        Log($"[STARTUP] ui={(useWebUi ? "web" : "classic")} (forceClassic={forceClassic})");
 
         Window activeWindow;
         if (useWebUi)
