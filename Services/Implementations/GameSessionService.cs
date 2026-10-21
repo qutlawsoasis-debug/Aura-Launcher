@@ -1,0 +1,306 @@
+using System;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using AuraLauncher.Core;
+using AuraLauncher.Models;
+using AuraLauncher.Services.Interfaces;
+
+namespace AuraLauncher.Services.Implementations;
+
+public class GameSessionService : IGameSessionService
+{
+    private readonly IGameLaunchService _launchService;
+    private readonly IPackUpdateService _packUpdateService;
+    private readonly IServerListSyncService _serverListSyncService;
+    private readonly ISkinService _skinService;
+    private readonly IConfigService _configService;
+    private readonly IDiscordRpcService? _discordRpcService;
+    private readonly IFriendService? _friendService;
+
+    private readonly object _stateLock = new();
+    private GameSessionState _state = GameSessionState.Idle;
+    private Process? _currentProcess;
+    private CancellationTokenSource? _activeCts;
+    private DateTime? _gameSessionStartTime;
+
+    public GameSessionState State
+    {
+        get
+        {
+            lock (_stateLock) return _state;
+        }
+        private set
+        {
+            lock (_stateLock)
+            {
+                if (_state == value) return;
+                _state = value;
+            }
+            StateChanged?.Invoke(this, value);
+        }
+    }
+
+    public bool IsGameRunning => State == GameSessionState.Running && _currentProcess != null && !_currentProcess.HasExited;
+
+    public Process? CurrentProcess => _currentProcess;
+
+    public event EventHandler<GameSessionState>? StateChanged;
+    public event EventHandler<string>? LogReceived;
+    public event EventHandler<GameExitedEventArgs>? GameExited;
+    public event EventHandler<Process>? GameStarted;
+
+    public GameSessionService(
+        IGameLaunchService launchService,
+        IPackUpdateService packUpdateService,
+        IServerListSyncService serverListSyncService,
+        ISkinService skinService,
+        IConfigService configService,
+        IDiscordRpcService? discordRpcService = null,
+        IFriendService? friendService = null)
+    {
+        _launchService = launchService;
+        _packUpdateService = packUpdateService;
+        _serverListSyncService = serverListSyncService;
+        _skinService = skinService;
+        _configService = configService;
+        _discordRpcService = discordRpcService;
+        _friendService = friendService;
+    }
+
+    public async Task<Process> LaunchAsync(
+        LaunchOptions? options = null,
+        IProgress<LaunchProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        lock (_stateLock)
+        {
+            if (_state != GameSessionState.Idle && _state != GameSessionState.Failed)
+            {
+                throw new InvalidOperationException("Game session is already preparing, launching, or running.");
+            }
+            _state = GameSessionState.Preparing;
+        }
+        StateChanged?.Invoke(this, GameSessionState.Preparing);
+
+        _activeCts?.Dispose();
+        _activeCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var ct = _activeCts.Token;
+
+        try
+        {
+            var config = _configService.CurrentConfig;
+
+            // 0. Валидация никнейма
+            var nickVal = NicknameValidator.Validate(config.Nickname);
+            if (!nickVal.IsValid)
+            {
+                FabricGameLaunchService.LogLauncherEvent("[CONFIG] Обнаружен невалидный никнейм в конфигурации. Запуск заблокирован до исправления.");
+                State = GameSessionState.Failed;
+                throw new InvalidOperationException("Укажи никнейм в Настройках (3-16 символов, A-Z, 0-9, _)");
+            }
+
+            config.QuickPlayMultiplayer = options?.QuickPlayMultiplayer;
+            config.QuickPlaySingleplayer = options?.QuickPlaySingleplayer;
+
+            // 1. Проверяем наличие и применяем обновления сборки модов через IPackUpdateService
+            progress?.Report(new LaunchProgress
+            {
+                Stage = "Проверка обновлений сборки...",
+                Percentage = 0,
+                DetailText = "Проверка обновлений сборки..."
+            });
+
+            var packProgress = new Progress<DownloadProgressReport>(report =>
+            {
+                progress?.Report(new LaunchProgress
+                {
+                    Stage = "Обновление сборки...",
+                    Percentage = report.Percentage,
+                    FormattedSpeed = report.FormattedSpeed,
+                    FormattedRemainingTime = report.FormattedRemainingTime,
+                    DetailText = report.TotalBytes > 0
+                        ? $"Сборка: {report.Percentage:F0}% ({report.FormattedSpeed})"
+                        : report.StatusText
+                });
+            });
+
+            PackUpdateResult updateResult;
+            try
+            {
+                updateResult = await _packUpdateService.CheckAndApplyAsync(packProgress, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[UPDATE: ERROR] {ex.Message}");
+                updateResult = new PackUpdateResult(PackUpdateStatus.Failed, $"Ошибка обновления: {ex.Message}");
+            }
+
+            if (updateResult.Status == PackUpdateStatus.Failed)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[UPDATE: FAILED] {updateResult.Message}");
+                State = GameSessionState.Failed;
+                throw new InvalidOperationException($"Сборка не обновилась: {updateResult.Message}");
+            }
+
+            ct.ThrowIfCancellationRequested();
+
+            // 1.5. Синхронизация управляемых серверов в servers.dat (перед запуском игры)
+            try
+            {
+                var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
+                await _serverListSyncService.SyncServersAsync(targetGameDir, updateResult.Servers, cancellationToken: ct);
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] Ошибка синхронизации серверов: {ex.Message}");
+            }
+
+            // 1.6. Конфигурация CustomSkinLoader
+            try
+            {
+                var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
+                _skinService.EnsureCustomSkinLoaderConfig(targetGameDir);
+                var uploadResult = await _skinService.UploadSkinToLobbyApiAsync(
+                    config.SkinPath,
+                    config.Nickname,
+                    config.SkinModel,
+                    config.SkinOwnerToken,
+                    config.LobbyApiBaseUrl,
+                    ct);
+
+                if (uploadResult.Success && !string.IsNullOrWhiteSpace(uploadResult.OwnerToken) &&
+                    uploadResult.OwnerToken != config.SkinOwnerToken)
+                {
+                    config.SkinOwnerToken = uploadResult.OwnerToken;
+                    await _configService.SaveConfigAsync(config, ct);
+                }
+
+                await _skinService.SyncSkinToGameAsync(config.SkinPath, config.Nickname, targetGameDir, ct);
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[CSL-SYNC: ERROR] {ex.Message}");
+            }
+
+            // 2. Автоустановка окружения и запуск игры
+            State = GameSessionState.Launching;
+            progress?.Report(new LaunchProgress
+            {
+                Stage = "Подготовка компонентов игры...",
+                Percentage = 0,
+                DetailText = "Подготовка компонентов игры..."
+            });
+
+            var installProgress = new Progress<InstallProgressReport>(report =>
+            {
+                progress?.Report(new LaunchProgress
+                {
+                    Stage = $"Установка: {report.Stage}",
+                    Percentage = report.Percentage,
+                    FormattedSpeed = report.FormattedSpeed,
+                    DetailText = string.IsNullOrWhiteSpace(report.FormattedSpeed)
+                        ? report.DetailText
+                        : $"{report.DetailText} • {report.FormattedSpeed}"
+                });
+            });
+
+            _gameSessionStartTime = DateTime.UtcNow;
+            _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
+
+            var process = await _launchService.LaunchGameAsync(
+                config,
+                line =>
+                {
+                    LogReceived?.Invoke(this, line);
+                },
+                onGameExited: (exitCode, logPath) =>
+                {
+                    _currentProcess = null;
+                    State = exitCode == 0 ? GameSessionState.Idle : GameSessionState.Failed;
+
+                    if (_gameSessionStartTime.HasValue)
+                    {
+                        var elapsed = DateTime.UtcNow - _gameSessionStartTime.Value;
+                        long addSec = (long)elapsed.TotalSeconds;
+                        if (addSec > 5)
+                        {
+                            _ = _configService.UpdateConfigAsync(c =>
+                            {
+                                c.TotalPlayTimeSeconds += addSec;
+                                c.TotalGameLaunches += 1;
+                                c.LastPlayedUtc = DateTime.UtcNow;
+                            });
+                        }
+                        _gameSessionStartTime = null;
+                    }
+
+                    try
+                    {
+                        if (_friendService != null)
+                        {
+                            _friendService.IsGameRunning = false;
+                            _ = _friendService.SyncNowAsync();
+                        }
+                        _discordRpcService?.SetInLauncher();
+                    }
+                    catch { }
+
+                    GameExited?.Invoke(this, new GameExitedEventArgs(exitCode, logPath));
+                },
+                installProgress: installProgress,
+                cancellationToken: ct);
+
+            _currentProcess = process;
+            State = GameSessionState.Running;
+
+            try
+            {
+                if (_friendService != null)
+                {
+                    _friendService.IsGameRunning = true;
+                    _ = _friendService.SyncNowAsync();
+                }
+                _discordRpcService?.SetPlayingGame(startTime: DateTime.UtcNow);
+                GameStarted?.Invoke(this, process);
+            }
+            catch { }
+
+            return process;
+        }
+        catch (OperationCanceledException)
+        {
+            State = GameSessionState.Idle;
+            throw;
+        }
+        catch (Exception)
+        {
+            State = GameSessionState.Failed;
+            throw;
+        }
+        finally
+        {
+            if (_configService?.CurrentConfig != null)
+            {
+                _configService.CurrentConfig.QuickPlayMultiplayer = null;
+                _configService.CurrentConfig.QuickPlaySingleplayer = null;
+            }
+        }
+    }
+
+    public async Task<bool> StopAsync(int timeoutMs = 5000)
+    {
+        _activeCts?.Cancel();
+        bool stopped = await _launchService.StopGameProcessAsync(timeoutMs);
+        if (stopped)
+        {
+            _currentProcess = null;
+            State = GameSessionState.Idle;
+        }
+        return stopped;
+    }
+}

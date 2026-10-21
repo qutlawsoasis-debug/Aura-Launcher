@@ -622,6 +622,7 @@ public partial class App : Application
         services.AddSingleton<ILauncherUpdateService, LauncherUpdateService>();
         services.AddSingleton<IPackUpdateService, PackUpdateService>();
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
+        services.AddSingleton<IGameSessionService, GameSessionService>();
         services.AddSingleton<ISkinService, SkinService>();
         services.AddSingleton<IServerListSyncService, ServerListSyncService>();
         services.AddSingleton<IModManifestService, ModManifestService>();

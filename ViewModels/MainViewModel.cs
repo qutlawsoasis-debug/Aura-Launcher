@@ -66,6 +66,7 @@ public class MainViewModel : ObservableObject
     private readonly IReportService? _reportService;
     private readonly IAchievementService? _achievementService;
     private readonly IScreenshotWatcherService _screenshotWatcher;
+    private readonly IGameSessionService _gameSessionService;
 
     // Свойства диалога «Отправить отчёт»
     private bool _isSendReportModalVisible;
@@ -762,7 +763,6 @@ public class MainViewModel : ObservableObject
     public WorkshopViewModel WorkshopVM { get; }
     public MusicDiskViewModel? MusicDiskVM { get; }
 
-    private DateTime? _gameSessionStartTime;
 
     public int AnthemVolume
     {
@@ -814,7 +814,8 @@ public class MainViewModel : ObservableObject
         IScreenshotWatcherService? screenshotWatcher = null,
         IReportService? reportService = null,
         IReleaseNotesService? releaseNotesService = null,
-        MusicDiskViewModel? musicDiskViewModel = null)
+        MusicDiskViewModel? musicDiskViewModel = null,
+        IGameSessionService? gameSessionService = null)
     {
         _configService = configService ?? throw new ArgumentNullException(nameof(configService));
         _launcherUpdateService = launcherUpdateService ?? throw new ArgumentNullException(nameof(launcherUpdateService));
@@ -822,6 +823,7 @@ public class MainViewModel : ObservableObject
         _launchService = launchService ?? throw new ArgumentNullException(nameof(launchService));
         _skinService = skinService ?? throw new ArgumentNullException(nameof(skinService));
         _serverListSyncService = serverListSyncService ?? new ServerListSyncService(launchService);
+        _gameSessionService = gameSessionService ?? new GameSessionService(launchService, packUpdateService, _serverListSyncService, skinService, configService, discordRpcService, friendService);
         _notificationService = notificationService;
         _notificationService?.ClearUpdateNotifications();
         _discordRpcService = discordRpcService;
@@ -1726,194 +1728,105 @@ public class MainViewModel : ObservableObject
             _launchCts = new CancellationTokenSource();
             var ct = _launchCts.Token;
 
-            var config = _configService.CurrentConfig;
-            config.QuickPlayMultiplayer = quickPlayMultiplayer;
-            config.QuickPlaySingleplayer = quickPlaySingleplayer;
-
-            // 1. Проверяем наличие и применяем обновления сборки модов через IPackUpdateService
             SetLauncherState(LauncherState.Checking, "Проверка обновлений сборки...");
-            var packProgress = new Progress<DownloadProgressReport>(report =>
+
+            var sessionProgress = new Progress<LaunchProgress>(p =>
             {
                 IsProgressVisible = true;
-                SetLauncherState(LauncherState.Downloading, "Обновление сборки...");
-                ProgressPercentage = report.Percentage;
-                SpeedText = report.FormattedSpeed;
-                RemainingTimeText = report.FormattedRemainingTime;
-                StatusText = report.TotalBytes > 0
-                    ? $"Сборка: {report.Percentage:F0}% ({report.FormattedSpeed})"
-                    : report.StatusText;
-            });
-
-            PackUpdateResult updateResult;
-            try
-            {
-                updateResult = await _packUpdateService.CheckAndApplyAsync(packProgress, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[UPDATE: ERROR] {ex.Message}");
-                updateResult = new PackUpdateResult(PackUpdateStatus.Failed, $"Ошибка обновления: {ex.Message}");
-            }
-
-            if (updateResult.Status == PackUpdateStatus.Failed)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[UPDATE: FAILED] {updateResult.Message}");
-                SetLauncherState(LauncherState.Idle, "Сборка не обновилась, повтори");
-                IsProgressVisible = false;
-                LobbyVM.NotifyLaunchFailed($"Сборка не обновилась: {updateResult.Message}");
-                return;
-            }
-
-            IsProgressVisible = false;
-            OverviewVM.RefreshStats();
-
-            ct.ThrowIfCancellationRequested();
-
-            // 1.5. Синхронизация управляемых серверов в servers.dat (перед запуском игры)
-            try
-            {
-                var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
-                await _serverListSyncService.SyncServersAsync(targetGameDir, updateResult.Servers, cancellationToken: ct);
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[SERVER-SYNC] Ошибка синхронизации серверов: {ex.Message}");
-            }
-
-            // 1.6. Конфигурация CustomSkinLoader: добавление AuraLobby первым источником и загрузка актуального скина
-            try
-            {
-                var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
-                _skinService.EnsureCustomSkinLoaderConfig(targetGameDir);
-                var uploadResult = await _skinService.UploadSkinToLobbyApiAsync(
-                    config.SkinPath,
-                    config.Nickname,
-                    config.SkinModel,
-                    config.SkinOwnerToken,
-                    config.LobbyApiBaseUrl,
-                    ct);
-
-                if (uploadResult.Success && !string.IsNullOrWhiteSpace(uploadResult.OwnerToken) &&
-                    uploadResult.OwnerToken != config.SkinOwnerToken)
+                if (p.Stage.StartsWith("Обновление", StringComparison.OrdinalIgnoreCase))
                 {
-                    config.SkinOwnerToken = uploadResult.OwnerToken;
-                    await _configService.SaveConfigAsync(config, ct);
+                    SetLauncherState(LauncherState.Downloading, "Обновление сборки...");
+                    ProgressPercentage = p.Percentage;
+                    SpeedText = p.FormattedSpeed;
+                    RemainingTimeText = p.FormattedRemainingTime;
+                    StatusText = p.DetailText;
                 }
-
-                await _skinService.SyncSkinToGameAsync(config.SkinPath, config.Nickname, targetGameDir, ct);
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[CSL-SYNC: ERROR] {ex.Message}");
-            }
-
-            // 2. Автоустановка окружения (CmlLib.Core) и запуск игры
-            SetLauncherState(LauncherState.Downloading, "Подготовка компонентов игры...");
-            IsProgressVisible = true;
-
-            var installProgress = new Progress<InstallProgressReport>(report =>
-            {
-                IsProgressVisible = true;
-                ProgressPercentage = report.Percentage;
-                SpeedText = report.FormattedSpeed;
-                StartLoadingDotsAnimation($"Установка: {report.Stage}");
-                StatusText = string.IsNullOrWhiteSpace(report.FormattedSpeed)
-                    ? report.DetailText
-                    : $"{report.DetailText} • {report.FormattedSpeed}";
+                else if (p.Stage.StartsWith("Установка:", StringComparison.OrdinalIgnoreCase))
+                {
+                    SetLauncherState(LauncherState.Downloading, "Подготовка компонентов игры...");
+                    ProgressPercentage = p.Percentage;
+                    SpeedText = p.FormattedSpeed;
+                    StartLoadingDotsAnimation(p.Stage);
+                    StatusText = p.DetailText;
+                }
+                else
+                {
+                    SetLauncherState(LauncherState.Checking, p.Stage);
+                    StatusText = p.DetailText;
+                }
             });
 
-            _gameSessionStartTime = DateTime.UtcNow;
-            _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
-
-            var process = await _launchService.LaunchGameAsync(
-                config,
-                line =>
+            void OnLog(object? s, string line)
+            {
+                System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
                 {
-                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                    LatestLogLine = line;
+                    GameLogs.Add(line);
+                    if (GameLogs.Count > 300)
                     {
-                        LatestLogLine = line;
-                        GameLogs.Add(line);
-                        if (GameLogs.Count > 300)
-                        {
-                            GameLogs.RemoveAt(0);
-                        }
-                    });
-                },
-                onGameExited: (exitCode, logPath) =>
-                {
-                    System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
-                    {
-                        IsGameRunning = false;
-                        if (_gameSessionStartTime.HasValue)
-                        {
-                            var elapsed = DateTime.UtcNow - _gameSessionStartTime.Value;
-                            long addSec = (long)elapsed.TotalSeconds;
-                            if (addSec > 5)
-                            {
-                                _ = _configService.UpdateConfigAsync(c =>
-                                {
-                                    c.TotalPlayTimeSeconds += addSec;
-                                    c.TotalGameLaunches += 1;
-                                    c.LastPlayedUtc = DateTime.UtcNow;
-                                });
-                            }
-                            _gameSessionStartTime = null;
-                        }
+                        GameLogs.RemoveAt(0);
+                    }
+                });
+            }
 
-                        OverviewVM.RefreshStats();
-                        LobbyVM.OnGameExited();
-                        if (exitCode != 0)
+            void OnExited(object? s, GameExitedEventArgs e)
+            {
+                System.Windows.Application.Current?.Dispatcher?.InvokeAsync(() =>
+                {
+                    IsGameRunning = false;
+                    OverviewVM.RefreshStats();
+                    LobbyVM.OnGameExited();
+                    if (e.ExitCode != 0)
+                    {
+                        var resolvedGameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
+                        var crashReport = GameCrashAnalyzer.AnalyzeCrash(resolvedGameDir, e.ExitCode);
+                        SetLauncherState(LauncherState.Error, $"{crashReport.Title}. {crashReport.UserAdvice}");
+                        PromptGameCrashToast(e.ExitCode, crashReport);
+                    }
+                    else
+                    {
+                        UpdateIdleState();
+                    }
+
+                    if (_isLauncherUpdatePending && !_isToastDismissedForSession && !string.IsNullOrWhiteSpace(_pendingNewVersion))
+                    {
+                        var parts = _pendingNewVersion.Split('.');
+                        string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
+                            ? $"beta 1.0.{patch - 8}"
+                            : _pendingNewVersion;
+
+                        UpdateBannerTitle = $"Вышло обновление {displayVer}";
+                        UpdateBannerButtonText = "Обновить";
+                        OnPropertyChanged(nameof(UpdateBannerMessage));
+                        IsUpdateBannerVisible = true;
+                    }
+
+                    try
+                    {
+                        if (LobbyVM.IsInLobby && LobbyVM.LobbyPlayers.Count > 0)
                         {
-                            var resolvedGameDir = _launchService.ResolveMinecraftDirectory(_configService.CurrentConfig.GameDir);
-                            var crashReport = GameCrashAnalyzer.AnalyzeCrash(resolvedGameDir, exitCode);
-                            SetLauncherState(LauncherState.Error, $"{crashReport.Title}. {crashReport.UserAdvice}");
-                            PromptGameCrashToast(exitCode, crashReport);
+                            _discordRpcService?.SetInLobby(LobbyVM.LobbyPlayers.Count, LobbyVM.HostName, LobbyVM.LobbyCode);
                         }
                         else
                         {
-                            UpdateIdleState();
+                            _discordRpcService?.SetInLauncher();
                         }
+                        GameExited?.Invoke(this, e.ExitCode);
+                    }
+                    catch { }
+                });
+            }
 
-                        // Если обновление лаунчера было отложено из-за игры, показываем тост сейчас
-                        if (_isLauncherUpdatePending && !_isToastDismissedForSession && !string.IsNullOrWhiteSpace(_pendingNewVersion))
-                        {
-                            var parts = _pendingNewVersion.Split('.');
-                            string displayVer = parts.Length == 3 && int.TryParse(parts[2], out int patch) && patch >= 8
-                                ? $"beta 1.0.{patch - 8}"
-                                : _pendingNewVersion;
+            _gameSessionService.LogReceived += OnLog;
+            _gameSessionService.GameExited += OnExited;
 
-                            UpdateBannerTitle = $"Вышло обновление {displayVer}";
-                            UpdateBannerButtonText = "Обновить";
-                            OnPropertyChanged(nameof(UpdateBannerMessage));
-                            IsUpdateBannerVisible = true;
-                        }
+            var options = new LaunchOptions
+            {
+                QuickPlayMultiplayer = quickPlayMultiplayer,
+                QuickPlaySingleplayer = quickPlaySingleplayer
+            };
 
-                        try
-                        {
-                            if (_friendService != null)
-                            {
-                                _friendService.IsGameRunning = false;
-                                _ = _friendService.SyncNowAsync();
-                            }
-                            if (LobbyVM.IsInLobby && LobbyVM.LobbyPlayers.Count > 0)
-                            {
-                                _discordRpcService?.SetInLobby(LobbyVM.LobbyPlayers.Count, LobbyVM.HostName, LobbyVM.LobbyCode);
-                            }
-                            else
-                            {
-                                _discordRpcService?.SetInLauncher();
-                            }
-                            GameExited?.Invoke(this, exitCode);
-                        }
-                        catch { }
-                    });
-                },
-                installProgress: installProgress,
-                cancellationToken: ct);
+            var process = await _gameSessionService.LaunchAsync(options, sessionProgress, ct);
 
             _gameProcess = process;
             IsGameRunning = true;
@@ -1925,12 +1838,6 @@ public class MainViewModel : ObservableObject
 
             try
             {
-                if (_friendService != null)
-                {
-                    _friendService.IsGameRunning = true;
-                    _ = _friendService.SyncNowAsync();
-                }
-                _discordRpcService?.SetPlayingGame(startTime: DateTime.UtcNow);
                 LobbyVM.OnHostGameStarted();
                 GameStarted?.Invoke(this, process);
             }
