@@ -52,9 +52,27 @@
     });
   }
 
+  // Время игровой сессии в капсуле «В игре»: м:сс, после часа — ч:мм:сс
+  let sessionTimer = 0;
+  function startSessionTimer() {
+    const el = document.getElementById('sessionTimer');
+    if (!el) return;
+    const started = Date.now();
+    const render = () => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+      el.textContent = h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+    };
+    render();
+    clearInterval(sessionTimer);
+    sessionTimer = setInterval(render, 1000);
+  }
+
   function setGameState(newState, payload = {}) {
     if (gameState === newState && !payload.force) return;
     gameState = newState;
+    if (newState === 'running') startSessionTimer();
+    else clearInterval(sessionTimer);
 
     if (newState === 'launching') {
       updateAllPlayButtons(payload.progress);

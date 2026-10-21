@@ -20,24 +20,43 @@
   };
 
   let turnBackTimer = null;
+  let rotationTween = 0;
+
+  // Плавный поворот модели вокруг вертикали. В режиме off — сразу и одним кадром.
+  function rotateModelTo(target, duration) {
+    if (!viewer || !viewer.playerObject) return;
+    cancelAnimationFrame(rotationTween);
+    const body = viewer.playerObject;
+    if (document.documentElement.dataset.effects === 'off') {
+      body.rotation.y = target;
+      viewer.render();
+      return;
+    }
+    const from = body.rotation.y;
+    const start = performance.now();
+    // easeOutBack с мягким овершутом — как --spring в CSS
+    const ease = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+    const step = now => {
+      const t = Math.min((now - start) / duration, 1);
+      body.rotation.y = from + (target - from) * ease(t);
+      if (t < 1) rotationTween = requestAnimationFrame(step);
+    };
+    rotationTween = requestAnimationFrame(step);
+  }
 
   function turnModelBack() {
     if (!viewer || !viewer.playerObject) return;
     clearTimeout(turnBackTimer);
     viewer.autoRotate = false;
-
-    // Smoothly rotate model back to show cape
-    viewer.playerObject.rotation.y = Math.PI * 0.95; // ~170 deg
+    rotateModelTo(Math.PI * 0.92, 650);
 
     turnBackTimer = setTimeout(() => {
       const effects = document.documentElement.dataset.effects;
-      if (viewer && viewer.playerObject) {
-        viewer.playerObject.rotation.y = 0;
-        if (effects !== 'low' && effects !== 'off' && !isHovered) {
-          viewer.autoRotate = true;
-        }
+      rotateModelTo(0, 750);
+      if (effects !== 'low' && effects !== 'off' && !isHovered) {
+        setTimeout(() => { if (viewer && !isHovered) viewer.autoRotate = true; }, 750);
       }
-    }, 1500);
+    }, 1800);
   }
 
   function initSkinview() {

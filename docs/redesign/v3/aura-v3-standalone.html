@@ -87,6 +87,10 @@
   --dur-1: 120ms;
   --dur-2: 200ms;
   --dur-3: 320ms;
+  /* Пружинным движениям нужна длина, иначе овершут превращается в рывок */
+  --dur-spring-s: 450ms;
+  --dur-spring-m: 550ms;
+  --dur-morph: 750ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --spring: cubic-bezier(0.34, 1.3, 0.5, 1);
   --smooth: cubic-bezier(0.22, 1, 0.36, 1);
@@ -95,10 +99,10 @@
 
 /* ================= 5. РЕЖИМЫ ЭФФЕКТОВ ================= */
 .island {
-  transition: width var(--dur-3) var(--spring),
-              height var(--dur-3) var(--spring),
-              border-radius var(--dur-3) var(--spring),
-              bottom var(--dur-3) var(--spring),
+  transition: width var(--dur-morph) var(--spring),
+              height var(--dur-morph) var(--spring),
+              border-radius var(--dur-morph) var(--spring),
+              bottom var(--dur-morph) var(--spring),
               background var(--dur-3) var(--ease-out),
               box-shadow var(--dur-3) var(--ease-out),
               border-color var(--dur-3) var(--ease-out);
@@ -309,50 +313,75 @@ body.is-open .world-dim {
   pointer-events: none;
 }
 
+/* Кнопки окна в духе macOS: тихие круги, при наведении на группу — цвета Apple и значки */
 .wincontrols {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 12px;
+  right: 14px;
   display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 3px;
-  border-radius: 99px;
-  background: var(--glass-solid);
-  border: 1px solid var(--line);
-  box-shadow: var(--glass-panel-shadow);
+  gap: 2px;
   z-index: 20;
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
-html[data-effects="full"] .wincontrols {
-  background: var(--glass-sheen), rgba(40, 42, 50, 0.75);
-}
-
 .wincontrols .win-btn {
-  width: 28px;
-  height: 28px;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: transparent;
+}
+
+.wincontrols .win-btn::before {
+  content: '';
+  position: absolute;
+  inset: 6.5px;
   border-radius: 50%;
-  color: var(--ink-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, color 0.15s, transform 0.15s var(--spring);
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: background-color var(--dur-2) var(--ease-out), transform var(--dur-spring-s) var(--spring);
 }
 
-.wincontrols .win-btn:hover {
-  background: var(--fill-2);
-  color: #FFFFFF;
+.wincontrols .win-btn svg {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-spring-s) var(--spring);
 }
 
-.wincontrols .win-btn:active {
-  transform: scale(0.92);
+.wincontrols:hover .win-btn[data-win="minimize"]::before { background: #FEBC2E; }
+.wincontrols:hover .win-btn[data-win="maximize"]::before { background: #28C840; }
+.wincontrols:hover .win-btn[data-win="close"]::before { background: #FF5F57; }
+
+.wincontrols:hover .win-btn {
+  color: rgba(0, 0, 0, 0.6);
 }
 
-.wincontrols .win-btn.win-close:hover {
-  background: rgba(255, 69, 58, 0.9);
-  color: #FFFFFF;
+.wincontrols:hover .win-btn svg {
+  opacity: 1;
+  transform: none;
+}
+
+.wincontrols .win-btn:hover::before {
+  transform: scale(1.12);
+}
+
+.wincontrols .win-btn:active::before {
+  transform: scale(0.9);
+  filter: brightness(0.85);
+}
+
+.wincontrols .win-btn:focus-visible {
+  outline: none;
+}
+
+.wincontrols .win-btn:focus-visible::before {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* ================= 2. ОСТРОВ-КАПСУЛА ================= */
@@ -396,7 +425,6 @@ html[data-effects="full"] .wincontrols {
   opacity: 0;
   transform: scale(0.97);
   pointer-events: none;
-  content-visibility: hidden;
   transition: opacity 0.25s, transform 0.5s var(--spring);
 }
 
@@ -404,7 +432,6 @@ html[data-effects="full"] .wincontrols {
   opacity: 1;
   transform: none;
   pointer-events: auto;
-  content-visibility: visible;
   transition: opacity 0.35s 0.14s, transform 0.6s var(--spring) 0.1s;
 }
 
@@ -510,6 +537,9 @@ html[data-effects="full"] .wincontrols {
   box-shadow: 0 0 12px var(--accent);
   animation: pulse 1.6s infinite;
 }
+
+/* Пульсация «В игре» не крутится, пока слой скрыт */
+.layer:not(.on) .live { animation-play-state: paused; }
 
 @keyframes pulse {
   50% { opacity: 0.35; }
@@ -678,15 +708,42 @@ html[data-effects="full"] .wincontrols {
 .status.idle { background: #9FE08A; box-shadow: 0 0 10px #9FE08A; }
 .status.off { background: rgba(255, 255, 255, 0.22); box-shadow: none; }
 
-.person {
+/* Строки списков в стиле iOS: подсветка скруглена и выходит за контент на 12px,
+   разделитель — отдельная линия, которая прячется под подсветкой и над ней. */
+.person,
+.pick {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 64px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--hair);
-  width: 100%;
+  width: calc(100% + 24px);
+  margin-inline: -12px;
+  padding: 10px 12px;
+  border-radius: 14px;
   text-align: left;
+}
+.person::after,
+.pick::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 1px;
+  background: var(--hair);
+  transition: opacity var(--dur-1) var(--ease-out);
+  pointer-events: none;
+}
+.person:last-child::after,
+.pick:last-child::after,
+.person:hover::after,
+.pick:hover::after,
+.person:has(+ .person:hover)::after,
+.pick:has(+ .pick:hover)::after {
+  opacity: 0;
+}
+.person {
+  min-height: 64px;
   transition: opacity var(--dur-2) var(--ease-out),
               transform var(--dur-2) var(--ease-out),
               max-height var(--dur-2) var(--ease-out),
@@ -694,6 +751,7 @@ html[data-effects="full"] .wincontrols {
               margin var(--dur-2) var(--ease-out),
               background-color var(--dur-1) var(--ease-out);
 }
+button.person:hover,
 .person:hover {
   background-color: var(--fill);
 }
@@ -706,9 +764,6 @@ html[data-effects="full"] .wincontrols {
   margin: 0;
   border: 0;
   overflow: hidden;
-}
-.person:last-child {
-  border-bottom: 0;
 }
 .person .name {
   font-weight: 600;
@@ -758,7 +813,7 @@ html[data-effects="full"] .wincontrols {
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transition: transform var(--dur-2) var(--spring);
+  transition: transform var(--dur-spring-s) var(--spring);
 }
 .toggle:active::after {
   transform: scaleX(1.15);
@@ -793,8 +848,34 @@ html[data-effects="full"] .wincontrols {
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.26);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 3px 8px rgba(0, 0, 0, 0.18);
-  transition: left var(--dur-3) var(--spring), width var(--dur-3) var(--spring);
+  transition: left var(--dur-spring-m) var(--spring), width var(--dur-spring-m) var(--spring);
 }
+
+/* Слайдер как в эталоне: на всю ширину, заливка до ручки через --p (ставит JS) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 8px;
+  margin: 0;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent) var(--p, 25%), var(--fill-2) var(--p, 25%));
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  transition: transform var(--dur-spring-s) var(--spring);
+}
+input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.06); }
+input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.18); }
+input[type="range"]:focus-visible { outline: none; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent), 0 2px 10px rgba(0, 0, 0, 0.4); }
 
 .field {
   width: 100%;
@@ -814,7 +895,7 @@ html[data-effects="full"] .wincontrols {
 .reveal {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows var(--dur-3) var(--spring);
+  transition: grid-template-rows var(--dur-spring-m) var(--spring);
 }
 .reveal.open { grid-template-rows: 1fr; }
 .reveal > div {
@@ -829,23 +910,15 @@ html[data-effects="full"] .wincontrols {
 }
 
 .pick {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  text-align: left;
   min-height: 62px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--hair);
-  transition: background-color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+  transition: background-color var(--dur-1) var(--ease-out), transform var(--dur-spring-s) var(--spring);
 }
 .pick:hover {
   background-color: var(--fill);
 }
 .pick:active {
-  transform: scale(0.98);
+  transform: scale(0.985);
 }
-.pick:last-child { border-bottom: 0; }
 .pick .radio {
   width: 24px;
   height: 24px;
@@ -864,7 +937,7 @@ html[data-effects="full"] .wincontrols {
   border-radius: 50%;
   background: var(--accent);
   transform: scale(0);
-  transition: transform var(--dur-2) var(--spring);
+  transition: transform var(--dur-spring-s) var(--spring);
 }
 .pick.on .radio::after {
   transform: scale(1);
@@ -896,7 +969,7 @@ html[data-effects="full"] .wincontrols {
   gap: 8px;
   font-size: 13px;
   color: var(--ink-3);
-  transition: transform var(--dur-2) var(--spring), opacity var(--dur-2) var(--ease-out);
+  transition: transform var(--dur-spring-s) var(--spring), opacity var(--dur-2) var(--ease-out);
 }
 .slot .ring {
   width: 66px;
@@ -906,7 +979,7 @@ html[data-effects="full"] .wincontrols {
   display: grid;
   place-items: center;
   font-size: 24px;
-  transition: border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), transform var(--dur-2) var(--spring);
+  transition: border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), transform var(--dur-spring-s) var(--spring);
 }
 .slot:hover .ring {
   border-color: var(--accent);
@@ -922,75 +995,43 @@ html[data-effects="full"] .wincontrols {
   --s: 54px;
   border-radius: 50%;
 }
-.slot.slot-invited {
-  animation: slotPop var(--dur-2) var(--spring) forwards;
-}
-
-@keyframes slotPop {
-  0% { transform: scale(0.88); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
-/* Content transition animation classes */
-.content-fade-out {
-  opacity: 0 !important;
-  transform: translateY(-4px) !important;
-  transition: opacity var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out) !important;
-}
-
-.content-fade-in {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out) !important;
-}
-
-.stagger-in {
-  opacity: 0;
-  transform: translateY(6px);
-  animation: staggerFadeIn var(--dur-2) var(--ease-out) forwards;
-  animation-delay: calc(var(--stagger-idx, 0) * 25ms);
-}
-
-@keyframes staggerFadeIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 .toast-container {
   position: absolute;
   left: 50%;
-  bottom: 120px;
-  top: auto;
+  top: 16px;
   transform: translateX(-50%);
   display: flex;
-  flex-direction: column-reverse;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
   z-index: 100;
   pointer-events: none;
 }
 
+/* Уведомления выезжают сверху, как в iOS */
 .toast-item {
   padding: 11px 20px;
   border-radius: 99px;
   background: var(--glass-solid);
   border: 1px solid var(--line);
   font-size: 15px;
+  font-weight: 500;
   color: var(--ink);
+  white-space: nowrap;
   opacity: 0;
-  transform: translateY(16px);
-  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-3) var(--spring);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  transform: translateY(-14px) scale(0.96);
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-spring-m) var(--spring);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+html[data-effects="full"] .toast-item {
+  background: var(--glass-sheen), rgba(40, 42, 50, 0.82);
 }
 
 .toast-item.is-visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: none;
 }
-  opacity: 1;
-  transform: translateY(0);
-}
-
 
 /* === 3. SCREENS === */
 
@@ -1112,7 +1153,7 @@ html[data-effects="full"] .wincontrols {
   flex: none;
   opacity: 0;
   transform: translateY(8px);
-  animation: viewerEnter var(--dur-3) var(--spring) forwards;
+  animation: viewerEnter var(--dur-spring-m) var(--spring) forwards;
 }
 
 @keyframes viewerEnter {
@@ -1139,74 +1180,87 @@ html[data-effects="full"] .wincontrols {
 }
 
 .capes {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
 .cape {
-  width: 64px;
-  height: 88px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
+  position: relative;
+  min-width: 0;
+  height: 104px;
+  border-radius: 16px;
   background: var(--fill);
+  box-shadow: inset 0 0 0 1px var(--hair);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px 4px;
+  gap: 8px;
+  padding: 10px 6px 8px;
   cursor: pointer;
-  transition: border-color var(--dur-2) var(--ease-out),
-              transform var(--dur-3) var(--spring),
-              background var(--dur-2) var(--ease-out);
+  transition: background-color var(--dur-1) var(--ease-out),
+              box-shadow var(--dur-2) var(--ease-out),
+              transform var(--dur-spring-s) var(--spring);
 }
 
 .cape:hover {
   background: var(--fill-2);
-  transform: translateY(-2px);
+}
+
+.cape:active {
+  transform: scale(0.96);
 }
 
 .cape.on {
-  border-color: var(--accent);
   background: var(--fill-2);
-  transform: scale(1.03);
-  box-shadow: 0 4px 14px rgba(100, 210, 255, 0.2);
+  box-shadow: inset 0 0 0 2px var(--accent), 0 6px 18px rgba(100, 210, 255, 0.18);
 }
 
+/* Превью — внешняя сторона плаща из текстуры 64x32: прямоугольник 10x16 в точке (1,1), масштаб x3 */
 .cape-thumb {
-  width: 32px;
+  width: 30px;
   height: 48px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  image-rendering: pixelated;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
   display: grid;
   place-items: center;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  flex: none;
+  transition: transform var(--dur-spring-s) var(--spring);
+}
+
+.cape:hover .cape-thumb,
+.cape.on .cape-thumb {
+  transform: translateY(-2px);
 }
 
 .cape-thumb-cyan {
-  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAA1ElEQVR4nOXDYWcCAQAG4Pf3lGxSZprZJCXNTDNLsp8QEX2IGPsQWSmO4zjKUiqOiNgszZLjOMqIGCP6F+9+yPvw4Gl7pHIU/AOVI+/9UTly7i+V43G1p3I8fO2oHPeLHypH9mND5bib+1SO25lH5biZulSOjLOmcqTH31SO1HBJ5Uj2P6kcid47lSNuz6kc19aMynFlTqkcl4ZD5bhoT6gcseaIynHeGFA5zupvVI7oS5fKEXm2qRzhmkXlOK2aVI6TikHlCJU7VI5gqUXlCBRfqfwfEgr17SzBjQEAAAAASUVORK5CYII=') -2px -2px / 64px 32px no-repeat;
-  background-size: 128px 64px;
-  background-position: -2px -2px;
+  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAA1ElEQVR4nOXDYWcCAQAG4Pf3lGxSZprZJCXNTDNLsp8QEX2IGPsQWSmO4zjKUiqOiNgszZLjOMqIGCP6F+9+yPvw4Gl7pHIU/AOVI+/9UTly7i+V43G1p3I8fO2oHPeLHypH9mND5bib+1SO25lH5biZulSOjLOmcqTH31SO1HBJ5Uj2P6kcid47lSNuz6kc19aMynFlTqkcl4ZD5bhoT6gcseaIynHeGFA5zupvVI7oS5fKEXm2qRzhmkXlOK2aVI6TikHlCJU7VI5gqUXlCBRfqfwfEgr17SzBjQEAAAAASUVORK5CYII=') -3px -3px / 192px 96px no-repeat;
 }
 
 .cape-thumb-silver {
-  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAAu0lEQVR4nOXDiwbCAAAF0Pu/ESUiYpqmqZRSxpimlKX0fr80TTVGRL9z+5B7OHgnPypHFH+pHOHzQ+W4PRIqx/keUzkO1xeVY3uKqByrfUjlmG9uVI7p8kLlGM+OVI7RZEflGARrKoc/XFA5vP6MyuH2JlQOxwuoHB13SOVoOQMqR6PjUzlqLY/KYTdcKodVc6gcpt2lchhWm8pRNJtUjoJRp3Lki1UqR65QoXJk8mUqRzpXonKksgaV/wEyuBIasfDO4AAAAABJRU5ErkJggg==') -2px -2px / 64px 32px no-repeat;
-  background-size: 128px 64px;
-  background-position: -2px -2px;
+  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAAu0lEQVR4nOXDiwbCAAAF0Pu/ESUiYpqmqZRSxpimlKX0fr80TTVGRL9z+5B7OHgnPypHFH+pHOHzQ+W4PRIqx/keUzkO1xeVY3uKqByrfUjlmG9uVI7p8kLlGM+OVI7RZEflGARrKoc/XFA5vP6MyuH2JlQOxwuoHB13SOVoOQMqR6PjUzlqLY/KYTdcKodVc6gcpt2lchhWm8pRNJtUjoJRp3Lki1UqR65QoXJk8mUqRzpXonKksgaV/wEyuBIasfDO4AAAAABJRU5ErkJggg==') -3px -3px / 192px 96px no-repeat;
 }
 
 .cape-thumb-none {
-  background: var(--fill-2);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--line);
   color: var(--ink-3);
 }
 
 .cape-title {
-  font-size: 11px;
+  max-width: 100%;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 1.2;
   color: var(--ink-2);
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color var(--dur-1) var(--ease-out);
 }
 
 .cape.on .cape-title {
@@ -1225,13 +1279,17 @@ html[data-effects="full"] .wincontrols {
   }
 
   .wardrobe-controls-col .capes .cape {
-    height: 78px;
-    width: 58px;
+    height: 88px;
+    gap: 6px;
   }
 
   .wardrobe-controls-col .capes .cape-thumb {
-    height: 40px;
-    width: 28px;
+    transform: scale(0.84);
+  }
+
+  .wardrobe-controls-col .capes .cape:hover .cape-thumb,
+  .wardrobe-controls-col .capes .cape.on .cape-thumb {
+    transform: scale(0.84) translateY(-2px);
   }
 }
 
@@ -1308,7 +1366,7 @@ html[data-effects="full"] .wincontrols {
     <div class="layer" data-l="running">
       <div class="bar">
         <div class="face" style="--s:44px"></div>
-        <div class="meta"><b>Coock0ld</b><span class="small dim">00:00:12</span></div>
+        <div class="meta"><b>Coock0ld</b><span class="small dim" id="sessionTimer">0:00</span></div>
         <button class="play" data-stop><span><span class="live"></span>В игре</span></button>
       </div>
     </div>
@@ -4455,15 +4513,23 @@ window.AURA_DEMO_DATA = (function () {
       return 'idle';
     }
 
-    island.addEventListener('mouseenter', () => {
+    // Меню раскрывается по задержке курсора на капсуле, но не над «Играть»:
+    // иначе кнопка уезжает из-под курсора на ~220px и клик попадает в пункт меню.
+    let hoverIntent = 0;
+    const canExpand = () => {
       const isLaunching = typeof window.isGameLaunching === 'function' && window.isGameLaunching();
       const isRunning = typeof window.isGameRunning === 'function' && window.isGameRunning();
-      if (!isLaunching && !isRunning && islandMode === 'idle') {
-        window.setIslandMode('nav', false);
-      }
+      return !isLaunching && !isRunning && islandMode === 'idle';
+    };
+    island.addEventListener('mousemove', (e) => {
+      if (!canExpand()) return;
+      clearTimeout(hoverIntent);
+      if (e.target.closest('[data-play]')) return;
+      hoverIntent = setTimeout(() => { if (canExpand()) window.setIslandMode('nav', false); }, 180);
     });
 
     island.addEventListener('mouseleave', () => {
+      clearTimeout(hoverIntent);
       if (islandMode === 'nav') {
         window.setIslandMode('idle', false);
       }
@@ -4494,12 +4560,6 @@ window.AURA_DEMO_DATA = (function () {
         if (typeof window.stopGame === 'function') {
           window.stopGame();
         }
-        return;
-      }
-
-      const copyBtn = e.target.closest('[data-copy]');
-      if (copyBtn) {
-        window.showToast('Код скопирован в буфер обмена', 'success');
         return;
       }
     });
@@ -4585,6 +4645,70 @@ window.AURA_DEMO_DATA = (function () {
     }, 3000);
   };
 
+  // 5b. Плавная перестановка списка (FLIP): оставшиеся строки переезжают, ушедшие гаснут на месте,
+  // новые проявляются по очереди. mutate() меняет видимость/порядок; followers — элементы под списком.
+  window.animateListChange = function (rows, mutate, followers = []) {
+    const effects = document.documentElement.dataset.effects;
+    if (effects === 'off' || !Element.prototype.animate) { mutate(); return; }
+
+    const tracked = [...rows, ...followers];
+    const before = new Map();
+    tracked.forEach(el => { if (!el.hidden) before.set(el, el.getBoundingClientRect()); });
+
+    mutate();
+
+    const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    let entering = 0;
+    tracked.forEach(el => {
+      const was = before.get(el);
+      if (el.hidden) {
+        if (!was) return;
+        // Призрак ушедшей строки гаснет там, где она была
+        const ghost = el.cloneNode(true);
+        ghost.hidden = false;
+        ghost.removeAttribute('id');
+        Object.assign(ghost.style, {
+          position: 'fixed', left: `${was.left}px`, top: `${was.top}px`,
+          width: `${was.width}px`, height: `${was.height}px`, margin: '0',
+          pointerEvents: 'none', zIndex: '30'
+        });
+        document.body.appendChild(ghost);
+        ghost.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.98)' }],
+          { duration: 180, easing: 'ease-out', fill: 'forwards' }).onfinish = () => ghost.remove();
+        return;
+      }
+      const now = el.getBoundingClientRect();
+      if (was) {
+        const dy = was.top - now.top;
+        if (Math.abs(dy) > 0.5) {
+          el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+            { duration: 420, easing: ease });
+        }
+      } else {
+        el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: 320, easing: ease, delay: 60 + Math.min(entering++, 7) * 30, fill: 'backwards' });
+      }
+    });
+  };
+
+  // 5c. Смена панели внутри раздела: старая гаснет, новая проявляется строками по очереди
+  window.swapPane = function (outPane, inPane) {
+    if (!inPane || outPane === inPane) return;
+    const animated = document.documentElement.dataset.effects !== 'off' && Element.prototype.animate;
+    const showIn = () => {
+      if (outPane) outPane.hidden = true;
+      inPane.hidden = false;
+      if (!animated) return;
+      const items = inPane.children.length > 1 ? Array.from(inPane.children) : [inPane];
+      items.forEach((el, i) => el.animate(
+        [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 320, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: Math.min(i, 7) * 30, fill: 'backwards' }));
+    };
+    if (!animated || !outPane || outPane.hidden) { showIn(); return; }
+    outPane.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-4px)' }],
+      { duration: 130, easing: 'ease-out', fill: 'forwards' }).onfinish = function () { this.cancel(); showIn(); };
+  };
+
   // 6. Tone detector on Island
   let detectDebounceTimer = null;
   window.detectGlassTone = function () {
@@ -4661,9 +4785,27 @@ window.AURA_DEMO_DATA = (function () {
     });
   }
 
+  // Время игровой сессии в капсуле «В игре»: м:сс, после часа — ч:мм:сс
+  let sessionTimer = 0;
+  function startSessionTimer() {
+    const el = document.getElementById('sessionTimer');
+    if (!el) return;
+    const started = Date.now();
+    const render = () => {
+      const s = Math.floor((Date.now() - started) / 1000);
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = String(s % 60).padStart(2, '0');
+      el.textContent = h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+    };
+    render();
+    clearInterval(sessionTimer);
+    sessionTimer = setInterval(render, 1000);
+  }
+
   function setGameState(newState, payload = {}) {
     if (gameState === newState && !payload.force) return;
     gameState = newState;
+    if (newState === 'running') startSessionTimer();
+    else clearInterval(sessionTimer);
 
     if (newState === 'launching') {
       updateAllPlayButtons(payload.progress);
@@ -4918,7 +5060,22 @@ window.AURA_DEMO_DATA = (function () {
     }
   }
 
+  // Карта всегда закрывает холст: минимальный масштаб «cover», сдвиг не выходит за край мира.
+  function clampTarget() {
+    if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = cv.width / dpr;
+    const cssH = cv.height / dpr;
+    const minZ = Math.max(cssW, cssH) / N;
+    target.z = Math.min(14, Math.max(minZ, target.z));
+    const halfW = cssW / (2 * target.z);
+    const halfH = cssH / (2 * target.z);
+    target.x = Math.min(N - halfW, Math.max(halfW, target.x));
+    target.y = Math.min(N - halfH, Math.max(halfH, target.y));
+  }
+
   function tick() {
+    clampTarget();
     let moved = false;
     for (const k of ['x', 'y', 'z']) {
       const d = target[k] - view[k];
@@ -4968,17 +5125,17 @@ window.AURA_DEMO_DATA = (function () {
 
     cv.addEventListener('wheel', (e) => {
       e.preventDefault();
-      target.z = Math.min(14, Math.max(2.5, target.z * (e.deltaY < 0 ? 1.15 : 0.87)));
+      target.z *= e.deltaY < 0 ? 1.15 : 0.87;
       kick();
     }, { passive: false });
 
     document.getElementById('zin')?.addEventListener('click', () => {
-      target.z = Math.min(14, target.z * 1.3);
+      target.z *= 1.3;
       kick();
     });
 
     document.getElementById('zout')?.addEventListener('click', () => {
-      target.z = Math.max(2.5, target.z / 1.3);
+      target.z /= 1.3;
       kick();
     });
 
@@ -4996,12 +5153,16 @@ window.AURA_DEMO_DATA = (function () {
 
     window.addEventListener('resize', () => {
       sizeMap();
+      clampTarget();
+      view = { ...target };
       drawMap();
     });
 
     if (window.ResizeObserver && cv) {
       const ro = new ResizeObserver(() => {
         sizeMap();
+        clampTarget();
+        view = { ...target };
         drawMap();
       });
       ro.observe(cv);
@@ -5050,16 +5211,11 @@ window.AURA_DEMO_DATA = (function () {
       });
     }
 
-    // 2. Interactive invite slots
-    document.querySelectorAll('#lobbySlotsContainer .slot').forEach(slot => {
+    // Свободный слот только открывает «Друзья» (data-open); само приглашение — кнопкой «Позвать» у друга.
+    document.querySelectorAll('#lobbySlotsContainer .slot:not(.full)').forEach(slot => {
       slot.addEventListener('click', () => {
-        if (!slot.classList.contains('full')) {
-          slot.classList.remove('slot-invited');
-          void slot.offsetWidth; // trigger reflow
-          slot.classList.add('slot-invited');
-          if (typeof window.showToast === 'function') {
-            window.showToast('Приглашение отправлено другу', 'info');
-          }
+        if (typeof window.showToast === 'function') {
+          window.showToast('Выберите друга и нажмите «Позвать»', 'info');
         }
       });
     });
@@ -5119,27 +5275,15 @@ window.AURA_DEMO_DATA = (function () {
         if (!list) return;
 
         const rows = Array.from(list.querySelectorAll('.person'));
-        rows.forEach(r => r.classList.add('content-fade-out'));
-
-        setTimeout(() => {
-          let visibleIdx = 0;
+        const followers = list.parentElement
+          ? Array.from(list.parentElement.children).filter(el => el !== list && list.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+          : [];
+        window.animateListChange(rows, () => {
           rows.forEach(r => {
-            r.classList.remove('content-fade-out');
-            r.classList.remove('stagger-in');
             const st = r.dataset.st;
-            let show = false;
-            if (tab === 'all') show = true;
-            else if (tab === 'game') show = (st === 'game');
-            else if (tab === 'online') show = (st === 'game' || st === 'online');
-
-            r.hidden = !show;
-            if (show) {
-              const idx = Math.min(visibleIdx++, 7);
-              r.style.setProperty('--stagger-idx', idx);
-              r.classList.add('stagger-in');
-            }
+            r.hidden = !(tab === 'all' || (tab === 'game' && st === 'game') || (tab === 'online' && (st === 'game' || st === 'online')));
           });
-        }, 120);
+        }, followers);
       });
     });
 
@@ -5270,24 +5414,43 @@ window.AURA_DEMO_DATA = (function () {
   };
 
   let turnBackTimer = null;
+  let rotationTween = 0;
+
+  // Плавный поворот модели вокруг вертикали. В режиме off — сразу и одним кадром.
+  function rotateModelTo(target, duration) {
+    if (!viewer || !viewer.playerObject) return;
+    cancelAnimationFrame(rotationTween);
+    const body = viewer.playerObject;
+    if (document.documentElement.dataset.effects === 'off') {
+      body.rotation.y = target;
+      viewer.render();
+      return;
+    }
+    const from = body.rotation.y;
+    const start = performance.now();
+    // easeOutBack с мягким овершутом — как --spring в CSS
+    const ease = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+    const step = now => {
+      const t = Math.min((now - start) / duration, 1);
+      body.rotation.y = from + (target - from) * ease(t);
+      if (t < 1) rotationTween = requestAnimationFrame(step);
+    };
+    rotationTween = requestAnimationFrame(step);
+  }
 
   function turnModelBack() {
     if (!viewer || !viewer.playerObject) return;
     clearTimeout(turnBackTimer);
     viewer.autoRotate = false;
-
-    // Smoothly rotate model back to show cape
-    viewer.playerObject.rotation.y = Math.PI * 0.95; // ~170 deg
+    rotateModelTo(Math.PI * 0.92, 650);
 
     turnBackTimer = setTimeout(() => {
       const effects = document.documentElement.dataset.effects;
-      if (viewer && viewer.playerObject) {
-        viewer.playerObject.rotation.y = 0;
-        if (effects !== 'low' && effects !== 'off' && !isHovered) {
-          viewer.autoRotate = true;
-        }
+      rotateModelTo(0, 750);
+      if (effects !== 'low' && effects !== 'off' && !isHovered) {
+        setTimeout(() => { if (viewer && !isHovered) viewer.autoRotate = true; }, 750);
       }
-    }, 1500);
+    }, 1800);
   }
 
   function initSkinview() {
@@ -5591,20 +5754,7 @@ window.AURA_DEMO_DATA = (function () {
         const outPane = tab === 'shaders' ? paneMods : paneShaders;
         const inPane = tab === 'shaders' ? paneShaders : paneMods;
 
-        if (outPane && !outPane.hidden) {
-          outPane.classList.add('content-fade-out');
-          setTimeout(() => {
-            outPane.hidden = true;
-            outPane.classList.remove('content-fade-out');
-            if (inPane) {
-              inPane.hidden = false;
-              inPane.classList.add('content-fade-in');
-              setTimeout(() => inPane.classList.remove('content-fade-in'), 200);
-            }
-          }, 120);
-        } else if (inPane) {
-          inPane.hidden = false;
-        }
+        window.swapPane(outPane, inPane);
       });
     });
 

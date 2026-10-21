@@ -26,16 +26,11 @@
       });
     }
 
-    // 2. Interactive invite slots
-    document.querySelectorAll('#lobbySlotsContainer .slot').forEach(slot => {
+    // Свободный слот только открывает «Друзья» (data-open); само приглашение — кнопкой «Позвать» у друга.
+    document.querySelectorAll('#lobbySlotsContainer .slot:not(.full)').forEach(slot => {
       slot.addEventListener('click', () => {
-        if (!slot.classList.contains('full')) {
-          slot.classList.remove('slot-invited');
-          void slot.offsetWidth; // trigger reflow
-          slot.classList.add('slot-invited');
-          if (typeof window.showToast === 'function') {
-            window.showToast('Приглашение отправлено другу', 'info');
-          }
+        if (typeof window.showToast === 'function') {
+          window.showToast('Выберите друга и нажмите «Позвать»', 'info');
         }
       });
     });

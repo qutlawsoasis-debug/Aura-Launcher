@@ -148,8 +148,8 @@ async function build() {
     let cssContent = fs.readFileSync(path.join(BASE_DIR, 'screens', sc), 'utf-8');
     if (sc === 'wardrobe.css') {
       cssContent = cssContent
-        .replace(/url\(['"]?\.\.\/images\/cape_cyan\.png['"]?\)/g, `url('${cyanCapeDataUrl}')`)
-        .replace(/url\(['"]?\.\.\/images\/cape_silver\.png['"]?\)/g, `url('${silverCapeDataUrl}')`);
+        .replace(/url\(['"]?\.\.\/(?:assets\/)?images\/cape_cyan\.png['"]?\)/g, () => `url('${cyanCapeDataUrl}')`)
+        .replace(/url\(['"]?\.\.\/(?:assets\/)?images\/cape_silver\.png['"]?\)/g, () => `url('${silverCapeDataUrl}')`);
     }
     screensCombinedCss += `\n/* === SCREEN CSS: ${sc} === */\n` + cssContent;
   }

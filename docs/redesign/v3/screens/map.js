@@ -153,7 +153,22 @@
     }
   }
 
+  // Карта всегда закрывает холст: минимальный масштаб «cover», сдвиг не выходит за край мира.
+  function clampTarget() {
+    if (!cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = cv.width / dpr;
+    const cssH = cv.height / dpr;
+    const minZ = Math.max(cssW, cssH) / N;
+    target.z = Math.min(14, Math.max(minZ, target.z));
+    const halfW = cssW / (2 * target.z);
+    const halfH = cssH / (2 * target.z);
+    target.x = Math.min(N - halfW, Math.max(halfW, target.x));
+    target.y = Math.min(N - halfH, Math.max(halfH, target.y));
+  }
+
   function tick() {
+    clampTarget();
     let moved = false;
     for (const k of ['x', 'y', 'z']) {
       const d = target[k] - view[k];
@@ -203,17 +218,17 @@
 
     cv.addEventListener('wheel', (e) => {
       e.preventDefault();
-      target.z = Math.min(14, Math.max(2.5, target.z * (e.deltaY < 0 ? 1.15 : 0.87)));
+      target.z *= e.deltaY < 0 ? 1.15 : 0.87;
       kick();
     }, { passive: false });
 
     document.getElementById('zin')?.addEventListener('click', () => {
-      target.z = Math.min(14, target.z * 1.3);
+      target.z *= 1.3;
       kick();
     });
 
     document.getElementById('zout')?.addEventListener('click', () => {
-      target.z = Math.max(2.5, target.z / 1.3);
+      target.z /= 1.3;
       kick();
     });
 
@@ -231,12 +246,16 @@
 
     window.addEventListener('resize', () => {
       sizeMap();
+      clampTarget();
+      view = { ...target };
       drawMap();
     });
 
     if (window.ResizeObserver && cv) {
       const ro = new ResizeObserver(() => {
         sizeMap();
+        clampTarget();
+        view = { ...target };
         drawMap();
       });
       ro.observe(cv);

@@ -245,15 +245,23 @@
       return 'idle';
     }
 
-    island.addEventListener('mouseenter', () => {
+    // Меню раскрывается по задержке курсора на капсуле, но не над «Играть»:
+    // иначе кнопка уезжает из-под курсора на ~220px и клик попадает в пункт меню.
+    let hoverIntent = 0;
+    const canExpand = () => {
       const isLaunching = typeof window.isGameLaunching === 'function' && window.isGameLaunching();
       const isRunning = typeof window.isGameRunning === 'function' && window.isGameRunning();
-      if (!isLaunching && !isRunning && islandMode === 'idle') {
-        window.setIslandMode('nav', false);
-      }
+      return !isLaunching && !isRunning && islandMode === 'idle';
+    };
+    island.addEventListener('mousemove', (e) => {
+      if (!canExpand()) return;
+      clearTimeout(hoverIntent);
+      if (e.target.closest('[data-play]')) return;
+      hoverIntent = setTimeout(() => { if (canExpand()) window.setIslandMode('nav', false); }, 180);
     });
 
     island.addEventListener('mouseleave', () => {
+      clearTimeout(hoverIntent);
       if (islandMode === 'nav') {
         window.setIslandMode('idle', false);
       }
@@ -284,12 +292,6 @@
         if (typeof window.stopGame === 'function') {
           window.stopGame();
         }
-        return;
-      }
-
-      const copyBtn = e.target.closest('[data-copy]');
-      if (copyBtn) {
-        window.showToast('Код скопирован в буфер обмена', 'success');
         return;
       }
     });
@@ -373,6 +375,70 @@
       toast.classList.remove('is-visible');
       setTimeout(() => toast.remove(), 400);
     }, 3000);
+  };
+
+  // 5b. Плавная перестановка списка (FLIP): оставшиеся строки переезжают, ушедшие гаснут на месте,
+  // новые проявляются по очереди. mutate() меняет видимость/порядок; followers — элементы под списком.
+  window.animateListChange = function (rows, mutate, followers = []) {
+    const effects = document.documentElement.dataset.effects;
+    if (effects === 'off' || !Element.prototype.animate) { mutate(); return; }
+
+    const tracked = [...rows, ...followers];
+    const before = new Map();
+    tracked.forEach(el => { if (!el.hidden) before.set(el, el.getBoundingClientRect()); });
+
+    mutate();
+
+    const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+    let entering = 0;
+    tracked.forEach(el => {
+      const was = before.get(el);
+      if (el.hidden) {
+        if (!was) return;
+        // Призрак ушедшей строки гаснет там, где она была
+        const ghost = el.cloneNode(true);
+        ghost.hidden = false;
+        ghost.removeAttribute('id');
+        Object.assign(ghost.style, {
+          position: 'fixed', left: `${was.left}px`, top: `${was.top}px`,
+          width: `${was.width}px`, height: `${was.height}px`, margin: '0',
+          pointerEvents: 'none', zIndex: '30'
+        });
+        document.body.appendChild(ghost);
+        ghost.animate([{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(0.98)' }],
+          { duration: 180, easing: 'ease-out', fill: 'forwards' }).onfinish = () => ghost.remove();
+        return;
+      }
+      const now = el.getBoundingClientRect();
+      if (was) {
+        const dy = was.top - now.top;
+        if (Math.abs(dy) > 0.5) {
+          el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
+            { duration: 420, easing: ease });
+        }
+      } else {
+        el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: 320, easing: ease, delay: 60 + Math.min(entering++, 7) * 30, fill: 'backwards' });
+      }
+    });
+  };
+
+  // 5c. Смена панели внутри раздела: старая гаснет, новая проявляется строками по очереди
+  window.swapPane = function (outPane, inPane) {
+    if (!inPane || outPane === inPane) return;
+    const animated = document.documentElement.dataset.effects !== 'off' && Element.prototype.animate;
+    const showIn = () => {
+      if (outPane) outPane.hidden = true;
+      inPane.hidden = false;
+      if (!animated) return;
+      const items = inPane.children.length > 1 ? Array.from(inPane.children) : [inPane];
+      items.forEach((el, i) => el.animate(
+        [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 320, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', delay: Math.min(i, 7) * 30, fill: 'backwards' }));
+    };
+    if (!animated || !outPane || outPane.hidden) { showIn(); return; }
+    outPane.animate([{ opacity: 1 }, { opacity: 0, transform: 'translateY(-4px)' }],
+      { duration: 130, easing: 'ease-out', fill: 'forwards' }).onfinish = function () { this.cancel(); showIn(); };
   };
 
   // 6. Tone detector on Island

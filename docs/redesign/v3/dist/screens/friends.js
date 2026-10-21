@@ -20,27 +20,15 @@
         if (!list) return;
 
         const rows = Array.from(list.querySelectorAll('.person'));
-        rows.forEach(r => r.classList.add('content-fade-out'));
-
-        setTimeout(() => {
-          let visibleIdx = 0;
+        const followers = list.parentElement
+          ? Array.from(list.parentElement.children).filter(el => el !== list && list.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)
+          : [];
+        window.animateListChange(rows, () => {
           rows.forEach(r => {
-            r.classList.remove('content-fade-out');
-            r.classList.remove('stagger-in');
             const st = r.dataset.st;
-            let show = false;
-            if (tab === 'all') show = true;
-            else if (tab === 'game') show = (st === 'game');
-            else if (tab === 'online') show = (st === 'game' || st === 'online');
-
-            r.hidden = !show;
-            if (show) {
-              const idx = Math.min(visibleIdx++, 7);
-              r.style.setProperty('--stagger-idx', idx);
-              r.classList.add('stagger-in');
-            }
+            r.hidden = !(tab === 'all' || (tab === 'game' && st === 'game') || (tab === 'online' && (st === 'game' || st === 'online')));
           });
-        }, 120);
+        }, followers);
       });
     });
 

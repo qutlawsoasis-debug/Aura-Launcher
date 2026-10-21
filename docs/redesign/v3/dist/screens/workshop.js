@@ -18,20 +18,7 @@
         const outPane = tab === 'shaders' ? paneMods : paneShaders;
         const inPane = tab === 'shaders' ? paneShaders : paneMods;
 
-        if (outPane && !outPane.hidden) {
-          outPane.classList.add('content-fade-out');
-          setTimeout(() => {
-            outPane.hidden = true;
-            outPane.classList.remove('content-fade-out');
-            if (inPane) {
-              inPane.hidden = false;
-              inPane.classList.add('content-fade-in');
-              setTimeout(() => inPane.classList.remove('content-fade-in'), 200);
-            }
-          }, 120);
-        } else if (inPane) {
-          inPane.hidden = false;
-        }
+        window.swapPane(outPane, inPane);
       });
     });
 

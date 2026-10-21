@@ -76,6 +76,10 @@
   --dur-1: 120ms;
   --dur-2: 200ms;
   --dur-3: 320ms;
+  /* Пружинным движениям нужна длина, иначе овершут превращается в рывок */
+  --dur-spring-s: 450ms;
+  --dur-spring-m: 550ms;
+  --dur-morph: 750ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --spring: cubic-bezier(0.34, 1.3, 0.5, 1);
   --smooth: cubic-bezier(0.22, 1, 0.36, 1);
@@ -84,10 +88,10 @@
 
 /* ================= 5. РЕЖИМЫ ЭФФЕКТОВ ================= */
 .island {
-  transition: width var(--dur-3) var(--spring),
-              height var(--dur-3) var(--spring),
-              border-radius var(--dur-3) var(--spring),
-              bottom var(--dur-3) var(--spring),
+  transition: width var(--dur-morph) var(--spring),
+              height var(--dur-morph) var(--spring),
+              border-radius var(--dur-morph) var(--spring),
+              bottom var(--dur-morph) var(--spring),
               background var(--dur-3) var(--ease-out),
               box-shadow var(--dur-3) var(--ease-out),
               border-color var(--dur-3) var(--ease-out);
