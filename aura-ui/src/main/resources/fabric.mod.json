@@ -3,7 +3,7 @@
   "id": "aura-ui",
   "version": "${version}",
   "name": "Aura UI",
-  "description": "Интерфейс сборки Aura: экран загрузки, главное меню и пауза",
+  "description": "Интерфейс сборки Aura: экран загрузки, главное меню и пауза на нативном движке NanoVG",
   "authors": ["Aura"],
   "license": "All-Rights-Reserved",
   "environment": "client",
@@ -11,7 +11,6 @@
   "depends": {
     "fabricloader": ">=0.14.0",
     "minecraft": "1.20.x",
-    "java": ">=17",
-    "mcef": "*"
+    "java": ">=17"
   }
 }

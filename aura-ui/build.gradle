@@ -17,8 +17,22 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modCompileOnly files("libs/mcef-fabric-2.1.6-1.20.1.jar")
-    modLocalRuntime files("libs/mcef-fabric-2.1.6-1.20.1.jar")
+
+    // NanoVG via LWJGL 3.3.1 (Minecraft 1.20.1 uses LWJGL 3.3.1)
+    implementation "org.lwjgl:lwjgl-nanovg:3.3.1"
+    include "org.lwjgl:lwjgl-nanovg:3.3.1"
+
+    implementation "org.lwjgl:lwjgl-nanovg:3.3.1:natives-windows"
+    include "org.lwjgl:lwjgl-nanovg:3.3.1:natives-windows"
+
+    implementation "org.lwjgl:lwjgl-nanovg:3.3.1:natives-linux"
+    include "org.lwjgl:lwjgl-nanovg:3.3.1:natives-linux"
+
+    implementation "org.lwjgl:lwjgl-nanovg:3.3.1:natives-macos"
+    include "org.lwjgl:lwjgl-nanovg:3.3.1:natives-macos"
+
+    implementation "org.lwjgl:lwjgl-nanovg:3.3.1:natives-macos-arm64"
+    include "org.lwjgl:lwjgl-nanovg:3.3.1:natives-macos-arm64"
 }
 
 processResources {
