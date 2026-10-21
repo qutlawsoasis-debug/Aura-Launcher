@@ -258,7 +258,7 @@ public partial class App : Application
         if (useWebUi)
         {
             var webShell = new WebShellWindow(
-                Services.GetRequiredService<IGameLaunchService>(),
+                Services.GetRequiredService<IGameSessionService>(),
                 Services.GetRequiredService<IConfigService>());
             activeWindow = webShell;
         }

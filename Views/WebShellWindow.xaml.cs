@@ -11,16 +11,16 @@ namespace AuraLauncher.Views;
 
 public partial class WebShellWindow : Window
 {
-    private readonly IGameLaunchService _gameLaunchService;
+    private readonly IGameSessionService _gameSessionService;
     private readonly IConfigService _configService;
     private WebBridge? _bridge;
 
     public WebShellWindow(
-        IGameLaunchService gameLaunchService,
+        IGameSessionService gameSessionService,
         IConfigService configService)
     {
         InitializeComponent();
-        _gameLaunchService = gameLaunchService;
+        _gameSessionService = gameSessionService;
         _configService = configService;
 
         Loaded += WebShellWindow_Loaded;
@@ -42,7 +42,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameLaunchService, _configService);
+            _bridge = new WebBridge(this, _gameSessionService, _configService);
             _bridge.Attach(WebViewControl.CoreWebView2);
 
             string targetUrl = await ResolveTargetUrlAsync();

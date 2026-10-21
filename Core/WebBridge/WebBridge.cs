@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using AuraLauncher.Models;
+using AuraLauncher.Services.Implementations;
 using AuraLauncher.Services.Interfaces;
 using Microsoft.Web.WebView2.Core;
 
@@ -12,21 +13,22 @@ namespace AuraLauncher.Core.WebBridge;
 public class WebBridge : IDisposable
 {
     private readonly Window _window;
-    private readonly IGameLaunchService _gameLaunchService;
+    private readonly IGameSessionService _gameSessionService;
     private readonly IConfigService _configService;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
 
     public WebBridge(
         Window window,
-        IGameLaunchService gameLaunchService,
+        IGameSessionService gameSessionService,
         IConfigService configService)
     {
         _window = window;
-        _gameLaunchService = gameLaunchService;
+        _gameSessionService = gameSessionService;
         _configService = configService;
 
-        _gameLaunchService.GameExited += OnGameExited;
+        _gameSessionService.StateChanged += OnSessionStateChanged;
+        _gameSessionService.GameExited += OnSessionGameExited;
     }
 
     public void Attach(CoreWebView2 coreWebView2)
@@ -37,9 +39,44 @@ public class WebBridge : IDisposable
         // Отправка начального статуса
         SendEvent("game.status", new
         {
-            isRunning = _gameLaunchService.IsGameRunning,
-            processId = _gameLaunchService.CurrentGameProcess?.Id,
+            state = MapState(_gameSessionService.State),
+            isRunning = _gameSessionService.IsGameRunning,
+            processId = _gameSessionService.CurrentProcess?.Id,
             exitCode = (int?)null
+        });
+    }
+
+    private static string MapState(GameSessionState state) => state switch
+    {
+        GameSessionState.Idle => "idle",
+        GameSessionState.Preparing => "preparing",
+        GameSessionState.Launching => "launching",
+        GameSessionState.Running => "running",
+        GameSessionState.Failed => "failed",
+        _ => "idle"
+    };
+
+    private void OnSessionStateChanged(object? sender, GameSessionState state)
+    {
+        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] StateChanged -> {state}");
+        SendEvent("game.status", new
+        {
+            state = MapState(state),
+            isRunning = state == GameSessionState.Running,
+            processId = _gameSessionService.CurrentProcess?.Id,
+            exitCode = (int?)null
+        });
+    }
+
+    private void OnSessionGameExited(object? sender, GameExitedEventArgs e)
+    {
+        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] GameExited -> exitCode={e.ExitCode}");
+        SendEvent("game.status", new
+        {
+            state = e.ExitCode == 0 ? "idle" : "failed",
+            isRunning = false,
+            processId = (int?)null,
+            exitCode = e.ExitCode
         });
     }
 
@@ -53,11 +90,14 @@ public class WebBridge : IDisposable
         }
         catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] JSON parse failed: {ex.Message}");
             SendError(null, "parse.error", ex.Message);
             return;
         }
 
         if (msg == null) return;
+
+        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] Command received: {msg.Name} (id={msg.Id})");
 
         try
         {
@@ -76,70 +116,62 @@ public class WebBridge : IDisposable
                     break;
 
                 default:
+                    FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: WARN] Unknown command: {msg.Name}");
                     SendError(msg.Id, "unknown.command", $"Command '{msg.Name}' is not implemented yet");
                     break;
             }
         }
         catch (Exception ex)
         {
+            FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] Error handling {msg.Name}: {ex.Message}");
             SendError(msg.Id, msg.Name, ex.Message);
         }
     }
 
     private Task HandleGameLaunchAsync(BridgeMessage msg)
     {
-        if (_gameLaunchService.IsGameRunning)
+        if (_gameSessionService.State != GameSessionState.Idle && _gameSessionService.State != GameSessionState.Failed)
         {
-            SendResponse(msg.Id, msg.Name, new { started = false, reason = "Game is already running" });
+            FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE: WARN] game.launch rejected: already_launching");
+            SendError(msg.Id, msg.Name, "already_launching");
             return Task.CompletedTask;
         }
 
         _gameLaunchCts?.Cancel();
         _gameLaunchCts = new CancellationTokenSource();
 
-        var config = _configService.CurrentConfig;
-
-        var progress = new Progress<InstallProgressReport>(report =>
+        var progress = new Progress<LaunchProgress>(p =>
         {
             SendEvent("game.progress", new
             {
-                percentage = report.Percentage,
-                stage = report.Stage ?? string.Empty,
-                detail = report.DetailText ?? string.Empty
+                stage = p.Stage ?? string.Empty,
+                percentage = p.Percentage,
+                detail = p.DetailText ?? string.Empty,
+                speed = p.FormattedSpeed ?? string.Empty,
+                remaining = p.FormattedRemainingTime ?? string.Empty
             });
-        });
-
-        SendEvent("game.status", new
-        {
-            isRunning = true,
-            isLaunching = true
         });
 
         _ = Task.Run(async () =>
         {
             try
             {
-                var process = await _gameLaunchService.LaunchGameAsync(
-                    config,
-                    onLogReceived: null,
-                    onGameExited: null,
-                    installProgress: progress,
+                FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE] Starting GameSessionService.LaunchAsync...");
+                var process = await _gameSessionService.LaunchAsync(
+                    options: null,
+                    progress: progress,
                     cancellationToken: _gameLaunchCts.Token);
 
+                FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] Game launched successfully! PID={process.Id}");
                 SendResponse(msg.Id, msg.Name, new { started = true, processId = process.Id });
-
-                SendEvent("game.status", new
-                {
-                    isRunning = true,
-                    processId = process.Id,
-                    exitCode = (int?)null
-                });
             }
             catch (Exception ex)
             {
+                FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] Launch failed: {ex.Message}");
                 SendError(msg.Id, msg.Name, ex.Message);
                 SendEvent("game.status", new
                 {
+                    state = "failed",
                     isRunning = false,
                     processId = (int?)null,
                     exitCode = -1,
@@ -147,13 +179,16 @@ public class WebBridge : IDisposable
                 });
             }
         });
+
         return Task.CompletedTask;
     }
 
     private async Task HandleGameStopAsync(BridgeMessage msg)
     {
+        FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE] game.stop requested");
         _gameLaunchCts?.Cancel();
-        bool stopped = await _gameLaunchService.StopGameProcessAsync(5000);
+        bool stopped = await _gameSessionService.StopAsync(5000);
+        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] game.stop completed: stopped={stopped}");
         SendResponse(msg.Id, msg.Name, new { stopped });
     }
 
@@ -164,6 +199,8 @@ public class WebBridge : IDisposable
         {
             action = prop.GetString() ?? string.Empty;
         }
+
+        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] window.action: {action}");
 
         _window.Dispatcher.Invoke(() =>
         {
@@ -187,16 +224,6 @@ public class WebBridge : IDisposable
         });
 
         SendResponse(msg.Id, msg.Name, new { action, success = true });
-    }
-
-    private void OnGameExited(object? sender, int exitCode)
-    {
-        SendEvent("game.status", new
-        {
-            isRunning = false,
-            processId = (int?)null,
-            exitCode
-        });
     }
 
     public void SendEvent(string eventName, object payload)
@@ -247,7 +274,8 @@ public class WebBridge : IDisposable
 
     public void Dispose()
     {
-        _gameLaunchService.GameExited -= OnGameExited;
+        _gameSessionService.StateChanged -= OnSessionStateChanged;
+        _gameSessionService.GameExited -= OnSessionGameExited;
         if (_coreWebView2 != null)
         {
             _coreWebView2.WebMessageReceived -= OnWebMessageReceived;
