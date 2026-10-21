@@ -651,6 +651,7 @@ public partial class App : Application
             sp.GetRequiredService<IModManifestService>(),
             sp.GetRequiredService<IGameLaunchService>()));
         services.AddSingleton<ILanWorldWatcher, LanWorldWatcher>();
+        services.AddSingleton<ILobbySessionService, LobbySessionService>();
         services.AddSingleton<IAudioService, AudioService>();
         services.AddSingleton<IAnthemService, AnthemService>();
         services.AddSingleton<MusicDiskViewModel>();
