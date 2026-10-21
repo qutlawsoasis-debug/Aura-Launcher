@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Aura — Пауза</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./game.css">
+</head>
+<body>
+  <!-- Underneath: in-game world -->
+  <div class="world-viewport" style="background-image: url('../v3/public/assets/images/bg_1.jpg');"></div>
+
+  <!-- Static pause blur & darken overlay -->
+  <div class="pause-overlay">
+    <div class="pause-panel">
+      <div class="pause-title">Игра на паузе</div>
+
+      <div class="pause-actions">
+        <button class="pause-btn primary" type="button">
+          <span>Продолжить</span>
+        </button>
+
+        <button class="pause-btn" type="button">
+          <span>Пригласить друга</span>
+        </button>
+
+        <button class="pause-btn" type="button">
+          <span>Открыть для сети</span>
+        </button>
+
+        <button class="pause-btn" type="button">
+          <span>Настройки</span>
+        </button>
+
+        <button class="pause-btn danger" type="button">
+          <span>В главное меню</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

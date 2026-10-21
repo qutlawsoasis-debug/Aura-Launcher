@@ -7,9 +7,14 @@
   <link rel="stylesheet" href="./game.css">
 </head>
 <body>
-  <!-- Cinematic world background -->
-  <div class="world-viewport"></div>
-  <div class="world-shade"></div>
+  <!-- Layer 1: Vibrant world with slow cinematic zoom -->
+  <div class="world-viewport loading-anim"></div>
+  
+  <!-- Layer 2: Subtle mist -->
+  <div class="world-mist"></div>
+
+  <!-- Layer 3: Edge vignette only (center is bright) -->
+  <div class="world-vignette"></div>
 
   <main class="loading-container">
     <div></div>
@@ -17,7 +22,7 @@
     <!-- Center brand wordmark with animated sweep flare -->
     <div class="loading-center">
       <h1 class="wordmark-large">Aura</h1>
-      <div class="loading-subtext">Инновационный мир приключений</div>
+      <div class="loading-subtext">Сервер друзей</div>
     </div>
 
     <!-- Bottom progress line & changing hints -->
@@ -37,7 +42,6 @@
   </main>
 
   <script>
-    // Cycle hints smoothly
     const hints = [
       'Подсказка: клавиша F3+T быстро перезагружает текстуры прямо в игре',
       'Совет: в лобби лаунчера можно позвать друга нажатием одной кнопки',
