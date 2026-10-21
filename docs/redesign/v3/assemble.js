@@ -36,6 +36,7 @@ const scriptsBlock = `
   <script src="assets/vendor/skinview3d.bundle.js"></script>
 
   <!-- Базовые скрипты ядра и модулей -->
+  <script src="src/perf-hud.js"></script>
   <script src="src/bridge.js"></script>
   <script src="assets/js/demo-data.js"></script>
   <script src="assets/js/core.js"></script>

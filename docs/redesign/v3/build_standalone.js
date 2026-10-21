@@ -125,7 +125,12 @@ async function build() {
   const onestBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'fonts', 'Onest.woff2')).toString('base64');
 
   console.log('3. Concatenating and inlining CSS stylesheets...');
+  const bgBlurPath = path.resolve(BASE_DIR, 'assets', 'images', 'bg_1-blur.jpg');
+  const bgBlurBase64 = fs.readFileSync(bgBlurPath).toString('base64');
+  const bgBlurDataUrl = `data:image/jpeg;base64,${bgBlurBase64}`;
+
   let tokensCss = fs.readFileSync(path.join(BASE_DIR, 'tokens.css'), 'utf-8');
+  tokensCss = tokensCss.replace(/url\(['"]?assets\/images\/bg_1-blur\.jpg['"]?\)/g, `url('${bgBlurDataUrl}')`);
 
   let coreCss = fs.readFileSync(path.join(BASE_DIR, 'assets', 'css', 'core.css'), 'utf-8');
   coreCss = coreCss.replace(/url\(['"]?\.\.\/images\/bg_1\.jpg['"]?\)/g, `url('${bgDataUrl}')`);
@@ -164,6 +169,7 @@ ${screensCombinedCss}
   console.log('5. Concatenating and inlining JavaScript modules...');
   const jsFiles = [
     path.join(BASE_DIR, 'assets', 'vendor', 'skinview3d.bundle.js'),
+    path.join(BASE_DIR, 'src', 'perf-hud.js'),
     path.join(BASE_DIR, 'src', 'bridge.js'),
     path.join(BASE_DIR, 'assets', 'js', 'demo-data.js'),
     path.join(BASE_DIR, 'assets', 'js', 'core.js'),

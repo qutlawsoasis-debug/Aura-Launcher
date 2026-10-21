@@ -23,13 +23,21 @@
     const canvas = document.getElementById('skinCanvas3D');
     if (!canvas || typeof skinview3d === 'undefined') return;
 
-    // Create skinview3d viewer instance
+    // Create skinview3d viewer instance with capped pixelRatio
     viewer = new skinview3d.SkinViewer({
       canvas: canvas,
       width: 260,
       height: 380,
       skin: DEFAULT_SKIN
     });
+
+    if (viewer.renderer) {
+      const cappedRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      viewer.renderer.setPixelRatio(cappedRatio);
+      if (viewer.composer) {
+        viewer.composer.setPixelRatio(cappedRatio);
+      }
+    }
 
     viewer.fov = 70;
     viewer.zoom = 0.9;
@@ -48,6 +56,24 @@
     runningAnimation.speed = 1.0;
 
     viewer.animation = idleAnimation;
+
+    // Throttled render loop: ~30 FPS for 'idle' (Стоит), 60 FPS for 'walk'/'run' (Идёт/Бежит)
+    const originalDraw = viewer.draw.bind(viewer);
+    let lastRenderTime = 0;
+    viewer.draw = function () {
+      const now = performance.now();
+      const targetFps = (activeAnimationMode === 'idle' && !isHovered) ? 30 : 60;
+      const minInterval = 1000 / targetFps - 2; // small epsilon for smooth vsync
+
+      if (now - lastRenderTime >= minInterval) {
+        lastRenderTime = now;
+        originalDraw();
+      } else {
+        if (!viewer._renderPaused && !viewer._disposed) {
+          viewer.animationID = window.requestAnimationFrame(() => viewer.draw());
+        }
+      }
+    };
 
     // Orbit controls limits
     if (viewer.controls) {

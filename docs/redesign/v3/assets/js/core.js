@@ -83,6 +83,12 @@
     const maxH = window.innerHeight - 110;
     const maxW = window.innerWidth - 60;
 
+    // Prepare content-visibility & active layer before transition
+    const targetLayer = document.querySelector(`.layer[data-l="${m}"]`);
+    if (targetLayer) {
+      targetLayer.style.contentVisibility = 'visible';
+    }
+
     if (island) {
       island.style.width = Math.min(w, maxW) + 'px';
       island.style.height = Math.min(h, maxH) + 'px';
@@ -98,11 +104,18 @@
       const isOn = l.dataset.l === m;
       l.classList.toggle('on', isOn);
       if (isOn) {
+        l.style.contentVisibility = 'visible';
         l.removeAttribute('inert');
         l.removeAttribute('aria-hidden');
       } else {
         l.setAttribute('inert', '');
         l.setAttribute('aria-hidden', 'true');
+        // After fade-out transition, hide content-visibility to save layout/draw passes
+        setTimeout(() => {
+          if (!l.classList.contains('on')) {
+            l.style.contentVisibility = 'hidden';
+          }
+        }, 300);
       }
     });
 

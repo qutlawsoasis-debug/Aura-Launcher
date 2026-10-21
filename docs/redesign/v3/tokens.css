@@ -85,6 +85,16 @@ html[data-effects="full"] .island {
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(1.05);
 }
 
+/* В раскрытых разделах фон капсулы — заранее размытая копия фона мира, backdrop-filter: none */
+html[data-effects="full"] .island.open {
+  background-image: var(--glass-sheen), linear-gradient(var(--glass), var(--glass)), url('assets/images/bg_1-blur.jpg');
+  background-position: center top, center center, center center;
+  background-size: auto, auto, cover;
+  background-repeat: no-repeat;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 html[data-effects="low"] .island {
   background: var(--glass-sheen), rgba(44, 46, 54, 0.9);
   backdrop-filter: none !important;
