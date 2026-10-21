@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,21 +18,29 @@ public class WebBridge : IDisposable
     private readonly IGameSessionService _gameSessionService;
     private readonly IConfigService _configService;
     private readonly IGraphicsPresetService? _presetService;
+    private readonly IWorkshopService? _workshopService;
+    private readonly IPackUpdateService? _packUpdateService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
+    private CancellationTokenSource? _packSyncCts;
+    private bool _isSyncing;
 
     public WebBridge(
         Window? window,
         IGameSessionService gameSessionService,
         IConfigService configService,
         IGraphicsPresetService? presetService = null,
+        IWorkshopService? workshopService = null,
+        IPackUpdateService? packUpdateService = null,
         Action<string>? logger = null)
     {
         _window = window;
         _gameSessionService = gameSessionService;
         _configService = configService;
         _presetService = presetService;
+        _workshopService = workshopService;
+        _packUpdateService = packUpdateService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
@@ -167,6 +177,26 @@ public class WebBridge : IDisposable
 
                 case "preset.apply":
                     HandlePresetApply(msg);
+                    break;
+
+                case "workshop.list":
+                    await HandleWorkshopListAsync(msg);
+                    break;
+
+                case "workshop.setShader":
+                    await HandleWorkshopSetShaderAsync(msg);
+                    break;
+
+                case "workshop.toggleMod":
+                    await HandleWorkshopToggleModAsync(msg);
+                    break;
+
+                case "pack.sync":
+                    await HandlePackSyncAsync(msg);
+                    break;
+
+                case "fs.openModsFolder":
+                    HandleFsOpenModsFolder(msg);
                     break;
 
                 default:
@@ -466,6 +496,229 @@ public class WebBridge : IDisposable
             Name = name,
             Error = error
         });
+    }
+
+    private async Task HandleWorkshopListAsync(BridgeMessage msg)
+    {
+        if (_workshopService == null)
+        {
+            _logger("[WEBBRIDGE: ERROR] workshop.list failed: IWorkshopService not available");
+            SendError(msg.Id, msg.Name, "service_unavailable");
+            return;
+        }
+
+        string gameDir = _configService.CurrentConfig.GameDir;
+        _logger($"[WEBBRIDGE] workshop.list requesting for {gameDir}");
+
+        var shaderPacks = await _workshopService.GetShaderPacksAsync(gameDir);
+        var mods = await _workshopService.GetModsAsync(gameDir);
+
+        var shaderList = shaderPacks.Select(s => new
+        {
+            fileName = s.FileName,
+            name = s.Name,
+            isActive = s.IsActive
+        }).ToList();
+
+        var modList = mods.Select(m => new
+        {
+            fileName = m.FileName,
+            name = m.DisplayName,
+            version = m.Version,
+            enabled = m.IsEnabled
+        }).ToList();
+
+        _logger($"[WEBBRIDGE] workshop.list response: {shaderList.Count} shaders, {modList.Count} mods");
+        SendResponse(msg.Id, msg.Name, new
+        {
+            shaders = shaderList,
+            mods = modList
+        });
+    }
+
+    private async Task HandleWorkshopSetShaderAsync(BridgeMessage msg)
+    {
+        if (_workshopService == null)
+        {
+            _logger("[WEBBRIDGE: ERROR] workshop.setShader failed: IWorkshopService not available");
+            SendError(msg.Id, msg.Name, "service_unavailable");
+            return;
+        }
+
+        string fileName = string.Empty;
+        if (msg.Payload is JsonElement el && el.TryGetProperty("fileName", out var fnProp) && fnProp.ValueKind == JsonValueKind.String)
+        {
+            fileName = fnProp.GetString() ?? string.Empty;
+        }
+
+        string gameDir = _configService.CurrentConfig.GameDir;
+        _logger($"[WEBBRIDGE] workshop.setShader fileName='{fileName}'");
+
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.Equals("none", StringComparison.OrdinalIgnoreCase) || fileName.Equals("off", StringComparison.OrdinalIgnoreCase))
+        {
+            _workshopService.SetActiveShaderPack(gameDir, "OFF");
+            _logger("[WEBBRIDGE] workshop.setShader disabled shaders (OFF)");
+            SendResponse(msg.Id, msg.Name, new { fileName = "", active = false });
+            return;
+        }
+
+        var packs = await _workshopService.GetShaderPacksAsync(gameDir);
+        var targetPack = packs.FirstOrDefault(p => string.Equals(p.FileName, fileName, StringComparison.OrdinalIgnoreCase) || string.Equals(p.Name, fileName, StringComparison.OrdinalIgnoreCase));
+        if (targetPack == null)
+        {
+            _logger($"[WEBBRIDGE: WARN] workshop.setShader rejected: invalid_shader '{fileName}'");
+            SendError(msg.Id, msg.Name, "invalid_shader");
+            return;
+        }
+
+        _workshopService.SetActiveShaderPack(gameDir, targetPack.FileName);
+        _logger($"[WEBBRIDGE] workshop.setShader activated '{targetPack.FileName}'");
+        SendResponse(msg.Id, msg.Name, new { fileName = targetPack.FileName, active = true });
+    }
+
+    private async Task HandleWorkshopToggleModAsync(BridgeMessage msg)
+    {
+        if (_workshopService == null)
+        {
+            _logger("[WEBBRIDGE: ERROR] workshop.toggleMod failed: IWorkshopService not available");
+            SendError(msg.Id, msg.Name, "service_unavailable");
+            return;
+        }
+
+        string fileName = string.Empty;
+        bool enabled = false;
+
+        if (msg.Payload is JsonElement el)
+        {
+            if (el.TryGetProperty("fileName", out var fnProp) && fnProp.ValueKind == JsonValueKind.String)
+            {
+                fileName = fnProp.GetString() ?? string.Empty;
+            }
+            if (el.TryGetProperty("enabled", out var enProp) && (enProp.ValueKind == JsonValueKind.True || enProp.ValueKind == JsonValueKind.False))
+            {
+                enabled = enProp.GetBoolean();
+            }
+            else
+            {
+                _logger("[WEBBRIDGE: WARN] workshop.toggleMod rejected: missing enabled");
+                SendError(msg.Id, msg.Name, "invalid_payload");
+                return;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            _logger("[WEBBRIDGE: WARN] workshop.toggleMod rejected: empty fileName");
+            SendError(msg.Id, msg.Name, "invalid_payload");
+            return;
+        }
+
+        string gameDir = _configService.CurrentConfig.GameDir;
+        _logger($"[WEBBRIDGE] workshop.toggleMod fileName='{fileName}', targetEnabled={enabled}");
+
+        var mods = await _workshopService.GetModsAsync(gameDir);
+        var mod = mods.FirstOrDefault(m => string.Equals(m.FileName, fileName, StringComparison.OrdinalIgnoreCase)
+                                        || string.Equals(m.DisplayName, fileName, StringComparison.OrdinalIgnoreCase));
+
+        if (mod == null)
+        {
+            _logger($"[WEBBRIDGE: WARN] workshop.toggleMod rejected: mod_not_found '{fileName}'");
+            SendError(msg.Id, msg.Name, "mod_not_found");
+            return;
+        }
+
+        bool success = _workshopService.ToggleMod(mod, enabled);
+        if (!success)
+        {
+            _logger($"[WEBBRIDGE: ERROR] workshop.toggleMod failed to toggle '{fileName}' to {enabled}");
+            SendError(msg.Id, msg.Name, "toggle_failed");
+            return;
+        }
+
+        _logger($"[WEBBRIDGE] workshop.toggleMod toggled: '{mod.FileName}', enabled={mod.IsEnabled}");
+        SendResponse(msg.Id, msg.Name, new { fileName = mod.FileName, enabled = mod.IsEnabled });
+    }
+
+    private async Task HandlePackSyncAsync(BridgeMessage msg)
+    {
+        if (_packUpdateService == null)
+        {
+            _logger("[WEBBRIDGE: ERROR] pack.sync failed: IPackUpdateService not available");
+            SendError(msg.Id, msg.Name, "service_unavailable");
+            return;
+        }
+
+        if (_isSyncing || _gameSessionService.State == GameSessionState.Preparing || _gameSessionService.State == GameSessionState.Launching)
+        {
+            _logger("[WEBBRIDGE: WARN] pack.sync rejected: busy");
+            SendError(msg.Id, msg.Name, "busy");
+            return;
+        }
+
+        _isSyncing = true;
+        _packSyncCts = new CancellationTokenSource();
+        _logger("[WEBBRIDGE] pack.sync started");
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var progress = new Progress<DownloadProgressReport>(report =>
+                {
+                    SendEvent("pack.progress", new
+                    {
+                        percentage = Math.Round(report.Percentage, 1),
+                        detail = string.IsNullOrWhiteSpace(report.CurrentFileName) ? report.StatusText : $"{report.StatusText} ({report.CurrentFileName})"
+                    });
+                });
+
+                var result = await _packUpdateService.CheckAndApplyAsync(progress, _packSyncCts.Token);
+                _logger($"[WEBBRIDGE] pack.sync finished: status={result.Status}, filesChanged={result.FilesChanged}, msg={result.Message}");
+
+                SendResponse(msg.Id, msg.Name, new
+                {
+                    status = result.Status.ToString().ToLowerInvariant(),
+                    message = result.Message,
+                    filesChanged = result.FilesChanged
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger($"[WEBBRIDGE: ERROR] pack.sync failed: {ex.Message}");
+                SendError(msg.Id, msg.Name, ex.Message);
+            }
+            finally
+            {
+                _isSyncing = false;
+            }
+        });
+
+        await Task.CompletedTask;
+    }
+
+    private void HandleFsOpenModsFolder(BridgeMessage msg)
+    {
+        string gameDir = _configService.CurrentConfig.GameDir;
+        string modsDir = Path.Combine(gameDir, "mods");
+        Directory.CreateDirectory(modsDir);
+
+        _logger($"[WEBBRIDGE] fs.openModsFolder: {modsDir}");
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{modsDir}\"",
+                UseShellExecute = true
+            });
+            SendResponse(msg.Id, msg.Name, new { success = true, path = modsDir });
+        }
+        catch (Exception ex)
+        {
+            _logger($"[WEBBRIDGE: ERROR] fs.openModsFolder failed: {ex.Message}");
+            SendError(msg.Id, msg.Name, ex.Message);
+        }
     }
 
     public event Action<BridgeMessage>? MessagePosted;

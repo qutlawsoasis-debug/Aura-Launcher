@@ -129,7 +129,7 @@ public class WebBridgeTests
         configService.CurrentConfig.VisualEffectsMode = "low";
 
         var sessionService = new TestGameSessionService();
-        using var bridge = new WebBridge(null, sessionService, configService, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -156,7 +156,7 @@ public class WebBridgeTests
     {
         var configService = new TestConfigService("C:\\test\\dir");
         var sessionService = new TestGameSessionService();
-        using var bridge = new WebBridge(null, sessionService, configService, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -190,7 +190,7 @@ public class WebBridgeTests
     {
         var configService = new TestConfigService("C:\\test\\dir");
         var sessionService = new TestGameSessionService();
-        using var bridge = new WebBridge(null, sessionService, configService, null, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, null, _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;
@@ -205,13 +205,184 @@ public class WebBridgeTests
         Assert.Equal(expectedError, lastResponse.Error);
     }
 
+    private class TestWorkshopService : IWorkshopService
+    {
+        public List<ShaderPackItem> Shaders { get; set; } = new();
+        public List<ModItem> Mods { get; set; } = new();
+        public string ActiveShader { get; set; } = "OFF";
+
+        public Task<List<WorldSaveItem>> GetWorldSavesAsync(string gameDir) => Task.FromResult(new List<WorldSaveItem>());
+        public Task<string> CreateWorldBackupAsync(WorldSaveItem world) => Task.FromResult("");
+        public Task ExportWorldToZipAsync(WorldSaveItem world, string destinationZipPath) => Task.CompletedTask;
+        public Task<string> ImportWorldFromZipAsync(string gameDir, string sourceZipPath) => Task.FromResult("");
+        public Task CreateAutoBackupLatestWorldAsync(string gameDir, int maxAutoBackupsPerWorld = 3) => Task.CompletedTask;
+        public Task RestoreWorldBackupAsync(WorldSaveItem world, WorldBackupItem backup) => Task.CompletedTask;
+        public Task DeleteWorldBackupAsync(WorldBackupItem backup) => Task.CompletedTask;
+        public Task<bool> DeleteWorldAsync(WorldSaveItem world) => Task.FromResult(true);
+
+        public Task<List<ModItem>> GetModsAsync(string gameDir) => Task.FromResult(Mods);
+        public bool ToggleMod(ModItem mod, bool enable)
+        {
+            mod.IsEnabled = enable;
+            return true;
+        }
+
+        public Task<List<ShaderPackItem>> GetShaderPacksAsync(string gameDir) => Task.FromResult(Shaders);
+        public void SetActiveShaderPack(string gameDir, string shaderFileName)
+        {
+            ActiveShader = shaderFileName;
+            foreach (var s in Shaders)
+            {
+                s.IsActive = string.Equals(s.FileName, shaderFileName, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        public Task<List<ScreenshotItem>> GetScreenshotsAsync(string gameDir) => Task.FromResult(new List<ScreenshotItem>());
+        public bool DeleteScreenshot(ScreenshotItem item) => true;
+    }
+
+    private class TestPackUpdateService : IPackUpdateService
+    {
+        public bool ShouldDelay { get; set; }
+        public TaskCompletionSource<bool>? DelayTcs { get; set; }
+
+        public async Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default, bool forceFullCheck = false)
+        {
+            if (ShouldDelay && DelayTcs != null)
+            {
+                await DelayTcs.Task;
+            }
+
+            progress?.Report(new DownloadProgressReport { Percentage = 50, StatusText = "Скачивание" });
+            progress?.Report(new DownloadProgressReport { Percentage = 100, StatusText = "Готово" });
+
+            return new PackUpdateResult(PackUpdateStatus.Updated, "Обновлено 2 файла", 2);
+        }
+    }
+
+    [Fact]
+    public async Task Handle_WorkshopList_ReturnsShadersAndMods()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var workshopService = new TestWorkshopService
+        {
+            Shaders = new List<ShaderPackItem>
+            {
+                new() { Name = "Sildurs", FileName = "Sildurs.zip", IsActive = true }
+            },
+            Mods = new List<ModItem>
+            {
+                new() { FileName = "sodium.jar", DisplayName = "Sodium", Version = "0.5.8", IsEnabled = true }
+            }
+        };
+
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_wl","type":"command","name":"workshop.list"}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("req_wl", lastResponse.Id);
+        Assert.Null(lastResponse.Error);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(lastResponse.Payload);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        var shaders = doc.RootElement.GetProperty("shaders");
+        var mods = doc.RootElement.GetProperty("mods");
+
+        Assert.Equal(1, shaders.GetArrayLength());
+        Assert.Equal("Sildurs.zip", shaders[0].GetProperty("fileName").GetString());
+        Assert.True(shaders[0].GetProperty("isActive").GetBoolean());
+
+        Assert.Equal(1, mods.GetArrayLength());
+        Assert.Equal("sodium.jar", mods[0].GetProperty("fileName").GetString());
+        Assert.True(mods[0].GetProperty("enabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Handle_WorkshopSetShader_InvalidShader_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var workshopService = new TestWorkshopService
+        {
+            Shaders = new List<ShaderPackItem>
+            {
+                new() { Name = "Sildurs", FileName = "Sildurs.zip", IsActive = false }
+            }
+        };
+
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_ss","type":"command","name":"workshop.setShader","payload":{"fileName":"NonExistent.zip"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("req_ss", lastResponse.Id);
+        Assert.Equal("invalid_shader", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_WorkshopToggleMod_ModNotFound_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var workshopService = new TestWorkshopService();
+
+        using var bridge = new WebBridge(null, sessionService, configService, null, workshopService, null, _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_tm","type":"command","name":"workshop.toggleMod","payload":{"fileName":"missing.jar","enabled":false}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("req_tm", lastResponse.Id);
+        Assert.Equal("mod_not_found", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_PackSync_WhenAlreadySyncing_ReturnsBusyError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        var delayTcs = new TaskCompletionSource<bool>();
+        var packUpdateService = new TestPackUpdateService
+        {
+            ShouldDelay = true,
+            DelayTcs = delayTcs
+        };
+
+        using var bridge = new WebBridge(null, sessionService, configService, null, null, packUpdateService, _ => {});
+
+        var responses = new List<BridgeMessage>();
+        bridge.MessagePosted += msg => responses.Add(msg);
+
+        // First call starts background sync
+        await bridge.ProcessRawMessageAsync("""{"id":"req_sync1","type":"command","name":"pack.sync"}""");
+
+        // Second call should immediately get rejected with busy
+        await bridge.ProcessRawMessageAsync("""{"id":"req_sync2","type":"command","name":"pack.sync"}""");
+
+        var busyResp = responses.FirstOrDefault(r => r.Id == "req_sync2");
+        Assert.NotNull(busyResp);
+        Assert.Equal("busy", busyResp.Error);
+
+        delayTcs.SetResult(true);
+    }
+
     [Fact]
     public async Task Handle_PresetApply_ValidKey_CallsServiceAndReturnsResult()
     {
         var configService = new TestConfigService("C:\\test\\dir");
         var sessionService = new TestGameSessionService();
         var presetService = new TestPresetService();
-        using var bridge = new WebBridge(null, sessionService, configService, presetService, _ => {});
+        using var bridge = new WebBridge(null, sessionService, configService, presetService, null, null, _ => {});
 
         BridgeMessage? lastResponse = null;
         bridge.MessagePosted += msg => lastResponse = msg;

@@ -250,6 +250,74 @@
       });
     }
 
+    // Mock workshop data in memory
+    const scope = typeof globalThis !== 'undefined' ? globalThis : window;
+    if (!scope.__mockWorkshopData) {
+      scope.__mockWorkshopData = {
+        shaders: [
+          { fileName: 'ComplementaryReimagined.zip', name: 'Complementary Reimagined', isActive: true },
+          { fileName: 'SildursEnhancedDefault.zip', name: 'Sildurs Enhanced Default', isActive: false },
+          { fileName: 'BuildersQoL.zip', name: 'Builders QoL', isActive: false }
+        ],
+        mods: [
+          { fileName: 'sodium-fabric-0.5.8.jar', name: 'Sodium', version: '0.5.8', enabled: true },
+          { fileName: 'iris-fabric-1.7.0.jar', name: 'Iris Shaders', version: '1.7.0', enabled: true },
+          { fileName: 'distanthorizons-2.1.2.jar', name: 'Distant Horizons', version: '2.1.2', enabled: true },
+          { fileName: 'voicechat-fabric-2.5.12.jar', name: 'Simple Voice Chat', version: '2.5.12', enabled: true },
+          { fileName: 'ferritecore-6.0.1.jar', name: 'FerriteCore', version: '6.0.1', enabled: false }
+        ]
+      };
+    }
+
+    if (name === 'workshop.list') {
+      return Promise.resolve({
+        shaders: scope.__mockWorkshopData.shaders.map(s => Object.assign({}, s)),
+        mods: scope.__mockWorkshopData.mods.map(m => Object.assign({}, m))
+      });
+    }
+
+    if (name === 'workshop.setShader') {
+      const fn = payload && payload.fileName;
+      if (!fn || fn === 'off' || fn === 'none') {
+        scope.__mockWorkshopData.shaders.forEach(s => s.isActive = false);
+        return Promise.resolve({ fileName: '', active: false });
+      }
+      const target = scope.__mockWorkshopData.shaders.find(s => s.fileName === fn || s.name === fn);
+      if (!target) {
+        return Promise.reject(new Error('invalid_shader'));
+      }
+      scope.__mockWorkshopData.shaders.forEach(s => s.isActive = (s === target));
+      return Promise.resolve({ fileName: target.fileName, active: true });
+    }
+
+    if (name === 'workshop.toggleMod') {
+      const fn = payload && payload.fileName;
+      const target = scope.__mockWorkshopData.mods.find(m => m.fileName === fn || m.name === fn);
+      if (!target) {
+        return Promise.reject(new Error('mod_not_found'));
+      }
+      target.enabled = Boolean(payload.enabled);
+      return Promise.resolve({ fileName: target.fileName, enabled: target.enabled });
+    }
+
+    if (name === 'pack.sync') {
+      setTimeout(() => {
+        emit('pack.progress', { percentage: 50, detail: 'Проверка модов...' });
+      }, 50);
+      setTimeout(() => {
+        emit('pack.progress', { percentage: 100, detail: 'Синхронизация завершена' });
+      }, 150);
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve({ status: 'updated', message: 'Сборка актуальна', filesChanged: 0 });
+        }, 200);
+      });
+    }
+
+    if (name === 'fs.openModsFolder') {
+      return Promise.resolve({ success: true, path: 'mock/mods' });
+    }
+
     return Promise.resolve({ success: true, mock: true });
   }
 
