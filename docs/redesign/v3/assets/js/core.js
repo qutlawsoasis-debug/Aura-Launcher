@@ -109,7 +109,57 @@
         window.location.hash = '#/';
       }
     }
+
+    // Update segmented lens positions on layer change
+    requestAnimationFrame(() => {
+      document.querySelectorAll(`[data-l="${m}"] .seg`).forEach(window.placeLens);
+    });
   };
+
+  // Segmented lens & toggle controllers
+  window.placeLens = function (seg) {
+    const onBtn = seg.querySelector('button.on');
+    const lens = seg.querySelector('.lens');
+    if (onBtn && lens) {
+      lens.style.left = onBtn.offsetLeft + 'px';
+      lens.style.width = onBtn.offsetWidth + 'px';
+    }
+  };
+
+  function initComponentInteractions() {
+    // Toggles
+    document.addEventListener('click', (e) => {
+      const toggle = e.target.closest('.toggle');
+      if (toggle) {
+        toggle.classList.toggle('on');
+        return;
+      }
+
+      // Reveals (e.g. joinBox, addBox)
+      const revealBtn = e.target.closest('[data-reveal]');
+      if (revealBtn) {
+        const targetId = revealBtn.dataset.reveal;
+        const targetEl = document.getElementById(targetId);
+        if (targetEl) targetEl.classList.toggle('open');
+        return;
+      }
+
+      // Segmented controls
+      const segBtn = e.target.closest('.seg button');
+      if (segBtn) {
+        const seg = segBtn.closest('.seg');
+        if (seg) {
+          seg.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+          segBtn.classList.add('on');
+          window.placeLens(seg);
+        }
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      document.querySelectorAll('.seg').forEach(window.placeLens);
+    });
+  }
 
   // 3. Router logic
   function handleHashChange() {
@@ -222,6 +272,7 @@
     window.setEffectsMode(currentEffectsMode);
     initSectionFooters();
     initIslandInteractions();
+    initComponentInteractions();
     handleHashChange();
     window.detectGlassTone();
   });

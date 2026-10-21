@@ -126,10 +126,10 @@ async function build() {
 
   console.log('3. Concatenating and inlining CSS stylesheets...');
   let tokensCss = fs.readFileSync(path.join(BASE_DIR, 'tokens.css'), 'utf-8');
-  tokensCss = tokensCss.replace(/--bg-world-image:\s*url\([^)]+\);/g, `--bg-world-image: url('${bgDataUrl}');`);
-  tokensCss = tokensCss.replace(/--skin:\s*url\([^)]+\);/g, `--skin: url('${steveDataUrl}');`);
 
   let coreCss = fs.readFileSync(path.join(BASE_DIR, 'assets', 'css', 'core.css'), 'utf-8');
+  coreCss = coreCss.replace(/url\(['"]?\.\.\/images\/bg_1\.jpg['"]?\)/g, `url('${bgDataUrl}')`);
+  coreCss = coreCss.replace(/url\(['"]?\.\.\/images\/steve\.png['"]?\)/g, `url('${steveDataUrl}')`);
   coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.woff2['"]?\)\s+format\(['"]woff2['"]\)/g, `url('data:font/woff2;charset=utf-8;base64,${onestBase64}') format('woff2')`);
 
   const screenCssFiles = ['play.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];

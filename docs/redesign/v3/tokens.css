@@ -39,9 +39,7 @@
   --bg-base: #070B10;
   --bg-panel-solid: rgba(38, 40, 48, 0.96);
   --bg-media-fallback: #0D161F;
-  --bg-world-image: url('../../../Resources/Backgrounds/bg_1.jpg');
   --bg-world-tone: dark;
-  --skin: url('assets/images/steve.png');
 
   --color-danger: #FF8A8A;
   --danger: #FF8A8A;
