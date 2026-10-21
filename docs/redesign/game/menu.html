@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Aura — Главное меню</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./game.css">
+</head>
+<body>
+  <!-- Cinematic world background with subtle parallax -->
+  <div class="world-viewport" id="parallaxBg"></div>
+  <div class="world-shade"></div>
+
+  <main class="menu-layout">
+    <!-- Top right profile bar -->
+    <header class="menu-top-bar">
+      <div class="friends-badge">
+        <span class="live-dot"></span>
+        <span>Друзья онлайн: <b>3</b></span>
+      </div>
+
+      <div class="glass-badge">
+        <div class="user-avatar">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+          </svg>
+        </div>
+        <span class="user-nick" id="userNick">Player746</span>
+      </div>
+    </header>
+
+    <!-- Center left brand and navigation -->
+    <section class="menu-center">
+      <div class="menu-brand-block">
+        <h1 class="menu-wordmark">Aura</h1>
+        <div class="menu-tagline">Сетевой сервер & одиночные миры</div>
+      </div>
+
+      <ul class="menu-nav-list" id="navList">
+        <li class="menu-nav-item" data-action="multiplayer">
+          <span>Играть на сервере</span>
+          <span class="nav-badge">Сеть</span>
+        </li>
+        <li class="menu-nav-item" data-action="singleplayer">
+          <span>Одиночная игра</span>
+        </li>
+        <li class="menu-nav-item" data-action="friends">
+          <span>Друзья онлайн</span>
+        </li>
+        <li class="menu-nav-item" data-action="settings">
+          <span>Настройки</span>
+        </li>
+        <li class="menu-nav-item" data-action="quit">
+          <span>Выход</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Bottom status bar -->
+    <footer class="menu-bottom-bar">
+      <div class="server-status-pill">
+        <span class="server-dot"></span>
+        <span>Сервер Aura: <b>42 игрока</b></span>
+        <span style="opacity: 0.3;">|</span>
+        <span>Пинг: <span class="server-ping">28 мс</span></span>
+      </div>
+
+      <div class="version-meta">
+        Minecraft 1.20.1 Fabric • Aura-Pack v1.2.103
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    // Subtle mouse parallax on the world background (transform only)
+    const bg = document.getElementById('parallaxBg');
+    if (bg) {
+      window.addEventListener('mousemove', (e) => {
+        const x = (e.clientX / window.innerWidth - 0.5) * -16;
+        const y = (e.clientY / window.innerHeight - 0.5) * -16;
+        bg.style.transform = `scale(1.06) translate(${x}px, ${y}px)`;
+      });
+    }
+
+    // Support simulated hover state via query parameter (e.g. ?hover=multiplayer)
+    const params = new URLSearchParams(window.location.search);
+    const hoverTarget = params.get('hover') || 'multiplayer';
+    if (hoverTarget) {
+      const item = document.querySelector(`.menu-nav-item[data-action="${hoverTarget}"]`);
+      if (item) {
+        item.classList.add('is-hovered');
+      }
+    }
+  </script>
+</body>
+</html>

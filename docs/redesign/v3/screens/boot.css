@@ -17,7 +17,7 @@
 }
 html.booting .island,
 html.booting .brand { opacity: 0; }
-.island, .brand { transition: opacity var(--dur-3) var(--ease-out); }
+.brand { transition: opacity var(--dur-3) var(--ease-out); }
 
 /* Мир под матовым стеклом (заранее размытая копия, без живого blur) */
 .boot-bg {
