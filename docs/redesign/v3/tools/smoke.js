@@ -8,16 +8,43 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
+const http = require('http');
+const { preview } = require('vite');
+
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const TEMP_USER_DATA = path.join(__dirname, '..', '.chrome_smoke_profile');
-const BASE_URL = 'http://localhost:8080/docs/redesign/v3';
+const BASE_URL = 'http://127.0.0.1:4173';
+const STANDALONE_PATH = path.resolve(__dirname, '..', 'dist-single', 'aura-v3-standalone.html');
+const STANDALONE_URL = 'file:///' + STANDALONE_PATH.replace(/\\/g, '/');
 
 const targets = [
   { name: 'index.html (effects=full)', url: `${BASE_URL}/index.html?effects=full`, effects: 'full' },
   { name: 'index.html (effects=off)', url: `${BASE_URL}/index.html?effects=off`, effects: 'off' },
-  { name: 'aura-v3-standalone.html (effects=full)', url: `${BASE_URL}/aura-v3-standalone.html?effects=full`, effects: 'full' },
-  { name: 'aura-v3-standalone.html (effects=off)', url: `${BASE_URL}/aura-v3-standalone.html?effects=off`, effects: 'off' }
+  { name: 'aura-v3-standalone.html (effects=full)', url: `${STANDALONE_URL}?effects=full`, effects: 'full' },
+  { name: 'aura-v3-standalone.html (effects=off)', url: `${STANDALONE_URL}?effects=off`, effects: 'off' }
 ];
+
+async function ensurePreviewServer() {
+  const isRunning = await new Promise(resolve => {
+    const req = http.request({ host: '127.0.0.1', port: 4173, method: 'HEAD', path: '/' }, res => resolve(true));
+    req.on('error', () => resolve(false));
+    req.setTimeout(600, () => { req.destroy(); resolve(false); });
+    req.end();
+  });
+
+  if (isRunning) {
+    console.log('⚡ Using already running vite preview on port 4173');
+    return null;
+  }
+
+  console.log('🚀 Starting vite preview server on port 4173...');
+  const server = await preview({
+    root: path.resolve(__dirname, '..'),
+    build: { outDir: 'dist' },
+    preview: { port: 4173, host: '127.0.0.1' }
+  });
+  return server;
+}
 
 const SECTIONS = ['map', 'lobby', 'friends', 'wardrobe', 'workshop', 'settings'];
 
@@ -40,6 +67,7 @@ async function runSmokeForTarget(target) {
 
   const chrome = spawn(CHROME_PATH, [
     '--headless=new',
+    '--allow-file-access-from-files',
     '--remote-debugging-port=9555',
     `--user-data-dir=${TEMP_USER_DATA}`,
     '--window-size=1366,768',
@@ -123,8 +151,12 @@ async function runSmokeForTarget(target) {
       } else if (msg.method === 'Runtime.exceptionThrown') {
         result.consoleErrors.push(msg.params.exceptionDetails.text + ' ' + (msg.params.exceptionDetails.exception?.description || ''));
       } else if (msg.method === 'Network.responseReceived') {
-        if (msg.params.response.status === 404) {
-          result.network404s.push(msg.params.response.url);
+        if (msg.params.response.status >= 400) {
+          result.network404s.push(`${msg.params.response.status} ${msg.params.response.url}`);
+        }
+      } else if (msg.method === 'Network.loadingFailed') {
+        if (!msg.params.canceled) {
+          result.network404s.push(`FAILED ${msg.params.errorText}: ${msg.params.requestId}`);
         }
       }
     } catch (e) {}
@@ -141,6 +173,37 @@ async function runSmokeForTarget(target) {
     returnByValue: true
   });
   result.skinview3dOk = (skinRes.result.value === 'object');
+
+  // 1b. Verify Onest font and .world background-image
+  const assetCheck = await sendSession('Runtime.evaluate', {
+    expression: `(async () => {
+      const fontLoaded = document.fonts ? document.fonts.check('16px Onest') : true;
+      const worldEl = document.querySelector('.world') || document.getElementById('world');
+      let bgLoaded = false;
+      let rawBg = '';
+      if (worldEl) {
+        rawBg = window.getComputedStyle(worldEl).backgroundImage || '';
+        if (rawBg && rawBg !== 'none') {
+          const match = rawBg.match(/url\\(["']?([^"')]+)["']?\\)/);
+          if (match && match[1]) {
+            bgLoaded = await new Promise(resolve => {
+              const img = new Image();
+              img.onload = () => resolve(true);
+              img.onerror = () => resolve(false);
+              img.src = match[1];
+            });
+          }
+        }
+      }
+      return { fontLoaded, bgLoaded, rawBg };
+    })()`,
+    awaitPromise: true,
+    returnByValue: true
+  });
+  result.fontAndBgOk = Boolean(assetCheck.result?.value?.fontLoaded && assetCheck.result?.value?.bgLoaded);
+  if (!result.fontAndBgOk) {
+    result.consoleErrors.push(`Asset check failed: fontLoaded=${assetCheck.result?.value?.fontLoaded}, bgLoaded=${assetCheck.result?.value?.bgLoaded}, rawBg=${assetCheck.result?.value?.rawBg}`);
+  }
 
   // 2. Verify backdrop filter count
   const filterRes = await sendSession('Runtime.evaluate', {
@@ -227,7 +290,8 @@ async function runSmokeForTarget(target) {
         })()`,
         returnByValue: true
       });
-      result.skinview3dOk = result.skinview3dOk && Boolean(skinRenderCheck.result.value);
+      result.skinview3dOk = result.skinview3dOk &&
+    result.fontAndBgOk && Boolean(skinRenderCheck.result.value);
     }
 
     // Inspect and click elements inside active .sec-body
@@ -300,7 +364,13 @@ async function runSmokeForTarget(target) {
   await sendSession('Runtime.evaluate', {
     expression: `(() => {
       const playBtn = document.querySelector('.bar .play');
-      if (playBtn) playBtn.click();
+      if (playBtn) {
+        if (typeof window.startGame === 'function') {
+          window.startGame(playBtn);
+        } else {
+          playBtn.click();
+        }
+      }
     })()`
   });
 
@@ -339,6 +409,7 @@ async function runSmokeForTarget(target) {
     result.backdropLayersOk &&
     result.mapCanvasSizeOk &&
     result.skinview3dOk &&
+    result.fontAndBgOk &&
     result.playRunningOk &&
     result.offTransitionsOk
   );
@@ -351,17 +422,32 @@ async function main() {
   console.log('🚀 Running Smoke Test Suite (index.html & aura-v3-standalone.html across effects modes)');
   console.log('========================================================================================\n');
 
+  let previewServer = null;
+  try {
+    previewServer = await ensurePreviewServer();
+  } catch (err) {
+    console.error('Failed to initialize vite preview server:', err);
+    process.exit(1);
+  }
+
   const results = [];
   let allPass = true;
 
-  for (const t of targets) {
-    try {
-      const res = await runSmokeForTarget(t);
-      results.push(res);
-      if (!res.passed) allPass = false;
-    } catch (e) {
-      console.error(`Error testing ${t.name}:`, e);
-      allPass = false;
+  try {
+    for (const t of targets) {
+      try {
+        const res = await runSmokeForTarget(t);
+        results.push(res);
+        if (!res.passed) allPass = false;
+      } catch (e) {
+        console.error(`Error testing ${t.name}:`, e);
+        allPass = false;
+      }
+    }
+  } finally {
+    if (previewServer) {
+      console.log('Stopping preview server...');
+      await previewServer.close();
     }
   }
 

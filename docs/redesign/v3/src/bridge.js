@@ -6,10 +6,14 @@
 
 (function (root, factory) {
   const mod = factory();
+  if (typeof window !== 'undefined') {
+    window.AuraBridge = mod;
+  }
+  if (typeof globalThis !== 'undefined') {
+    globalThis.AuraBridge = mod;
+  }
   if (typeof module === 'object' && module.exports) {
     module.exports = mod;
-  } else {
-    root.AuraBridge = mod;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : window, function () {
   'use strict';

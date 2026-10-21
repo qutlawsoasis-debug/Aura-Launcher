@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'Onest';
-  src: url('../fonts/Onest.woff2') format('woff2');
+  src: url('/assets/fonts/Onest.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
 }
@@ -53,7 +53,7 @@ button {
 .world {
   position: absolute;
   inset: -3%;
-  background: url('../images/bg_1.jpg') center/cover no-repeat;
+  background: url('/assets/images/bg_1.jpg') center/cover no-repeat;
   transition: transform 1.4s var(--smooth);
   z-index: 0;
 }
@@ -485,7 +485,7 @@ body.is-open .world-dim {
   border-radius: calc(var(--s) * 0.28);
   flex: none;
   image-rendering: pixelated;
-  background: url('../images/steve.png'), url('../images/steve.png');
+  background: url('/assets/images/steve.png'), url('/assets/images/steve.png');
   background-size: calc(var(--s) * 8), calc(var(--s) * 8);
   background-position: calc(var(--s) * -5) calc(var(--s) * -1), calc(var(--s) * -1) calc(var(--s) * -1);
 }

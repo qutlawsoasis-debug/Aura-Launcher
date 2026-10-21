@@ -96,11 +96,11 @@
 }
 
 .cape-thumb-cyan {
-  background: url('../assets/images/cape_cyan.png') -3px -3px / 192px 96px no-repeat;
+  background: url('/assets/images/cape_cyan.png') -3px -3px / 192px 96px no-repeat;
 }
 
 .cape-thumb-silver {
-  background: url('../assets/images/cape_silver.png') -3px -3px / 192px 96px no-repeat;
+  background: url('/assets/images/cape_silver.png') -3px -3px / 192px 96px no-repeat;
 }
 
 .cape-thumb-none {

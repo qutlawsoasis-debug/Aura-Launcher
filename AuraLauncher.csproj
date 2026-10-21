@@ -84,7 +84,9 @@
     <Error Condition="'$(NodeExitCode)' != '0'" Text="Node.js не найден в PATH. Для сборки Release требуется Node.js." />
     
     <Message Importance="high" Text="==> Building UI distribution (npm run build)..." />
-    <Exec Command="node build_dist.js" WorkingDirectory="docs\redesign\v3" />
+    <Exec Command="npm ci" WorkingDirectory="docs\redesign\v3" Condition="!Exists('docs\redesign\v3\node_modules')"
+          ContinueOnError="false" />
+    <Exec Command="npm run build" WorkingDirectory="docs\redesign\v3" />
     
     <ItemGroup>
       <UiDistFiles Include="docs\redesign\v3\dist\**\*.*" />

@@ -1,2 +1,5 @@
 .chrome*/
 screenshots/
+node_modules/
+dist/
+dist-single/

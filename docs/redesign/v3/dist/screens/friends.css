@@ -1,4 +1,0 @@
-/* Friends Section styles — uses core Island component classes */
-#friendList .person[hidden] {
-  display: none !important;
-}
