@@ -7,6 +7,7 @@ using Xunit;
 
 namespace AuraLauncher.Tests;
 
+[Collection(LobbyGlobalStateCollection.Name)]
 public class LobbyStateManagerTests
 {
     [Fact]

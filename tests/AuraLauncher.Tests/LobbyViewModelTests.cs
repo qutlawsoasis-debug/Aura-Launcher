@@ -9,6 +9,7 @@ using Xunit;
 
 namespace AuraLauncher.Tests;
 
+[Collection(LobbyGlobalStateCollection.Name)]
 public class LobbyViewModelTests
 {
     private class MockLobbyService : ILobbyService

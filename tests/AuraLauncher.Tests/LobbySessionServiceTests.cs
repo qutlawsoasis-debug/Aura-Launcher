@@ -9,6 +9,7 @@ using Xunit;
 
 namespace AuraLauncher.Tests;
 
+[Collection(LobbyGlobalStateCollection.Name)]
 public class LobbySessionServiceTests
 {
     private class FakeLobbyService : ILobbyService

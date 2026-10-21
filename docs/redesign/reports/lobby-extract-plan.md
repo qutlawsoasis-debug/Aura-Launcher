@@ -114,6 +114,30 @@ public interface ILobbySessionService : IDisposable
 
 ---
 
+## 5а. Сверка сценария хоста: `LobbyViewModel` → `LobbySessionService` (коммит f1bd724)
+
+| Ветка VM (строки) | Место в сервисе | Примечание |
+|---|---|---|
+| `ClaimPersonalTunnelAsync` (1120–1168) | `ClaimPersonalTunnelAsync` (239) | открытие браузера вынесено в колбэк `onBrowserUrl` |
+| `OpenWorldAsHostAsync`: `AURA_FAKE_TUNNEL` / `UseFakeTunnel` (1176–1190) | `OpenWorldAsync` (~358) | сразу `HostOpenWorldAsync("fake-test.e4mc.link")` |
+| авто-бэкап мира (1193–1198) | `OpenWorldAsync` (~390) | только если игра не запущена |
+| `_domainTcs` + `_worldWatcher.Start(latest.log)` (1200–1204) | `OpenWorldAsync` (399–400) | |
+| e4mc: домен уже в watcher (1208–1216) | `OpenWorldAsync` (404–409) | |
+| мир уже слушает 25565 (1219–1226) | `OpenWorldAsync` (415–418) | `PlayitTunnelProvider.TestTcpConnectAsync` |
+| подсказка «Esc → Открыть для сети» (1230–1233) | `StatusHint` + `WaitingForWorld` | |
+| `HostLaunchRequested` (1235–1239) | `IGameSessionService.LaunchAsync` (430) | VM отдавал запуск MainViewModel |
+| `OnLanDomainAssigned` (1253) | `OnLanDomainAssigned` (439) | |
+| `OnLanWorldOpened` (1265–1382) | `OnLanWorldOpened` (451) | `_lobbyService.IsHost` → `Role == Host` |
+| `CompleteHostOpenWorldAsync` (1383–1447) | `CompleteHostOpenWorldAsync` (537) | `_hostOpenGate`, `_lastTunnelAddress` |
+| `OnLanWorldClosed` (1448–1474) | `OnLanWorldClosed` (580) | |
+| `OnGameExited` (1475–1503) | `OnGameExited` (900) | через `LobbyStateManager.OnGameExited` |
+
+**Не перенесено:** UI-поля (`HostStatusText`, `StatusIcon`, `IsBusy`, `OnPropertyChanged`), облачные миры, 3D-сцена, `ShowMismatchDialog`.
+
+**Тесты:** классы, которые трогают `AURA_FAKE_TUNNEL`, `LobbyService.UseE4allTunnel` и `FakeTunnelProvider`, объединены в коллекцию `LobbyGlobalState` без параллельного запуска. Причина прежней нестабильности: `FakeTunnelProvider.DefaultHost` читает `AURA_FAKE_TUNNEL` при создании, и параллельный `LobbySessionServiceTests` подменял хост на `127.0.0.1`.
+
+---
+
 ## 6. План реализации по шагам
 
 - **Шаг 1 (Сервис + Тесты)**:

@@ -15,6 +15,7 @@ using Xunit;
 
 namespace AuraLauncher.Tests;
 
+[Collection(LobbyGlobalStateCollection.Name)]
 public class FriendsAndLobbyScenarioTests
 {
     private sealed class ScenarioLobbyService : ILobbyService
