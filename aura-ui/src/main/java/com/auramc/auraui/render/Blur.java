@@ -3,14 +3,19 @@ package com.auramc.auraui.render;
 import com.auramc.auraui.AuraUi;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.FloatBuffer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.SimpleFramebuffer;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 
@@ -25,6 +30,9 @@ public final class Blur {
     private static int uTexture = -1;
     private static int uDelta = -1;
     private static int uRadius = -1;
+
+    private static int quadVao = 0;
+    private static int quadVbo = 0;
 
     private static Framebuffer passA = null;
     private static Framebuffer passB = null;
@@ -128,6 +136,30 @@ public final class Blur {
             uTexture = GL20.glGetUniformLocation(program, "DiffuseSampler");
             uDelta = GL20.glGetUniformLocation(program, "Delta");
             uRadius = GL20.glGetUniformLocation(program, "Radius");
+
+            // Fullscreen quad VAO/VBO for OpenGL 3.2+ Core Profile
+            quadVao = GL30.glGenVertexArrays();
+            quadVbo = GL15.glGenBuffers();
+            GL30.glBindVertexArray(quadVao);
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, quadVbo);
+
+            // Large fullscreen triangle covering NDC [-1, 1]
+            // (-1, -1), (3, -1), (-1, 3)
+            float[] verts = new float[] {
+                -1.0f, -1.0f,
+                 3.0f, -1.0f,
+                -1.0f,  3.0f
+            };
+            FloatBuffer buf = BufferUtils.createFloatBuffer(verts.length);
+            buf.put(verts).flip();
+            GL15.glBufferData(GL15.GL_ARRAY_BUFFER, buf, GL15.GL_STATIC_DRAW);
+
+            GL20.glEnableVertexAttribArray(0);
+            GL20.glVertexAttribPointer(0, 2, GL11.GL_FLOAT, false, 0, 0);
+
+            GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, 0);
+            GL30.glBindVertexArray(0);
+
             shaderLoaded = true;
         } catch (Throwable t) {
             AuraUi.LOGGER.error("[aura-ui] Failed to init blur shader", t);
@@ -151,7 +183,7 @@ public final class Blur {
         }
 
         initShader();
-        if (!shaderLoaded || program == 0) return;
+        if (!shaderLoaded || program == 0 || quadVao == 0) return;
 
         // Downscaled framebuffers for performance
         int bw = Math.max(1, w / 2);
@@ -164,9 +196,9 @@ public final class Blur {
             passB = new SimpleFramebuffer(bw, bh, false, false);
         }
 
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
         RenderSystem.disableBlend();
         RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
 
         // Copy main framebuffer downscaled to passA
         GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, main.fbo);
@@ -177,28 +209,30 @@ public final class Blur {
         GL20.glUniform1i(uTexture, 0);
         GL20.glUniform1f(uRadius, radiusPx * 0.5f);
 
+        GL30.glBindVertexArray(quadVao);
+
         // Pass 1: Horizontal into passB
         passB.beginWrite(true);
         GL20.glUniform2f(uDelta, 1.0f / bw, 0.0f);
         RenderSystem.bindTexture(passA.getColorAttachment());
-        drawQuad();
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
 
         // Pass 2: Vertical back into main framebuffer
         main.beginWrite(false);
         GL20.glUniform2f(uDelta, 0.0f, 1.0f / bh);
         RenderSystem.bindTexture(passB.getColorAttachment());
-        drawQuad();
+        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
 
+        GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
-        GL11.glPopAttrib();
-    }
 
-    private static void drawQuad() {
-        GL11.glBegin(GL11.GL_QUADS);
-        GL11.glTexCoord2f(0, 0); GL11.glVertex2f(-1, -1);
-        GL11.glTexCoord2f(1, 0); GL11.glVertex2f(1, -1);
-        GL11.glTexCoord2f(1, 1); GL11.glVertex2f(1, 1);
-        GL11.glTexCoord2f(0, 1); GL11.glVertex2f(-1, 1);
-        GL11.glEnd();
+        // Restore MC RenderSystem state
+        RenderSystem.activeTexture(GL13.GL_TEXTURE0);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.enableCull();
+        RenderSystem.depthMask(true);
+        GlStateManager._enableBlend();
+        GlStateManager._enableCull();
     }
 }

@@ -94,50 +94,56 @@ public class AuraPauseScreen extends Screen {
         int fbWidth = client.getWindow().getFramebufferWidth();
         int fbHeight = client.getWindow().getFramebufferHeight();
         double guiScale = client.getWindow().getScaleFactor();
+        float scale = (float) guiScale;
 
-        float realMouseX = (float) (client.mouse.getX());
-        float realMouseY = (float) (client.mouse.getY());
+        float winW = (float) (fbWidth / scale);
+        float winH = (float) (fbHeight / scale);
+
+        float realMouseX = (float) (client.mouse.getX() / scale);
+        float realMouseY = (float) (client.mouse.getY() / scale);
 
         // 1. Two-pass GPU Blur of the in-game world
         Blur.renderBlur(44.0f);
 
-        // 2. NanoVG rendering in framebuffer pixels (crisp 1:1)
-        AuraRenderer.beginFrame(fbWidth, fbHeight, 1.0f);
+        // 2. NanoVG rendering in scaled window coordinates (sharp HiDPI via scale factor)
+        if (!AuraRenderer.beginFrame(winW, winH, scale)) {
+            return;
+        }
 
         // Darken overlay
         float animProgress = Anim.easeOutCubic(openTime / 0.25f);
         int overlayAlpha = (int) (0.65f * 255 * animProgress);
-        AuraRenderer.rect(0, 0, fbWidth, fbHeight, (overlayAlpha << 24) | 0x080B12);
+        AuraRenderer.rect(0, 0, winW, winH, (overlayAlpha << 24) | 0x080B12);
 
         // In low/off mode, render a fallback backdrop
         if (Blur.getMode() == Blur.Mode.LOW) {
-            AuraRenderer.rect(0, 0, fbWidth, fbHeight, Theme.rgba(18, 22, 32, 0.85f * animProgress));
+            AuraRenderer.rect(0, 0, winW, winH, Theme.rgba(18, 22, 32, 0.85f * animProgress));
         }
 
-        // Panel layout (centered, width 360px scaled for dpi or standard 360-400px)
-        float panelW = Math.min(380.0f * (float) (guiScale / 2.0), fbWidth * 0.9f);
+        // Panel layout (centered, width 380px)
+        float panelW = Math.min(380.0f, winW * 0.9f);
         panel.width = panelW;
-        float btnH = 48.0f * (float) (guiScale / 2.0);
-        float gap = 10.0f * (float) (guiScale / 2.0);
+        float btnH = 48.0f;
+        float gap = 10.0f;
         float totalH = 60.0f + buttons.size() * (btnH + gap) + 20.0f;
         panel.height = totalH;
 
         float slideOffset = (1.0f - animProgress) * 16.0f;
-        panel.x = (fbWidth - panel.width) * 0.5f;
-        panel.y = (fbHeight - panel.height) * 0.5f + slideOffset;
+        panel.x = (winW - panel.width) * 0.5f;
+        panel.y = (winH - panel.height) * 0.5f + slideOffset;
 
         // Render Title
-        float titleFontSize = 22.0f * (float) (guiScale / 2.0);
+        float titleFontSize = 22.0f;
         float titleY = panel.y + 36.0f;
-        AuraRenderer.text("ИГРА НА ПАУЗЕ", fbWidth * 0.5f, titleY, titleFontSize,
+        AuraRenderer.text("ИГРА НА ПАУЗЕ", winW * 0.5f, titleY, titleFontSize,
                 Theme.withAlpha(0xFFFFFFFF, animProgress), NanoVG.NVG_ALIGN_CENTER);
 
         // Subtitle line decorations
         float tw = AuraRenderer.textWidth("ИГРА НА ПАУЗЕ", titleFontSize);
         float lineW = 32.0f;
-        AuraRenderer.rect(fbWidth * 0.5f - tw * 0.5f - lineW - 14.0f, titleY - titleFontSize * 0.35f,
+        AuraRenderer.rect(winW * 0.5f - tw * 0.5f - lineW - 14.0f, titleY - titleFontSize * 0.35f,
                 lineW, 1.0f, Theme.rgba(255, 255, 255, 0.25f * animProgress));
-        AuraRenderer.rect(fbWidth * 0.5f + tw * 0.5f + 14.0f, titleY - titleFontSize * 0.35f,
+        AuraRenderer.rect(winW * 0.5f + tw * 0.5f + 14.0f, titleY - titleFontSize * 0.35f,
                 lineW, 1.0f, Theme.rgba(255, 255, 255, 0.25f * animProgress));
 
         // Render buttons
@@ -157,8 +163,10 @@ public class AuraPauseScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (client == null) return false;
-        float realMouseX = (float) (client.mouse.getX());
-        float realMouseY = (float) (client.mouse.getY());
+        double guiScale = client.getWindow().getScaleFactor();
+        float scale = (float) guiScale;
+        float realMouseX = (float) (client.mouse.getX() / scale);
+        float realMouseY = (float) (client.mouse.getY() / scale);
 
         for (Button btn : buttons) {
             if (btn.mouseClicked(realMouseX, realMouseY, button)) return true;
@@ -169,8 +177,10 @@ public class AuraPauseScreen extends Screen {
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (client == null) return false;
-        float realMouseX = (float) (client.mouse.getX());
-        float realMouseY = (float) (client.mouse.getY());
+        double guiScale = client.getWindow().getScaleFactor();
+        float scale = (float) guiScale;
+        float realMouseX = (float) (client.mouse.getX() / scale);
+        float realMouseY = (float) (client.mouse.getY() / scale);
 
         for (Button btn : buttons) {
             if (btn.mouseReleased(realMouseX, realMouseY, button)) return true;

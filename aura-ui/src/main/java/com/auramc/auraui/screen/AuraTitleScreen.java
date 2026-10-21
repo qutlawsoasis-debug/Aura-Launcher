@@ -115,51 +115,56 @@ public class AuraTitleScreen extends Screen {
         int fbWidth = client.getWindow().getFramebufferWidth();
         int fbHeight = client.getWindow().getFramebufferHeight();
         double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) (guiScale / 2.0);
+        float scale = (float) guiScale;
 
-        float realMouseX = (float) (client.mouse.getX());
-        float realMouseY = (float) (client.mouse.getY());
+        float winW = (float) (fbWidth / scale);
+        float winH = (float) (fbHeight / scale);
+
+        float realMouseX = (float) (client.mouse.getX() / scale);
+        float realMouseY = (float) (client.mouse.getY() / scale);
 
         // Target mouse parallax
-        float targetPx = (realMouseX / fbWidth - 0.5f) * 20.0f;
-        float targetPy = (realMouseY / fbHeight - 0.5f) * 20.0f;
+        float targetPx = (realMouseX / winW - 0.5f) * 20.0f;
+        float targetPy = (realMouseY / winH - 0.5f) * 20.0f;
         mouseParallaxX = Anim.lerp(mouseParallaxX, targetPx, dt * 4.0f);
         mouseParallaxY = Anim.lerp(mouseParallaxY, targetPy, dt * 4.0f);
 
-        AuraRenderer.beginFrame(fbWidth, fbHeight, 1.0f);
+        if (!AuraRenderer.beginFrame(winW, winH, scale)) {
+            return;
+        }
 
         // 1. Background image cover with slow continuous zoom
         int bgImage = AuraRenderer.getImage(bgTexture);
         float zoomProgress = (float) (Math.sin(openTime * 0.15f) * 0.5 + 0.5);
         float bgScale = 1.04f + zoomProgress * 0.05f;
-        float bgW = fbWidth * bgScale;
-        float bgH = fbHeight * bgScale;
-        float bgX = (fbWidth - bgW) * 0.5f - mouseParallaxX;
-        float bgY = (fbHeight - bgH) * 0.5f - mouseParallaxY;
+        float bgW = winW * bgScale;
+        float bgH = winH * bgScale;
+        float bgX = (winW - bgW) * 0.5f - mouseParallaxX;
+        float bgY = (winH - bgH) * 0.5f - mouseParallaxY;
         if (bgImage > 0) {
             AuraRenderer.drawImage(bgImage, bgX, bgY, bgW, bgH, 1.0f);
         } else {
-            AuraRenderer.rect(0, 0, fbWidth, fbHeight, 0xFF080B12);
+            AuraRenderer.rect(0, 0, winW, winH, 0xFF080B12);
         }
 
         // Atmospheric vignette and contrast shade
-        AuraRenderer.gradient(0, 0, fbWidth * 0.55f, fbHeight, 0,
+        AuraRenderer.gradient(0, 0, winW * 0.55f, winH, 0,
                 Theme.rgba(8, 11, 18, 0.85f), Theme.rgba(8, 11, 18, 0.40f));
-        AuraRenderer.gradient(0, 0, fbWidth, fbHeight * 0.25f, 0,
+        AuraRenderer.gradient(0, 0, winW, winH * 0.25f, 0,
                 Theme.rgba(8, 11, 18, 0.50f), Theme.rgba(8, 11, 18, 0.0f));
-        AuraRenderer.gradient(0, fbHeight * 0.75f, fbWidth, fbHeight * 0.25f, 0,
+        AuraRenderer.gradient(0, winH * 0.75f, winW, winH * 0.25f, 0,
                 Theme.rgba(8, 11, 18, 0.0f), Theme.rgba(8, 11, 18, 0.65f));
 
         // 2. Header (Top Bar)
-        float topPad = 32.0f * scale;
-        float rightPad = 36.0f * scale;
+        float topPad = 32.0f;
+        float rightPad = 36.0f;
 
         // Player badge on top-right
         String playerNick = client.getSession() != null ? client.getSession().getUsername() : "Player";
-        float badgeH = 36.0f * scale;
-        float nickW = AuraRenderer.textWidth(playerNick, 14.0f * scale);
-        float badgeW = nickW + 48.0f * scale;
-        float badgeX = fbWidth - rightPad - badgeW;
+        float badgeH = 36.0f;
+        float nickW = AuraRenderer.textWidth(playerNick, 14.0f);
+        float badgeW = nickW + 48.0f;
+        float badgeX = winW - rightPad - badgeW;
         float badgeY = topPad;
 
         AuraRenderer.shadow(badgeX, badgeY, badgeW, badgeH, badgeH * 0.5f, 16.0f, 0, Theme.rgba(0, 0, 0, 0.35f));
@@ -171,117 +176,117 @@ public class AuraTitleScreen extends Screen {
         float avX = badgeX + 4.0f;
         float avY = badgeY + 4.0f;
         AuraRenderer.roundRect(avX, avY, avSize, avSize, avSize * 0.5f, Theme.FILL_2);
-        AuraRenderer.text("👤", avX + avSize * 0.5f, avY + avSize * 0.5f + 4.0f, 12.0f * scale,
+        AuraRenderer.text("👤", avX + avSize * 0.5f, avY + avSize * 0.5f + 4.0f, 12.0f,
                 Theme.ACCENT, NanoVG.NVG_ALIGN_CENTER);
 
-        AuraRenderer.text(playerNick, avX + avSize + 8.0f, badgeY + badgeH * 0.5f + 4.5f * scale,
-                14.0f * scale, Theme.TEXT_PRIMARY, NanoVG.NVG_ALIGN_LEFT);
+        AuraRenderer.text(playerNick, avX + avSize + 8.0f, badgeY + badgeH * 0.5f + 4.5f,
+                14.0f, Theme.TEXT_PRIMARY, NanoVG.NVG_ALIGN_LEFT);
 
         // Friends pill next to profile
-        float friendsPillW = 160.0f * scale;
-        float friendsPillX = badgeX - friendsPillW - 12.0f * scale;
+        float friendsPillW = 160.0f;
+        float friendsPillX = badgeX - friendsPillW - 12.0f;
         AuraRenderer.roundRect(friendsPillX, badgeY, friendsPillW, badgeH, badgeH * 0.5f, Theme.PANEL_GLASS);
         AuraRenderer.outline(friendsPillX, badgeY, friendsPillW, badgeH, badgeH * 0.5f, 1.0f, Theme.PANEL_BORDER);
 
         // Live dot
-        float dotX = friendsPillX + 16.0f * scale;
+        float dotX = friendsPillX + 16.0f;
         float dotY = badgeY + badgeH * 0.5f;
         AuraRenderer.shadow(dotX - 3.5f, dotY - 3.5f, 7.0f, 7.0f, 3.5f, 8.0f, 0, 0xFF34D399);
         AuraRenderer.roundRect(dotX - 3.5f, dotY - 3.5f, 7.0f, 7.0f, 3.5f, 0xFF34D399);
 
-        AuraRenderer.text("Друзья онлайн: —", dotX + 10.0f * scale, badgeY + badgeH * 0.5f + 4.5f * scale,
-                13.0f * scale, Theme.TEXT_SECONDARY, NanoVG.NVG_ALIGN_LEFT);
+        AuraRenderer.text("Друзья онлайн: —", dotX + 10.0f, badgeY + badgeH * 0.5f + 4.5f,
+                13.0f, Theme.TEXT_SECONDARY, NanoVG.NVG_ALIGN_LEFT);
 
         // 3. Center Left Brand Block
-        float leftPad = 80.0f * scale;
-        float brandY = fbHeight * 0.28f;
+        float leftPad = 80.0f;
+        float brandY = winH * 0.28f;
 
         // Wordmark
         float titleProgress = Anim.easeOutCubic(Math.min(1.0f, openTime / 0.35f));
         float titleShift = (1.0f - titleProgress) * 20.0f;
-        AuraRenderer.text("Aura", leftPad, brandY + titleShift, 52.0f * scale,
+        AuraRenderer.text("Aura", leftPad, brandY + titleShift, 52.0f,
                 Theme.withAlpha(Theme.TEXT_PRIMARY, titleProgress), NanoVG.NVG_ALIGN_LEFT);
 
         // Tagline
-        AuraRenderer.text("Сервер друзей", leftPad, brandY + 36.0f * scale + titleShift, 16.0f * scale,
+        AuraRenderer.text("Сервер друзей", leftPad, brandY + 36.0f + titleShift, 16.0f,
                 Theme.withAlpha(Theme.ACCENT, titleProgress), NanoVG.NVG_ALIGN_LEFT);
 
         // 4. Navigation Menu Items
-        float navStartY = brandY + 70.0f * scale;
-        float itemH = 50.0f * scale;
-        float itemW = 380.0f * scale;
+        float navStartY = brandY + 70.0f;
+        float itemH = 50.0f;
+        float itemW = 380.0f;
 
         for (int i = 0; i < navItems.size(); i++) {
             NavItem item = navItems.get(i);
             float itemDelay = 0.2f + i * 0.06f;
             float itemProgress = Anim.easeOutCubic(Math.max(0.0f, Math.min(1.0f, (openTime - itemDelay) / 0.3f)));
 
-            float curY = navStartY + i * (itemH + 12.0f * scale);
+            float curY = navStartY + i * (itemH + 12.0f);
             boolean hovered = realMouseX >= leftPad && realMouseX <= leftPad + itemW &&
                               realMouseY >= curY && realMouseY <= curY + itemH;
 
             item.hover = Anim.lerp(item.hover, hovered ? 1.0f : 0.0f, dt * 14.0f);
 
-            float slideX = leftPad + item.hover * (16.0f * scale);
+            float slideX = leftPad + item.hover * 16.0f;
             float cascadeY = curY + (1.0f - itemProgress) * 16.0f;
             float alpha = itemProgress;
 
             // Cyan left accent line when hovered
             if (item.hover > 0.01f) {
-                float lineH = itemH - 14.0f * scale;
-                float lineTop = cascadeY + 7.0f * scale;
-                AuraRenderer.shadow(slideX - 14.0f * scale, lineTop, 3.0f, lineH, 1.5f, 14.0f * item.hover, 0,
+                float lineH = itemH - 14.0f;
+                float lineTop = cascadeY + 7.0f;
+                AuraRenderer.shadow(slideX - 14.0f, lineTop, 3.0f, lineH, 1.5f, 14.0f * item.hover, 0,
                         Theme.rgba(100, 210, 255, 0.6f * item.hover));
-                AuraRenderer.roundRect(slideX - 14.0f * scale, lineTop, 3.0f, lineH, 1.5f,
+                AuraRenderer.roundRect(slideX - 14.0f, lineTop, 3.0f, lineH, 1.5f,
                         Theme.withAlpha(Theme.ACCENT, item.hover * alpha));
             }
 
             // Label
             int labelColor = hovered ? 0xFFFFFFFF : Theme.rgba(255, 255, 255, 0.85f);
-            AuraRenderer.text(item.label, slideX, cascadeY + 22.0f * scale, 20.0f * scale,
+            AuraRenderer.text(item.label, slideX, cascadeY + 22.0f, 20.0f,
                     Theme.withAlpha(labelColor, alpha), NanoVG.NVG_ALIGN_LEFT);
 
             // Badge (e.g. СЕТЬ)
             if (item.badge != null) {
-                float lw = AuraRenderer.textWidth(item.label, 20.0f * scale);
-                float badgeX2 = slideX + lw + 12.0f * scale;
-                float badgeY2 = cascadeY + 8.0f * scale;
-                float badgeH2 = 18.0f * scale;
-                float badgeW2 = AuraRenderer.textWidth(item.badge, 10.0f * scale) + 14.0f * scale;
+                float lw = AuraRenderer.textWidth(item.label, 20.0f);
+                float badgeX2 = slideX + lw + 12.0f;
+                float badgeY2 = cascadeY + 8.0f;
+                float badgeH2 = 18.0f;
+                float badgeW2 = AuraRenderer.textWidth(item.badge, 10.0f) + 14.0f;
 
-                AuraRenderer.roundRect(badgeX2, badgeY2, badgeW2, badgeH2, 9.0f * scale,
+                AuraRenderer.roundRect(badgeX2, badgeY2, badgeW2, badgeH2, 9.0f,
                         Theme.rgba(100, 210, 255, 0.15f * alpha));
-                AuraRenderer.outline(badgeX2, badgeY2, badgeW2, badgeH2, 9.0f * scale, 1.0f,
+                AuraRenderer.outline(badgeX2, badgeY2, badgeW2, badgeH2, 9.0f, 1.0f,
                         Theme.rgba(100, 210, 255, 0.35f * alpha));
-                AuraRenderer.text(item.badge, badgeX2 + badgeW2 * 0.5f, badgeY2 + badgeH2 * 0.5f + 3.5f * scale,
-                        10.0f * scale, Theme.withAlpha(Theme.ACCENT, alpha), NanoVG.NVG_ALIGN_CENTER);
+                AuraRenderer.text(item.badge, badgeX2 + badgeW2 * 0.5f, badgeY2 + badgeH2 * 0.5f + 3.5f,
+                        10.0f, Theme.withAlpha(Theme.ACCENT, alpha), NanoVG.NVG_ALIGN_CENTER);
             }
 
             // Description (appears on hover)
             if (item.hover > 0.01f) {
                 float descShift = (1.0f - item.hover) * -8.0f;
-                AuraRenderer.text(item.desc, slideX + descShift, cascadeY + 40.0f * scale, 13.0f * scale,
+                AuraRenderer.text(item.desc, slideX + descShift, cascadeY + 40.0f, 13.0f,
                         Theme.withAlpha(Theme.TEXT_DIM, item.hover * alpha), NanoVG.NVG_ALIGN_LEFT);
             }
         }
 
         // 5. Bottom Status Bar
-        float bottomY = fbHeight - 40.0f * scale;
+        float bottomY = winH - 40.0f;
 
         // Server status pill
-        float pillW = 240.0f * scale;
-        float pillH = 34.0f * scale;
+        float pillW = 240.0f;
+        float pillH = 34.0f;
         float pillX = leftPad;
         AuraRenderer.shadow(pillX, bottomY - pillH * 0.5f, pillW, pillH, pillH * 0.5f, 12.0f, 0, Theme.rgba(0, 0, 0, 0.3f));
         AuraRenderer.roundRect(pillX, bottomY - pillH * 0.5f, pillW, pillH, pillH * 0.5f, Theme.PANEL_GLASS);
         AuraRenderer.outline(pillX, bottomY - pillH * 0.5f, pillW, pillH, pillH * 0.5f, 1.0f, Theme.PANEL_BORDER);
 
-        float sDotX = pillX + 16.0f * scale;
+        float sDotX = pillX + 16.0f;
         float sDotY = bottomY;
         AuraRenderer.roundRect(sDotX - 3.5f, sDotY - 3.5f, 7.0f, 7.0f, 3.5f, 0xFF34D399);
 
-        AuraRenderer.text("Сервер: —   |   Пинг: —", sDotX + 10.0f * scale, bottomY + 4.5f * scale,
-                13.0f * scale, Theme.TEXT_SECONDARY, NanoVG.NVG_ALIGN_LEFT);
+        AuraRenderer.text("Сервер: —   |   Пинг: —", sDotX + 10.0f, bottomY + 4.5f,
+                13.0f, Theme.TEXT_SECONDARY, NanoVG.NVG_ALIGN_LEFT);
 
         // Version info on bottom right
         String modVer = FabricLoader.getInstance().getModContainer("aura-ui")
@@ -289,8 +294,8 @@ public class AuraTitleScreen extends Screen {
                 .map(meta -> meta.getVersion().getFriendlyString())
                 .orElse("1.0.0");
         String verText = "Minecraft 1.20.1 Fabric • v" + modVer;
-        AuraRenderer.text(verText, fbWidth - rightPad, bottomY + 4.5f * scale,
-                13.0f * scale, Theme.TEXT_DIM, NanoVG.NVG_ALIGN_RIGHT);
+        AuraRenderer.text(verText, winW - rightPad, bottomY + 4.5f,
+                13.0f, Theme.TEXT_DIM, NanoVG.NVG_ALIGN_RIGHT);
 
         AuraRenderer.endFrame();
     }
@@ -301,19 +306,19 @@ public class AuraTitleScreen extends Screen {
 
         int fbHeight = client.getWindow().getFramebufferHeight();
         double guiScale = client.getWindow().getScaleFactor();
-        float scale = (float) (guiScale / 2.0);
+        float scale = (float) guiScale;
 
-        float realMouseX = (float) (client.mouse.getX());
-        float realMouseY = (float) (client.mouse.getY());
+        float realMouseX = (float) (client.mouse.getX() / scale);
+        float realMouseY = (float) (client.mouse.getY() / scale);
 
-        float leftPad = 80.0f * scale;
-        float brandY = fbHeight * 0.28f;
-        float navStartY = brandY + 70.0f * scale;
-        float itemH = 50.0f * scale;
-        float itemW = 380.0f * scale;
+        float leftPad = 80.0f;
+        float brandY = (fbHeight / scale) * 0.28f;
+        float navStartY = brandY + 70.0f;
+        float itemH = 50.0f;
+        float itemW = 380.0f;
 
         for (int i = 0; i < navItems.size(); i++) {
-            float curY = navStartY + i * (itemH + 12.0f * scale);
+            float curY = navStartY + i * (itemH + 12.0f);
             if (realMouseX >= leftPad && realMouseX <= leftPad + itemW &&
                 realMouseY >= curY && realMouseY <= curY + itemH) {
                 NavItem item = navItems.get(i);

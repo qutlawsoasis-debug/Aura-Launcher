@@ -2,6 +2,7 @@ package com.auramc.auraui.render;
 
 import com.auramc.auraui.AuraUi;
 import com.auramc.auraui.ui.Theme;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -15,10 +16,14 @@ import org.lwjgl.nanovg.NVGPaint;
 import org.lwjgl.nanovg.NanoVG;
 import org.lwjgl.nanovg.NanoVGGL3;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL30;
 
 public final class AuraRenderer {
     private static long vg = 0;
     private static boolean initialized = false;
+    private static boolean inFrame = false;
     private static int fontOnest = -1;
     private static final Map<String, Integer> imageCache = new HashMap<>();
 
@@ -40,8 +45,8 @@ public final class AuraRenderer {
                 return false;
             }
 
-            // Load Onest.ttf from assets
-            Identifier fontId = new Identifier("aura-ui", "fonts/Onest.ttf");
+            // Load onest.ttf from assets (lowercase identifier path)
+            Identifier fontId = new Identifier("aura-ui", "fonts/onest.ttf");
             var resourceOpt = MinecraftClient.getInstance().getResourceManager().getResource(fontId);
             if (resourceOpt.isPresent()) {
                 try (InputStream is = resourceOpt.get().getInputStream()) {
@@ -53,7 +58,7 @@ public final class AuraRenderer {
                     AuraUi.LOGGER.info("[aura-ui] NanoVG loaded font Onest (handle={})", fontOnest);
                 }
             } else {
-                AuraUi.LOGGER.warn("[aura-ui] Font Onest.ttf not found in assets");
+                AuraUi.LOGGER.warn("[aura-ui] Font fonts/onest.ttf not found in assets");
             }
 
             initialized = true;
@@ -68,25 +73,42 @@ public final class AuraRenderer {
         return vg;
     }
 
-    public static void beginFrame(float width, float height, float devicePixelRatio) {
-        if (!init()) return;
+    private static int savedVao = 0;
 
-        // Save OpenGL state before NanoVG touches shaders and states
-        GL11.glPushAttrib(GL11.GL_ALL_ATTRIB_BITS);
+    public static boolean beginFrame(float width, float height, float devicePixelRatio) {
+        if (!init()) return false;
+        if (inFrame) return true;
+
+        savedVao = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
 
         NanoVG.nvgBeginFrame(vg, width, height, devicePixelRatio);
+        inFrame = true;
+        return true;
     }
 
     public static void endFrame() {
-        if (vg == 0) return;
+        if (!inFrame || vg == 0) return;
+        inFrame = false;
+
         NanoVG.nvgEndFrame(vg);
 
-        // Restore OpenGL state
-        GL11.glPopAttrib();
+        // Restore clean OpenGL / RenderSystem state for Minecraft Core Profile
+        GL30.glBindVertexArray(savedVao);
+        GL20.glUseProgram(0);
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
 
-        // Ensure Minecraft shaders and blending are restored
+        RenderSystem.activeTexture(GL13.GL_TEXTURE0);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
+        RenderSystem.enableCull();
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(true);
+        GL11.glDisable(GL11.GL_STENCIL_TEST);
+
+        // Reset GlStateManager caches to match RenderSystem state
+        GlStateManager._enableCull();
+        GlStateManager._enableBlend();
+        GlStateManager._blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
     }
 
     private static void setNvgColor(NVGColor target, int argb) {
