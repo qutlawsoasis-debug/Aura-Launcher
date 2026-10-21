@@ -65,11 +65,8 @@
     tc.putImageData(img, 0, 0);
   })();
 
-  const pois = [
-    { x: 118, y: 132, name: 'Вы', me: 1 },
-    { x: 168, y: 96, name: 'zxcursed' },
-    { x: 96, y: 160, name: 'Спавн', spawn: 1 }
-  ];
+  // Пока карта «в разработке», процедурный мир — только фон без меток.
+  const pois = [];
 
   let view = { x: 128, y: 128, z: 5 };
   let target = { ...view };

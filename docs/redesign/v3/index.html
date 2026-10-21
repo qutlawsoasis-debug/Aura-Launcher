@@ -76,22 +76,31 @@
         <div class="sec-head">
           <div>
             <h2>Карта</h2>
-            <div class="sub">Мир Coock0ld · изученная область</div>
+            <div class="sub">В разработке</div>
           </div>
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
         <div class="sec-body" style="padding:0;overflow:hidden">
-          <div class="mapwrap">
-  <canvas id="mapCanvas"></canvas>
-  <div class="coords" id="coords">X 0 · Z 0</div>
-  <div class="map-list">
-    <button type="button" class="person" data-poi="0"><div class="face" style="--s:34px"></div><div style="flex:1"><div class="name">Вы</div><div class="small dim">Дом у озера</div></div></button>
-    <button type="button" class="person" data-poi="1"><div class="face" style="--s:34px"></div><div style="flex:1"><div class="name">zxcursed</div><div class="small dim">Шахта</div></div><span class="status"></span></button>
-    <button type="button" class="person" data-poi="2"><div style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700">S</div><div style="flex:1"><div class="name">Спавн</div></div></button>
-  </div>
-  <div class="map-zoom">
-    <button type="button" id="zin" aria-label="Приблизить">+</button>
-    <button type="button" id="zout" aria-label="Отдалить">−</button>
+          <div class="mapwrap map-soon">
+  <canvas id="mapCanvas" aria-hidden="true"></canvas>
+  <div class="map-veil" aria-hidden="true"></div>
+  <div class="map-soon-card">
+    <div class="map-compass" aria-hidden="true">
+      <span class="wave"></span><span class="wave w2"></span>
+      <svg viewBox="0 0 64 64" width="64" height="64">
+        <circle cx="32" cy="32" r="27" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.5"/>
+        <g class="needle"><path d="M32 9 L37 32 L32 30 L27 32 Z" fill="var(--accent)"/><path d="M32 55 L27 32 L32 34 L37 32 Z" fill="currentColor" fill-opacity=".45"/></g>
+        <circle cx="32" cy="32" r="2.5" fill="currentColor"/>
+      </svg>
+    </div>
+    <span class="map-badge ms" style="--i:0">В разработке</span>
+    <div class="map-soon-title ms" style="--i:1">Карта мира скоро</div>
+    <div class="map-soon-text dim ms" style="--i:2">Здесь будет живая карта вашего мира прямо из игры и друзья на ней. Мы уже её рисуем.</div>
+    <div class="map-soon-list">
+      <div class="ms" style="--i:3"><span class="dot"></span>Карта из JourneyMap</div>
+      <div class="ms" style="--i:4"><span class="dot"></span>Друзья в реальном времени</div>
+      <div class="ms" style="--i:5"><span class="dot"></span>Свои метки и точки</div>
+    </div>
   </div>
 </div>
 
