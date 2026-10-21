@@ -1,15 +1,13 @@
 /**
  * Aura Launcher v3 — Wardrobe Section Controller (skinview3d 3D Viewer)
- * Interactive 3D Minecraft skin model with Walking/Idle animation, cape toggle, and pause management.
+ * 3D-модель скина: плавное смешивание анимаций, вращение с инерцией, плащи без подгрузки на лету,
+ * рендер только пока раздел открыт.
  */
 
 (function () {
   'use strict';
 
   let viewer = null;
-  let idleAnimation = null;
-  let walkingAnimation = null;
-  let runningAnimation = null;
   let activeAnimationMode = 'idle'; // 'idle', 'walk', 'run'
   let isHovered = false;
 
@@ -18,44 +16,117 @@
     cyan: 'assets/images/cape_cyan.png',
     silver: 'assets/images/cape_silver.png'
   };
+  const capeImages = {};
 
+  const effects = () => document.documentElement.dataset.effects;
+
+  // Плащи грузим один раз: loadCape(Image) применяется сразу, без декодирования на клике
+  function preloadCapes() {
+    return Promise.all(Object.entries(CAPE_MAP).map(([key, src]) => new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => { capeImages[key] = img; resolve(); };
+      img.onerror = resolve;
+      img.src = src;
+    })));
+  }
+
+  /* ---------- Смешивание анимаций ----------
+     Каждый кадр поза собирается из «покоя» + анимации. При смене анимации старая и новая
+     считаются обе, и поза плавно переходит от одной к другой за BLEND_SEC. */
+  const BLEND_SEC = 0.35;
+  const animations = {};
+  const blend = { from: null, to: null, t: 1 };
+  let restPose = null;
+
+  function poseParts(player) {
+    const s = player.skin;
+    return [player, s.head, s.body, s.leftArm, s.rightArm, s.leftLeg, s.rightLeg, player.cape, player.elytra].filter(Boolean);
+  }
+
+  function capturePose(player) {
+    return poseParts(player).map(p => [p.position.x, p.position.y, p.position.z, p.rotation.x, p.rotation.y, p.rotation.z]);
+  }
+
+  function applyPose(player, pose) {
+    poseParts(player).forEach((p, i) => {
+      const v = pose[i];
+      p.position.set(v[0], v[1], v[2]);
+      p.rotation.set(v[3], v[4], v[5]);
+    });
+  }
+
+  function lerpPose(a, b, w) {
+    return a.map((va, i) => va.map((x, j) => x + (b[i][j] - x) * w));
+  }
+
+  function setAnimation(mode) {
+    const next = animations[mode] || animations.idle;
+    if (blend.to === next) return;
+    if (!blend.to || effects() !== 'full' && effects() !== 'low') {
+      blend.from = null; blend.to = next; blend.t = 1;
+      return;
+    }
+    blend.from = blend.to;
+    blend.to = next;
+    blend.t = 0;
+  }
+
+  function makeBlendedAnimation() {
+    return new skinview3d.FunctionAnimation((player, progress, delta) => {
+      if (!restPose || !blend.to) return;
+      if (blend.from && blend.t < 1) {
+        applyPose(player, restPose);
+        blend.from.update(player, delta);
+        const a = capturePose(player);
+        applyPose(player, restPose);
+        blend.to.update(player, delta);
+        const b = capturePose(player);
+        blend.t = Math.min(1, blend.t + delta / BLEND_SEC);
+        const w = 1 - Math.pow(1 - blend.t, 3); // ease-out
+        applyPose(player, lerpPose(a, b, w));
+        if (blend.t >= 1) blend.from = null;
+      } else {
+        applyPose(player, restPose);
+        blend.to.update(player, delta);
+      }
+    });
+  }
+
+  /* ---------- Поворот к плащу ----------
+     Крутим обёртку модели (её же крутит автоповорот) по кратчайшему пути. */
   let turnBackTimer = null;
   let rotationTween = 0;
 
-  // Плавный поворот модели вокруг вертикали. В режиме off — сразу и одним кадром.
-  function rotateModelTo(target, duration) {
-    if (!viewer || !viewer.playerObject) return;
+  function rotateWrapperTo(target, duration) {
+    if (!viewer) return;
     cancelAnimationFrame(rotationTween);
-    const body = viewer.playerObject;
-    if (document.documentElement.dataset.effects === 'off') {
-      body.rotation.y = target;
+    const wrap = viewer.playerWrapper;
+    const TAU = Math.PI * 2;
+    const from = wrap.rotation.y;
+    let to = target + Math.round((from - target) / TAU) * TAU;
+    if (effects() === 'off') {
+      wrap.rotation.y = to;
       viewer.render();
       return;
     }
-    const from = body.rotation.y;
     const start = performance.now();
-    // easeOutBack с мягким овершутом — как --spring в CSS
-    const ease = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+    const ease = t => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2); // мягкий овершут, как --spring
     const step = now => {
       const t = Math.min((now - start) / duration, 1);
-      body.rotation.y = from + (target - from) * ease(t);
+      wrap.rotation.y = from + (to - from) * ease(t);
       if (t < 1) rotationTween = requestAnimationFrame(step);
     };
     rotationTween = requestAnimationFrame(step);
   }
 
-  function turnModelBack() {
-    if (!viewer || !viewer.playerObject) return;
+  function showCapeSide() {
+    if (!viewer) return;
     clearTimeout(turnBackTimer);
     viewer.autoRotate = false;
-    rotateModelTo(Math.PI * 0.92, 650);
-
+    rotateWrapperTo(Math.PI, 700);
     turnBackTimer = setTimeout(() => {
-      const effects = document.documentElement.dataset.effects;
-      rotateModelTo(0, 750);
-      if (effects !== 'low' && effects !== 'off' && !isHovered) {
-        setTimeout(() => { if (viewer && !isHovered) viewer.autoRotate = true; }, 750);
-      }
+      rotateWrapperTo(0, 800);
+      setTimeout(() => { turnBackTimer = null; updateRenderPauseState(); }, 820);
     }, 1800);
   }
 
@@ -69,155 +140,91 @@
     }
 
     const rect = canvas.getBoundingClientRect();
-    const w = rect.width > 50 ? rect.width : 260;
-    const h = rect.height > 50 ? rect.height : 380;
-
-    // Create skinview3d viewer instance
     viewer = new skinview3d.SkinViewer({
       canvas: canvas,
-      width: w,
-      height: h,
+      width: rect.width > 50 ? rect.width : 260,
+      height: rect.height > 50 ? rect.height : 380,
       skin: DEFAULT_SKIN
     });
-
-    if (viewer.renderer) {
-      const cappedRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-      viewer.renderer.setPixelRatio(cappedRatio);
-      if (viewer.composer) {
-        viewer.composer.setPixelRatio(cappedRatio);
-      }
-    }
-
-    // Set preserveDrawingBuffer to true or force initial render once skin loads
-    viewer.loadSkin(DEFAULT_SKIN).then(() => {
-      viewer.render();
-    }).catch(() => {});
+    viewer.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 
     viewer.fov = 70;
     viewer.zoom = 0.9;
-    viewer.autoRotate = true;
     viewer.autoRotateSpeed = 0.55;
 
-    // Load initial cape
-    viewer.loadCape(CAPE_MAP.cyan).catch(() => {});
-
-    // Animations setup
-    idleAnimation = new skinview3d.IdleAnimation();
-    idleAnimation.speed = 0.8;
-    walkingAnimation = new skinview3d.WalkingAnimation();
-    walkingAnimation.speed = 0.85;
-    runningAnimation = new skinview3d.RunningAnimation();
-    runningAnimation.speed = 1.0;
-
-    viewer.animation = idleAnimation;
-
-    // Throttled render loop with single-frame render in 'off' mode
-    const originalDraw = viewer.draw.bind(viewer);
-    let lastRenderTime = 0;
-    viewer.draw = function () {
-      const effects = document.documentElement.dataset.effects;
-      if (effects === 'off') {
-        originalDraw();
-        return;
-      }
-
-      const now = performance.now();
-      const targetFps = (activeAnimationMode === 'idle' && !isHovered) ? 30 : 60;
-      const minInterval = 1000 / targetFps - 2;
-
-      if (now - lastRenderTime >= minInterval) {
-        lastRenderTime = now;
-        originalDraw();
-      } else {
-        if (!viewer._renderPaused && !viewer._disposed) {
-          viewer.animationID = window.requestAnimationFrame(() => viewer.draw());
-        }
-      }
-    };
-
-    // Orbit controls limits
+    // Вращение мышью с инерцией вместо жёсткой привязки к курсору
     if (viewer.controls) {
+      viewer.controls.enableDamping = true;
+      viewer.controls.dampingFactor = 0.08;
+      viewer.controls.rotateSpeed = 0.7;
       viewer.controls.enableZoom = true;
+      viewer.controls.enablePan = false;
       viewer.controls.minDistance = 15;
       viewer.controls.maxDistance = 60;
     }
 
-    // Resize observer on wardrobe container to update viewer size dynamically
+    animations.idle = new skinview3d.IdleAnimation();
+    animations.idle.speed = 0.8;
+    animations.walk = new skinview3d.WalkingAnimation();
+    animations.walk.speed = 0.85;
+    animations.run = new skinview3d.RunningAnimation();
+    animations.run.speed = 1.0;
+
+    restPose = capturePose(viewer.playerObject);
+    blend.to = animations.idle;
+    viewer.animation = makeBlendedAnimation();
+
+    viewer.loadSkin(DEFAULT_SKIN).then(() => viewer.render()).catch(() => {});
+    preloadCapes().then(() => {
+      if (capeImages.cyan) viewer.loadCape(capeImages.cyan);
+      viewer.render();
+    });
+
     if (window.ResizeObserver) {
-      const ro = new ResizeObserver(() => {
-        if (viewer && canvas) {
-          const r = canvas.getBoundingClientRect();
-          if (r.width > 50 && r.height > 50) {
-            viewer.setSize(r.width, r.height);
-          }
-        }
-      });
-      ro.observe(canvas);
+      new ResizeObserver(() => {
+        const r = canvas.getBoundingClientRect();
+        if (r.width > 50 && r.height > 50) viewer.setSize(r.width, r.height);
+      }).observe(canvas);
     }
 
-    // Hover walking animation transition
     canvas.addEventListener('mouseenter', () => {
       isHovered = true;
       viewer.autoRotate = false;
-      if (activeAnimationMode === 'idle' && walkingAnimation) {
-        viewer.animation = walkingAnimation;
-      }
+      if (activeAnimationMode === 'idle') setAnimation('walk');
     });
 
     canvas.addEventListener('mouseleave', () => {
       isHovered = false;
-      const effects = document.documentElement.dataset.effects;
-      if (effects !== 'low' && effects !== 'off') {
-        viewer.autoRotate = true;
-      }
-      applyAnimationMode(activeAnimationMode);
+      setAnimation(activeAnimationMode);
+      updateRenderPauseState();
     });
 
-    // Animation Segment buttons
     document.querySelectorAll('.skin-anim-seg button').forEach(btn => {
       btn.addEventListener('click', () => {
-        const mode = btn.dataset.anim;
-        activeAnimationMode = mode;
-        applyAnimationMode(mode);
+        activeAnimationMode = btn.dataset.anim;
+        setAnimation(activeAnimationMode);
+        if (effects() === 'off') viewer.render();
       });
     });
 
-    // Model type
     document.querySelectorAll('#modelTypeSeg button').forEach(btn => {
       btn.addEventListener('click', () => {
-        const model = btn.dataset.model || 'default';
-        if (viewer && viewer.playerObject) {
-          viewer.playerObject.skin.modelType = model;
-          if (document.documentElement.dataset.effects === 'off') {
-            viewer.render();
-          }
-        }
+        viewer.playerObject.skin.modelType = btn.dataset.model || 'default';
+        if (effects() === 'off') viewer.render();
       });
     });
 
-    // Cape selector with turnModelBack on hover and click
     document.querySelectorAll('#capeSelector .cape').forEach(btn => {
-      btn.addEventListener('mouseenter', () => {
-        turnModelBack();
-      });
-
       btn.addEventListener('click', () => {
         document.querySelectorAll('#capeSelector .cape').forEach(b => b.classList.remove('on'));
         btn.classList.add('on');
         const capeType = btn.dataset.cape;
-        if (capeType === 'none') {
-          viewer.resetCape();
-        } else if (CAPE_MAP[capeType]) {
-          viewer.loadCape(CAPE_MAP[capeType]).catch(() => {});
-        }
-        turnModelBack();
-        if (document.documentElement.dataset.effects === 'off') {
-          setTimeout(() => viewer && viewer.render(), 100);
-        }
+        if (capeType === 'none') viewer.resetCape();
+        else if (capeImages[capeType]) viewer.loadCape(capeImages[capeType]);
+        showCapeSide();
       });
     });
 
-    // Custom skin file upload with face preview update
     const skinFileInput = document.getElementById('skinFileInput');
     const skinNameLabel = document.getElementById('currentSkinFileName');
     const skinFacePreview = document.getElementById('skinFacePreview');
@@ -230,89 +237,55 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
           const dataUrl = ev.target.result;
-          canvas.style.transition = 'opacity var(--dur-1) var(--ease-out)';
+          canvas.style.transition = 'opacity var(--dur-2) var(--ease-out)';
           canvas.style.opacity = '0.3';
 
           viewer.loadSkin(dataUrl).then(() => {
             canvas.style.opacity = '1';
             if (skinNameLabel) skinNameLabel.textContent = file.name;
-            if (skinFacePreview) {
-              skinFacePreview.style.backgroundImage = `url('${dataUrl}'), url('${dataUrl}')`;
-            }
-            if (document.documentElement.dataset.effects === 'off') {
-              viewer.render();
-            }
-            if (typeof window.showToast === 'function') {
-              window.showToast('Скин успешно загружен', 'success');
-            }
+            if (skinFacePreview) skinFacePreview.style.backgroundImage = `url('${dataUrl}'), url('${dataUrl}')`;
+            if (effects() === 'off') viewer.render();
+            if (typeof window.showToast === 'function') window.showToast('Скин загружен', 'success');
           }).catch(() => {
             canvas.style.opacity = '1';
-            if (typeof window.showToast === 'function') {
-              window.showToast('Не удалось загрузить скин', 'error');
-            }
+            if (typeof window.showToast === 'function') window.showToast('Не удалось загрузить скин', 'error');
           });
         };
         reader.readAsDataURL(file);
       });
     }
 
-    // Nickname input toast feedback
     const nickInput = document.getElementById('inputPlayerNickname');
     if (nickInput) {
       nickInput.addEventListener('change', () => {
-        if (typeof window.showToast === 'function') {
-          window.showToast(`Ник изменён на ${nickInput.value}`, 'info');
-        }
+        if (typeof window.showToast === 'function') window.showToast(`Ник изменён на ${nickInput.value}`, 'info');
       });
     }
 
     updateRenderPauseState();
   }
 
-  function applyAnimationMode(mode) {
-    if (!viewer) return;
-    const effects = document.documentElement.dataset.effects;
-    if (effects === 'off') {
-      viewer.animation = null;
-      viewer.render();
-      return;
-    }
-    if (mode === 'idle') viewer.animation = idleAnimation;
-    else if (mode === 'walk') viewer.animation = walkingAnimation;
-    else if (mode === 'run') viewer.animation = runningAnimation;
-  }
-
+  // Рендер идёт каждый кадр, пока раздел открыт и окно видно; иначе полностью стоит.
   function updateRenderPauseState() {
-    const isWardrobeOpen = document.body.classList.contains('is-open') && 
+    const isWardrobeOpen = document.body.classList.contains('is-open') &&
       document.querySelector('[data-l="wardrobe"]')?.classList.contains('on');
-    const effects = document.documentElement.dataset.effects;
-    const isHidden = document.hidden;
 
     if (isWardrobeOpen && !viewer) {
       initSkinview();
       return;
     }
-
     if (!viewer) return;
 
-    if (!isWardrobeOpen || isHidden) {
+    const mode = effects();
+    if (!isWardrobeOpen || document.hidden) {
       viewer.renderPaused = true;
-    } else if (effects === 'off') {
-      // In 'off' mode: static single frame render, no animations, no autoRotate
+    } else if (mode === 'off') {
       viewer.renderPaused = true;
       viewer.autoRotate = false;
-      viewer.animation = null;
       viewer.render();
-    } else if (effects === 'low') {
-      // In 'low' mode: animation active, autoRotate off
-      viewer.renderPaused = false;
-      viewer.autoRotate = false;
-      applyAnimationMode(activeAnimationMode);
     } else {
-      // In 'full' mode: full animations + autoRotate
       viewer.renderPaused = false;
-      viewer.autoRotate = !isHovered;
-      applyAnimationMode(activeAnimationMode);
+      viewer.autoRotate = mode === 'full' && !isHovered && turnBackTimer === null;
     }
   }
 
@@ -320,16 +293,15 @@
   window.AuraWardrobe = {
     get viewer() { return viewer; },
     get isHovered() { return isHovered; },
-    updateRenderPauseState: updateRenderPauseState
+    updateRenderPauseState
   };
 
-  // Listen to layer changes, route changes, visibility and effects
   window.addEventListener('hashchange', updateRenderPauseState);
   document.addEventListener('visibilitychange', updateRenderPauseState);
 
   const islandEl = document.getElementById('island');
   if (islandEl && window.MutationObserver) {
-    new MutationObserver(updateRenderPauseState).observe(islandEl, { attributes: true, attributeFilter: ['class', 'style'] });
+    new MutationObserver(updateRenderPauseState).observe(islandEl, { attributes: true, attributeFilter: ['class'] });
   }
 
   if (document.readyState === 'loading') {

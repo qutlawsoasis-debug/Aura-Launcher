@@ -19,19 +19,78 @@
     const ramHint = document.getElementById('settingsRamHint');
     const presetHint = document.getElementById('settingsPresetHint');
 
-    // 1. RAM Slider
+    // 1. Память: ручка едет плавно, цифра прокручивается, при отпускании ручка доезжает до целого ГБ
     if (ramSlider && ramVal && ramHint) {
-      const updateRam = () => {
-        const v = parseInt(ramSlider.value, 10);
-        const percent = ((v - 4) / 8) * 100;
-        ramSlider.style.setProperty('--p', `${percent}%`);
-        ramVal.textContent = v;
-        const note = (v <= 4 ? 'Минимум' : v <= 6 ? 'Оптимально' : v <= 8 ? 'Для шейдеров' : 'Для Distant Horizons');
-        ramHint.textContent = `${note} · из 16 ГБ`;
+      const MIN = Number(ramSlider.min), MAX = Number(ramSlider.max);
+      const animated = () => document.documentElement.dataset.effects !== 'off' && Element.prototype.animate;
+      const noteFor = v => (v <= 4 ? 'Минимум' : v <= 6 ? 'Оптимально' : v <= 8 ? 'Для шейдеров' : 'Для Distant Horizons');
+      let shown = Math.round(Number(ramSlider.value));
+      let shownNote = noteFor(shown);
+      let glide = 0;
+
+      ramVal.style.display = 'inline-block';
+      ramVal.style.position = 'relative';
+      ramVal.style.minWidth = '1.2ch';
+
+      const roll = (next, dir) => {
+        if (!animated()) { ramVal.textContent = next; return; }
+        const ghost = document.createElement('span');
+        ghost.textContent = ramVal.textContent;
+        Object.assign(ghost.style, { position: 'absolute', left: '0', top: '0' });
+        ramVal.textContent = next;
+        ramVal.appendChild(ghost);
+        const ease = 'cubic-bezier(0.22, 1, 0.36, 1)';
+        ghost.animate([{ transform: 'translateY(0)', opacity: 1 }, { transform: `translateY(${-dir * 0.55}em)`, opacity: 0 }],
+          { duration: 260, easing: ease, fill: 'forwards' }).onfinish = () => ghost.remove();
+        ramVal.firstChild && ramVal.animate([{ transform: `translateY(${dir * 0.55}em)`, opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }],
+          { duration: 320, easing: ease });
       };
 
-      ramSlider.addEventListener('input', updateRam);
-      updateRam();
+      const render = () => {
+        const raw = Number(ramSlider.value);
+        ramSlider.style.setProperty('--p', `${((raw - MIN) / (MAX - MIN)) * 100}%`);
+        const v = Math.round(raw);
+        if (v !== shown) { roll(v, v > shown ? 1 : -1); shown = v; }
+        const note = noteFor(v);
+        if (note !== shownNote) {
+          shownNote = note;
+          if (animated()) {
+            ramHint.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 120, easing: 'ease-out' }).onfinish = () => {
+              ramHint.textContent = `${note} · из 16 ГБ`;
+              ramHint.animate([{ opacity: 0, transform: 'translateY(3px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: 'ease-out' });
+            };
+          } else {
+            ramHint.textContent = `${note} · из 16 ГБ`;
+          }
+        }
+      };
+
+      const glideTo = target => {
+        cancelAnimationFrame(glide);
+        const from = Number(ramSlider.value);
+        if (!animated() || Math.abs(target - from) < 0.001) { ramSlider.value = target; render(); return; }
+        const start = performance.now();
+        const step = now => {
+          const t = Math.min((now - start) / 260, 1);
+          ramSlider.value = from + (target - from) * (1 - Math.pow(1 - t, 3));
+          render();
+          if (t < 1) glide = requestAnimationFrame(step);
+        };
+        glide = requestAnimationFrame(step);
+      };
+
+      ramSlider.step = 'any';
+      ramSlider.addEventListener('input', () => { cancelAnimationFrame(glide); render(); });
+      ramSlider.addEventListener('change', () => glideTo(Math.round(Number(ramSlider.value))));
+      ramSlider.addEventListener('keydown', (e) => {
+        const d = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 }[e.key];
+        if (!d) return;
+        e.preventDefault();
+        glideTo(Math.min(MAX, Math.max(MIN, Math.round(Number(ramSlider.value)) + d)));
+      });
+      ramVal.textContent = shown;
+      ramHint.textContent = `${shownNote} · из 16 ГБ`;
+      render();
     }
 
     // 2. Graphics Preset Segmented Buttons with crossfade hint
