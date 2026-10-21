@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\aura-icon.ico</ApplicationIcon>
-    <Version>1.2.140</Version>
+    <Version>1.2.141</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -92,6 +92,15 @@
       <UiDistFiles Include="docs\redesign\v3\dist\**\*.*" />
     </ItemGroup>
     <Copy SourceFiles="@(UiDistFiles)" DestinationFolder="$(TargetDir)ui\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- dotnet publish (build-release.ps1 → Velopack) пишет в PublishDir: интерфейс нужен и там -->
+  <Target Name="PublishWebUi" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <UiPublishFiles Include="docs\redesign\v3\dist\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UiPublishFiles)" DestinationFolder="$(PublishDir)ui\%(RecursiveDir)" />
+    <Error Condition="!Exists('$(PublishDir)ui\index.html')" Text="Интерфейс не попал в публикацию: нет ui\index.html" />
   </Target>
 
 </Project>
