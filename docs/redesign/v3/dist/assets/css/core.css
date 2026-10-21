@@ -64,7 +64,7 @@ button {
   pointer-events: none;
   background: rgba(0, 0, 0, 0.18);
   opacity: 0;
-  transition: opacity 0.6s var(--smooth);
+  transition: opacity var(--dur-3) var(--ease-out);
   z-index: 1;
 }
 
@@ -75,10 +75,6 @@ button {
   background: linear-gradient(180deg, rgba(4, 8, 14, 0.4), transparent 20%, transparent 62%, rgba(4, 8, 14, 0.55));
   transition: background 0.6s;
   z-index: 2;
-}
-
-body.is-open .world {
-  transform: scale(1.04);
 }
 
 body.is-open .world-dim {
@@ -180,13 +176,16 @@ body.is-open .world-dim {
 }
 
 /* ================= 2. ОСТРОВ-КАПСУЛА ================= */
+/* Центрирование без transform: под трансформированным предком Chrome отключает
+   background-attachment: fixed, на котором держится заранее размытая копия мира. */
 .island {
   position: absolute;
-  left: 50%;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
   bottom: 36px;
   width: 400px;
   height: 76px;
-  transform: translateX(-50%);
   border-radius: 38px;
   overflow: hidden;
   contain: layout paint;

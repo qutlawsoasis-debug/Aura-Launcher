@@ -94,7 +94,9 @@
               bottom var(--dur-morph) var(--spring),
               background var(--dur-3) var(--ease-out),
               box-shadow var(--dur-3) var(--ease-out),
-              border-color var(--dur-3) var(--ease-out);
+              border-color var(--dur-3) var(--ease-out),
+              backdrop-filter 0s linear,
+              -webkit-backdrop-filter 0s linear;
 }
 
 html[data-effects="full"] .island {
@@ -103,29 +105,49 @@ html[data-effects="full"] .island {
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(1.05);
 }
 
-/* В раскрытых разделах заранее размытый фон — отдельный слой через ::before с плавным fade */
+/* В раскрытом разделе вместо живого размытия — заранее размытая копия мира (bg_1-blur.jpg,
+   те же blur/saturate/brightness запечены в картинку). Копия привязана к окну (fixed) с тем же
+   размером и центром, что у .world (inset -3%, cover, 16:9), и накрыта тем же градиентом .shade
+   и затемнением .world-dim — поэтому совпадает с миром в каждом кадре морфа, без JS. */
 .island::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background-image: var(--glass-sheen), linear-gradient(var(--glass), var(--glass)), url('assets/images/bg_1-blur.jpg');
-  background-position: var(--bg-blur-pos, center top, center center, center center);
-  background-size: var(--bg-blur-size, auto, auto, cover);
+  background-image:
+    var(--glass-sheen),
+    linear-gradient(var(--glass), var(--glass)),
+    linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)),
+    linear-gradient(180deg, rgba(4, 8, 14, 0.4), transparent 20%, transparent 62%, rgba(4, 8, 14, 0.55)),
+    url('assets/images/bg_1-blur.jpg');
+  background-attachment: scroll, scroll, scroll, fixed, fixed;
+  background-position: center top, center, center, 0 0, center center;
+  background-size: auto, auto, auto, 100vw 100vh, max(106vw, calc(106vh * 16 / 9)) auto;
   background-repeat: no-repeat;
   opacity: 0;
   pointer-events: none;
   z-index: 0;
-  transition: opacity var(--dur-2) var(--ease-out);
+  transition: opacity var(--dur-3) var(--ease-out);
 }
 
 html[data-effects="full"] .island.open::before {
   opacity: 1;
 }
 
+/* Живое размытие снимается только когда копия уже проявилась (задержка = длительности проявления),
+   а при закрытии возвращается сразу — иначе мелькает прозрачная панель без размытия. */
 html[data-effects="full"] .island.open {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: width var(--dur-morph) var(--spring),
+              height var(--dur-morph) var(--spring),
+              border-radius var(--dur-morph) var(--spring),
+              bottom var(--dur-morph) var(--spring),
+              background var(--dur-3) var(--ease-out),
+              box-shadow var(--dur-3) var(--ease-out),
+              border-color var(--dur-3) var(--ease-out),
+              backdrop-filter 0s linear var(--dur-3),
+              -webkit-backdrop-filter 0s linear var(--dur-3);
 }
 
 html[data-effects="low"] .island {
