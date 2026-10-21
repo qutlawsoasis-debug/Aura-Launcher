@@ -57,6 +57,7 @@ public class CloudLobbyService : ICloudLobbyService
         string worldName,
         string? seed = null,
         string? worldId = null,
+        string? version = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -66,7 +67,8 @@ public class CloudLobbyService : ICloudLobbyService
                 owner = string.IsNullOrWhiteSpace(owner) ? "Player" : owner.Trim(),
                 worldName = string.IsNullOrWhiteSpace(worldName) ? "Мир" : worldName.Trim(),
                 seed = seed?.Trim() ?? string.Empty,
-                worldId = worldId?.Trim()
+                worldId = worldId?.Trim(),
+                version = version?.Trim()
             };
 
             var content = new StringContent(
@@ -198,6 +200,7 @@ public class CloudLobbyService : ICloudLobbyService
         string owner,
         string worldName,
         string zipFilePath,
+        string? version = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -213,6 +216,10 @@ public class CloudLobbyService : ICloudLobbyService
             req.Headers.Add("X-Aura-Secret", DefaultSecret);
             req.Headers.Add("X-Owner", Uri.EscapeDataString(owner.Trim()));
             req.Headers.Add("X-World-Name", Uri.EscapeDataString(worldName.Trim()));
+            if (!string.IsNullOrWhiteSpace(version))
+            {
+                req.Headers.Add("X-Game-Version", version.Trim());
+            }
 
             using var resp = await _httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (!resp.IsSuccessStatusCode)

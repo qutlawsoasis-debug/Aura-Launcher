@@ -120,6 +120,38 @@ public class LobbyViewModel : ObservableObject
         set => SetProperty(ref _newWorldSeed, value);
     }
 
+    private string _newWorldVersion = GameVersionProfiles.Version121;
+    public string NewWorldVersion
+    {
+        get => _newWorldVersion;
+        set
+        {
+            if (SetProperty(ref _newWorldVersion, value))
+            {
+                OnPropertyChanged(nameof(IsNewWorldVersion120));
+                OnPropertyChanged(nameof(IsNewWorldVersion121));
+            }
+        }
+    }
+
+    public bool IsNewWorldVersion120
+    {
+        get => _newWorldVersion == GameVersionProfiles.Version120;
+        set
+        {
+            if (value) NewWorldVersion = GameVersionProfiles.Version120;
+        }
+    }
+
+    public bool IsNewWorldVersion121
+    {
+        get => _newWorldVersion == GameVersionProfiles.Version121;
+        set
+        {
+            if (value) NewWorldVersion = GameVersionProfiles.Version121;
+        }
+    }
+
     private bool _isCreatingWorld;
     public bool IsCreatingWorld
     {
@@ -544,6 +576,7 @@ public class LobbyViewModel : ObservableObject
         {
             CreateWorldError = null;
             IsCreateModeFromScratch = true;
+            NewWorldVersion = GameVersionProfiles.NormalizeVersion(_configService?.CurrentConfig?.SelectedVersion);
             IsCreateWorldFormVisible = true;
         }, _ => !IsInLobby);
         CancelCreateWorldFormCommand = new RelayCommand(_ =>
@@ -3080,7 +3113,7 @@ public class LobbyViewModel : ObservableObject
 
         try
         {
-            var res = await _cloudLobbyService.CreateOrStartWorldAsync(myNick, wName, NewWorldSeed);
+            var res = await _cloudLobbyService.CreateOrStartWorldAsync(myNick, wName, NewWorldSeed, version: NewWorldVersion);
             if (res != null && res.Port.HasValue)
             {
                 IsCreateWorldFormVisible = false;
@@ -3120,7 +3153,7 @@ public class LobbyViewModel : ObservableObject
 
         try
         {
-            var res = await _cloudLobbyService.CreateOrStartWorldAsync(world.Owner, world.Name, world.Seed, world.Id);
+            var res = await _cloudLobbyService.CreateOrStartWorldAsync(world.Owner, world.Name, world.Seed, world.Id, world.GameVersion);
             if (res == null || !res.Port.HasValue)
             {
                 world.Status = "sleeping";
@@ -3481,6 +3514,8 @@ public class CloudWorldItemViewModel : ObservableObject
     public string Name => _item.Name;
     public string Owner => _item.Owner;
     public string? Seed => _item.Seed;
+    public string GameVersion => _item.GameVersion ?? "1.20.1";
+    public string DisplayVersion => GameVersionProfiles.NormalizeVersion(_item.GameVersion);
 
     private int? _port;
     public int? Port

@@ -17,9 +17,12 @@ public record CloudWorldItem(
     [property: JsonPropertyName("max_players")] int MaxPlayers = 8,
     [property: JsonPropertyName("is_owner")] bool IsOwner = false,
     [property: JsonPropertyName("stageText")] string? StageText = null,
-    [property: JsonPropertyName("progress")] int Progress = 0
+    [property: JsonPropertyName("progress")] int Progress = 0,
+    [property: JsonPropertyName("game_version")] string? GameVersion = "1.20.1"
 )
 {
+    [JsonIgnore]
+    public string DisplayVersion => GameVersion ?? "1.20.1";
     [JsonIgnore]
     public bool IsRunning => string.Equals(Status, "running", System.StringComparison.OrdinalIgnoreCase);
 
@@ -55,7 +58,8 @@ public record CloudLobbyCreateResponse(
     [property: JsonPropertyName("worldId")] string? WorldId,
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("owner")] string? Owner,
-    [property: JsonPropertyName("error")] string? Error
+    [property: JsonPropertyName("error")] string? Error,
+    [property: JsonPropertyName("game_version")] string? GameVersion = null
 );
 
 public record CloudWorldShareResponse(

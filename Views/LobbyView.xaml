@@ -357,6 +357,38 @@
                                     </Grid>
                                 </Border>
 
+                                <TextBlock Text="Версия игры"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource GameInputTextMutedBrush}"
+                                           Margin="2,0,0,6" />
+                                <Grid Height="32" Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton Grid.Column="0"
+                                                 GroupName="NewWorldVersionGroup"
+                                                 Content="1.21.1 (Новая)"
+                                                 IsChecked="{Binding IsNewWorldVersion121, Mode=TwoWay}"
+                                                 Style="{StaticResource SubNavPillRadio}"
+                                                 HorizontalAlignment="Stretch"
+                                                 HorizontalContentAlignment="Center"
+                                                 Height="32"
+                                                 FontSize="12"
+                                                 Margin="0,0,3,0" />
+                                    <RadioButton Grid.Column="1"
+                                                 GroupName="NewWorldVersionGroup"
+                                                 Content="1.20.1 (Старая)"
+                                                 IsChecked="{Binding IsNewWorldVersion120, Mode=TwoWay}"
+                                                 Style="{StaticResource SubNavPillRadio}"
+                                                 HorizontalAlignment="Stretch"
+                                                 HorizontalContentAlignment="Center"
+                                                 Height="32"
+                                                 FontSize="12"
+                                                 Margin="3,0,0,0" />
+                                </Grid>
+
                                 <TextBlock Text="{Binding CreateWorldError}"
                                            FontFamily="{StaticResource MainFont}"
                                            FontSize="12"
@@ -498,6 +530,38 @@
                                                Foreground="{DynamicResource Accent}"
                                                HorizontalAlignment="Center" />
                                 </StackPanel>
+
+                                <TextBlock Text="Версия игры"
+                                           FontFamily="{StaticResource MainFont}"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource GameInputTextMutedBrush}"
+                                           Margin="2,0,0,6" />
+                                <Grid Height="32" Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <RadioButton Grid.Column="0"
+                                                 GroupName="NewWorldVersionGroup"
+                                                 Content="1.21.1 (Новая)"
+                                                 IsChecked="{Binding IsNewWorldVersion121, Mode=TwoWay}"
+                                                 Style="{StaticResource SubNavPillRadio}"
+                                                 HorizontalAlignment="Stretch"
+                                                 HorizontalContentAlignment="Center"
+                                                 Height="32"
+                                                 FontSize="12"
+                                                 Margin="0,0,3,0" />
+                                    <RadioButton Grid.Column="1"
+                                                 GroupName="NewWorldVersionGroup"
+                                                 Content="1.20.1 (Старая)"
+                                                 IsChecked="{Binding IsNewWorldVersion120, Mode=TwoWay}"
+                                                 Style="{StaticResource SubNavPillRadio}"
+                                                 HorizontalAlignment="Stretch"
+                                                 HorizontalContentAlignment="Center"
+                                                 Height="32"
+                                                 FontSize="12"
+                                                 Margin="3,0,0,0" />
+                                </Grid>
 
                                 <TextBlock Text="{Binding CreateWorldError}"
                                            FontFamily="{StaticResource MainFont}"
