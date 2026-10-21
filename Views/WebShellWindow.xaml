@@ -17,6 +17,6 @@
                       UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
     <Grid Background="{DynamicResource BgBase}">
-        <wv2:WebView2 x:Name="WebViewControl" />
+        <wv2:WebView2 x:Name="WebViewControl" DefaultBackgroundColor="#0B0F16" />
     </Grid>
 </Window>

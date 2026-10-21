@@ -270,6 +270,22 @@ public partial class WebBridge : IDisposable
                     await HandleLogsExportAsync(msg);
                     break;
 
+                case "startup.run":
+                    HandleStartupRun(msg);
+                    break;
+
+                case "startup.retry":
+                    HandleStartupChoice(msg, retry: true);
+                    break;
+
+                case "startup.skip":
+                    HandleStartupChoice(msg, retry: false);
+                    break;
+
+                case "changelog.get":
+                    HandleChangelogGet(msg);
+                    break;
+
                 case "launcher.updateGet":
                     HandleLauncherUpdateGet(msg);
                     break;

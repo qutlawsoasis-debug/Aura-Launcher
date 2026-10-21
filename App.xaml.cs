@@ -180,9 +180,18 @@ public partial class App : Application
         }
         catch { }
 
-        // Предстартовое окно (splash): открывается до тяжелых ресурсов и главного окна
+        // Новый интерфейс «Остров» по умолчанию; старое окно — по --classic или AURA_WEBUI=0,
+        // а также автоматически, если в сборке нет папки с интерфейсом.
+        bool forceClassic = isSelfTest ||
+                            Array.Exists(args, a => a.Equals("--classic", StringComparison.OrdinalIgnoreCase)) ||
+                            Environment.GetEnvironmentVariable("AURA_WEBUI") == "0";
+        bool useWebUi = !forceClassic && WebShellWindow.HasUiBundle();
+        Log($"[STARTUP] ui={(useWebUi ? "web" : "classic")} (forceClassic={forceClassic})");
+
+        // Предстартовое окно (splash): открывается до тяжелых ресурсов и главного окна.
+        // В новом интерфейсе экран загрузки и проверка обновления — внутри самого окна.
         bool isUpdatedRestart = Array.Exists(args, a => a.Equals("--updated-restart", StringComparison.OrdinalIgnoreCase));
-        bool skipSplash = isUpdatedRestart || isSelfTest || Array.Exists(args, a => a.Equals("--no-splash", StringComparison.OrdinalIgnoreCase) || a.Equals("--no-preupdate", StringComparison.OrdinalIgnoreCase));
+        bool skipSplash = useWebUi || isUpdatedRestart || isSelfTest || Array.Exists(args, a => a.Equals("--no-splash", StringComparison.OrdinalIgnoreCase) || a.Equals("--no-preupdate", StringComparison.OrdinalIgnoreCase));
 
         StartupWindow? splashWin = null;
 
@@ -251,14 +260,6 @@ public partial class App : Application
         }
         catch { }
 
-        // Новый интерфейс «Остров» по умолчанию; старое окно — по --classic или AURA_WEBUI=0,
-        // а также автоматически, если в сборке нет папки с интерфейсом.
-        bool forceClassic = isSelfTest ||
-                            Array.Exists(args, a => a.Equals("--classic", StringComparison.OrdinalIgnoreCase)) ||
-                            Environment.GetEnvironmentVariable("AURA_WEBUI") == "0";
-        bool useWebUi = !forceClassic && WebShellWindow.HasUiBundle();
-        Log($"[STARTUP] ui={(useWebUi ? "web" : "classic")} (forceClassic={forceClassic})");
-
         Window activeWindow;
         if (useWebUi)
         {
@@ -273,7 +274,10 @@ public partial class App : Application
                 Services.GetRequiredService<IFriendService>(),
                 Services.GetRequiredService<IReportService>(),
                 Services.GetRequiredService<ILobbySessionService>(),
-                Services.GetRequiredService<ILauncherUpdateService>());
+                Services.GetRequiredService<ILauncherUpdateService>())
+            {
+                IsUpdatedRestart = isUpdatedRestart
+            };
             activeWindow = webShell;
         }
         else

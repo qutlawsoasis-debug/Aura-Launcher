@@ -1,0 +1,166 @@
+/**
+ * Aura Launcher v3 — экран загрузки.
+ * Мост проверяет обновление (startup.run → события startup.state), экран показывает статус.
+ * Когда всё готово, парящая капсула уплывает вниз на место настоящей и растворяется в ней.
+ */
+
+(function () {
+  'use strict';
+
+  const MIN_SHOW_MS = 1500;
+
+  function initBoot() {
+    const root = document.documentElement;
+    const boot = document.getElementById('boot');
+    if (!boot || !root.classList.contains('booting')) return;
+
+    const floatBox = boot.querySelector('.boot-float');
+    const capsule = document.getElementById('bootCapsule');
+    const status = document.getElementById('bootStatus');
+    const bar = document.getElementById('bootBar');
+    const actions = document.getElementById('bootActions');
+    const retryBtn = document.getElementById('bootRetry');
+    const skipBtn = document.getElementById('bootSkip');
+    const versionEl = document.getElementById('bootVersion');
+    const news = document.getElementById('bootNews');
+    const newsList = document.getElementById('bootNewsList');
+    const newsVersion = document.getElementById('bootNewsVersion');
+    const newsGo = document.getElementById('bootNewsGo');
+
+    const startedAt = performance.now();
+    const effectsOff = () => root.dataset.effects === 'off';
+    let finished = false;
+    let waitNews = null;
+
+    const DOTS = '<span class="boot-dots"><i>.</i><i>.</i><i>.</i></span>';
+
+    function setStatus(html, tone) {
+      if (status.dataset.html === html && status.dataset.tone === (tone || '')) return;
+      status.dataset.html = html;
+      status.dataset.tone = tone || '';
+      const apply = () => {
+        status.innerHTML = html;
+        status.classList.toggle('ok', tone === 'ok');
+        status.classList.toggle('err', tone === 'err');
+        status.classList.remove('swap');
+      };
+      if (effectsOff()) { apply(); return; }
+      status.classList.add('swap');
+      setTimeout(apply, 160);
+    }
+
+    function onState(s) {
+      if (!s || finished) return;
+      const x = s.extra || {};
+      boot.classList.toggle('downloading', s.stage === 'downloading');
+      actions.hidden = s.stage !== 'error';
+      switch (s.stage) {
+        case 'checking':
+          setStatus('Проверка обновления' + DOTS);
+          break;
+        case 'upToDate':
+          setStatus('Установлено последнее обновление', 'ok');
+          break;
+        case 'updated':
+          setStatus('Обновление установлено', 'ok');
+          break;
+        case 'downloading': {
+          const pct = Math.max(0, Math.min(100, Number(x.percentage) || 0));
+          bar.style.transform = `scaleX(${pct / 100})`;
+          setStatus(`Скачиваем ${x.version || 'обновление'} · ${Math.round(pct)}%${x.speed ? ' · ' + x.speed : ''}`);
+          break;
+        }
+        case 'installing':
+          bar.style.transform = 'scaleX(1)';
+          setStatus('Установка и перезапуск' + DOTS);
+          break;
+        case 'error':
+          setStatus(x.text || 'Ошибка', 'err');
+          retryBtn.hidden = Boolean(x.skipOnly);
+          break;
+        case 'ready':
+          finish();
+          break;
+      }
+    }
+
+    async function finish() {
+      if (finished) return;
+      finished = true;
+      if (waitNews) await waitNews;
+
+      const wait = MIN_SHOW_MS - (performance.now() - startedAt);
+      if (wait > 0) await new Promise(r => setTimeout(r, wait));
+      setStatus('Запуск' + DOTS);
+      await new Promise(r => setTimeout(r, effectsOff() ? 0 : 450));
+
+      const island = document.getElementById('island');
+      if (effectsOff() || !island || !capsule.animate) {
+        root.classList.remove('booting');
+        return;
+      }
+
+      // Капсула плывёт из центра точно на место настоящей и растворяется в ней
+      const from = capsule.getBoundingClientRect();
+      const to = island.getBoundingClientRect();
+      const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+      const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+      const current = getComputedStyle(floatBox).transform;
+      floatBox.style.animation = 'none';
+      boot.classList.add('leaving');
+
+      const glide = floatBox.animate([
+        { transform: current === 'none' ? 'none' : current },
+        { transform: `translate(${dx * 0.5}px, ${dy * 0.42}px) scale(1.04)`, offset: 0.55 },
+        { transform: `translate(${dx}px, ${dy}px)` }
+      ], { duration: 1050, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'forwards' });
+
+      setTimeout(() => root.classList.remove('booting'), 820);
+      await glide.finished.catch(() => {});
+      await capsule.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' }).finished.catch(() => {});
+      boot.remove();
+    }
+
+    function showNews(info) {
+      const items = (info && info.changelog) || [];
+      if (!info || !info.updated || !items.length) return;
+      newsVersion.textContent = info.version || '';
+      newsList.innerHTML = '';
+      items.forEach((line, i) => {
+        const li = document.createElement('li');
+        li.style.setProperty('--i', i);
+        li.textContent = line.replace(/^\[[^\]]+\]\s*/, '');
+        newsList.appendChild(li);
+      });
+      news.hidden = false;
+      waitNews = new Promise(resolve => newsGo.addEventListener('click', () => {
+        news.hidden = true;
+        resolve();
+      }, { once: true }));
+    }
+
+    retryBtn.addEventListener('click', () => { actions.hidden = true; window.AuraBridge.send('startup.retry').catch(() => {}); });
+    skipBtn.addEventListener('click', () => { actions.hidden = true; window.AuraBridge.send('startup.skip').catch(() => {}); });
+
+    if (!window.AuraBridge) {
+      finish();
+      return;
+    }
+    window.AuraBridge.on('startup.state', onState);
+    window.AuraBridge.send('startup.run')
+      .then(info => {
+        if (info && info.version) versionEl.textContent = info.version;
+        showNews(info);
+      })
+      .catch(() => finish());
+
+    // Страховка: если мост молчит, не держим пользователя на заставке
+    setTimeout(() => { if (!finished && actions.hidden && !boot.classList.contains('downloading')) finish(); }, 20000);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBoot);
+  } else {
+    initBoot();
+  }
+})();

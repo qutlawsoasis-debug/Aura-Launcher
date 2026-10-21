@@ -449,6 +449,28 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
+    // Экран загрузки: ?boot=update | updated | error
+    if (name === 'startup.run' || name === 'startup.retry' || name === 'startup.skip' || name === 'changelog.get') {
+      const mode = (typeof location !== 'undefined' && (location.search.match(/[?&]boot=(\w+)/) || [])[1]) || '';
+      const changelog = ['[Интерфейс] Новый интерфейс «Остров»', '[Лобби] Комнаты и приглашения друзей', '[Гардероб] Смена ника и 3D-скин'];
+      const st = (ms, stage, extra) => setTimeout(() => emit('startup.state', { stage, extra }), ms);
+      if (name === 'changelog.get') return Promise.resolve({ version: 'beta 1.0.133', changelog });
+      if (name === 'startup.skip') { st(100, 'ready'); return Promise.resolve({ ok: true }); }
+      if (name === 'startup.retry') { st(50, 'checking'); st(900, 'upToDate'); st(1500, 'ready'); return Promise.resolve({ ok: true }); }
+      st(30, 'checking');
+      if (mode === 'error') {
+        st(900, 'error', { text: 'Не удалось проверить обновления' });
+      } else if (mode === 'update') {
+        [0, 18, 41, 67, 88, 100].forEach((p, i) => st(700 + i * 450, 'downloading', { percentage: p, speed: '12.4 МБ/с', version: 'beta 1.0.134' }));
+        st(3600, 'installing');
+        st(5200, 'ready');
+      } else {
+        st(700, mode === 'updated' ? 'updated' : 'upToDate');
+        st(1200, 'ready');
+      }
+      return Promise.resolve({ version: 'beta 1.0.133', updated: mode === 'updated', changelog: mode === 'updated' ? changelog : [] });
+    }
+
     // Обновление лаунчера: в dev показываем плашку только с ?update=1
     if (name === 'launcher.updateGet') {
       const on = typeof location !== 'undefined' && /[?&]update=1/.test(location.search);

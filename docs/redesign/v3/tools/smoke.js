@@ -255,7 +255,8 @@ async function runSmokeForTarget(target) {
           const cvRect = cv.getBoundingClientRect();
           const dpr = window.devicePixelRatio || 1;
 
-          const rectMatches = Math.abs(wrapRect.width - cvRect.width) <= 2 && Math.abs(wrapRect.height - cvRect.height) <= 2;
+          // Размер раскладки, без transform: у холста-заглушки идёт медленный «наплыв» через scale
+          const rectMatches = Math.abs(wrap.clientWidth - cv.offsetWidth) <= 2 && Math.abs(wrap.clientHeight - cv.offsetHeight) <= 2;
           const listInside = list ? (list.getBoundingClientRect().left >= wrapRect.left - 2) : true;
           const zoomInside = zoom ? (zoom.getBoundingClientRect().right <= wrapRect.right + 2) : true;
 

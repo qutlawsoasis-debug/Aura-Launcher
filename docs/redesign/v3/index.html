@@ -1,6 +1,5 @@
-<!-- GENERATED — не редактировать, правь shell.html и screens/* -->
 <!doctype html>
-<html lang="ru" data-effects="full">
+<html lang="ru" data-effects="full" class="booting">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,6 +8,32 @@
   
 </head>
 <body>
+  <!-- Экран загрузки: проверка обновления, затем капсула уплывает на своё место -->
+  <div class="boot" id="boot" aria-live="polite">
+    <div class="boot-bg"></div>
+    <div class="boot-aurora"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
+    <div class="boot-news" id="bootNews" hidden>
+      <div class="boot-news-head"><span class="boot-news-badge">Обновлено</span><b id="bootNewsVersion"></b></div>
+      <div class="boot-news-title">Что нового</div>
+      <ul id="bootNewsList"></ul>
+      <button type="button" class="btn primary" id="bootNewsGo">Поехали</button>
+    </div>
+    <div class="boot-float">
+      <div class="boot-capsule" id="bootCapsule">
+        <div class="boot-mark"><span class="ring"></span><span class="core">A</span></div>
+        <div class="boot-meta">
+          <b>Aura</b>
+          <span class="boot-status" id="bootStatus">Запуск<span class="boot-dots"><i>.</i><i>.</i><i>.</i></span></span>
+        </div>
+        <span class="boot-bar"><i id="bootBar"></i></span>
+      </div>
+    </div>
+    <div class="boot-actions" id="bootActions" hidden>
+      <button type="button" class="btn primary" id="bootRetry">Повторить</button>
+      <button type="button" class="btn" id="bootSkip">Пропустить</button>
+    </div>
+    <div class="boot-version" id="bootVersion"></div>
+  </div>
   <div class="world" id="world"></div>
   <div class="world-dim"></div>
   <div class="shade"></div>

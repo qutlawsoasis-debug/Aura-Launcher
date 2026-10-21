@@ -1,0 +1,235 @@
+/* ============ Экран загрузки ============
+   Парящая стеклянная капсула над размытым миром и «северным сиянием».
+   В конце капсула уплывает вниз на место настоящей (.island) и растворяется в ней. */
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+html:not(.booting) .boot { display: none; }
+html.booting .island,
+html.booting .brand { opacity: 0; }
+.island, .brand { transition: opacity var(--dur-3) var(--ease-out); }
+
+/* Мир под матовым стеклом (заранее размытая копия, без живого blur) */
+.boot-bg {
+  position: absolute;
+  inset: -3%;
+  background:
+    linear-gradient(180deg, rgba(8, 11, 18, 0.55), rgba(8, 11, 18, 0.35) 45%, rgba(8, 11, 18, 0.75)),
+    url('/assets/images/bg_1-blur.jpg') center / cover no-repeat;
+  animation: boot-zoom 14s ease-out both;
+}
+@keyframes boot-zoom {
+  from { transform: scale(1.12); }
+  to   { transform: scale(1.02); }
+}
+
+/* Северное сияние: мягкие пятна света медленно плавают за капсулой */
+.boot-aurora { position: absolute; inset: 0; overflow: hidden; }
+.boot-aurora span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  border-radius: 50%;
+  opacity: 0.85;
+  filter: blur(60px);
+  will-change: transform;
+}
+.boot-aurora .a1 { background: radial-gradient(circle, rgba(100, 210, 255, 0.55), transparent 65%); animation: boot-drift1 11s ease-in-out infinite alternate; }
+.boot-aurora .a2 { background: radial-gradient(circle, rgba(140, 110, 255, 0.45), transparent 65%); animation: boot-drift2 13s ease-in-out infinite alternate; }
+.boot-aurora .a3 { background: radial-gradient(circle, rgba(80, 255, 200, 0.30), transparent 65%); animation: boot-drift3 9s ease-in-out infinite alternate; }
+@keyframes boot-drift1 { from { transform: translate(-180px, -60px) scale(1); } to { transform: translate(120px, 40px) scale(1.25); } }
+@keyframes boot-drift2 { from { transform: translate(160px, 80px) scale(1.15); } to { transform: translate(-120px, -70px) scale(0.9); } }
+@keyframes boot-drift3 { from { transform: translate(0, 140px) scale(0.8); } to { transform: translate(40px, -120px) scale(1.1); } }
+
+/* Капсула парит: плавное покачивание вверх-вниз с лёгким наклоном */
+.boot-float {
+  position: relative;
+  animation: boot-float 4.2s ease-in-out infinite;
+}
+@keyframes boot-float {
+  0%, 100% { transform: translateY(-7px) rotate(-0.6deg); }
+  50%      { transform: translateY(7px) rotate(0.6deg); }
+}
+
+.boot-capsule {
+  position: relative;
+  width: 400px;
+  height: 76px;
+  border-radius: 38px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 22px 0 14px;
+  overflow: hidden;
+  background: var(--glass-sheen), rgba(30, 32, 40, 0.62);
+  border: var(--glass-panel-border);
+  box-shadow: var(--glass-panel-shadow), 0 0 60px rgba(100, 210, 255, 0.18);
+  animation: boot-in 900ms var(--spring) both;
+}
+@keyframes boot-in {
+  from { opacity: 0; transform: translateY(26px) scale(0.86); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Знак Aura с бегущим световым кольцом */
+.boot-mark {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.boot-mark .ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 55%, rgba(100, 210, 255, 0.9) 80%, #fff 88%, transparent 92%);
+  -webkit-mask: radial-gradient(circle, transparent 20px, #000 21px);
+          mask: radial-gradient(circle, transparent 20px, #000 21px);
+  animation: boot-spin 1.6s linear infinite;
+}
+.boot-mark .core {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: 0 0 18px rgba(100, 210, 255, 0.55);
+}
+@keyframes boot-spin { to { transform: rotate(360deg); } }
+
+.boot-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.boot-meta b { font-size: 17px; }
+.boot-status {
+  font-size: 14px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: opacity var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+}
+.boot-status.swap { opacity: 0; }
+.boot-status.ok { color: var(--accent); }
+.boot-status.err { color: var(--danger); }
+.boot-dots i {
+  font-style: normal;
+  animation: boot-dot 1.2s ease-in-out infinite;
+}
+.boot-dots i:nth-child(2) { animation-delay: 0.2s; }
+.boot-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes boot-dot { 0%, 100% { opacity: 0.2; } 40% { opacity: 1; } }
+
+.boot-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  opacity: 0;
+  transition: opacity var(--dur-2) var(--ease-out);
+}
+.boot-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), #fff);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  transition: transform var(--dur-3) var(--ease-out);
+}
+.boot.downloading .boot-bar { opacity: 1; }
+
+.boot-actions {
+  position: absolute;
+  top: calc(50% + 70px);
+  display: flex;
+  gap: 10px;
+  pointer-events: auto;
+  animation: boot-in 500ms var(--spring) both;
+}
+.boot-actions[hidden] { display: none; }
+
+.boot-version {
+  position: absolute;
+  bottom: 22px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* «Что нового» после обновления */
+.boot-news {
+  position: absolute;
+  bottom: calc(50% + 70px);
+  width: min(460px, calc(100% - 48px));
+  padding: 22px 24px 20px;
+  border-radius: 26px;
+  pointer-events: auto;
+  background: var(--glass-sheen), rgba(30, 32, 40, 0.7);
+  border: var(--glass-panel-border);
+  box-shadow: var(--glass-panel-shadow);
+  animation: boot-in 800ms var(--spring) both;
+}
+.boot-news[hidden] { display: none; }
+.boot-news-head { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 14px; }
+.boot-news-badge {
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.boot-news-title { margin: 12px 0 10px; font-size: 26px; font-weight: 700; }
+.boot-news ul { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.boot-news li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink-2);
+  opacity: 0;
+  transform: translateX(-8px);
+  animation: boot-li 500ms var(--spring) forwards;
+  animation-delay: calc(var(--i) * 70ms + 300ms);
+}
+.boot-news li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+@keyframes boot-li { to { opacity: 1; transform: none; } }
+.boot-news .btn { width: 100%; }
+
+/* Уход: фон и сияние тают, пока капсула плывёт вниз */
+.boot.leaving .boot-bg,
+.boot.leaving .boot-aurora,
+.boot.leaving .boot-version,
+.boot.leaving .boot-news {
+  opacity: 0;
+  transition: opacity 700ms var(--ease-out);
+}
+
+/* Упрощение */
+html[data-effects="low"] .boot-aurora .a2,
+html[data-effects="low"] .boot-aurora .a3 { display: none; }
+html[data-effects="off"] .boot *,
+html[data-effects="off"] .boot { animation: none !important; transition: none !important; }
+html[data-effects="off"] .boot-aurora { display: none; }
+html[data-effects="off"] .boot-news li { opacity: 1; transform: none; }

@@ -24,6 +24,9 @@ public partial class WebShellWindow : Window
     private readonly ILauncherUpdateService? _launcherUpdateService;
     private WebBridge? _bridge;
 
+    /// <summary>Лаунчер только что перезапущен после обновления — экран загрузки покажет «Что нового».</summary>
+    public bool IsUpdatedRestart { get; init; }
+
     public WebShellWindow(
         IGameSessionService gameSessionService,
         IConfigService configService,
@@ -69,7 +72,10 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService);
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService)
+            {
+                IsUpdatedRestart = IsUpdatedRestart
+            };
             _bridge.Attach(WebViewControl.CoreWebView2);
 
             _friendService?.Start();

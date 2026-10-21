@@ -9,12 +9,14 @@ import '../screens/wardrobe.css';
 import '../screens/workshop.css';
 import '../screens/settings.css';
 import '../screens/update.css';
+import '../screens/boot.css';
 
 // JS modules in exact tag order
 import './perf-hud.js';
 import './bridge.js';
 import './profile.js';
 import './update.js';
+import './boot.js';
 import '../assets/js/demo-data.js';
 import '../assets/js/core.js';
 import '../screens/play.js';
