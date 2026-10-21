@@ -12,6 +12,7 @@
 
   <!-- Стили экранов -->
   <link rel="stylesheet" href="screens/play.css">
+  <link rel="stylesheet" href="screens/map.css">
   <link rel="stylesheet" href="screens/lobby.css">
   <link rel="stylesheet" href="screens/friends.css">
   <link rel="stylesheet" href="screens/wardrobe.css">
@@ -74,8 +75,21 @@
           </div>
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
-        <div class="sec-body mapwrap">
-          <canvas id="mapCanvas" style="width:100%;height:100%;display:block;min-height:300px;background:#0b1622;border-radius:18px;"></canvas>
+        <div class="sec-body" style="padding:0;overflow:hidden">
+          <div class="mapwrap">
+  <canvas id="mapCanvas"></canvas>
+  <div class="coords" id="coords">X 0 · Z 0</div>
+  <div class="map-list">
+    <button type="button" class="person" data-poi="0"><div class="face" style="--s:34px"></div><div style="flex:1"><div class="name">Вы</div><div class="small dim">Дом у озера</div></div></button>
+    <button type="button" class="person" data-poi="1"><div class="face" style="--s:34px"></div><div style="flex:1"><div class="name">zxcursed</div><div class="small dim">Шахта</div></div><span class="status"></span></button>
+    <button type="button" class="person" data-poi="2"><div style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700">S</div><div style="flex:1"><div class="name">Спавн</div></div></button>
+  </div>
+  <div class="map-zoom">
+    <button type="button" id="zin" aria-label="Приблизить">+</button>
+    <button type="button" id="zout" aria-label="Отдалить">−</button>
+  </div>
+</div>
+
         </div>
         <div class="sec-foot"></div>
       </div>
@@ -237,232 +251,49 @@
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
         <div class="sec-body">
-          <section class="screen-view" id="screen-wardrobe" aria-label="Экран Гардероб">
-  <div class="screen-wardrobe-layout">
-
-    <!-- Верхний ряд: Заголовок и карточка профиля -->
-    <div class="wardrobe-top-row">
-      <div class="wardrobe-title-group">
-        <h2 class="wardrobe-main-heading">Гардероб и профиль</h2>
-        <p class="wardrobe-subheading">Интерактивная 3D-настройка скина, выбор плаща и параметры модели</p>
-      </div>
-
-      <div class="wardrobe-player-badge">
-        <div class="player-badge-meta">
-          <span class="player-badge-nick" id="wardrobeBadgeNick">Coock0ld</span>
-          <span class="player-badge-id">ID: AURA-7821-X9M2</span>
-        </div>
-        <span class="badge-tag">Aura Core</span>
-      </div>
+          <div class="wardrobe">
+  <div class="wardrobe-viewer-col">
+    <canvas id="skinCanvas3D" width="260" height="380" title="Потяните для вращения, колёсико — зум"></canvas>
+    <div class="seg skin-anim-seg" data-seg="anim" style="margin-top:8px">
+      <span class="lens"></span>
+      <button type="button" class="on" data-anim="idle">Стоит</button>
+      <button type="button" data-anim="walk">Идёт</button>
+      <button type="button" data-anim="run">Бежит</button>
     </div>
-
-    <!-- Основная 2-колоночная сетка -->
-    <div class="wardrobe-content-grid">
-
-      <!-- Левая колонка: 3D Сцена персонажа -->
-      <div class="glass-island elevated wardrobe-stage-island" data-glass>
-        <div class="stage-header">
-          <div class="stage-title-wrap">
-            <svg class="icon stage-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            <span class="stage-title">3D Предпросмотр</span>
-          </div>
-
-          <div class="stage-top-controls">
-            <!-- Кнопка авто-вращения -->
-            <button type="button" class="btn-stage-toggle active" id="btnToggleAutoRotate" title="Включить / остановить плавное вращение">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-              <span>Авто</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 3D Canvas сцена -->
-        <div class="skin-viewport-wrap" id="skinViewportWrap" title="Потяните курсором для свободного 3D вращения">
-          <canvas id="skinCanvas3D" class="skin-canvas-3d" width="600" height="760" aria-label="3D Модель скина персонажа"></canvas>
-          
-          <div class="viewport-hud-overlay">
-            <span class="hud-angle-badge" id="hudAngleBadge">0°</span>
-            <span class="hud-cape-badge" id="hudCapeBadge">Плащ Aura</span>
-          </div>
-
-          <!-- Световой блик под ногами персонажа -->
-          <div class="character-pedestal-light"></div>
-        </div>
-
-        <div class="stage-footer">
-          <span class="stage-hint-text">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 2a10 10 0 0 1 10 10"></path></svg>
-            <span>Потяните курсором для вращения 360°</span>
-          </span>
-
-          <!-- Быстрые ракурсы -->
-          <div class="quick-angle-buttons" role="group" aria-label="Быстрый выбор угла обзора">
-            <button type="button" class="btn-angle active" data-angle="0">Спереди</button>
-            <button type="button" class="btn-angle" data-angle="45">3/4</button>
-            <button type="button" class="btn-angle" data-angle="90">Сбоку</button>
-            <button type="button" class="btn-angle" data-angle="180">Сзади</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Правая колонка: Параметры внешности и кастомизация -->
-      <div class="wardrobe-controls-column">
-
-        <!-- Секция 1: Ник и ID профиля -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              </span>
-              <span>Игровой профиль</span>
-            </span>
-          </div>
-
-          <div class="profile-edit-fields">
-            <div class="form-field-group">
-              <label for="wardrobeNickInput" class="form-field-label">Никнейм в игре</label>
-              <div class="nick-input-wrap">
-                <input type="text" id="wardrobeNickInput" class="text-input-field" value="Coock0ld" maxlength="16" spellcheck="false" autocomplete="off">
-                <button type="button" class="btn-secondary btn-save-nick" id="btnSaveNickname">Сохранить</button>
-              </div>
-              <span class="field-hint">От 3 до 16 символов (латиница, цифры, подчёркивание)</span>
-            </div>
-
-            <div class="profile-id-row">
-              <span class="id-row-label">Код друга для поиска:</span>
-              <span class="id-row-val" id="wardrobeProfileIdVal">AURA-7821-X9M2</span>
-              <button type="button" class="btn-copy-id" id="btnCopyProfileId" title="Скопировать код профиля">
-                <svg class="icon icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span class="btn-copy-label">Копировать</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Секция 2: Модель персонажа (Alex 3px / Steve 4px) -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect></svg>
-              </span>
-              <span>Формат модели персонажа</span>
-            </span>
-          </div>
-
-          <div class="model-type-selector">
-            <div class="segment-pill-control" role="radiogroup" aria-label="Геометрия модели">
-              <button type="button" class="segment-option" id="modelSteveBtn" data-model="classic" role="radio" aria-checked="true">
-                <span class="segment-radio-title">Классика (Steve)</span>
-                <span class="segment-radio-sub">Широкие руки (4 пикселя)</span>
-              </button>
-              <button type="button" class="segment-option" id="modelAlexBtn" data-model="slim" role="radio" aria-checked="false">
-                <span class="segment-radio-title">Слим (Alex)</span>
-                <span class="segment-radio-sub">Тонкие руки (3 пикселя)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Секция 3: Выбор плаща -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-              </span>
-              <span>Плащ Aura</span>
-            </span>
-            <span class="cape-status-tag" id="capeStatusTag">Активен: Aura</span>
-          </div>
-
-          <div class="cape-cards-grid" role="radiogroup" aria-label="Выбор плаща">
-            <!-- Плащ Aura -->
-            <div class="cape-card active" data-cape="founder" role="radio" aria-checked="true">
-              <div class="cape-card-preview cape-founder-preview">
-                <div class="cape-emblem-gold">A</div>
-              </div>
-              <div class="cape-card-info">
-                <span class="cape-card-name">Плащ Aura</span>
-                <span class="cape-card-desc">Фирменный янтарный плащ с эмблемой Aura</span>
-              </div>
-              <div class="cape-radio-dot"></div>
-            </div>
-
-            <!-- Стандартный плащ -->
-            <div class="cape-card" data-cape="classic" role="radio" aria-checked="false">
-              <div class="cape-card-preview cape-classic-preview">
-                <div class="cape-emblem-silver">M</div>
-              </div>
-              <div class="cape-card-info">
-                <span class="cape-card-name">Стандартный плащ</span>
-                <span class="cape-card-desc">Классический глубокий тёмный текстиль</span>
-              </div>
-              <div class="cape-radio-dot"></div>
-            </div>
-
-            <!-- Без плаща -->
-            <div class="cape-card" data-cape="none" role="radio" aria-checked="false">
-              <div class="cape-card-preview cape-none-preview">
-                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </div>
-              <div class="cape-card-info">
-                <span class="cape-card-name">Без плаща</span>
-                <span class="cape-card-desc">Отображать только оригинальный скин</span>
-              </div>
-              <div class="cape-radio-dot"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Секция 4: Загрузка скина (.png) -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              </span>
-              <span>Файл скина персонажа</span>
-            </span>
-          </div>
-
-          <!-- Скрытый инпут для файла -->
-          <input type="file" id="skinFileInput" accept="image/png" style="display: none;" aria-label="Выбрать файл скина">
-
-          <div class="skin-upload-dropzone" id="skinUploadDropzone">
-            <div class="upload-icon-circle">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            </div>
-            <div class="upload-text-group">
-              <span class="upload-title" id="skinFileNameDisplay">Скин: default_coock0ld.png (64×64)</span>
-              <span class="upload-sub">Перетащите сюда PNG-файл скина или выберите с диска</span>
-            </div>
-            
-            <div class="upload-buttons-row">
-              <button type="button" class="btn-primary-action btn-upload-skin" id="btnTriggerSkinUpload">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span>Загрузить скин (.png)</span>
-              </button>
-              
-              <button type="button" class="btn-secondary btn-reset-skin" id="btnResetDefaultSkin">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                <span>Сбросить на дефолтный</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="skin-format-note">
-            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            <span>Поддерживаются форматы PNG 64×64 и 64×32. Изменения видны всем участникам лобби и на серверах Aura.</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
   </div>
-</section>
+
+  <div class="wardrobe-controls-col" style="flex:1">
+    <div class="small dim" style="margin-bottom:10px">Плащ</div>
+    <div class="capes" id="capeSelector">
+      <button type="button" class="cape on" data-cape="cyan" title="Лазурный плащ"><span class="sw" style="background:linear-gradient(160deg,#5FD4E8,#2A6F8E)"></span></button>
+      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ"><span class="sw" style="background:linear-gradient(160deg,#C9CDD6,#6B7280)"></span></button>
+      <button type="button" class="cape" data-cape="none" title="Без плаща">нет</button>
+    </div>
+
+    <div class="row">
+      <span>Модель</span>
+      <div class="seg" style="width:190px" data-seg="model" id="modelTypeSeg">
+        <span class="lens"></span>
+        <button type="button" class="on" data-model="default">Steve</button>
+        <button type="button" data-model="slim">Alex</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      <label class="btn sm" style="cursor:pointer">
+        Загрузить
+        <input type="file" id="skinFileInput" accept="image/png" style="display:none">
+      </label>
+    </div>
+
+    <div class="row">
+      <span>Ник</span>
+      <input class="field" id="inputPlayerNickname" value="Coock0ld" style="width:170px;height:40px">
+    </div>
+  </div>
+</div>
+
         </div>
         <div class="sec-foot"></div>
       </div>
@@ -479,185 +310,67 @@
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
         <div class="sec-body">
-          <section class="screen-view" id="screen-workshop" aria-label="Экран Мастерская">
-  <div class="screen-workshop-layout">
+          <div class="seg" data-seg="workshop" id="workshopSegmented">
+  <span class="lens"></span>
+  <button type="button" class="on" data-tab="shaders">Шейдеры</button>
+  <button type="button" data-tab="mods">Моды · 15</button>
+</div>
 
-    <!-- Левая секция: Список модов с фильтрацией и поиском -->
-    <div class="workshop-main-column">
-      
-      <!-- Верхняя панель управления модами -->
-      <div class="glass-island elevated workshop-header-island" data-glass>
-        <div class="workshop-header-top">
-          <div class="workshop-title-wrap">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-              </span>
-              <span>Мастерская модификаций</span>
-            </span>
-            <span class="mod-count-badge" id="modCountBadge">15 модов активно</span>
-          </div>
+<div data-pane="shaders" id="paneShaders" style="margin-top:6px">
+  <button type="button" class="pick on" data-shader="complementary">
+    <span class="radio"></span>
+    <span>
+      <b>Complementary Reimagined</b>
+      <span class="small dim">Выбор Aura · нужна хорошая видеокарта</span>
+    </span>
+  </button>
+  <button type="button" class="pick" data-shader="sildurs">
+    <span class="radio"></span>
+    <span>
+      <b>Sildurs Enhanced Default</b>
+      <span class="small dim">Лёгкие шейдеры</span>
+    </span>
+  </button>
+  <button type="button" class="pick" data-shader="builders">
+    <span class="radio"></span>
+    <span>
+      <b>Builders QoL</b>
+      <span class="small dim">Максимум FPS</span>
+    </span>
+  </button>
+  <button type="button" class="pick" data-shader="none">
+    <span class="radio"></span>
+    <span>
+      <b>Без шейдеров</b>
+      <span class="small dim">Vanilla</span>
+    </span>
+  </button>
+</div>
 
-          <div class="workshop-header-actions">
-            <button type="button" class="btn-secondary" id="btnOpenModsFolder" title="Открыть локальную папку mods">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-              <span>Папка mods</span>
-            </button>
-            <button type="button" class="btn-secondary" id="btnSyncMods" title="Проверить синхронизацию файлов">
-              <svg class="icon" id="syncModsIcon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-              <span id="syncModsText">Синхронизировать</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Фильтры категорий и строка поиска -->
-        <div class="workshop-controls-row">
-          <div class="workshop-category-tabs" role="tablist" aria-label="Категории модификаций">
-            <button type="button" class="category-pill-tab active" data-category="all" role="tab" aria-selected="true">
-              <span>Все моды</span>
-              <span class="tab-counter" id="countAll">15</span>
-            </button>
-            <button type="button" class="category-pill-tab" data-category="optimization" role="tab" aria-selected="false">
-              <span>Оптимизация</span>
-              <span class="tab-counter" id="countOpt">6</span>
-            </button>
-            <button type="button" class="category-pill-tab" data-category="graphics" role="tab" aria-selected="false">
-              <span>Графика и шейдеры</span>
-              <span class="tab-counter" id="countGfx">5</span>
-            </button>
-            <button type="button" class="category-pill-tab" data-category="gameplay" role="tab" aria-selected="false">
-              <span>Геймплей и звук</span>
-              <span class="tab-counter" id="countGame">4</span>
-            </button>
-          </div>
-
-          <div class="workshop-search-box">
-            <svg class="icon search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="modSearchInput" class="text-input-field mod-search-field" placeholder="Поиск модификаций..." autocomplete="off" spellcheck="false">
-            <button type="button" class="search-clear-btn" id="btnSearchClear" aria-label="Очистить поиск" style="display: none;">
-              <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Список модов -->
-      <div class="mod-list-container" id="modListContainer" role="list">
-        <!-- Генерируется и управляется через workshop.js -->
-      </div>
-    </div>
-
-    <!-- Правая секция: Шейдерпаки и диагностика сборки -->
-    <div class="workshop-side-column">
-      
-      <!-- Карточка выбора шейдерпака -->
-      <div class="glass-island elevated shader-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-            </span>
-            <span>Шейдерпаки Iris</span>
-          </span>
-          <span class="shader-engine-badge">Sodium Core</span>
-        </div>
-
-        <div class="shader-description-note">
-          Поддержка PBR-освещения, объёмных облаков и лучей солнца через Iris Shaders.
-        </div>
-
-        <div class="shader-packs-list" id="shaderPacksList" role="radiogroup" aria-label="Выбор шейдерпака">
-          <!-- Complementary Reimagined -->
-          <div class="shader-card active" data-shader-id="complementary" role="radio" aria-checked="true" tabindex="0">
-            <div class="shader-radio-dot"></div>
-            <div class="shader-card-meta">
-              <div class="shader-name-row">
-                <span class="shader-title">Complementary Reimagined</span>
-                <span class="shader-tag recommended">Выбор Aura</span>
-              </div>
-              <p class="shader-info">r5.1.1 • Мягкие тени, фотореалистичная вода и атмосферный туман</p>
-            </div>
-          </div>
-
-          <!-- Sildurs Enhanced Default -->
-          <div class="shader-card" data-shader-id="sildurs" role="radio" aria-checked="false" tabindex="0">
-            <div class="shader-radio-dot"></div>
-            <div class="shader-card-meta">
-              <div class="shader-name-row">
-                <span class="shader-title">Sildurs Enhanced Default</span>
-                <span class="shader-tag">Легковесный</span>
-              </div>
-              <p class="shader-info">v1.3.2 Fancy • Ванильная эстетика, цветные тени и отражения</p>
-            </div>
-          </div>
-
-          <!-- Builders QoL -->
-          <div class="shader-card" data-shader-id="builders" role="radio" aria-checked="false" tabindex="0">
-            <div class="shader-radio-dot"></div>
-            <div class="shader-card-meta">
-              <div class="shader-name-row">
-                <span class="shader-title">Builders QoL</span>
-                <span class="shader-tag">Макс. FPS</span>
-              </div>
-              <p class="shader-info">v1.0 • Чистый свет и улучшенная вода без нагрузки на видеокарту</p>
-            </div>
-          </div>
-
-          <!-- Без шейдеров -->
-          <div class="shader-card" data-shader-id="none" role="radio" aria-checked="false" tabindex="0">
-            <div class="shader-radio-dot"></div>
-            <div class="shader-card-meta">
-              <div class="shader-name-row">
-                <span class="shader-title">Шейдеры отключены</span>
-                <span class="shader-tag vanilla">Vanilla</span>
-              </div>
-              <p class="shader-info">Стандартная отрисовка чанков через движок Sodium</p>
-            </div>
-          </div>
-        </div>
-
-        <button type="button" class="btn-secondary btn-shader-folder" id="btnOpenShaderFolder">
-          <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-          <span>Папка shaderpacks</span>
-        </button>
-      </div>
-
-      <!-- Карточка информации о сборке -->
-      <div class="glass-island build-info-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-            </span>
-            <span>Статус модпака</span>
-          </span>
-          <span class="status-indicator-badge live">Синхронизировано</span>
-        </div>
-
-        <div class="build-stats-grid">
-          <div class="build-stat-box">
-            <span class="build-stat-label">Манифест</span>
-            <span class="build-stat-val">20261019.2050</span>
-          </div>
-          <div class="build-stat-box">
-            <span class="build-stat-label">Целостность</span>
-            <span class="build-stat-val text-success">Синхронизировано</span>
-          </div>
-          <div class="build-stat-box">
-            <span class="build-stat-label">Размер файлов</span>
-            <span class="build-stat-val">342.8 МБ</span>
-          </div>
-          <div class="build-stat-box">
-            <span class="build-stat-label">Загрузчик</span>
-            <span class="build-stat-val">Fabric 0.19.5</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
+<div data-pane="mods" id="paneMods" style="margin-top:6px" hidden>
+  <div class="row">
+    <span>Sodium<span class="hint">Оптимизация видеоядра</span></span>
+    <span class="toggle on" data-mod="sodium"></span>
   </div>
-</section>
+  <div class="row">
+    <span>Iris Shaders<span class="hint">Графика и шейдеры</span></span>
+    <span class="toggle on" data-mod="iris"></span>
+  </div>
+  <div class="row">
+    <span>Distant Horizons<span class="hint">Сверхдальний рендеринг чанков</span></span>
+    <span class="toggle on" data-mod="dh"></span>
+  </div>
+  <div class="row">
+    <span>Simple Voice Chat<span class="hint">Голосовой чат по P2P</span></span>
+    <span class="toggle on" data-mod="voice"></span>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-top:14px">
+  <button type="button" class="btn" id="btnSyncMods">Синхронизировать</button>
+  <button type="button" class="btn ghost" id="btnOpenModsFolder">Открыть папку</button>
+</div>
+
         </div>
         <div class="sec-foot"></div>
       </div>
@@ -674,329 +387,71 @@
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
         <div class="sec-body">
-          <section class="screen-view" id="screen-settings" aria-label="Экран Настройки">
-  <div class="screen-settings-layout">
-
-    <!-- Левая колонка: Клиент, память, пути и графика -->
-    <div class="settings-main-column">
-
-      <!-- Карточка: Клиент и среда запуска -->
-      <div class="glass-island elevated" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            </span>
-            <span>Клиент и среда запуска</span>
-          </span>
-          <span class="settings-section-badge">Сборка Aura</span>
-        </div>
-
-        <div class="settings-form-grid">
-          
-          <!-- Выбор версии клиента -->
-          <div class="setting-field-group">
-            <div class="setting-label-row">
-              <label class="setting-label" for="clientVersionTrigger">Версия Minecraft и загрузчик</label>
-              <span class="setting-hint">Рекомендуется Fabric 1.20.1</span>
-            </div>
-            
-            <div class="custom-dropdown" id="clientVersionDropdown">
-              <button type="button" class="custom-dropdown-trigger" id="clientVersionTrigger" aria-haspopup="listbox" aria-expanded="false">
-                <span class="dropdown-selected-val" id="clientVersionText">Fabric 1.20.1 (Aura Pack v1.2 • Рекомендуемая)</span>
-                <svg class="icon dropdown-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
-              <div class="custom-dropdown-list" role="listbox" aria-label="Выбор версии">
-                <button type="button" class="dropdown-item active" data-version="fabric-1.20.1" role="option" aria-selected="true">
-                  <span>Fabric 1.20.1 (Aura Pack v1.2 • Рекомендуемая)</span>
-                  <span class="badge-item-tag">Стабильная</span>
-                </button>
-                <button type="button" class="dropdown-item" data-version="fabric-1.21.1" role="option" aria-selected="false">
-                  <span>Fabric 1.21.1 (Экспериментальная)</span>
-                  <span class="badge-item-tag experimental">Beta</span>
-                </button>
-                <button type="button" class="dropdown-item" data-version="vanilla-1.20.1" role="option" aria-selected="false">
-                  <span>Vanilla 1.20.1 (Чистый клиент без модов)</span>
-                  <span class="badge-item-tag">Оригинал</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Выделение RAM -->
-          <div class="setting-field-group">
-            <div class="setting-label-row">
-              <label class="setting-label" for="ramSliderInput">Выделение оперативной памяти Java (RAM)</label>
-              <span class="ram-current-display"><strong id="ramValueText">6 ГБ</strong> / 16 ГБ доступно</span>
-            </div>
-
-            <div class="ram-slider-wrapper">
-              <div class="ram-slider-track-container">
-                <input type="range" min="4" max="12" step="1" value="6" class="ram-range-slider" id="ramSliderInput" aria-label="Ползунок выделения оперативной памяти в ГБ">
-                <div class="ram-slider-fill" id="ramSliderFill"></div>
-              </div>
-              <div class="ram-range-scale">
-                <span>4 ГБ</span>
-                <span>6 ГБ</span>
-                <span>8 ГБ</span>
-                <span>10 ГБ</span>
-                <span>12 ГБ</span>
-              </div>
-            </div>
-
-            <!-- Чипы быстрого выбора RAM -->
-            <div class="ram-chips-row" role="radiogroup" aria-label="Быстрый выбор памяти">
-              <button type="button" class="ram-chip" data-ram="4" role="radio" aria-checked="false">4 ГБ (Минимум)</button>
-              <button type="button" class="ram-chip active" data-ram="6" role="radio" aria-checked="true">6 ГБ (Оптимально)</button>
-              <button type="button" class="ram-chip" data-ram="8" role="radio" aria-checked="false">8 ГБ (Шейдеры)</button>
-              <button type="button" class="ram-chip" data-ram="12" role="radio" aria-checked="false">12 ГБ (Distant Hor.)</button>
-            </div>
-            
-            <p class="setting-subtext" id="ramHintText">6 ГБ обеспечивает высокую частоту кадров и стабильную сборку мусора GC при использовании шейдерпаков.</p>
-          </div>
-
-          <!-- Папка игры -->
-          <div class="setting-field-group">
-            <div class="setting-label-row">
-              <label class="setting-label" for="gameFolderPathInput">Рабочая папка игры</label>
-              <span class="setting-hint">Папка хранения сборки, логов и сохранений</span>
-            </div>
-
-            <div class="path-input-action-row">
-              <div class="path-input-wrap">
-                <input type="text" id="gameFolderPathInput" class="text-input-field path-input" value="%APPDATA%\.aura" spellcheck="false" autocomplete="off">
-              </div>
-              <button type="button" class="btn-secondary" id="btnBrowseGameFolder" title="Выбрать другую папку">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <span>Обзор...</span>
-              </button>
-              <button type="button" class="btn-secondary" id="btnResetGameFolder" title="Сбросить путь на стандартный (%APPDATA%\.aura)">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                <span>Сброс</span>
-              </button>
-            </div>
-
-            <!-- Блок валидации ошибки при пустом/неверном пути -->
-            <div class="game-path-validation-error" id="gamePathError" style="display: none;">
-              <svg class="icon error-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              <span id="gamePathErrorText">Путь к папке игры не может быть пустым. Укажите корректную директорию.</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Карточка: Пресеты графики Minecraft -->
-      <div class="glass-island elevated" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-            </span>
-            <span>Пресеты графики Minecraft</span>
-          </span>
-          <span class="setting-hint">Мгновенная настройка Sodium и видеоядра</span>
-        </div>
-
-        <div class="graphics-presets-grid" role="radiogroup" aria-label="Пресеты графики">
-          <!-- Пресет: Слабый ПК -->
-          <div class="preset-card" data-preset="low" role="radio" aria-checked="false" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Слабый ПК</span>
-              <span class="preset-badge">60+ FPS</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 8 чанков</span>
-              <span>Шейдеры: Выкл</span>
-              <span>Частицы: Минимум</span>
-            </div>
-          </div>
-
-          <!-- Пресет: Средний -->
-          <div class="preset-card" data-preset="medium" role="radio" aria-checked="false" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Средний</span>
-              <span class="preset-badge">Баланс</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 12 чанков</span>
-              <span>Шейдеры: Builders QoL</span>
-              <span>Мягкий свет: Вкл</span>
-            </div>
-          </div>
-
-          <!-- Пресет: Высокий (по умолчанию) -->
-          <div class="preset-card active" data-preset="high" role="radio" aria-checked="true" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Высокий</span>
-              <span class="preset-badge recommended">Рекомендуемый</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 16 чанков</span>
-              <span>Шейдеры: Sildurs / Fancy</span>
-              <span>PBR-текстуры: Вкл</span>
-            </div>
-          </div>
-
-          <!-- Пресет: Ультра -->
-          <div class="preset-card" data-preset="ultra" role="radio" aria-checked="false" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Ультра</span>
-              <span class="preset-badge">Кинокачество</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 24 чанка</span>
-              <span>Шейдеры: Complementary</span>
-              <span>Distant Horizons: Вкл</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Правая колонка: Эффекты лаунчера, поведение и системное обслуживание -->
-    <div class="settings-side-column">
-
-      <!-- Карточка: Визуальные эффекты интерфейса -->
-      <div class="glass-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
-            </span>
-            <span>Визуальные эффекты лаунчера</span>
-          </span>
-        </div>
-
-        <p class="setting-subtext">Адаптация прозрачности Liquid Glass, размытия фона и парящих частиц под мощность GPU.</p>
-
-        <div class="segmented-control effects-segmented-control" role="group" aria-label="Режим визуальных эффектов">
-          <button type="button" class="segment-btn active" data-effect-btn="full" aria-checked="true">
-            <span>Полные</span>
-          </button>
-          <button type="button" class="segment-btn" data-effect-btn="low" aria-checked="false">
-            <span>Лёгкие</span>
-          </button>
-          <button type="button" class="segment-btn" data-effect-btn="off" aria-checked="false">
-            <span>Выкл</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Карточка: Поведение при запуске и обновления -->
-      <div class="glass-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </span>
-            <span>Поведение и обновление</span>
-          </span>
-        </div>
-
-        <div class="toggle-options-stack">
-          <!-- Скрывать лаунчер при запуске -->
-          <div class="toggle-option-row">
-            <div class="toggle-option-meta">
-              <span class="toggle-title">Скрывать лаунчер при запуске игры</span>
-              <span class="toggle-desc">Освобождает видеопамять во время игры</span>
-            </div>
-            <label class="switch-label-wrap" title="Скрывать лаунчер">
-              <input type="checkbox" id="chkHideOnLaunch" class="switch-input" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-
-          <!-- Автообновление через Velopack -->
-          <div class="toggle-option-row">
-            <div class="toggle-option-meta">
-              <span class="toggle-title">Автообновление Velopack</span>
-              <span class="toggle-desc">Фоновая загрузка дельта-патчей клиента</span>
-            </div>
-            <label class="switch-label-wrap" title="Автообновление">
-              <input type="checkbox" id="chkAutoUpdate" class="switch-input" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-
-          <!-- Закрывать при падении туннеля -->
-          <div class="toggle-option-row">
-            <div class="toggle-option-meta">
-              <span class="toggle-title">Аварийный стоп P2P-туннеля</span>
-              <span class="toggle-desc">Останавливать туннель при закрытии клиента</span>
-            </div>
-            <label class="switch-label-wrap" title="Стоп туннеля">
-              <input type="checkbox" id="chkKillTunnelOnExit" class="switch-input" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Карточка: Системные действия и диагностика -->
-      <div class="glass-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            </span>
-            <span>Диагностика и кэш</span>
-          </span>
-        </div>
-
-        <div class="maintenance-actions-stack">
-          <button type="button" class="btn-secondary maintenance-btn" id="btnOpenLogsFolder">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            <span>Открыть папку логов</span>
-          </button>
-
-          <button type="button" class="btn-secondary maintenance-btn" id="btnExportDiagnostics">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            <span>Экспорт отчёта о сбоях</span>
-          </button>
-
-          <button type="button" class="btn-danger maintenance-btn" id="btnOpenClearCacheModal">
-            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-            <span>Очистить кэш модов</span>
-          </button>
-        </div>
-      </div>
-
-    </div>
-
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin:4px 0 16px">
+  <div>
+    <div class="small dim" style="margin-bottom:8px">Память для игры</div>
+    <div class="ram-num" style="font-size:60px;font-weight:700;letter-spacing:-.04em;line-height:1"><span id="settingsRamVal">6</span> ГБ</div>
   </div>
+  <div class="small dim" id="settingsRamHint">Оптимально · из 16 ГБ</div>
+</div>
 
-  <!-- Модальное окно подтверждения очистки кэша -->
-  <div class="modal-backdrop" id="modalClearCache" aria-hidden="true" role="dialog" aria-labelledby="modalClearCacheTitle">
-    <div class="glass-modal">
-      <div class="modal-header-row">
-        <h3 class="modal-title" id="modalClearCacheTitle">
-          <svg class="icon text-danger" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          <span>Очистка кэша сборки</span>
-        </h3>
-        <button type="button" class="modal-close-btn" id="btnCloseClearCacheModal" aria-label="Закрыть">
-          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
+<input type="range" min="4" max="12" step="1" value="6" id="settingsRamSlider">
 
-      <div class="modal-body">
-        <p class="modal-dialog-text">
-          Будут удалены временные файлы загрузчика, кэшированные индексы SHA-256 и скомпилированные шейдеры. При следующем запуске лаунчер выполнит быструю повторную верификацию.
-        </p>
-        <p class="modal-dialog-subtext">
-          Ваши сохранения миров, скриншоты и настройки управления затронуты не будут.
-        </p>
-      </div>
+<div class="group-title">Графика</div>
+<div class="seg" data-seg="preset" id="presetSegmented" style="margin-top:8px">
+  <span class="lens"></span>
+  <button type="button" data-preset-idx="0">Слабая</button>
+  <button type="button" data-preset-idx="1">Средняя</button>
+  <button type="button" class="on" data-preset-idx="2">Высокая</button>
+  <button type="button" data-preset-idx="3">Ультра</button>
+</div>
+<div class="small dim" style="margin:10px 2px 0" id="settingsPresetHint">16 чанков · шейдеры Sildurs · PBR-текстуры</div>
 
-      <div class="modal-footer">
-        <button type="button" class="btn-secondary" id="btnCancelClearCache">Отмена</button>
-        <button type="button" class="btn-danger" id="btnConfirmClearCache">Очистить кэш</button>
-      </div>
-    </div>
+<div class="group-title">Лаунчер</div>
+<div class="row">
+  <span>Эффекты</span>
+  <div class="seg" style="width:230px" data-seg="effects" id="effectsSegmented">
+    <span class="lens"></span>
+    <button type="button" class="on" data-fx="full">Полные</button>
+    <button type="button" data-fx="low">Лёгкие</button>
+    <button type="button" data-fx="off">Выкл</button>
   </div>
+</div>
+<div class="row">
+  <span>Скрывать лаунчер в игре<span class="hint">Освобождает видеопамять</span></span>
+  <span class="toggle on" id="toggleHideOnLaunch"></span>
+</div>
+<div class="row">
+  <span>Автообновление<span class="hint">Фоновое обновление через Velopack</span></span>
+  <span class="toggle on" id="toggleAutoUpdate"></span>
+</div>
+<div class="row">
+  <span>Останавливать туннель при выходе</span>
+  <span class="toggle on" id="toggleStopTunnelOnExit"></span>
+</div>
 
-</section>
+<div class="group-title">Игра</div>
+<div class="row">
+  <span>Версия<span class="hint" id="gameVersionHint">Fabric 1.20.1 · Aura Pack 1.2</span></span>
+  <button type="button" class="btn sm" id="btnChangeVersion">Сменить</button>
+</div>
+<div class="row">
+  <span>Папка игры<span class="hint" id="gameFolderHint">%APPDATA%\.aura</span></span>
+  <button type="button" class="btn sm" id="btnBrowseFolder">Обзор</button>
+</div>
+
+<div class="group-title">Если что-то сломалось</div>
+<div class="row">
+  <span>Логи и отчёт о сбое</span>
+  <button type="button" class="btn sm" id="btnExportLogs">Экспорт</button>
+</div>
+<div class="row" id="rowClearCache">
+  <span>Кэш модов<span class="hint">Очистить скомпилированные шейдеры и временные архивы</span></span>
+  <div id="clearCacheActionWrap" style="display:inline-flex;gap:6px;align-items:center">
+    <button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>
+  </div>
+</div>
+
         </div>
         <div class="sec-foot"></div>
       </div>
@@ -1006,10 +461,14 @@
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   
+  <!-- Сторонние библиотеки (skinview3d UMD) -->
+  <script src="assets/vendor/skinview3d.bundle.js"></script>
+
   <!-- Базовые скрипты ядра и модулей -->
   <script src="assets/js/demo-data.js"></script>
   <script src="assets/js/core.js"></script>
   <script src="screens/play.js"></script>
+  <script src="screens/map.js"></script>
   <script src="screens/lobby.js"></script>
   <script src="screens/friends.js"></script>
   <script src="screens/wardrobe.js"></script>

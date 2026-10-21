@@ -1,226 +1,42 @@
-<section class="screen-view" id="screen-wardrobe" aria-label="Экран Гардероб">
-  <div class="screen-wardrobe-layout">
-
-    <!-- Верхний ряд: Заголовок и карточка профиля -->
-    <div class="wardrobe-top-row">
-      <div class="wardrobe-title-group">
-        <h2 class="wardrobe-main-heading">Гардероб и профиль</h2>
-        <p class="wardrobe-subheading">Интерактивная 3D-настройка скина, выбор плаща и параметры модели</p>
-      </div>
-
-      <div class="wardrobe-player-badge">
-        <div class="player-badge-meta">
-          <span class="player-badge-nick" id="wardrobeBadgeNick">Coock0ld</span>
-          <span class="player-badge-id">ID: AURA-7821-X9M2</span>
-        </div>
-        <span class="badge-tag">Aura Core</span>
-      </div>
+<div class="wardrobe">
+  <div class="wardrobe-viewer-col">
+    <canvas id="skinCanvas3D" width="260" height="380" title="Потяните для вращения, колёсико — зум"></canvas>
+    <div class="seg skin-anim-seg" data-seg="anim" style="margin-top:8px">
+      <span class="lens"></span>
+      <button type="button" class="on" data-anim="idle">Стоит</button>
+      <button type="button" data-anim="walk">Идёт</button>
+      <button type="button" data-anim="run">Бежит</button>
     </div>
-
-    <!-- Основная 2-колоночная сетка -->
-    <div class="wardrobe-content-grid">
-
-      <!-- Левая колонка: 3D Сцена персонажа -->
-      <div class="glass-island elevated wardrobe-stage-island" data-glass>
-        <div class="stage-header">
-          <div class="stage-title-wrap">
-            <svg class="icon stage-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            <span class="stage-title">3D Предпросмотр</span>
-          </div>
-
-          <div class="stage-top-controls">
-            <!-- Кнопка авто-вращения -->
-            <button type="button" class="btn-stage-toggle active" id="btnToggleAutoRotate" title="Включить / остановить плавное вращение">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
-              <span>Авто</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 3D Canvas сцена -->
-        <div class="skin-viewport-wrap" id="skinViewportWrap" title="Потяните курсором для свободного 3D вращения">
-          <canvas id="skinCanvas3D" class="skin-canvas-3d" width="600" height="760" aria-label="3D Модель скина персонажа"></canvas>
-          
-          <div class="viewport-hud-overlay">
-            <span class="hud-angle-badge" id="hudAngleBadge">0°</span>
-            <span class="hud-cape-badge" id="hudCapeBadge">Плащ Aura</span>
-          </div>
-
-          <!-- Световой блик под ногами персонажа -->
-          <div class="character-pedestal-light"></div>
-        </div>
-
-        <div class="stage-footer">
-          <span class="stage-hint-text">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 2a10 10 0 0 1 10 10"></path></svg>
-            <span>Потяните курсором для вращения 360°</span>
-          </span>
-
-          <!-- Быстрые ракурсы -->
-          <div class="quick-angle-buttons" role="group" aria-label="Быстрый выбор угла обзора">
-            <button type="button" class="btn-angle active" data-angle="0">Спереди</button>
-            <button type="button" class="btn-angle" data-angle="45">3/4</button>
-            <button type="button" class="btn-angle" data-angle="90">Сбоку</button>
-            <button type="button" class="btn-angle" data-angle="180">Сзади</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Правая колонка: Параметры внешности и кастомизация -->
-      <div class="wardrobe-controls-column">
-
-        <!-- Секция 1: Ник и ID профиля -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              </span>
-              <span>Игровой профиль</span>
-            </span>
-          </div>
-
-          <div class="profile-edit-fields">
-            <div class="form-field-group">
-              <label for="wardrobeNickInput" class="form-field-label">Никнейм в игре</label>
-              <div class="nick-input-wrap">
-                <input type="text" id="wardrobeNickInput" class="text-input-field" value="Coock0ld" maxlength="16" spellcheck="false" autocomplete="off">
-                <button type="button" class="btn-secondary btn-save-nick" id="btnSaveNickname">Сохранить</button>
-              </div>
-              <span class="field-hint">От 3 до 16 символов (латиница, цифры, подчёркивание)</span>
-            </div>
-
-            <div class="profile-id-row">
-              <span class="id-row-label">Код друга для поиска:</span>
-              <span class="id-row-val" id="wardrobeProfileIdVal">AURA-7821-X9M2</span>
-              <button type="button" class="btn-copy-id" id="btnCopyProfileId" title="Скопировать код профиля">
-                <svg class="icon icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span class="btn-copy-label">Копировать</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Секция 2: Модель персонажа (Alex 3px / Steve 4px) -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect></svg>
-              </span>
-              <span>Формат модели персонажа</span>
-            </span>
-          </div>
-
-          <div class="model-type-selector">
-            <div class="segment-pill-control" role="radiogroup" aria-label="Геометрия модели">
-              <button type="button" class="segment-option" id="modelSteveBtn" data-model="classic" role="radio" aria-checked="true">
-                <span class="segment-radio-title">Классика (Steve)</span>
-                <span class="segment-radio-sub">Широкие руки (4 пикселя)</span>
-              </button>
-              <button type="button" class="segment-option" id="modelAlexBtn" data-model="slim" role="radio" aria-checked="false">
-                <span class="segment-radio-title">Слим (Alex)</span>
-                <span class="segment-radio-sub">Тонкие руки (3 пикселя)</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Секция 3: Выбор плаща -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-              </span>
-              <span>Плащ Aura</span>
-            </span>
-            <span class="cape-status-tag" id="capeStatusTag">Активен: Aura</span>
-          </div>
-
-          <div class="cape-cards-grid" role="radiogroup" aria-label="Выбор плаща">
-            <!-- Плащ Aura -->
-            <div class="cape-card active" data-cape="founder" role="radio" aria-checked="true">
-              <div class="cape-card-preview cape-founder-preview">
-                <div class="cape-emblem-gold">A</div>
-              </div>
-              <div class="cape-card-info">
-                <span class="cape-card-name">Плащ Aura</span>
-                <span class="cape-card-desc">Фирменный янтарный плащ с эмблемой Aura</span>
-              </div>
-              <div class="cape-radio-dot"></div>
-            </div>
-
-            <!-- Стандартный плащ -->
-            <div class="cape-card" data-cape="classic" role="radio" aria-checked="false">
-              <div class="cape-card-preview cape-classic-preview">
-                <div class="cape-emblem-silver">M</div>
-              </div>
-              <div class="cape-card-info">
-                <span class="cape-card-name">Стандартный плащ</span>
-                <span class="cape-card-desc">Классический глубокий тёмный текстиль</span>
-              </div>
-              <div class="cape-radio-dot"></div>
-            </div>
-
-            <!-- Без плаща -->
-            <div class="cape-card" data-cape="none" role="radio" aria-checked="false">
-              <div class="cape-card-preview cape-none-preview">
-                <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </div>
-              <div class="cape-card-info">
-                <span class="cape-card-name">Без плаща</span>
-                <span class="cape-card-desc">Отображать только оригинальный скин</span>
-              </div>
-              <div class="cape-radio-dot"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Секция 4: Загрузка скина (.png) -->
-        <div class="glass-island" data-glass>
-          <div class="glass-island-header">
-            <span class="glass-island-title">
-              <span class="glass-island-title-icon">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-              </span>
-              <span>Файл скина персонажа</span>
-            </span>
-          </div>
-
-          <!-- Скрытый инпут для файла -->
-          <input type="file" id="skinFileInput" accept="image/png" style="display: none;" aria-label="Выбрать файл скина">
-
-          <div class="skin-upload-dropzone" id="skinUploadDropzone">
-            <div class="upload-icon-circle">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            </div>
-            <div class="upload-text-group">
-              <span class="upload-title" id="skinFileNameDisplay">Скин: default_coock0ld.png (64×64)</span>
-              <span class="upload-sub">Перетащите сюда PNG-файл скина или выберите с диска</span>
-            </div>
-            
-            <div class="upload-buttons-row">
-              <button type="button" class="btn-primary-action btn-upload-skin" id="btnTriggerSkinUpload">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                <span>Загрузить скин (.png)</span>
-              </button>
-              
-              <button type="button" class="btn-secondary btn-reset-skin" id="btnResetDefaultSkin">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                <span>Сбросить на дефолтный</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="skin-format-note">
-            <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-            <span>Поддерживаются форматы PNG 64×64 и 64×32. Изменения видны всем участникам лобби и на серверах Aura.</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
   </div>
-</section>
+
+  <div class="wardrobe-controls-col" style="flex:1">
+    <div class="small dim" style="margin-bottom:10px">Плащ</div>
+    <div class="capes" id="capeSelector">
+      <button type="button" class="cape on" data-cape="cyan" title="Лазурный плащ"><span class="sw" style="background:linear-gradient(160deg,#5FD4E8,#2A6F8E)"></span></button>
+      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ"><span class="sw" style="background:linear-gradient(160deg,#C9CDD6,#6B7280)"></span></button>
+      <button type="button" class="cape" data-cape="none" title="Без плаща">нет</button>
+    </div>
+
+    <div class="row">
+      <span>Модель</span>
+      <div class="seg" style="width:190px" data-seg="model" id="modelTypeSeg">
+        <span class="lens"></span>
+        <button type="button" class="on" data-model="default">Steve</button>
+        <button type="button" data-model="slim">Alex</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      <label class="btn sm" style="cursor:pointer">
+        Загрузить
+        <input type="file" id="skinFileInput" accept="image/png" style="display:none">
+      </label>
+    </div>
+
+    <div class="row">
+      <span>Ник</span>
+      <input class="field" id="inputPlayerNickname" value="Coock0ld" style="width:170px;height:40px">
+    </div>
+  </div>
+</div>

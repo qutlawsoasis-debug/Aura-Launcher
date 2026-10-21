@@ -1,323 +1,64 @@
-<section class="screen-view" id="screen-settings" aria-label="Экран Настройки">
-  <div class="screen-settings-layout">
-
-    <!-- Левая колонка: Клиент, память, пути и графика -->
-    <div class="settings-main-column">
-
-      <!-- Карточка: Клиент и среда запуска -->
-      <div class="glass-island elevated" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-            </span>
-            <span>Клиент и среда запуска</span>
-          </span>
-          <span class="settings-section-badge">Сборка Aura</span>
-        </div>
-
-        <div class="settings-form-grid">
-          
-          <!-- Выбор версии клиента -->
-          <div class="setting-field-group">
-            <div class="setting-label-row">
-              <label class="setting-label" for="clientVersionTrigger">Версия Minecraft и загрузчик</label>
-              <span class="setting-hint">Рекомендуется Fabric 1.20.1</span>
-            </div>
-            
-            <div class="custom-dropdown" id="clientVersionDropdown">
-              <button type="button" class="custom-dropdown-trigger" id="clientVersionTrigger" aria-haspopup="listbox" aria-expanded="false">
-                <span class="dropdown-selected-val" id="clientVersionText">Fabric 1.20.1 (Aura Pack v1.2 • Рекомендуемая)</span>
-                <svg class="icon dropdown-arrow" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
-              <div class="custom-dropdown-list" role="listbox" aria-label="Выбор версии">
-                <button type="button" class="dropdown-item active" data-version="fabric-1.20.1" role="option" aria-selected="true">
-                  <span>Fabric 1.20.1 (Aura Pack v1.2 • Рекомендуемая)</span>
-                  <span class="badge-item-tag">Стабильная</span>
-                </button>
-                <button type="button" class="dropdown-item" data-version="fabric-1.21.1" role="option" aria-selected="false">
-                  <span>Fabric 1.21.1 (Экспериментальная)</span>
-                  <span class="badge-item-tag experimental">Beta</span>
-                </button>
-                <button type="button" class="dropdown-item" data-version="vanilla-1.20.1" role="option" aria-selected="false">
-                  <span>Vanilla 1.20.1 (Чистый клиент без модов)</span>
-                  <span class="badge-item-tag">Оригинал</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Выделение RAM -->
-          <div class="setting-field-group">
-            <div class="setting-label-row">
-              <label class="setting-label" for="ramSliderInput">Выделение оперативной памяти Java (RAM)</label>
-              <span class="ram-current-display"><strong id="ramValueText">6 ГБ</strong> / 16 ГБ доступно</span>
-            </div>
-
-            <div class="ram-slider-wrapper">
-              <div class="ram-slider-track-container">
-                <input type="range" min="4" max="12" step="1" value="6" class="ram-range-slider" id="ramSliderInput" aria-label="Ползунок выделения оперативной памяти в ГБ">
-                <div class="ram-slider-fill" id="ramSliderFill"></div>
-              </div>
-              <div class="ram-range-scale">
-                <span>4 ГБ</span>
-                <span>6 ГБ</span>
-                <span>8 ГБ</span>
-                <span>10 ГБ</span>
-                <span>12 ГБ</span>
-              </div>
-            </div>
-
-            <!-- Чипы быстрого выбора RAM -->
-            <div class="ram-chips-row" role="radiogroup" aria-label="Быстрый выбор памяти">
-              <button type="button" class="ram-chip" data-ram="4" role="radio" aria-checked="false">4 ГБ (Минимум)</button>
-              <button type="button" class="ram-chip active" data-ram="6" role="radio" aria-checked="true">6 ГБ (Оптимально)</button>
-              <button type="button" class="ram-chip" data-ram="8" role="radio" aria-checked="false">8 ГБ (Шейдеры)</button>
-              <button type="button" class="ram-chip" data-ram="12" role="radio" aria-checked="false">12 ГБ (Distant Hor.)</button>
-            </div>
-            
-            <p class="setting-subtext" id="ramHintText">6 ГБ обеспечивает высокую частоту кадров и стабильную сборку мусора GC при использовании шейдерпаков.</p>
-          </div>
-
-          <!-- Папка игры -->
-          <div class="setting-field-group">
-            <div class="setting-label-row">
-              <label class="setting-label" for="gameFolderPathInput">Рабочая папка игры</label>
-              <span class="setting-hint">Папка хранения сборки, логов и сохранений</span>
-            </div>
-
-            <div class="path-input-action-row">
-              <div class="path-input-wrap">
-                <input type="text" id="gameFolderPathInput" class="text-input-field path-input" value="%APPDATA%\.aura" spellcheck="false" autocomplete="off">
-              </div>
-              <button type="button" class="btn-secondary" id="btnBrowseGameFolder" title="Выбрать другую папку">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                <span>Обзор...</span>
-              </button>
-              <button type="button" class="btn-secondary" id="btnResetGameFolder" title="Сбросить путь на стандартный (%APPDATA%\.aura)">
-                <svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                <span>Сброс</span>
-              </button>
-            </div>
-
-            <!-- Блок валидации ошибки при пустом/неверном пути -->
-            <div class="game-path-validation-error" id="gamePathError" style="display: none;">
-              <svg class="icon error-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-              <span id="gamePathErrorText">Путь к папке игры не может быть пустым. Укажите корректную директорию.</span>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Карточка: Пресеты графики Minecraft -->
-      <div class="glass-island elevated" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-            </span>
-            <span>Пресеты графики Minecraft</span>
-          </span>
-          <span class="setting-hint">Мгновенная настройка Sodium и видеоядра</span>
-        </div>
-
-        <div class="graphics-presets-grid" role="radiogroup" aria-label="Пресеты графики">
-          <!-- Пресет: Слабый ПК -->
-          <div class="preset-card" data-preset="low" role="radio" aria-checked="false" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Слабый ПК</span>
-              <span class="preset-badge">60+ FPS</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 8 чанков</span>
-              <span>Шейдеры: Выкл</span>
-              <span>Частицы: Минимум</span>
-            </div>
-          </div>
-
-          <!-- Пресет: Средний -->
-          <div class="preset-card" data-preset="medium" role="radio" aria-checked="false" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Средний</span>
-              <span class="preset-badge">Баланс</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 12 чанков</span>
-              <span>Шейдеры: Builders QoL</span>
-              <span>Мягкий свет: Вкл</span>
-            </div>
-          </div>
-
-          <!-- Пресет: Высокий (по умолчанию) -->
-          <div class="preset-card active" data-preset="high" role="radio" aria-checked="true" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Высокий</span>
-              <span class="preset-badge recommended">Рекомендуемый</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 16 чанков</span>
-              <span>Шейдеры: Sildurs / Fancy</span>
-              <span>PBR-текстуры: Вкл</span>
-            </div>
-          </div>
-
-          <!-- Пресет: Ультра -->
-          <div class="preset-card" data-preset="ultra" role="radio" aria-checked="false" tabindex="0">
-            <div class="preset-top-row">
-              <span class="preset-name">Ультра</span>
-              <span class="preset-badge">Кинокачество</span>
-            </div>
-            <div class="preset-specs">
-              <span>Дальность: 24 чанка</span>
-              <span>Шейдеры: Complementary</span>
-              <span>Distant Horizons: Вкл</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Правая колонка: Эффекты лаунчера, поведение и системное обслуживание -->
-    <div class="settings-side-column">
-
-      <!-- Карточка: Визуальные эффекты интерфейса -->
-      <div class="glass-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg>
-            </span>
-            <span>Визуальные эффекты лаунчера</span>
-          </span>
-        </div>
-
-        <p class="setting-subtext">Адаптация прозрачности Liquid Glass, размытия фона и парящих частиц под мощность GPU.</p>
-
-        <div class="segmented-control effects-segmented-control" role="group" aria-label="Режим визуальных эффектов">
-          <button type="button" class="segment-btn active" data-effect-btn="full" aria-checked="true">
-            <span>Полные</span>
-          </button>
-          <button type="button" class="segment-btn" data-effect-btn="low" aria-checked="false">
-            <span>Лёгкие</span>
-          </button>
-          <button type="button" class="segment-btn" data-effect-btn="off" aria-checked="false">
-            <span>Выкл</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Карточка: Поведение при запуске и обновления -->
-      <div class="glass-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </span>
-            <span>Поведение и обновление</span>
-          </span>
-        </div>
-
-        <div class="toggle-options-stack">
-          <!-- Скрывать лаунчер при запуске -->
-          <div class="toggle-option-row">
-            <div class="toggle-option-meta">
-              <span class="toggle-title">Скрывать лаунчер при запуске игры</span>
-              <span class="toggle-desc">Освобождает видеопамять во время игры</span>
-            </div>
-            <label class="switch-label-wrap" title="Скрывать лаунчер">
-              <input type="checkbox" id="chkHideOnLaunch" class="switch-input" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-
-          <!-- Автообновление через Velopack -->
-          <div class="toggle-option-row">
-            <div class="toggle-option-meta">
-              <span class="toggle-title">Автообновление Velopack</span>
-              <span class="toggle-desc">Фоновая загрузка дельта-патчей клиента</span>
-            </div>
-            <label class="switch-label-wrap" title="Автообновление">
-              <input type="checkbox" id="chkAutoUpdate" class="switch-input" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-
-          <!-- Закрывать при падении туннеля -->
-          <div class="toggle-option-row">
-            <div class="toggle-option-meta">
-              <span class="toggle-title">Аварийный стоп P2P-туннеля</span>
-              <span class="toggle-desc">Останавливать туннель при закрытии клиента</span>
-            </div>
-            <label class="switch-label-wrap" title="Стоп туннеля">
-              <input type="checkbox" id="chkKillTunnelOnExit" class="switch-input" checked>
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Карточка: Системные действия и диагностика -->
-      <div class="glass-island" data-glass>
-        <div class="glass-island-header">
-          <span class="glass-island-title">
-            <span class="glass-island-title-icon">
-              <svg class="icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
-            </span>
-            <span>Диагностика и кэш</span>
-          </span>
-        </div>
-
-        <div class="maintenance-actions-stack">
-          <button type="button" class="btn-secondary maintenance-btn" id="btnOpenLogsFolder">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            <span>Открыть папку логов</span>
-          </button>
-
-          <button type="button" class="btn-secondary maintenance-btn" id="btnExportDiagnostics">
-            <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            <span>Экспорт отчёта о сбоях</span>
-          </button>
-
-          <button type="button" class="btn-danger maintenance-btn" id="btnOpenClearCacheModal">
-            <svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-            <span>Очистить кэш модов</span>
-          </button>
-        </div>
-      </div>
-
-    </div>
-
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin:4px 0 16px">
+  <div>
+    <div class="small dim" style="margin-bottom:8px">Память для игры</div>
+    <div class="ram-num" style="font-size:60px;font-weight:700;letter-spacing:-.04em;line-height:1"><span id="settingsRamVal">6</span> ГБ</div>
   </div>
+  <div class="small dim" id="settingsRamHint">Оптимально · из 16 ГБ</div>
+</div>
 
-  <!-- Модальное окно подтверждения очистки кэша -->
-  <div class="modal-backdrop" id="modalClearCache" aria-hidden="true" role="dialog" aria-labelledby="modalClearCacheTitle">
-    <div class="glass-modal">
-      <div class="modal-header-row">
-        <h3 class="modal-title" id="modalClearCacheTitle">
-          <svg class="icon text-danger" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          <span>Очистка кэша сборки</span>
-        </h3>
-        <button type="button" class="modal-close-btn" id="btnCloseClearCacheModal" aria-label="Закрыть">
-          <svg class="icon" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
+<input type="range" min="4" max="12" step="1" value="6" id="settingsRamSlider">
 
-      <div class="modal-body">
-        <p class="modal-dialog-text">
-          Будут удалены временные файлы загрузчика, кэшированные индексы SHA-256 и скомпилированные шейдеры. При следующем запуске лаунчер выполнит быструю повторную верификацию.
-        </p>
-        <p class="modal-dialog-subtext">
-          Ваши сохранения миров, скриншоты и настройки управления затронуты не будут.
-        </p>
-      </div>
+<div class="group-title">Графика</div>
+<div class="seg" data-seg="preset" id="presetSegmented" style="margin-top:8px">
+  <span class="lens"></span>
+  <button type="button" data-preset-idx="0">Слабая</button>
+  <button type="button" data-preset-idx="1">Средняя</button>
+  <button type="button" class="on" data-preset-idx="2">Высокая</button>
+  <button type="button" data-preset-idx="3">Ультра</button>
+</div>
+<div class="small dim" style="margin:10px 2px 0" id="settingsPresetHint">16 чанков · шейдеры Sildurs · PBR-текстуры</div>
 
-      <div class="modal-footer">
-        <button type="button" class="btn-secondary" id="btnCancelClearCache">Отмена</button>
-        <button type="button" class="btn-danger" id="btnConfirmClearCache">Очистить кэш</button>
-      </div>
-    </div>
+<div class="group-title">Лаунчер</div>
+<div class="row">
+  <span>Эффекты</span>
+  <div class="seg" style="width:230px" data-seg="effects" id="effectsSegmented">
+    <span class="lens"></span>
+    <button type="button" class="on" data-fx="full">Полные</button>
+    <button type="button" data-fx="low">Лёгкие</button>
+    <button type="button" data-fx="off">Выкл</button>
   </div>
+</div>
+<div class="row">
+  <span>Скрывать лаунчер в игре<span class="hint">Освобождает видеопамять</span></span>
+  <span class="toggle on" id="toggleHideOnLaunch"></span>
+</div>
+<div class="row">
+  <span>Автообновление<span class="hint">Фоновое обновление через Velopack</span></span>
+  <span class="toggle on" id="toggleAutoUpdate"></span>
+</div>
+<div class="row">
+  <span>Останавливать туннель при выходе</span>
+  <span class="toggle on" id="toggleStopTunnelOnExit"></span>
+</div>
 
-</section>
+<div class="group-title">Игра</div>
+<div class="row">
+  <span>Версия<span class="hint" id="gameVersionHint">Fabric 1.20.1 · Aura Pack 1.2</span></span>
+  <button type="button" class="btn sm" id="btnChangeVersion">Сменить</button>
+</div>
+<div class="row">
+  <span>Папка игры<span class="hint" id="gameFolderHint">%APPDATA%\.aura</span></span>
+  <button type="button" class="btn sm" id="btnBrowseFolder">Обзор</button>
+</div>
+
+<div class="group-title">Если что-то сломалось</div>
+<div class="row">
+  <span>Логи и отчёт о сбое</span>
+  <button type="button" class="btn sm" id="btnExportLogs">Экспорт</button>
+</div>
+<div class="row" id="rowClearCache">
+  <span>Кэш модов<span class="hint">Очистить скомпилированные шейдеры и временные архивы</span></span>
+  <div id="clearCacheActionWrap" style="display:inline-flex;gap:6px;align-items:center">
+    <button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>
+  </div>
+</div>

@@ -132,7 +132,7 @@ async function build() {
   coreCss = coreCss.replace(/url\(['"]?\.\.\/images\/steve\.png['"]?\)/g, `url('${steveDataUrl}')`);
   coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.woff2['"]?\)\s+format\(['"]woff2['"]\)/g, `url('data:font/woff2;charset=utf-8;base64,${onestBase64}') format('woff2')`);
 
-  const screenCssFiles = ['play.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];
+  const screenCssFiles = ['play.css', 'map.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];
   let screensCombinedCss = '';
   for (const sc of screenCssFiles) {
     let cssContent = fs.readFileSync(path.join(BASE_DIR, 'screens', sc), 'utf-8');
@@ -154,6 +154,7 @@ ${screensCombinedCss}
 
   console.log('4. Reading screen HTML views from shell.html...');
   const shellHtml = fs.readFileSync(path.join(BASE_DIR, 'shell.html'), 'utf-8');
+  const mapHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'map.html'), 'utf-8');
   const lobbyHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'lobby.html'), 'utf-8');
   const friendsHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'friends.html'), 'utf-8');
   const wardrobeHtml = fs.readFileSync(path.join(BASE_DIR, 'screens', 'wardrobe.html'), 'utf-8');
@@ -162,9 +163,11 @@ ${screensCombinedCss}
 
   console.log('5. Concatenating and inlining JavaScript modules...');
   const jsFiles = [
+    path.join(BASE_DIR, 'assets', 'vendor', 'skinview3d.bundle.js'),
     path.join(BASE_DIR, 'assets', 'js', 'demo-data.js'),
     path.join(BASE_DIR, 'assets', 'js', 'core.js'),
     path.join(BASE_DIR, 'screens', 'play.js'),
+    path.join(BASE_DIR, 'screens', 'map.js'),
     path.join(BASE_DIR, 'screens', 'lobby.js'),
     path.join(BASE_DIR, 'screens', 'friends.js'),
     path.join(BASE_DIR, 'screens', 'wardrobe.js'),
@@ -178,6 +181,12 @@ ${screensCombinedCss}
     combinedJs += `\n// === MODULE: ${path.basename(jf)} ===\n` + jsContent;
   }
 
+  // Base64 inline capes if present in wardrobe.js
+  const cyanCapeBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'cape_cyan.png')).toString('base64');
+  const silverCapeBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'cape_silver.png')).toString('base64');
+  combinedJs = combinedJs.replace(/assets\/images\/cape_cyan\.png/g, `data:image/png;base64,${cyanCapeBase64}`);
+  combinedJs = combinedJs.replace(/assets\/images\/cape_silver\.png/g, `data:image/png;base64,${silverCapeBase64}`);
+
   const combinedScript = `
 <script id="aura-inlined-scripts">
 ${combinedJs}
@@ -188,6 +197,7 @@ ${combinedJs}
   let standaloneHtml = shellHtml
     .replace('<!-- SHELL_STYLES_PLACEHOLDER -->', combinedStyle)
     .replace('<!-- SHELL_SCRIPTS_PLACEHOLDER -->', combinedScript)
+    .replace('<!-- SCREEN_MAP_PLACEHOLDER -->', mapHtml)
     .replace('<!-- SCREEN_LOBBY_PLACEHOLDER -->', lobbyHtml)
     .replace('<!-- SCREEN_FRIENDS_PLACEHOLDER -->', friendsHtml)
     .replace('<!-- SCREEN_WARDROBE_PLACEHOLDER -->', wardrobeHtml)
