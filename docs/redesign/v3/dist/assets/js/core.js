@@ -136,11 +136,13 @@
     // Update segmented lens positions on layer change
     requestAnimationFrame(() => {
       document.querySelectorAll(`[data-l="${m}"] .seg`).forEach(window.placeLens);
+      syncPreBlurBackground();
     });
   };
 
   // Segmented lens & toggle controllers
   window.placeLens = function (seg) {
+    if (!seg) return;
     const onBtn = seg.querySelector('button.on');
     const lens = seg.querySelector('.lens');
     if (onBtn && lens) {
@@ -149,7 +151,33 @@
     }
   };
 
+  function syncPreBlurBackground() {
+    if (!island || !sections.includes(islandMode)) return;
+    const worldEl = document.querySelector('.world');
+    if (!worldEl) return;
+
+    const wRect = worldEl.getBoundingClientRect();
+    const iRect = island.getBoundingClientRect();
+    const bgX = Math.round(wRect.left - iRect.left);
+    const bgY = Math.round(wRect.top - iRect.top);
+    const bgW = Math.round(wRect.width);
+    const bgH = Math.round(wRect.height);
+
+    island.style.setProperty('--bg-blur-pos', `center top, center center, ${bgX}px ${bgY}px`);
+    island.style.setProperty('--bg-blur-size', `auto, auto, ${bgW}px ${bgH}px`);
+  }
+
   function initComponentInteractions() {
+    // ResizeObserver for segmented controls to keep lens perfectly positioned
+    if (typeof ResizeObserver !== 'undefined') {
+      const segObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          window.placeLens(entry.target);
+        }
+      });
+      document.querySelectorAll('.seg').forEach(seg => segObserver.observe(seg));
+    }
+
     // Toggles
     document.addEventListener('click', (e) => {
       const toggle = e.target.closest('.toggle');
@@ -269,8 +297,15 @@
       }
     });
 
+    island.addEventListener('transitionend', (e) => {
+      if (e.target === island && (e.propertyName === 'width' || e.propertyName === 'height')) {
+        syncPreBlurBackground();
+      }
+    });
+
     window.addEventListener('resize', () => {
       window.setIslandMode(islandMode, false);
+      syncPreBlurBackground();
     });
   }
 
