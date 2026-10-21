@@ -1,6 +1,7 @@
 /**
  * Smoke Test Suite for Aura Launcher v3 (index.html & aura-v3-standalone.html)
  * Tests at 1366x768 across effects modes (full & off).
+ * Real clicks on each visible interactive control in .sec-body.
  */
 
 const fs = require('fs');
@@ -153,12 +154,11 @@ async function runSmokeForTarget(target) {
   const filterCount = filterRes.result.value || 0;
   result.backdropLayersOk = (target.effects === 'off' ? filterCount === 0 : filterCount <= 1);
 
-  // 3. Test sections iteration & buttons
+  // 3. Test sections iteration, real clicking on interactive elements
   for (const sec of SECTIONS) {
     await sendSession('Runtime.evaluate', {
       expression: `window.setIslandMode("${sec}")`
     });
-    // Wait for island transition to finish in full effects (0.75s transition)
     await new Promise(r => setTimeout(r, target.effects === 'off' ? 150 : 800));
     result.sectionsVisited++;
 
@@ -183,8 +183,8 @@ async function runSmokeForTarget(target) {
       result.mapCanvasSizeOk = !!mapCheck.result.value?.isMatch;
     }
 
-    // Inspect elements inside active .sec-body
-    const inspectRes = await sendSession('Runtime.evaluate', {
+    // Inspect and click elements inside active .sec-body
+    const clickSummary = await sendSession('Runtime.evaluate', {
       expression: `(() => {
         const body = document.querySelector('[data-l="${sec}"] .sec-body');
         if (!body) return { count: 0, overlapped: 0, badButtons: 0 };
@@ -193,7 +193,6 @@ async function runSmokeForTarget(target) {
         let badButtons = 0;
 
         for (const el of clickable) {
-          // If element is inside an un-opened reveal, skip bounds check
           const closedReveal = el.closest('.reveal:not(.open)');
           if (closedReveal) continue;
 
@@ -202,7 +201,6 @@ async function runSmokeForTarget(target) {
             continue;
           }
 
-          // Check if element is within body scroll viewport
           const bodyRect = body.getBoundingClientRect();
           const isVerticallyVisible = (rect.bottom > bodyRect.top && rect.top < bodyRect.bottom);
           if (isVerticallyVisible) {
@@ -210,29 +208,29 @@ async function runSmokeForTarget(target) {
             const cy = Math.max(rect.top + 5, Math.min(rect.bottom - 5, rect.top + rect.height / 2));
             const topEl = document.elementFromPoint(cx, cy);
             if (!topEl || (!el.contains(topEl) && !topEl.contains(el))) {
+              console.log('OVERLAP in ' + sec + ': el <' + el.tagName + ' class=\"' + el.className + '\">, topEl: <' + (topEl ? topEl.tagName + ' class=\"' + topEl.className + '\"' : 'null') + '>');
               overlapped++;
             }
           }
 
-          // Check if button has handler / data-cmd
-          const hasKnownDataset = Boolean(
-            el.dataset.cmd || el.dataset.open || el.dataset.play || el.dataset.anim ||
-            el.dataset.model || el.dataset.cape || el.dataset.tab || el.dataset.presetIdx ||
-            el.dataset.fx || ('copy' in el.dataset) || el.dataset.reveal || el.dataset.poi
-          );
-          const hasKnownClass = (
-            el.classList.contains('pick') || el.classList.contains('btn-accept-req') ||
-            el.classList.contains('btn-reject-req') || el.classList.contains('btn-invite-friend') ||
-            el.classList.contains('cape')
-          );
-          const hasKnownId = (
-            el.id === 'btnStartClearCache' || el.id === 'btnSubmitJoinCode' ||
-            el.id === 'btnSubmitAddFriend' || el.id === 'zin' || el.id === 'zout' ||
-            el.id === 'btnCopyLobbyCode' || el.id === 'btnCopyMyFriendCode'
-          );
+          // Test real click and detect DOM change / toast / command
+          if (el.tagName === 'BUTTON' || el.classList.contains('toggle') || el.classList.contains('pick')) {
+            const prevHtml = document.body.innerHTML;
+            const prevToasts = document.querySelectorAll('.toast-item').length;
+            
+            try {
+              el.click();
+            } catch (e) {}
 
-          if (el.tagName === 'BUTTON' && !hasKnownDataset && !hasKnownClass && !hasKnownId) {
-            badButtons++;
+            const nextHtml = document.body.innerHTML;
+            const nextToasts = document.querySelectorAll('.toast-item').length;
+            const hasCmd = Boolean(el.dataset.cmd) || Boolean(el.getAttribute('onclick')) || Boolean(el.closest('[data-cmd]'));
+            const hasEffect = (nextHtml !== prevHtml) || (nextToasts !== prevToasts) || hasCmd;
+
+            if (!hasEffect) {
+              console.log('NO EFFECT: <' + el.tagName + ' class=\"' + el.className + '\" text=\"' + (el.innerText || '').slice(0, 20) + '\"> in ' + sec);
+              badButtons++;
+            }
           }
         }
 
@@ -241,26 +239,22 @@ async function runSmokeForTarget(target) {
       returnByValue: true
     });
 
-    if (inspectRes.result.value) {
-      result.buttonsClicked += inspectRes.result.value.count;
-      result.overlappedElements += inspectRes.result.value.overlapped;
-      result.buttonsWithoutEffectOrCmd += inspectRes.result.value.badButtons;
+    if (clickSummary.result.value) {
+      result.buttonsClicked += clickSummary.result.value.count;
+      result.overlappedElements += clickSummary.result.value.overlapped;
+      result.buttonsWithoutEffectOrCmd += clickSummary.result.value.badButtons;
     }
   }
 
-  // 4. Test Play -> Running state
+  // 4. Test Play -> Running state via real click
   await sendSession('Runtime.evaluate', { expression: 'window.setIslandMode("idle")' });
   await new Promise(r => setTimeout(r, 400));
 
-  const playRes = await sendSession('Runtime.evaluate', {
+  await sendSession('Runtime.evaluate', {
     expression: `(() => {
       const playBtn = document.querySelector('.bar .play');
-      if (playBtn) {
-        window.startGame(playBtn);
-      }
-      return !!playBtn;
-    })()`,
-    returnByValue: true
+      if (playBtn) playBtn.click();
+    })()`
   });
 
   // Wait for launch completion (effects=off takes 1-2 frames, full ~1.8s)
@@ -275,8 +269,14 @@ async function runSmokeForTarget(target) {
 
   result.playRunningOk = !!(runningRes.result.value?.running && runningRes.result.value?.mode);
 
-  // Stop game
-  await sendSession('Runtime.evaluate', { expression: 'if (window.stopGame) window.stopGame();' });
+  // Stop game via real click on stop button if running
+  await sendSession('Runtime.evaluate', {
+    expression: `(() => {
+      const stopBtn = document.querySelector('[data-stop]');
+      if (stopBtn) stopBtn.click();
+      else if (window.stopGame) window.stopGame();
+    })()`
+  });
 
   ws.removeEventListener('message', sessionEventsHandler);
   ws.close();
