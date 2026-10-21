@@ -70,9 +70,26 @@
     <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="Velopack" Version="1.2.161" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.0" />
   </ItemGroup>
+
+  <!-- Build UI distribution for WebShell on Release -->
+  <Target Name="BuildWebUi" BeforeTargets="BeforeBuild" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="node -v" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+    </Exec>
+    <Error Condition="'$(NodeExitCode)' != '0'" Text="Node.js не найден в PATH. Для сборки Release требуется Node.js." />
+    
+    <Message Importance="high" Text="==> Building UI distribution (npm run build)..." />
+    <Exec Command="node build_dist.js" WorkingDirectory="docs\redesign\v3" />
+    
+    <ItemGroup>
+      <UiDistFiles Include="docs\redesign\v3\dist\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(UiDistFiles)" DestinationFolder="$(TargetDir)ui\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

@@ -164,6 +164,7 @@ ${screensCombinedCss}
   console.log('5. Concatenating and inlining JavaScript modules...');
   const jsFiles = [
     path.join(BASE_DIR, 'assets', 'vendor', 'skinview3d.bundle.js'),
+    path.join(BASE_DIR, 'src', 'bridge.js'),
     path.join(BASE_DIR, 'assets', 'js', 'demo-data.js'),
     path.join(BASE_DIR, 'assets', 'js', 'core.js'),
     path.join(BASE_DIR, 'screens', 'play.js'),

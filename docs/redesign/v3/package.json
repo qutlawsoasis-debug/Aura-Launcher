@@ -1,0 +1,13 @@
+{
+  "name": "aura-v3-web",
+  "private": true,
+  "version": "3.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "node build_dist.js",
+    "smoke": "node tools/smoke.js"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

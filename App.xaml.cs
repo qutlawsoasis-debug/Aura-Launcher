@@ -251,47 +251,62 @@ public partial class App : Application
         }
         catch { }
 
-        // Создаем главное окно и передаем MainViewModel в качестве DataContext
-        MainWindow mainWindow;
-        try
+        bool useWebUi = Array.Exists(args, a => a.Equals("--webui", StringComparison.OrdinalIgnoreCase)) ||
+                        Environment.GetEnvironmentVariable("AURA_WEBUI") == "1";
+
+        Window activeWindow;
+        if (useWebUi)
         {
-            mainWindow = new MainWindow
-            {
-                DataContext = Services.GetRequiredService<MainViewModel>()
-            };
+            var webShell = new WebShellWindow(
+                Services.GetRequiredService<IGameLaunchService>(),
+                Services.GetRequiredService<IConfigService>());
+            activeWindow = webShell;
         }
-        catch (Exception ex)
+        else
         {
-            if (Current?.Dispatcher?.HasShutdownStarted == true) return;
-            LogCrash(ex, isFatal: true);
+            // Создаем главное окно и передаем MainViewModel в качестве DataContext
+            MainWindow mainWindow;
             try
             {
-                var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
-                if (launcherUpdateService.IsInstalled)
+                mainWindow = new MainWindow
                 {
-                    FabricGameLaunchService.LogLauncherEvent($"[EMERGENCY-UPDATE] Сбой запуска интерфейса ({ex.Message}). Запуск аварийного обновления...");
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                    var emergencyResult = Task.Run(() => launcherUpdateService.CheckAndApplyAsync(ct: cts.Token)).GetAwaiter().GetResult();
-                    if (emergencyResult.Status == LauncherUpdateStatus.UpdatedRestarting)
+                    DataContext = Services.GetRequiredService<MainViewModel>()
+                };
+            }
+            catch (Exception ex)
+            {
+                if (Current?.Dispatcher?.HasShutdownStarted == true) return;
+                LogCrash(ex, isFatal: true);
+                try
+                {
+                    var launcherUpdateService = Services.GetRequiredService<ILauncherUpdateService>();
+                    if (launcherUpdateService.IsInstalled)
                     {
-                        FabricGameLaunchService.LogLauncherEvent("[EMERGENCY-UPDATE] Аварийное обновление применено! Перезапуск...");
-                        Environment.Exit(0);
-                        return;
+                        FabricGameLaunchService.LogLauncherEvent($"[EMERGENCY-UPDATE] Сбой запуска интерфейса ({ex.Message}). Запуск аварийного обновления...");
+                        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                        var emergencyResult = Task.Run(() => launcherUpdateService.CheckAndApplyAsync(ct: cts.Token)).GetAwaiter().GetResult();
+                        if (emergencyResult.Status == LauncherUpdateStatus.UpdatedRestarting)
+                        {
+                            FabricGameLaunchService.LogLauncherEvent("[EMERGENCY-UPDATE] Аварийное обновление применено! Перезапуск...");
+                            Environment.Exit(0);
+                            return;
+                        }
                     }
                 }
-            }
-            catch { }
+                catch { }
 
-            MessageBox.Show($"Не удалось запустить интерфейс Aura Launcher:\n\n{ex.Message}\n\nЛог ошибки сохранён в:\n%APPDATA%\\Aura\\launcher.log", "Aura Launcher - Ошибка запуска", MessageBoxButton.OK, MessageBoxImage.Error);
-            Environment.Exit(1);
-            return;
+                MessageBox.Show($"Не удалось запустить интерфейс Aura Launcher:\n\n{ex.Message}\n\nЛог ошибки сохранён в:\n%APPDATA%\\Aura\\launcher.log", "Aura Launcher - Ошибка запуска", MessageBoxButton.OK, MessageBoxImage.Error);
+                Environment.Exit(1);
+                return;
+            }
+            activeWindow = mainWindow;
         }
 
-        StartPipeServer(pipeName, mainWindow);
+        StartPipeServer(pipeName, activeWindow);
 
-        MainWindow = mainWindow;
-        mainWindow.Opacity = 0.0;
-        mainWindow.Show();
+        MainWindow = activeWindow;
+        activeWindow.Opacity = 0.0;
+        activeWindow.Show();
         ShutdownMode = ShutdownMode.OnMainWindowClose;
 
         // Плавный переход из сплеша в главное окно: fade-out сплеша + fade-in главного (300 мс)
@@ -301,7 +316,7 @@ public partial class App : Application
             {
                 EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
             };
-            mainWindow.BeginAnimation(UIElement.OpacityProperty, mainFadeIn);
+            activeWindow.BeginAnimation(UIElement.OpacityProperty, mainFadeIn);
         }
         catch { }
 
@@ -325,8 +340,8 @@ public partial class App : Application
             }
         }
 
-        // Запускаем фоновую инициализацию ViewModel
-        if (mainWindow.DataContext is MainViewModel mainVM)
+        // Запускаем фоновую инициализацию ViewModel для классического окна
+        if (activeWindow is MainWindow mWin && mWin.DataContext is MainViewModel mainVM)
         {
             _ = mainVM.InitializeAsync();
             if (!string.IsNullOrWhiteSpace(protocolArg))
@@ -381,7 +396,7 @@ public partial class App : Application
         {
             var anthemService = Services.GetRequiredService<IAnthemService>();
             anthemService.Initialize();
-            mainWindow.Closed += (s, args) =>
+            activeWindow.Closed += (s, args) =>
             {
                 try { anthemService.Stop(); } catch { }
             };
@@ -393,7 +408,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunFakeUpdateUiAsync(mainWindow, fakeUpdateUiMode);
+                bool success = await Core.SceneDiagnostics.RunFakeUpdateUiAsync((activeWindow as MainWindow)!, fakeUpdateUiMode);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -405,7 +420,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.CaptureAllScreenshotsAsync(mainWindow, captureShotsPrefix);
+                bool success = await Core.SceneDiagnostics.CaptureAllScreenshotsAsync((activeWindow as MainWindow)!, captureShotsPrefix);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -417,7 +432,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.LiveTestKillPlayitAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.LiveTestKillPlayitAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -429,7 +444,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunLobbyLifecycleTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunLobbyLifecycleTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -441,7 +456,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.LiveTestLobbyAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.LiveTestLobbyAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -453,7 +468,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunAnthemTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunAnthemTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -465,7 +480,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunRapidTabSwitchStressTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunRapidTabSwitchStressTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -477,7 +492,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunTrayAndHideLauncherTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunTrayAndHideLauncherTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -489,7 +504,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunFriendsSelfTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunFriendsSelfTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -501,7 +516,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunProtocolSelfTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunProtocolSelfTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -513,7 +528,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunNotificationsAndReportTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunNotificationsAndReportTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -525,7 +540,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunIconSelfTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunIconSelfTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -537,7 +552,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunReportSelfTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunReportSelfTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -549,7 +564,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunLayoutAuditAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunLayoutAuditAsync((activeWindow as MainWindow)!);
                 Environment.Exit(success ? 0 : 1);
             });
         }
@@ -557,7 +572,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunScalingCrispnessTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunScalingCrispnessTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -569,7 +584,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunColorsTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunColorsTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -581,7 +596,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunSplashSelfTestAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunSplashSelfTestAsync((activeWindow as MainWindow)!);
                 if (exitAfterTest)
                 {
                     await Task.Delay(1000);
@@ -593,7 +608,7 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                bool success = await Core.SceneDiagnostics.RunSelfTestShotsAsync(mainWindow);
+                bool success = await Core.SceneDiagnostics.RunSelfTestShotsAsync((activeWindow as MainWindow)!);
                 Environment.Exit(success ? 0 : 1);
             });
         }
@@ -784,7 +799,7 @@ public partial class App : Application
         catch { }
     }
 
-    private static void StartPipeServer(string pipeName, MainWindow mainWindow)
+    private static void StartPipeServer(string pipeName, Window targetWindow)
     {
         _ = Task.Run(async () =>
         {
@@ -804,13 +819,13 @@ public partial class App : Application
                     var msg = await reader.ReadLineAsync();
                     if (!string.IsNullOrWhiteSpace(msg))
                     {
-                        mainWindow.Dispatcher.Invoke(() =>
+                        targetWindow.Dispatcher.Invoke(() =>
                         {
-                            mainWindow.RestoreFromTray();
+                            if (targetWindow is MainWindow mWin) mWin.RestoreFromTray(); else { targetWindow.WindowState = WindowState.Normal; targetWindow.Activate(); }
                             if (msg.StartsWith("URI:", StringComparison.OrdinalIgnoreCase))
                             {
                                 string uri = msg.Substring(4).Trim();
-                                if (mainWindow.DataContext is MainViewModel mainVM)
+                                if (targetWindow is MainWindow mWin2 && mWin2.DataContext is MainViewModel mainVM)
                                 {
                                     mainVM.HandleProtocolUri(uri);
                                 }
