@@ -97,6 +97,7 @@
       const island = document.getElementById('island');
       if (effectsOff() || !island || !capsule.animate) {
         root.classList.remove('booting');
+        boot.remove();
         return;
       }
 
@@ -109,15 +110,16 @@
       floatBox.style.animation = 'none';
       boot.classList.add('leaving');
 
+      // Одно плавное движение без промежуточных рывков
       const glide = floatBox.animate([
         { transform: current === 'none' ? 'none' : current },
-        { transform: `translate(${dx * 0.5}px, ${dy * 0.42}px) scale(1.04)`, offset: 0.55 },
         { transform: `translate(${dx}px, ${dy}px)` }
-      ], { duration: 1050, easing: 'cubic-bezier(0.5, 0, 0.2, 1)', fill: 'forwards' });
-
-      setTimeout(() => root.classList.remove('booting'), 820);
+      ], { duration: 950, easing: 'cubic-bezier(0.65, 0, 0.25, 1)', fill: 'forwards' });
       await glide.finished.catch(() => {});
-      await capsule.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: 'forwards' }).finished.catch(() => {});
+
+      // Прилетела ровно на место — перекрёстная смена с настоящей капсулой
+      root.classList.remove('booting');
+      await capsule.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
       boot.remove();
     }
 

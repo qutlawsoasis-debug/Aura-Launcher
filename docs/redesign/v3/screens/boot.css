@@ -10,7 +10,6 @@
   place-items: center;
   pointer-events: none;
 }
-html:not(.booting) .boot { display: none; }
 html.booting .island,
 html.booting .brand { opacity: 0; }
 .island, .brand { transition: opacity var(--dur-3) var(--ease-out); }
@@ -56,8 +55,8 @@ html.booting .brand { opacity: 0; }
   animation: boot-float 4.2s ease-in-out infinite;
 }
 @keyframes boot-float {
-  0%, 100% { transform: translateY(-7px) rotate(-0.6deg); }
-  50%      { transform: translateY(7px) rotate(0.6deg); }
+  0%, 100% { transform: translateY(-6px); }
+  50%      { transform: translateY(6px); }
 }
 
 .boot-capsule {
