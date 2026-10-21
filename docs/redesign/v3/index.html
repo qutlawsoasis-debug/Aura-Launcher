@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
   <title>Aura — Остров</title>
   
   <!-- Дизайн-токены и ядро стилей -->
@@ -209,7 +210,7 @@
       <div class="name">Steve_Miner</div>
       <div class="small dim">В лаунчере</div>
     </div>
-    <button type="button" class="btn sm btn-invite-friend">Позвать</button>
+    <button type="button" class="btn sm btn-invite-friend" data-cmd="friends.invite">Позвать</button>
     <span class="status idle"></span>
   </div>
   <div class="person" data-st="off">
@@ -371,8 +372,8 @@
 </div>
 
 <div style="display:flex;gap:10px;margin-top:14px">
-  <button type="button" class="btn" id="btnSyncMods">Синхронизировать</button>
-  <button type="button" class="btn ghost" id="btnOpenModsFolder">Открыть папку</button>
+  <button type="button" class="btn" id="btnSyncMods" data-cmd="pack.sync">Синхронизировать</button>
+  <button type="button" class="btn ghost" id="btnOpenModsFolder" data-cmd="fs.openModsFolder">Открыть папку</button>
 </div>
 
         </div>
@@ -437,17 +438,17 @@
 <div class="group-title">Игра</div>
 <div class="row">
   <span>Версия<span class="hint" id="gameVersionHint">Fabric 1.20.1 · Aura Pack 1.2</span></span>
-  <button type="button" class="btn sm" id="btnChangeVersion">Сменить</button>
+  <button type="button" class="btn sm" id="btnChangeVersion" data-cmd="game.changeVersion">Сменить</button>
 </div>
 <div class="row">
   <span>Папка игры<span class="hint" id="gameFolderHint">%APPDATA%\.aura</span></span>
-  <button type="button" class="btn sm" id="btnBrowseFolder">Обзор</button>
+  <button type="button" class="btn sm" id="btnBrowseFolder" data-cmd="fs.openGameFolder">Обзор</button>
 </div>
 
 <div class="group-title">Если что-то сломалось</div>
 <div class="row">
   <span>Логи и отчёт о сбое</span>
-  <button type="button" class="btn sm" id="btnExportLogs">Экспорт</button>
+  <button type="button" class="btn sm" id="btnExportLogs" data-cmd="logs.export">Экспорт</button>
 </div>
 <div class="row" id="rowClearCache">
   <span>Кэш модов<span class="hint">Очистить скомпилированные шейдеры и временные архивы</span></span>

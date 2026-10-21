@@ -44,17 +44,17 @@
 <div class="group-title">Игра</div>
 <div class="row">
   <span>Версия<span class="hint" id="gameVersionHint">Fabric 1.20.1 · Aura Pack 1.2</span></span>
-  <button type="button" class="btn sm" id="btnChangeVersion">Сменить</button>
+  <button type="button" class="btn sm" id="btnChangeVersion" data-cmd="game.changeVersion">Сменить</button>
 </div>
 <div class="row">
   <span>Папка игры<span class="hint" id="gameFolderHint">%APPDATA%\.aura</span></span>
-  <button type="button" class="btn sm" id="btnBrowseFolder">Обзор</button>
+  <button type="button" class="btn sm" id="btnBrowseFolder" data-cmd="fs.openGameFolder">Обзор</button>
 </div>
 
 <div class="group-title">Если что-то сломалось</div>
 <div class="row">
   <span>Логи и отчёт о сбое</span>
-  <button type="button" class="btn sm" id="btnExportLogs">Экспорт</button>
+  <button type="button" class="btn sm" id="btnExportLogs" data-cmd="logs.export">Экспорт</button>
 </div>
 <div class="row" id="rowClearCache">
   <span>Кэш модов<span class="hint">Очистить скомпилированные шейдеры и временные архивы</span></span>

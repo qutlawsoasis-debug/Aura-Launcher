@@ -48,7 +48,7 @@
     if (syncBtn) {
       syncBtn.addEventListener('click', () => {
         if (typeof window.showToast === 'function') {
-          window.showToast('Сборка актуальна (15 модов, 0 изменений)', 'success');
+          window.showToast('Синхронизация сборок будет доступна в лаунчере', 'info');
         }
       });
     }
@@ -57,7 +57,7 @@
     if (openFolderBtn) {
       openFolderBtn.addEventListener('click', () => {
         if (typeof window.showToast === 'function') {
-          window.showToast('Папка модов: %APPDATA%\\.aura\\mods', 'info');
+          window.showToast('Открытие папки модов будет доступно в лаунчере', 'info');
         }
       });
     }

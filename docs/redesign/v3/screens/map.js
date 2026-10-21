@@ -80,8 +80,13 @@
   function sizeMap() {
     if (!cv) return;
     const r = cv.getBoundingClientRect();
-    cv.width = Math.max(1, r.width);
-    cv.height = Math.max(1, r.height);
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.round(Math.max(1, r.width) * dpr);
+    const h = Math.round(Math.max(1, r.height) * dpr);
+    if (cv.width !== w || cv.height !== h) {
+      cv.width = w;
+      cv.height = h;
+    }
   }
 
   function drawMap() {
@@ -220,14 +225,12 @@
       drawMap();
     });
 
-    const islandEl = document.getElementById('island');
-    if (islandEl) {
-      islandEl.addEventListener('transitionend', (e) => {
-        if (e.target === islandEl && document.querySelector('[data-l="map"]')?.classList.contains('on')) {
-          sizeMap();
-          drawMap();
-        }
+    if (window.ResizeObserver && cv) {
+      const ro = new ResizeObserver(() => {
+        sizeMap();
+        drawMap();
       });
+      ro.observe(cv);
     }
   }
 

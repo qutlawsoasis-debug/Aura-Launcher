@@ -48,14 +48,14 @@ const scriptsBlock = `
 `;
 
 let compiled = shellHtml
-  .replace('<!-- SHELL_STYLES_PLACEHOLDER -->', stylesBlock)
-  .replace('<!-- SHELL_SCRIPTS_PLACEHOLDER -->', scriptsBlock)
-  .replace('<!-- SCREEN_MAP_PLACEHOLDER -->', mapHtml)
-  .replace('<!-- SCREEN_LOBBY_PLACEHOLDER -->', lobbyHtml)
-  .replace('<!-- SCREEN_FRIENDS_PLACEHOLDER -->', friendsHtml)
-  .replace('<!-- SCREEN_WARDROBE_PLACEHOLDER -->', wardrobeHtml)
-  .replace('<!-- SCREEN_WORKSHOP_PLACEHOLDER -->', workshopHtml)
-  .replace('<!-- SCREEN_SETTINGS_PLACEHOLDER -->', settingsHtml);
+  .replace('<!-- SHELL_STYLES_PLACEHOLDER -->', () => stylesBlock)
+  .replace('<!-- SHELL_SCRIPTS_PLACEHOLDER -->', () => scriptsBlock)
+  .replace('<!-- SCREEN_MAP_PLACEHOLDER -->', () => mapHtml)
+  .replace('<!-- SCREEN_LOBBY_PLACEHOLDER -->', () => lobbyHtml)
+  .replace('<!-- SCREEN_FRIENDS_PLACEHOLDER -->', () => friendsHtml)
+  .replace('<!-- SCREEN_WARDROBE_PLACEHOLDER -->', () => wardrobeHtml)
+  .replace('<!-- SCREEN_WORKSHOP_PLACEHOLDER -->', () => workshopHtml)
+  .replace('<!-- SCREEN_SETTINGS_PLACEHOLDER -->', () => settingsHtml);
 
 fs.writeFileSync(path.join(baseDir, 'index.html'), compiled, 'utf-8');
 console.log('Successfully compiled index.html from shell.html! Bytes:', compiled.length);

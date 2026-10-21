@@ -81,7 +81,7 @@
     if (changeVerBtn) {
       changeVerBtn.addEventListener('click', () => {
         if (typeof window.showToast === 'function') {
-          window.showToast('Выбран профиль: Fabric 1.20.1 (Aura Pack 1.2)', 'info');
+          window.showToast('Смена версии будет доступна в лаунчере', 'info');
         }
       });
     }
@@ -90,7 +90,7 @@
     if (browseFolderBtn) {
       browseFolderBtn.addEventListener('click', () => {
         if (typeof window.showToast === 'function') {
-          window.showToast('Папка игры: %APPDATA%\\.aura', 'info');
+          window.showToast('Выбор папки будет доступен в лаунчере', 'info');
         }
       });
     }
@@ -99,7 +99,7 @@
     if (exportLogsBtn) {
       exportLogsBtn.addEventListener('click', () => {
         if (typeof window.showToast === 'function') {
-          window.showToast('Отчёт о работе экспортирован в %APPDATA%\\.aura\\logs', 'success');
+          window.showToast('Экспорт отчёта будет доступен в лаунчере', 'info');
         }
       });
     }

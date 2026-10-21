@@ -95,7 +95,15 @@
     document.body.classList.toggle('is-idle', m === 'idle');
 
     document.querySelectorAll('.layer').forEach(l => {
-      l.classList.toggle('on', l.dataset.l === m);
+      const isOn = l.dataset.l === m;
+      l.classList.toggle('on', isOn);
+      if (isOn) {
+        l.removeAttribute('inert');
+        l.removeAttribute('aria-hidden');
+      } else {
+        l.setAttribute('inert', '');
+        l.setAttribute('aria-hidden', 'true');
+      }
     });
 
     document.querySelectorAll('.sec-foot button[data-open]').forEach(b => {
@@ -167,6 +175,13 @@
     if (sections.includes(raw)) {
       window.setIslandMode(raw, false);
     } else {
+      if (raw !== '') {
+        try {
+          history.replaceState(null, '', '#/');
+        } catch (e) {
+          window.location.hash = '#/';
+        }
+      }
       const running = typeof window.isGameRunning === 'function' && window.isGameRunning();
       window.setIslandMode(running ? 'running' : 'idle', false);
     }

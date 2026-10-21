@@ -195,14 +195,14 @@ ${combinedJs}
 
   console.log('6. Assembling single aura-v3-standalone.html from shell.html...');
   let standaloneHtml = shellHtml
-    .replace('<!-- SHELL_STYLES_PLACEHOLDER -->', combinedStyle)
-    .replace('<!-- SHELL_SCRIPTS_PLACEHOLDER -->', combinedScript)
-    .replace('<!-- SCREEN_MAP_PLACEHOLDER -->', mapHtml)
-    .replace('<!-- SCREEN_LOBBY_PLACEHOLDER -->', lobbyHtml)
-    .replace('<!-- SCREEN_FRIENDS_PLACEHOLDER -->', friendsHtml)
-    .replace('<!-- SCREEN_WARDROBE_PLACEHOLDER -->', wardrobeHtml)
-    .replace('<!-- SCREEN_WORKSHOP_PLACEHOLDER -->', workshopHtml)
-    .replace('<!-- SCREEN_SETTINGS_PLACEHOLDER -->', settingsHtml);
+    .replace('<!-- SHELL_STYLES_PLACEHOLDER -->', () => combinedStyle)
+    .replace('<!-- SHELL_SCRIPTS_PLACEHOLDER -->', () => combinedScript)
+    .replace('<!-- SCREEN_MAP_PLACEHOLDER -->', () => mapHtml)
+    .replace('<!-- SCREEN_LOBBY_PLACEHOLDER -->', () => lobbyHtml)
+    .replace('<!-- SCREEN_FRIENDS_PLACEHOLDER -->', () => friendsHtml)
+    .replace('<!-- SCREEN_WARDROBE_PLACEHOLDER -->', () => wardrobeHtml)
+    .replace('<!-- SCREEN_WORKSHOP_PLACEHOLDER -->', () => workshopHtml)
+    .replace('<!-- SCREEN_SETTINGS_PLACEHOLDER -->', () => settingsHtml);
 
   const outPath = path.join(BASE_DIR, 'aura-v3-standalone.html');
   fs.writeFileSync(outPath, standaloneHtml, 'utf-8');

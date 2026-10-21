@@ -71,15 +71,21 @@
 
     // 3. Add Friend by Code
     if (submitAdd && inputFriend) {
+      inputFriend.addEventListener('input', () => {
+        inputFriend.removeAttribute('aria-invalid');
+      });
+
       submitAdd.addEventListener('click', () => {
         const code = inputFriend.value.trim().toUpperCase();
-        if (!code) {
+        if (!code || !/^AURA-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(code)) {
+          inputFriend.setAttribute('aria-invalid', 'true');
           if (typeof window.showToast === 'function') {
-            window.showToast('Введите код друга', 'error');
+            window.showToast(code ? 'Неверный формат кода друга (AURA-XXXX-XXXX)' : 'Введите код друга', 'error');
           }
           return;
         }
 
+        inputFriend.removeAttribute('aria-invalid');
         if (typeof window.showToast === 'function') {
           window.showToast(`Заявка отправлена: ${code}`, 'success');
         }
@@ -95,7 +101,7 @@
         const person = e.target.closest('.person');
         const name = person ? person.querySelector('.name')?.textContent : '';
         if (typeof window.showToast === 'function') {
-          window.showToast(`Приглашение отправлено ${name}`, 'info');
+          window.showToast(`Приглашение в лобби будет доступно в лаунчере (${name})`, 'info');
         }
       });
     });
