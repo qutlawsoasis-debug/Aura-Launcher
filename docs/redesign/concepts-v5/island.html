@@ -27,9 +27,11 @@ button { cursor: pointer; }
 [hidden] { display: none !important; }
 
 /* мир */
-.world { position: absolute; inset: -3%; background: var(--world) center/cover; transition: transform 1.4s var(--smooth), filter .8s var(--smooth); }
+.world { position: absolute; inset: -3%; background: var(--world) center/cover; transition: transform 1.4s var(--smooth); }
 .shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(4,8,14,.4), transparent 20%, transparent 62%, rgba(4,8,14,.55)); transition: background .6s; }
-.is-open .world { transform: scale(1.04); filter: brightness(.82); }
+.world-dim { position: absolute; inset: 0; pointer-events: none; background: rgba(0,0,0,.18); opacity: 0; transition: opacity .6s var(--smooth); }
+.is-open .world { transform: scale(1.04); }
+.is-open .world-dim { opacity: 1; }
 .brand { position: absolute; top: 26px; left: 34px; font-size: 22px; font-weight: 700; letter-spacing: -.02em; text-shadow: 0 2px 16px rgba(0,0,0,.4); }
 .wincontrols { position: absolute; top: 18px; right: 20px; display: flex; gap: 2px; }
 .wincontrols button { width: 40px; height: 32px; border-radius: 10px; color: var(--ink-2); font-size: 15px; transition: background .2s, color .2s; }
@@ -156,7 +158,7 @@ body:not(.is-idle) .hint-key { opacity: 0; }
 </style>
 </head>
 <body>
-<div class="world" id="world"></div><div class="shade"></div>
+<div class="world" id="world"></div><div class="world-dim"></div><div class="shade"></div>
 <div class="brand">Aura</div>
 <div class="wincontrols"><button aria-label="Свернуть">—</button><button aria-label="Развернуть">□</button><button aria-label="Закрыть">✕</button></div>
 
