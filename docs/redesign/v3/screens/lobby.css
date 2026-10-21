@@ -71,8 +71,19 @@
   color: var(--accent-ink);
   background: var(--accent);
   box-shadow: var(--accent-glow);
+  border: none;
+  cursor: pointer;
   animation: lobby-breathe 3.6s ease-in-out infinite;
+  transition: box-shadow var(--dur-2) var(--ease-out);
 }
+.lobby-hero .hero-core:hover {
+  animation: none;
+  transform: scale(1.1);
+  transition: transform var(--dur-spring-s) var(--spring), box-shadow var(--dur-2) var(--ease-out);
+  box-shadow: 0 10px 40px rgba(100, 210, 255, 0.6);
+}
+.lobby-hero .hero-core:active { transform: scale(0.94); }
+.lobby-hero .hero-core:disabled { opacity: 0.6; cursor: default; }
 @keyframes lobby-orbit {
   0%   { transform: scale(0.55); opacity: 0; }
   25%  { opacity: 0.9; }

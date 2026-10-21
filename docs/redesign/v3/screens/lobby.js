@@ -218,6 +218,7 @@
 
     // --- Действия ---
     async function createLobby() {
+      if (createBtn.disabled) return;
       createBtn.disabled = true;
       try {
         apply(await sendBridge('lobby.create'));
@@ -323,6 +324,8 @@
 
     // --- Подписки ---
     if (createBtn) createBtn.addEventListener('click', createLobby);
+    const heroCreate = document.getElementById('btnHeroCreate');
+    if (heroCreate) heroCreate.addEventListener('click', createLobby);
     if (submitJoin) submitJoin.addEventListener('click', joinLobby);
     if (inputJoin) {
       inputJoin.addEventListener('input', () => inputJoin.removeAttribute('aria-invalid'));
