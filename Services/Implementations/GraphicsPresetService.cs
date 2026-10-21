@@ -841,6 +841,16 @@ public class GraphicsPresetService : IGraphicsPresetService
                         }
                     }
                 }
+
+                // Удаление папок ошибочных шейдеров (например, сгенерированных EuphoriaPatcher)
+                foreach (var errDir in Directory.GetDirectories(shaderpacksDir, "_0Euphoria*"))
+                {
+                    try { Directory.Delete(errDir, true); } catch { }
+                }
+                foreach (var errFile in Directory.GetFiles(shaderpacksDir, "_0EUPHORIA*"))
+                {
+                    try { File.Delete(errFile); } catch { }
+                }
             }
 
             // 2. Добавление/копирование шейдеров выбранного пресета
