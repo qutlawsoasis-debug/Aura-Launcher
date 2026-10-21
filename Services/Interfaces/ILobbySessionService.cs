@@ -40,7 +40,8 @@ public record LobbyStatusDto(
     string? HostName,
     string? TunnelAddress,
     int? PingMs,
-    IReadOnlyList<LobbyPlayerItemDto> Players
+    IReadOnlyList<LobbyPlayerItemDto> Players,
+    string? StatusHint = null
 );
 
 public interface ILobbySessionService : IDisposable
@@ -52,6 +53,8 @@ public interface ILobbySessionService : IDisposable
     int? CurrentTunnelPingMs { get; }
     string? HostNick { get; }
     string? LastError { get; }
+    string? StatusHint { get; }
+    bool HasPersonalTunnel { get; }
     IReadOnlyList<LobbyPlayerItemDto> Players { get; }
     IReadOnlyDictionary<string, PlayerModSyncInfo>? ModSync { get; }
 
@@ -63,6 +66,7 @@ public interface ILobbySessionService : IDisposable
     event EventHandler<string>? ErrorOccurred;
 
     Task<string?> CreateLobbyAsync(string hostName, CancellationToken cancellationToken = default);
+    Task<string?> ClaimPersonalTunnelAsync(Action<string>? onBrowserUrl = null, CancellationToken cancellationToken = default);
     Task<bool> JoinByCodeAsync(string code, string guestNick, CancellationToken cancellationToken = default);
     Task OpenWorldAsync(int? localPort = null, CancellationToken cancellationToken = default);
     Task ConnectToGameAsync(CancellationToken cancellationToken = default);

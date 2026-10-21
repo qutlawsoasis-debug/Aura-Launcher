@@ -43,8 +43,9 @@ public class LobbySessionServiceTests
         public Task<bool> HostOpenWorldAsync(string? customTunnelAddress = null, int localPort = 25565, CancellationToken cancellationToken = default)
         {
             if (!HostOpenWorldSuccess) return Task.FromResult(false);
-            CurrentTunnelAddress = customTunnelAddress;
+            CurrentTunnelAddress = customTunnelAddress ?? "eu.aura.playit.gg:25565";
             CurrentStatus = "open";
+            TunnelAddressReady?.Invoke(CurrentTunnelAddress);
             return Task.FromResult(true);
         }
 
@@ -146,6 +147,7 @@ public class LobbySessionServiceTests
         {
             IsRunning = false;
             CurrentPort = null;
+            CurrentDomain = null;
         }
 
         public void TriggerWorldOpened(int port)
@@ -160,12 +162,18 @@ public class LobbySessionServiceTests
             WorldClosed?.Invoke();
         }
 
+        public void TriggerDomainAssigned(string domain)
+        {
+            CurrentDomain = domain;
+            DomainAssigned?.Invoke(domain);
+        }
+
         public void Dispose() { }
     }
 
     private class FakeLaunchService : IGameLaunchService
     {
-        public bool IsGameRunning => false;
+        public bool IsGameRunning { get; set; } = false;
         public System.Diagnostics.Process? CurrentGameProcess => null;
         public event EventHandler<int>? GameExited { add { } remove { } }
         public Task<bool> StopGameProcessAsync(int timeoutMs = 6000) => Task.FromResult(true);
@@ -237,7 +245,7 @@ public class LobbySessionServiceTests
     }
 
     [Fact]
-    public async Task OpenWorld_Success_TransitionsThroughTunnelStartingToActive()
+    public async Task OpenWorld_FakeTunnel_TransitionsDirectlyToActive()
     {
         var lobbyService = new FakeLobbyService();
         var tunnel = new FakeTunnelProvider();
@@ -249,16 +257,122 @@ public class LobbySessionServiceTests
         using var service = new LobbySessionService(lobbyService, tunnel, watcher, launch, session, cfg, logger: _ => {});
 
         await service.CreateLobbyAsync("HostUser");
+
+        Environment.SetEnvironmentVariable("AURA_FAKE_TUNNEL", "1");
+        try
+        {
+            await service.OpenWorldAsync(25565);
+
+            Assert.Equal(LobbySessionState.Active, service.State);
+            Assert.Equal("fake-test.e4mc.link", service.CurrentTunnelAddress);
+            Assert.False(watcher.IsRunning);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AURA_FAKE_TUNNEL", null);
+        }
+    }
+
+    [Fact]
+    public async Task OpenWorld_RealFlow_LaunchesGameAndBecomesActiveOnWorldOpened()
+    {
+        var lobbyService = new FakeLobbyService();
+        var tunnel = new FakeTunnelProvider();
+        var watcher = new FakeLanWorldWatcher();
+        var launch = new FakeLaunchService { IsGameRunning = false };
+        var session = new FakeGameSessionService();
+        var cfg = new TestConfigService(@"C:\fake\dir");
+
+        using var service = new LobbySessionService(lobbyService, tunnel, watcher, launch, session, cfg, logger: _ => {});
+
+        await service.CreateLobbyAsync("HostUser");
+        await service.OpenWorldAsync();
+
+        Assert.True(session.LaunchCalled);
+        Assert.Equal(LobbySessionState.WaitingForWorld, service.State);
+        Assert.True(watcher.IsRunning);
+
         watcher.TriggerWorldOpened(25565);
 
-        var states = new List<LobbySessionState>();
-        service.StateChanged += (s, st) => states.Add(st);
+        // Allow async task to complete
+        for (int i = 0; i < 50 && service.State != LobbySessionState.Active; i++)
+        {
+            await Task.Delay(20);
+        }
 
-        await service.OpenWorldAsync(25565);
-
-        Assert.Contains(LobbySessionState.TunnelStarting, states);
         Assert.Equal(LobbySessionState.Active, service.State);
         Assert.Equal("eu.aura.playit.gg:25565", service.CurrentTunnelAddress);
+    }
+
+    [Fact]
+    public async Task OpenWorld_UseE4allTunnel_UsesDomainFromWatcher()
+    {
+        var lobbyService = new FakeLobbyService();
+        var tunnel = new FakeTunnelProvider();
+        var watcher = new FakeLanWorldWatcher();
+        var launch = new FakeLaunchService { IsGameRunning = false };
+        var session = new FakeGameSessionService();
+        var cfg = new TestConfigService(@"C:\fake\dir");
+
+        using var service = new LobbySessionService(lobbyService, tunnel, watcher, launch, session, cfg, logger: _ => {});
+
+        bool prevE4all = LobbyService.UseE4allTunnel;
+        LobbyService.UseE4allTunnel = true;
+
+        try
+        {
+            await service.CreateLobbyAsync("HostUser");
+            await service.OpenWorldAsync();
+
+            watcher.TriggerDomainAssigned("test-custom.e4mc.link");
+
+            for (int i = 0; i < 50 && service.State != LobbySessionState.Active; i++)
+            {
+                await Task.Delay(20);
+            }
+
+            Assert.Equal(LobbySessionState.Active, service.State);
+            Assert.Equal("test-custom.e4mc.link", service.CurrentTunnelAddress);
+        }
+        finally
+        {
+            LobbyService.UseE4allTunnel = prevE4all;
+        }
+    }
+
+    [Fact]
+    public async Task LanWorldClosed_ResetsLobbyToWaitingForWorld()
+    {
+        var lobbyService = new FakeLobbyService();
+        var tunnel = new FakeTunnelProvider();
+        var watcher = new FakeLanWorldWatcher();
+        var launch = new FakeLaunchService();
+        var session = new FakeGameSessionService();
+        var cfg = new TestConfigService(@"C:\fake\dir");
+
+        using var service = new LobbySessionService(lobbyService, tunnel, watcher, launch, session, cfg, logger: _ => {});
+
+        Environment.SetEnvironmentVariable("AURA_FAKE_TUNNEL", "1");
+        try
+        {
+            await service.CreateLobbyAsync("HostUser");
+            await service.OpenWorldAsync(25565);
+            Assert.Equal(LobbySessionState.Active, service.State);
+
+            watcher.TriggerWorldClosed();
+
+            for (int i = 0; i < 50 && service.State != LobbySessionState.WaitingForWorld; i++)
+            {
+                await Task.Delay(20);
+            }
+
+            Assert.Equal(LobbySessionState.WaitingForWorld, service.State);
+            Assert.Null(service.CurrentTunnelAddress);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("AURA_FAKE_TUNNEL", null);
+        }
     }
 
     [Fact]
@@ -295,11 +409,9 @@ public class LobbySessionServiceTests
         await service.CreateLobbyAsync("HostUser");
         lobbyService.CurrentStatus = "open";
 
-        // Emulate guest presence via status update
         lobbyService.JoinSuccess = true;
         await service.JoinByCodeAsync("AURA-7777", "TrollPlayer");
 
-        // Host re-creates/kicks
         await service.CreateLobbyAsync("HostUser");
         bool kicked = await service.KickPlayerAsync("TrollPlayer");
         Assert.True(kicked);
@@ -341,7 +453,6 @@ public class LobbySessionServiceTests
         var service = new LobbySessionService(lobbyService, tunnel, watcher, launch, session, cfg, logger: _ => {});
         service.Dispose();
 
-        // Triggering events after dispose should not throw
         watcher.TriggerWorldOpened(25565);
         lobbyService.TriggerKicked();
     }

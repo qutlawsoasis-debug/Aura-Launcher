@@ -22,9 +22,11 @@ public class LobbySessionService : ILobbySessionService
     private readonly IMinecraftPingService? _pingService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IFriendService? _friendService;
+    private readonly IWorkshopService? _workshopService;
     private readonly Action<string> _logger;
 
     private readonly object _stateLock = new();
+    private readonly SemaphoreSlim _hostOpenGate = new(1, 1);
     private readonly LobbyStateManager _stateManager;
 
     private LobbySessionRole _role = LobbySessionRole.None;
@@ -34,9 +36,13 @@ public class LobbySessionService : ILobbySessionService
     private int? _currentTunnelPingMs;
     private string? _hostNick;
     private string? _lastError;
+    private string? _statusHint;
+    private bool _hasPersonalTunnel;
+    private string? _lastTunnelAddress;
     private List<LobbyPlayerItemDto> _players = new();
     private IReadOnlyDictionary<string, PlayerModSyncInfo>? _modSync;
 
+    private TaskCompletionSource<string>? _domainTcs;
     private CancellationTokenSource? _pollCts;
     private Task? _pollTask;
 
@@ -93,6 +99,18 @@ public class LobbySessionService : ILobbySessionService
         private set { lock (_stateLock) _lastError = value; }
     }
 
+    public string? StatusHint
+    {
+        get { lock (_stateLock) return _statusHint; }
+        private set { lock (_stateLock) _statusHint = value; }
+    }
+
+    public bool HasPersonalTunnel
+    {
+        get { lock (_stateLock) return _hasPersonalTunnel; }
+        private set { lock (_stateLock) _hasPersonalTunnel = value; }
+    }
+
     public IReadOnlyList<LobbyPlayerItemDto> Players
     {
         get { lock (_stateLock) return _players.ToList(); }
@@ -122,6 +140,7 @@ public class LobbySessionService : ILobbySessionService
         IMinecraftPingService? pingService = null,
         IDiscordRpcService? discordRpcService = null,
         IFriendService? friendService = null,
+        IWorkshopService? workshopService = null,
         Action<string>? logger = null)
     {
         _lobbyService = lobbyService ?? throw new ArgumentNullException(nameof(lobbyService));
@@ -134,6 +153,7 @@ public class LobbySessionService : ILobbySessionService
         _pingService = pingService;
         _discordRpcService = discordRpcService;
         _friendService = friendService;
+        _workshopService = workshopService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _stateManager = new LobbyStateManager(_worldWatcher, _tunnelProvider);
@@ -144,12 +164,17 @@ public class LobbySessionService : ILobbySessionService
         _lobbyService.ModSyncUpdated += OnLobbyModSyncUpdated;
         _lobbyService.KickedFromLobby += OnLobbyKicked;
 
+        _worldWatcher.WorldOpened += OnLanWorldOpened;
+        _worldWatcher.WorldClosed += OnLanWorldClosed;
+        _worldWatcher.DomainAssigned += OnLanDomainAssigned;
+
         _gameSessionService.GameExited += OnGameExited;
     }
 
     private void SetError(string error)
     {
         LastError = error;
+        StatusHint = error;
         State = LobbySessionState.Error;
         ErrorOccurred?.Invoke(this, error);
     }
@@ -171,6 +196,7 @@ public class LobbySessionService : ILobbySessionService
 
         State = LobbySessionState.Creating;
         LastError = null;
+        StatusHint = null;
 
         try
         {
@@ -198,16 +224,7 @@ public class LobbySessionService : ILobbySessionService
             State = LobbySessionState.WaitingForWorld;
             RaiseLobbyUpdated();
 
-            try
-            {
-                string gameDir = GetGameDir();
-                string logPath = Path.Combine(gameDir, "logs", "latest.log");
-                _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: _launchService.IsGameRunning);
-            }
-            catch (Exception ex)
-            {
-                _logger($"[LOBBY-SESSION: WARN] Failed to start log watcher: {ex.Message}");
-            }
+// Log watcher starts when OpenWorldAsync is invoked
 
             StartPolling(isHost: true);
             return code;
@@ -215,6 +232,45 @@ public class LobbySessionService : ILobbySessionService
         catch (Exception ex)
         {
             SetError(ex.Message);
+            return null;
+        }
+    }
+
+    public async Task<string?> ClaimPersonalTunnelAsync(Action<string>? onBrowserUrl = null, CancellationToken cancellationToken = default)
+    {
+        var playit = _tunnelProvider as PlayitTunnelProvider;
+        if (playit == null)
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var toolsDir = Path.Combine(appData, ".aura", "tools");
+            playit = new PlayitTunnelProvider(null, toolsDir);
+        }
+
+        try
+        {
+            StatusHint = "Открываем браузер: подтвердите привязку туннеля...";
+            PlayitTunnelProvider.LogTunnel("[CLAIM] Запуск привязки персонального туннеля хоста...");
+
+            var secret = await playit.ClaimTunnelAsync(url =>
+            {
+                StatusHint = "Подтвердите привязку в браузере (кнопка Add agent)...";
+                onBrowserUrl?.Invoke(url);
+            }).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(secret))
+            {
+                HasPersonalTunnel = true;
+                StatusHint = "Личный туннель успешно привязан! Ваши миры изолированы.";
+                PlayitTunnelProvider.LogTunnel("[CLAIM] Персональный туннель успешно привязан.");
+                return secret;
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[CLAIM: ERROR] {ex.Message}");
+            StatusHint = $"Ошибка привязки: {ex.Message}";
+            SetError($"Ошибка привязки: {ex.Message}");
             return null;
         }
     }
@@ -243,6 +299,7 @@ public class LobbySessionService : ILobbySessionService
 
         State = LobbySessionState.Joining;
         LastError = null;
+        StatusHint = null;
 
         try
         {
@@ -293,52 +350,260 @@ public class LobbySessionService : ILobbySessionService
             return;
         }
 
-        State = LobbySessionState.TunnelStarting;
         LastError = null;
+        StatusHint = "Запуск мира...";
 
         try
         {
-            bool started = await _stateManager.StartTunnelAsync(cancellationToken).ConfigureAwait(false);
-            if (!started)
+            bool isFakeTunnel = string.Equals(Environment.GetEnvironmentVariable("AURA_FAKE_TUNNEL"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(Environment.GetEnvironmentVariable("UseFakeTunnel"), "true", StringComparison.OrdinalIgnoreCase);
+
+            if (isFakeTunnel)
             {
-                SetError(_stateManager.LastError ?? "Не удалось запустить туннель");
+                var success = await _lobbyService.HostOpenWorldAsync(customTunnelAddress: "fake-test.e4mc.link", localPort: localPort ?? 25565, cancellationToken: cancellationToken).ConfigureAwait(false);
+                if (success)
+                {
+                    lock (_stateLock)
+                    {
+                        _currentTunnelAddress = "fake-test.e4mc.link";
+                    }
+                    StatusHint = "Мир открыт, друзья могут подключиться";
+                    State = LobbySessionState.Active;
+                    TunnelAddressReady?.Invoke(this, "fake-test.e4mc.link");
+                    RaiseLobbyUpdated();
+                }
+                else
+                {
+                    SetError("Не удалось зарегистрировать адрес лобби на сервере");
+                }
                 return;
             }
 
-            string? pubAddr = _stateManager.PublicAddress;
-            int? pubPort = _stateManager.PublicPort;
+            var gameDir = GetGameDir();
+            bool isGameRunning = _launchService.IsGameRunning || _gameSessionService.IsGameRunning;
 
-            string fullAddress = (pubPort.HasValue && pubPort.Value > 0)
-                ? $"{pubAddr}:{pubPort.Value}"
-                : (pubAddr ?? string.Empty);
-
-            if (string.IsNullOrWhiteSpace(fullAddress))
+            if (_workshopService != null && !isGameRunning)
             {
-                SetError("Публичный адрес туннеля не получен");
-                return;
+                StatusHint = "Резервная копия мира...";
+                try
+                {
+                    await _workshopService.CreateAutoBackupLatestWorldAsync(gameDir).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger($"[LOBBY-SESSION: WARN] Backup failed: {ex.Message}");
+                }
             }
 
-            int port = localPort ?? _worldWatcher.CurrentPort ?? 25565;
-            bool registered = await _lobbyService.HostOpenWorldAsync(fullAddress, port, cancellationToken).ConfigureAwait(false);
-            if (!registered)
+            var logPath = Path.Combine(gameDir, "logs", "latest.log");
+            _domainTcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _worldWatcher.Start(logPath, readFromEnd: true, scanRecentTail: isGameRunning);
+
+            if (isGameRunning)
             {
-                SetError("Не удалось зарегистрировать адрес лобби на сервере");
-                return;
+                if (LobbyService.UseE4allTunnel)
+                {
+                    if (!string.IsNullOrWhiteSpace(_worldWatcher.CurrentDomain))
+                    {
+                        _domainTcs.TrySetResult(_worldWatcher.CurrentDomain);
+                        _ = CompleteHostOpenWorldAsync(_worldWatcher.CurrentDomain, localPort);
+                        return;
+                    }
+                }
+                else
+                {
+                    bool alreadyListening = await PlayitTunnelProvider.TestTcpConnectAsync("127.0.0.1", 25565, 500, cancellationToken).ConfigureAwait(false);
+                    if (alreadyListening)
+                    {
+                        OnLanWorldOpened(25565);
+                        return;
+                    }
+                }
             }
 
-            lock (_stateLock)
-            {
-                _currentTunnelAddress = fullAddress;
-            }
-
-            State = LobbySessionState.Active;
-            TunnelAddressReady?.Invoke(this, fullAddress);
+            StatusHint = "Игра запущена. Зайдите в мир и откройте сеть (Esc → Открыть для сети)";
+            State = LobbySessionState.WaitingForWorld;
             RaiseLobbyUpdated();
+
+            if (!isGameRunning)
+            {
+                await _gameSessionService.LaunchAsync(new LaunchOptions(), null, cancellationToken).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
-            SetError(ex.Message);
+            SetError($"Ошибка: {ex.Message}");
         }
+    }
+
+    private void OnLanDomainAssigned(string domain)
+    {
+        if (!LobbyService.UseE4allTunnel) return;
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        _domainTcs?.TrySetResult(domain);
+
+        if (Role == LobbySessionRole.Host && State != LobbySessionState.Active)
+        {
+            _ = CompleteHostOpenWorldAsync(domain);
+        }
+    }
+
+    private void OnLanWorldOpened(int port)
+    {
+        if (Role != LobbySessionRole.Host) return;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (State == LobbySessionState.Active) return;
+
+                if (port != 25565)
+                {
+                    var msg = $"Мир открыт на порту {port}, а нужен 25565";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
+                    SetError(msg);
+                    return;
+                }
+
+                if (LobbyService.UseE4allTunnel)
+                {
+                    string? domain = _worldWatcher.CurrentDomain;
+                    if (string.IsNullOrWhiteSpace(domain) && _domainTcs != null)
+                    {
+                        StatusHint = "Мир открыт в сети. Ожидание назначения P2P-адреса...";
+                        var completedTask = await Task.WhenAny(_domainTcs.Task, Task.Delay(TimeSpan.FromSeconds(15))).ConfigureAwait(false);
+                        if (completedTask == _domainTcs.Task)
+                        {
+                            domain = await _domainTcs.Task.ConfigureAwait(false);
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(domain))
+                    {
+                        domain = _worldWatcher.CurrentDomain;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(domain))
+                    {
+                        await CompleteHostOpenWorldAsync(domain, port).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        var msg = "Не удалось получить адрес e4mc из лога игры за 15 секунд. Убедитесь, что мод e4all установлен.";
+                        PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] {msg}");
+                        SetError(msg);
+                    }
+                    return;
+                }
+
+                // Playit tunnel flow:
+                StatusHint = "Мир открыт на порту 25565! Подключение туннеля...";
+                State = LobbySessionState.TunnelStarting;
+
+                var success = await _lobbyService.HostOpenWorldAsync(localPort: 25565).ConfigureAwait(false);
+                if (success)
+                {
+                    var tInfo = _tunnelProvider.CurrentInfo;
+                    string? fullAddress = _lobbyService.CurrentTunnelAddress ?? ((tInfo.PublicPort.HasValue && tInfo.PublicPort.Value > 0) ? $"{tInfo.PublicAddress}:{tInfo.PublicPort.Value}" : tInfo.PublicAddress);
+                    lock (_stateLock)
+                    {
+                        _currentTunnelAddress = fullAddress;
+                    }
+
+                    StatusHint = "Мир готов, друзья могут подключаться";
+                    State = LobbySessionState.Active;
+                    if (!string.IsNullOrWhiteSpace(fullAddress))
+                    {
+                        TunnelAddressReady?.Invoke(this, fullAddress);
+                    }
+                    RaiseLobbyUpdated();
+                }
+                else
+                {
+                    var reason = _tunnelProvider?.CurrentInfo.ErrorMessage ?? "Туннель playit не смог запуститься или подтвердить подключение.";
+                    PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] HostOpenWorldAsync returned false: {reason}");
+                    SetError($"Туннель не поднялся: {reason}");
+                }
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] OnLanWorldOpened failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+                SetError($"Ошибка: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task CompleteHostOpenWorldAsync(string domain, int? port = null)
+    {
+        if (string.IsNullOrWhiteSpace(domain)) return;
+        if (Role != LobbySessionRole.Host) return;
+
+        await _hostOpenGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            if (State == LobbySessionState.Active && string.Equals(_lastTunnelAddress, domain, StringComparison.OrdinalIgnoreCase)) return;
+
+            StatusHint = $"Получен адрес {domain}. Регистрация...";
+            int localPort = port ?? _worldWatcher.CurrentPort ?? 25565;
+            var success = await _lobbyService.HostOpenWorldAsync(customTunnelAddress: domain, localPort: localPort).ConfigureAwait(false);
+            if (success)
+            {
+                _lastTunnelAddress = domain;
+                lock (_stateLock)
+                {
+                    _currentTunnelAddress = domain;
+                }
+                StatusHint = $"Мир открыт ({domain}), друзья могут подключиться";
+                State = LobbySessionState.Active;
+                TunnelAddressReady?.Invoke(this, domain);
+                RaiseLobbyUpdated();
+            }
+            else
+            {
+                var reason = "Не удалось зарегистрировать адрес лобби на сервере.";
+                PlayitTunnelProvider.LogTunnel($"[LOBBY: ERROR] HostOpenWorldAsync returned false: {reason}");
+                SetError(reason);
+            }
+        }
+        catch (Exception ex)
+        {
+            PlayitTunnelProvider.LogTunnel($"[EXCEPTION] CompleteHostOpenWorldAsync failed: {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}");
+            SetError($"Ошибка: {ex.Message}");
+        }
+        finally
+        {
+            _hostOpenGate.Release();
+        }
+    }
+
+    private void OnLanWorldClosed()
+    {
+        if (Role != LobbySessionRole.Host) return;
+
+        PlayitTunnelProvider.LogTunnel("[LOBBY] World closed detected in latest.log. Resetting lobby to waiting/closed.");
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _stateManager.StopTunnelAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                PlayitTunnelProvider.LogTunnel($"[EXCEPTION] OnLanWorldClosed StopTunnel: {ex.Message}");
+            }
+            finally
+            {
+                lock (_stateLock)
+                {
+                    _currentTunnelAddress = null;
+                    _lastTunnelAddress = null;
+                }
+                StatusHint = "Мир был закрыт хостом. Ожидание повторного открытия мира.";
+                State = LobbySessionState.WaitingForWorld;
+                RaiseLobbyUpdated();
+            }
+        });
     }
 
     public async Task ConnectToGameAsync(CancellationToken cancellationToken = default)
@@ -444,6 +709,8 @@ public class LobbySessionService : ILobbySessionService
             _currentTunnelPingMs = null;
             _hostNick = null;
             _lastError = null;
+            _statusHint = null;
+            _lastTunnelAddress = null;
             _players.Clear();
             _modSync = null;
         }
@@ -481,7 +748,6 @@ public class LobbySessionService : ILobbySessionService
                         }
                     }
 
-                    // Ping check if tunnel address is known
                     string? addr = CurrentTunnelAddress;
                     if (!string.IsNullOrWhiteSpace(addr) && _pingService != null)
                     {
@@ -563,7 +829,8 @@ public class LobbySessionService : ILobbySessionService
                 HostName: _hostNick,
                 TunnelAddress: _currentTunnelAddress,
                 PingMs: _currentTunnelPingMs,
-                Players: _players.ToList()
+                Players: _players.ToList(),
+                StatusHint: _statusHint
             );
         }
         LobbyUpdated?.Invoke(this, dto);
@@ -634,7 +901,23 @@ public class LobbySessionService : ILobbySessionService
     {
         if (Role == LobbySessionRole.Host)
         {
-            _stateManager.OnGameExited();
+            _worldWatcher.Stop();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _lobbyService.CloseLobbyAsHostAsync().ConfigureAwait(false);
+                    await _stateManager.StopTunnelAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger($"[LOBBY-SESSION: WARN] GameExited cleanup failed: {ex.Message}");
+                }
+                finally
+                {
+                    await LeaveLobbyAsync().ConfigureAwait(false);
+                }
+            });
         }
         else if (Role == LobbySessionRole.Guest)
         {
@@ -655,6 +938,10 @@ public class LobbySessionService : ILobbySessionService
         _lobbyService.LobbyStatusUpdated -= OnLobbyStatusUpdated;
         _lobbyService.ModSyncUpdated -= OnLobbyModSyncUpdated;
         _lobbyService.KickedFromLobby -= OnLobbyKicked;
+
+        _worldWatcher.WorldOpened -= OnLanWorldOpened;
+        _worldWatcher.WorldClosed -= OnLanWorldClosed;
+        _worldWatcher.DomainAssigned -= OnLanDomainAssigned;
 
         _gameSessionService.GameExited -= OnGameExited;
     }
