@@ -1,60 +1,124 @@
 <!doctype html>
-<!-- Источник текстур экрана загрузки: те же токены и стекло, что у капсулы лаунчера (docs/redesign/v3).
-     Каждый #id снимается отдельно в PNG с прозрачным фоном (tools/render-textures.js). -->
+<!-- Текстуры для кинематографичного экрана загрузки Aura по концепту docs/redesign/game/loading.html -->
 <html>
 <head>
 <meta charset="utf-8">
 <style>
-  @font-face { font-family: Onest; src: url('../../docs/redesign/v3/public/assets/fonts/Onest.woff2') format('woff2'); font-weight: 100 900; }
-  html, body { margin: 0; background: transparent; font-family: Onest, sans-serif; color: #fff; }
-  .shot { position: absolute; left: 0; }
+  @font-face {
+    font-family: 'Onest';
+    src: url('../../docs/redesign/v3/public/assets/fonts/Onest.woff2') format('woff2');
+    font-weight: 100 900;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: 'Onest', sans-serif;
+    color: #fff;
+    -webkit-font-smoothing: antialiased;
+  }
+  .shot {
+    position: absolute;
+    left: 0;
+    display: inline-block;
+  }
 
-  /* Капсула 400×76 — как .boot-capsule: стекло поверх размытого мира */
-  #capsule {
+  /* 1. Крупный вордмарк AURA: Onest 800, градиент со свечением */
+  #wordmark {
     top: 0;
-    width: 400px; height: 76px; box-sizing: border-box;
-    border-radius: 38px;
-    display: flex; align-items: center; gap: 14px; padding: 0 22px 0 14px;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.03) 40%, rgba(0,0,0,.10)),
-      rgba(30, 32, 40, 0.62);
-    border: 1px solid rgba(255,255,255,.18);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
-  }
-  .core { width: 36px; height: 36px; margin: 6px; border-radius: 50%; display: grid; place-items: center;
-    font-weight: 800; font-size: 18px; color: #00283A; background: #64D2FF; box-shadow: 0 0 18px rgba(100,210,255,.55); }
-  .meta { display: flex; flex-direction: column; gap: 2px; }
-  .meta b { font-size: 17px; }
-  .meta span { font-size: 14px; color: rgba(255,255,255,.76); }
-
-  /* Бегущее световое кольцо вокруг знака (вращается в игре) */
-  #ring {
-    top: 100px; width: 48px; height: 48px; border-radius: 50%;
-    background: conic-gradient(from 0deg, transparent 0 55%, rgba(100,210,255,.9) 80%, #fff 88%, transparent 92%);
-    -webkit-mask: radial-gradient(circle, transparent 20px, #000 21px);
-            mask: radial-gradient(circle, transparent 20px, #000 21px);
+    font-size: 88px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #FFFFFF;
+    line-height: 1;
+    padding: 20px 30px;
+    background: linear-gradient(120deg, #FFFFFF 0%, #FFFFFF 38%, #64D2FF 48%, #FFFFFF 58%, #FFFFFF 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 24px rgba(100, 210, 255, 0.45));
   }
 
-  /* Мягкое пятно света для «северного сияния» (цвет задаётся в игре) */
-  #glow {
-    top: 160px; width: 256px; height: 256px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,255,255,.45) 35%, rgba(255,255,255,0) 68%);
+  /* 2. Подзаголовок: СЕРВЕР ДРУЗЕЙ */
+  #subtitle {
+    top: 150px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: #64D2FF;
+    padding: 6px 14px;
+    line-height: 1;
+    opacity: 0.95;
+    text-shadow: 0 0 12px rgba(100, 210, 255, 0.4);
   }
 
-  /* Тень под капсулой */
-  #shadow {
-    top: 440px; width: 480px; height: 140px;
-    background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0,0,0,.45), rgba(0,0,0,0) 70%);
+  /* 3. Узкая диагональная полоса света для блика (shine) */
+  #shine {
+    top: 200px;
+    width: 60px;
+    height: 140px;
+    background: linear-gradient(105deg,
+      rgba(255,255,255,0) 0%,
+      rgba(100,210,255,0.2) 30%,
+      rgba(255,255,255,0.95) 50%,
+      rgba(100,210,255,0.2) 70%,
+      rgba(255,255,255,0) 100%);
+    filter: blur(2px);
+  }
+
+  /* 4. Метка статуса с точкой слева: • Загрузка */
+  #label {
+    top: 360px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #FFFFFF;
+    padding: 6px 12px;
+    line-height: 1;
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #64D2FF;
+    box-shadow: 0 0 8px #64D2FF;
+  }
+
+  /* 5. Подсказки tip1..tip4 */
+  .tip {
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.55);
+    padding: 6px 14px;
+    line-height: 1;
+  }
+  #tip1 { top: 410px; }
+  #tip2 { top: 450px; }
+  #tip3 { top: 490px; }
+  #tip4 { top: 530px; }
+
+  /* 6. Виньетка: затемнение по краям и снизу, центр прозрачный */
+  #vignette {
+    top: 580px;
+    width: 960px;
+    height: 540px;
+    background: radial-gradient(circle at 50% 48%, rgba(8, 11, 18, 0) 35%, rgba(8, 11, 18, 0.5) 75%, rgba(8, 11, 18, 0.85) 100%),
+                linear-gradient(180deg, rgba(8, 11, 18, 0.35) 0%, rgba(8, 11, 18, 0) 25%, rgba(8, 11, 18, 0) 70%, rgba(8, 11, 18, 0.8) 100%);
   }
 </style>
 </head>
 <body>
-  <div class="shot" id="capsule">
-    <div class="core">A</div>
-    <div class="meta"><b>Aura</b><span>Загружаем мир</span></div>
-  </div>
-  <div class="shot" id="ring"></div>
-  <div class="shot" id="glow"></div>
-  <div class="shot" id="shadow"></div>
+  <div class="shot" id="wordmark">Aura</div>
+  <div class="shot" id="subtitle">Сервер друзей</div>
+  <div class="shot" id="shine"></div>
+  <div class="shot" id="label"><span class="dot"></span><span>Загрузка</span></div>
+  <div class="shot tip" id="tip1">Подсказка: клавиша F3+T быстро перезагружает текстуры прямо в игре</div>
+  <div class="shot tip" id="tip2">Совет: в лобби лаунчера можно позвать друга нажатием одной кнопки</div>
+  <div class="shot tip" id="tip3">Гардероб: обновляйте скины и плащи прямо из лаунчера</div>
+  <div class="shot tip" id="tip4">Друзья онлайн: подключайтесь к мирам друзей в один клик</div>
+  <div class="shot" id="vignette"></div>
 </body>
 </html>

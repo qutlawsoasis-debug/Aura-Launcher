@@ -12,10 +12,17 @@ import net.minecraft.util.Identifier;
  */
 public final class AuraTextures {
     public static final Identifier BACKGROUND = id("background");
-    public static final Identifier CAPSULE = id("capsule");
-    public static final Identifier RING = id("ring");
-    public static final Identifier GLOW = id("glow");
-    public static final Identifier SHADOW = id("shadow");
+    public static final Identifier VIGNETTE = id("vignette");
+    public static final Identifier WORDMARK = id("wordmark");
+    public static final Identifier SUBTITLE = id("subtitle");
+    public static final Identifier SHINE = id("shine");
+    public static final Identifier LABEL = id("label");
+    public static final Identifier TIP1 = id("tip1");
+    public static final Identifier TIP2 = id("tip2");
+    public static final Identifier TIP3 = id("tip3");
+    public static final Identifier TIP4 = id("tip4");
+
+    public static final Identifier[] TIPS = new Identifier[] { TIP1, TIP2, TIP3, TIP4 };
 
     private static boolean registered;
 
@@ -30,14 +37,15 @@ public final class AuraTextures {
     public static void register(MinecraftClient client) {
         if (registered) return;
         registered = true;
-        for (Identifier tex : new Identifier[] { BACKGROUND, CAPSULE, RING, GLOW, SHADOW }) {
+        for (Identifier tex : new Identifier[] {
+            BACKGROUND, VIGNETTE, WORDMARK, SUBTITLE, SHINE, LABEL, TIP1, TIP2, TIP3, TIP4
+        }) {
             try (InputStream in = AuraTextures.class.getResourceAsStream("/assets/" + tex.getNamespace() + "/" + tex.getPath())) {
                 if (in == null) {
                     AuraUi.LOGGER.warn("[aura-ui] texture not found: {}", tex);
                     continue;
                 }
                 NativeImageBackedTexture texture = new NativeImageBackedTexture(NativeImage.read(in));
-                // Сглаживание: текстуры масштабируются под любое разрешение окна
                 texture.setFilter(true, false);
                 client.getTextureManager().registerTexture(tex, texture);
             } catch (Exception e) {

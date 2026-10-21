@@ -7,12 +7,11 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
 
 /**
- * Экран загрузки «Остров»: размытый мир, плавающее «северное сияние»,
- * парящая стеклянная капсула Aura с бегущим кольцом и полосой прогресса.
- * Все размеры — в пикселях макета лаунчера (капсула 400×76 при высоте окна 768).
+ * Кинематографичный экран загрузки по концепту docs/redesign/game/loading.html:
+ * мир на весь экран с медленным наплывом, виньетка, крупный AURA с бегущим бликом,
+ * подзаголовок «Сервер друзей», линия прогресса 2px и плавно сменяющиеся подсказки.
  */
 public final class AuraSplash {
     private static final float DESIGN_HEIGHT = 768f;
@@ -22,8 +21,8 @@ public final class AuraSplash {
     }
 
     /**
-     * @param alpha        общая непрозрачность экрана (как у ванилы: появление при перезагрузке ресурсов и уход)
-     * @param capsuleAlpha непрозрачность капсулы (гаснет первой, когда загрузка закончилась)
+     * @param alpha        общая непрозрачность экрана (появление при перезагрузке ресурсов и уход)
+     * @param capsuleAlpha непрозрачность элементов интерфейса (гаснет первой при завершении загрузки)
      * @param progress     сглаженный прогресс загрузки 0..1
      */
     public static void render(DrawContext ctx, float alpha, float capsuleAlpha, float progress) {
@@ -32,7 +31,6 @@ public final class AuraSplash {
         int sh = ctx.getScaledWindowHeight();
         double guiScale = client.getWindow().getScaleFactor();
         float k = MathHelper.clamp(client.getWindow().getFramebufferHeight() / DESIGN_HEIGHT, 0.6f, 3f);
-        // Пиксели макета → единицы GUI
         float px = (float) (k / guiScale);
         float t = (System.currentTimeMillis() - START) / 1000f;
 
@@ -41,9 +39,14 @@ public final class AuraSplash {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
+        // 1. Фон мира с медленным наплывом (1.08 -> 1.0 за 14 сек) и виньетка
         drawBackground(ctx, sw, sh, t, alpha);
-        drawAurora(ctx, sw, sh, px, t, alpha);
-        drawCapsule(ctx, sw, sh, px, t, alpha * capsuleAlpha, progress);
+
+        // 2. Центр: крупный вордмарк AURA с бегущим бликом и подзаголовок
+        drawCenterBrand(ctx, sw, sh, px, t, alpha * capsuleAlpha);
+
+        // 3. Низ: линия прогресса, статус загрузки слева и подсказки справа
+        drawBottomBar(ctx, sw, sh, px, t, alpha * capsuleAlpha, progress);
 
         ctx.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.defaultBlendFunc();
@@ -52,72 +55,123 @@ public final class AuraSplash {
         RenderSystem.enableDepthTest();
     }
 
-    /** Мир под матовым стеклом: «cover» на весь экран, медленный наплыв и затемнение как в лаунчере. */
     private static void drawBackground(DrawContext ctx, int sw, int sh, float t, float alpha) {
-        float zoom = 1.12f - 0.10f * easeOut(Math.min(t / 14f, 1f));
-        float cover = Math.max(sw / 1280f, sh / 720f) * zoom;
-        float w = 1280f * cover;
-        float h = 720f * cover;
-        drawTex(ctx, AuraTextures.BACKGROUND, (sw - w) / 2f, (sh - h) / 2f, w, h, 1280, 720, 1f, 1f, 1f, alpha, false);
+        // Наплыв 1.08 -> 1.00 за 14 сек
+        float zoom = 1.08f - 0.08f * easeOut(Math.min(t / 14f, 1f));
+        float cover = Math.max(sw / 1920f, sh / 1080f) * zoom;
+        float w = 1920f * cover;
+        float h = 1080f * cover;
+        float bx = (sw - w) / 2f;
+        float by = (sh - h) / 2f;
 
-        int top = argb(alpha * 0.55f, 8, 11, 18);
-        int mid = argb(alpha * 0.35f, 8, 11, 18);
-        int bottom = argb(alpha * 0.75f, 8, 11, 18);
-        ctx.fillGradient(0, 0, sw, (int) (sh * 0.45f), top, mid);
-        ctx.fillGradient(0, (int) (sh * 0.45f), sw, sh, mid, bottom);
+        drawTex(ctx, AuraTextures.BACKGROUND, bx, by, w, h, 1920, 1080, 1f, 1f, 1f, alpha, false);
+
+        // Виньетка поверх фона
+        drawTex(ctx, AuraTextures.VIGNETTE, 0, 0, sw, sh, 1920, 1080, 1f, 1f, 1f, alpha * 0.9f, false);
     }
 
-    /** Три мягких пятна света (бирюза, фиолет, мята) плавают за капсулой, складываясь по яркости. */
-    private static void drawAurora(DrawContext ctx, int sw, int sh, float px, float t, float alpha) {
-        float cx = sw / 2f;
-        float cy = sh / 2f;
-        glow(ctx, cx, cy, px, wave(t, 11f), -180, -60, 120, 40, 1f, 1.25f, 100, 210, 255, 0.16f * alpha);
-        glow(ctx, cx, cy, px, wave(t, 13f), 160, 80, -120, -70, 1.15f, 0.9f, 140, 110, 255, 0.12f * alpha);
-        glow(ctx, cx, cy, px, wave(t, 9f), 0, 140, 40, -120, 0.8f, 1.1f, 80, 255, 200, 0.08f * alpha);
+    private static void drawCenterBrand(DrawContext ctx, int sw, int sh, float px, float t, float alpha) {
+        if (alpha <= 0.005f) return;
+
+        // Вордмарк: текстура 738x256 (исходный размер с отступами и тенью)
+        // В макете вордмарк ~370x128 CSS px при высоте 768
+        float ww = (738f / 2f) * px;
+        float wh = (256f / 2f) * px;
+        float cx = (sw - ww) / 2f;
+        float cy = sh * 0.44f - wh / 2f;
+
+        drawTex(ctx, AuraTextures.WORDMARK, cx, cy, ww, wh, 738, 256, 1f, 1f, 1f, alpha, false);
+
+        // Блик (shine) по вордмарку раз в 4 сек
+        float cycle = t % 4.0f;
+        if (cycle < 1.2f) {
+            float p = cycle / 1.2f; // 0..1
+            float shineW = (120f / 2f) * px;
+            float shineH = (280f / 2f) * px;
+            float sx = cx - shineW + p * (ww + shineW * 2f);
+            float sy = cy + (wh - shineH) / 2f;
+
+            // Ограничиваем блик прямоугольником вордмарка
+            int scissorX = (int) Math.max(0, cx);
+            int scissorY = (int) Math.max(0, cy);
+            int scissorW = (int) Math.min(sw - scissorX, ww);
+            int scissorH = (int) Math.min(sh - scissorY, wh);
+
+            if (scissorW > 0 && scissorH > 0) {
+                ctx.enableScissor(scissorX, scissorY, scissorX + scissorW, scissorY + scissorH);
+                drawTex(ctx, AuraTextures.SHINE, sx, sy, shineW, shineH, 120, 280, 1f, 1f, 1f, alpha * 0.85f, true);
+                ctx.disableScissor();
+            }
+        }
+
+        // Подзаголовок: текстура 410x54 (исходный 205x27)
+        float subW = (410f / 2f) * px;
+        float subH = (54f / 2f) * px;
+        float subX = (sw - subW) / 2f;
+        float subY = cy + wh - 10f * px;
+
+        drawTex(ctx, AuraTextures.SUBTITLE, subX, subY, subW, subH, 410, 54, 1f, 1f, 1f, alpha * 0.95f, false);
     }
 
-    private static void glow(DrawContext ctx, float cx, float cy, float px, float p,
-                             float x0, float y0, float x1, float y1, float s0, float s1,
-                             int r, int g, int b, float a) {
-        float size = 520f * px * MathHelper.lerp(p, s0, s1);
-        float x = cx + MathHelper.lerp(p, x0, x1) * px - size / 2f;
-        float y = cy + MathHelper.lerp(p, y0, y1) * px - size / 2f;
-        drawTex(ctx, AuraTextures.GLOW, x, y, size, size, 512, 512, r / 255f, g / 255f, b / 255f, a, true);
-    }
+    private static void drawBottomBar(DrawContext ctx, int sw, int sh, float px, float t, float alpha, float progress) {
+        if (alpha <= 0.005f) return;
 
-    /** Капсула парит вверх-вниз; кольцо вокруг знака крутится; внизу — полоса прогресса. */
-    private static void drawCapsule(DrawContext ctx, int sw, int sh, float px, float t, float alpha, float progress) {
-        if (alpha <= 0.01f) return;
-        float w = 400f * px;
-        float h = 76f * px;
-        float floatY = (float) Math.sin(t * Math.PI * 2 / 4.2) * 6f * px;
-        float x = (sw - w) / 2f;
-        float y = (sh - h) / 2f + floatY;
+        // Линия прогресса: 62.5% ширины экрана, 2px высота
+        float barWidth = sw * 0.625f;
+        float barX = (sw - barWidth) / 2f;
+        float barY = sh - 56f * px;
+        float fillWidth = barWidth * MathHelper.clamp(progress, 0f, 1f);
 
-        drawTex(ctx, AuraTextures.SHADOW, x - 40f * px, y + 10f * px, 480f * px, 140f * px, 960, 280, 1f, 1f, 1f, alpha * 0.8f, false);
-        drawTex(ctx, AuraTextures.CAPSULE, x, y, w, h, 800, 152, 1f, 1f, 1f, alpha, false);
+        // 1. Метка слева: label.png (202x52 -> 101x26)
+        float labelW = (202f / 2f) * px;
+        float labelH = (52f / 2f) * px;
+        float labelX = barX;
+        float labelY = barY - labelH - 6f * px;
+        drawTex(ctx, AuraTextures.LABEL, labelX, labelY, labelW, labelH, 202, 52, 1f, 1f, 1f, alpha, false);
 
-        // Кольцо вокруг знака: центр знака в макете — (38, 38) от левого верхнего угла капсулы
-        MatrixStack m = ctx.getMatrices();
-        m.push();
-        m.translate(x + 38f * px, y + 38f * px, 0f);
-        m.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((t * 225f) % 360f));
-        drawTex(ctx, AuraTextures.RING, -24f * px, -24f * px, 48f * px, 48f * px, 96, 96, 1f, 1f, 1f, alpha, false);
-        m.pop();
+        // 2. Сменяющиеся подсказки справа (каждые 4 с со сглаженным затуханием 0.4 с)
+        float tipCycle = 4.0f;
+        int tipIndex = ((int) (t / tipCycle)) % AuraTextures.TIPS.length;
+        float phase = t % tipCycle;
+        float tipAlpha = 1.0f;
+        if (phase < 0.4f) {
+            tipAlpha = phase / 0.4f;
+        } else if (phase > 3.6f) {
+            tipAlpha = (4.0f - phase) / 0.4f;
+        }
+        tipAlpha *= alpha * 0.8f;
 
-        // Полоса прогресса под надписью, в пикселях макета
-        m.push();
-        m.translate(x, y, 0f);
-        m.scale(px, px, 1f);
-        int left = 72;
-        int right = 372;
-        int top = 64;
-        int fillTo = left + Math.round((right - left) * MathHelper.clamp(progress, 0f, 1f));
-        ctx.fill(left, top, right, top + 3, argb(alpha * 0.12f, 255, 255, 255));
-        ctx.fill(left, top, fillTo, top + 3, argb(alpha, 100, 210, 255));
+        Identifier curTip = AuraTextures.TIPS[tipIndex];
+        int tipNativeW = tipIndex == 0 ? 976 : (tipIndex == 1 ? 958 : (tipIndex == 2 ? 780 : 816));
+        float tipW = (tipNativeW / 2f) * px;
+        float tipH = (50f / 2f) * px;
+        float tipX = barX + barWidth - tipW;
+        float tipY = barY - tipH - 6f * px;
+        drawTex(ctx, curTip, tipX, tipY, tipW, tipH, tipNativeW, 50, 1f, 1f, 1f, tipAlpha, false);
+
+        // 3. Подложка линии: белый 12%
+        int bgCol = argb(alpha * 0.12f, 255, 255, 255);
+        ctx.fill((int) barX, (int) barY, (int) (barX + barWidth), (int) (barY + 2f), bgCol);
+
+        // 4. Заполнение линии: акцент #64D2FF
+        if (fillWidth > 0.5f) {
+            int fillCol = argb(alpha, 100, 210, 255);
+            ctx.fill((int) barX, (int) barY, (int) (barX + fillWidth), (int) (barY + 2f), fillCol);
+        }
+
+        // После fill обязательно восстанавливаем смешивание
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        m.pop();
+
+        // 5. Маленькая светящаяся точка на конце заполнения
+        if (fillWidth > 1f && fillWidth < barWidth - 1f) {
+            float dotX = barX + fillWidth;
+            float dotY = barY + 1f;
+            int dotCol = argb(alpha, 255, 255, 255);
+            ctx.fill((int) (dotX - 1f), (int) (dotY - 2f), (int) (dotX + 2f), (int) (dotY + 3f), dotCol);
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+        }
     }
 
     private static void drawTex(DrawContext ctx, Identifier tex, float x, float y, float w, float h,
@@ -140,11 +194,6 @@ public final class AuraSplash {
         if (additive) {
             RenderSystem.defaultBlendFunc();
         }
-    }
-
-    /** Плавное «туда-обратно» за период (как animation-direction: alternate). */
-    private static float wave(float t, float period) {
-        return (float) (0.5 - 0.5 * Math.cos(t * Math.PI / period));
     }
 
     private static float easeOut(float x) {
