@@ -106,33 +106,63 @@
         <div class="sec-head">
           <div>
             <h2>Лобби</h2>
-            <div class="sub"><span class="acc">●</span> Туннель активен · 34 мс</div>
+            <div class="sub" id="lobbySubStatus">Играйте вместе с друзьями</div>
           </div>
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
         <div class="sec-body">
-          <div class="small dim" style="margin-bottom:10px">Код комнаты для друзей</div>
-<div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-  <div class="code" id="lobbyRoomCodeDisplay">7821 · X9M2</div>
-  <button type="button" class="btn primary" id="btnCopyLobbyCode" data-copy>Скопировать</button>
-</div>
-<div class="slots" id="lobbySlotsContainer">
-  <div class="slot full"><div class="ring"><div class="face"></div></div><span class="slot-name">Coock0ld</span></div>
-  <button type="button" class="slot" data-open="friends"><div class="ring">+</div>Пригласить</button>
-  <button type="button" class="slot" data-open="friends"><div class="ring">+</div>Пригласить</button>
-  <button type="button" class="slot" data-open="friends"><div class="ring">+</div>Пригласить</button>
-</div>
-<div class="small dim" id="lobbyPlayersCountText" style="text-align:center;margin-bottom:18px">1 из 8 игроков</div>
-<button type="button" class="btn" data-reveal="joinBox">Войти по чужому коду</button>
-<div class="reveal" id="joinBox">
-  <div>
-    <div style="display:flex;gap:10px;padding-top:12px">
-      <input class="field" id="inputJoinCode" placeholder="AURA-0000-XXXX">
-      <button type="button" class="btn primary" id="btnSubmitJoinCode">Войти</button>
-    </div>
-  </div>
-</div>
+          <div class="lobby-invite" id="lobbyInviteCard" hidden>
+            <div class="face" style="--s:40px"></div>
+            <div style="flex:1;min-width:0">
+              <div class="name" id="lobbyInviteFrom">Друг</div>
+              <div class="small dim">зовёт вас в лобби</div>
+            </div>
+            <button type="button" class="btn sm primary" id="btnAcceptInvite">Принять</button>
+            <button type="button" class="btn sm ghost" id="btnDeclineInvite" aria-label="Отклонить">✕</button>
+          </div>
 
+          <div class="lobby-stage" id="lobbyStage" data-view="idle">
+            <!-- Нет лобби -->
+            <div class="lobby-view" data-view="idle">
+              <div class="lobby-hero" aria-hidden="true">
+                <span class="orbit o1"></span><span class="orbit o2"></span><span class="orbit o3"></span>
+                <span class="hero-core">+</span>
+              </div>
+              <div class="lobby-title st" style="--i:0">Своя комната за пару секунд</div>
+              <div class="lobby-text dim st" style="--i:1">Создайте лобби и позовите друзей. Мир откроется через туннель, порты настраивать не нужно.</div>
+              <div class="lobby-actions st" style="--i:2">
+                <button type="button" class="btn primary" id="btnCreateLobby">Создать лобби</button>
+                <button type="button" class="btn" data-reveal="joinBox">Войти по коду</button>
+              </div>
+              <div class="reveal st" id="joinBox" style="--i:3">
+                <div>
+                  <div style="display:flex;gap:10px;padding-top:14px">
+                    <input class="field" id="inputJoinCode" placeholder="Код комнаты, например BL58UR" autocomplete="off" spellcheck="false">
+                    <button type="button" class="btn primary" id="btnSubmitJoinCode">Войти</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Комната (хост или гость) -->
+            <div class="lobby-view" data-view="room">
+              <div class="small dim st" style="--i:0;margin-bottom:10px" id="lobbyCodeLabel">Код комнаты для друзей</div>
+              <div class="st" style="--i:1;display:flex;align-items:center;justify-content:space-between;gap:16px">
+                <div class="code" id="lobbyRoomCodeDisplay"></div>
+                <button type="button" class="btn" id="btnCopyLobbyCode" data-copy>Скопировать</button>
+              </div>
+              <div class="lobby-status st" style="--i:2" id="lobbyStatus" data-tone="wait">
+                <span class="lobby-dot"></span>
+                <span id="lobbyStatusText">Лобби создано</span>
+              </div>
+              <div class="slots st" style="--i:3" id="lobbySlotsContainer"></div>
+              <div class="small dim st" id="lobbyPlayersCountText" style="--i:4;text-align:center;margin-bottom:18px"></div>
+              <div class="lobby-actions st" style="--i:5">
+                <button type="button" class="btn primary" id="btnLobbyMain">Открыть мир</button>
+                <button type="button" class="btn ghost danger" id="btnLeaveLobby">Покинуть</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="sec-foot"></div>
       </div>

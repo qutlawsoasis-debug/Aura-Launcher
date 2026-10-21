@@ -885,4 +885,209 @@ public class WebBridgeTests
         }
     }
 
+    private class FakeLobbySession : ILobbySessionService
+    {
+        public LobbySessionRole Role { get; set; }
+        public LobbySessionState State { get; set; }
+        public string? CurrentLobbyCode { get; set; }
+        public string? CurrentHostToken { get; set; }
+        public string? CurrentTunnelAddress { get; set; }
+        public int? CurrentTunnelPingMs { get; set; }
+        public string? HostNick { get; set; }
+        public string? LastError { get; set; }
+        public string? StatusHint { get; set; }
+        public bool HasPersonalTunnel { get; set; }
+        public IReadOnlyList<LobbyPlayerItemDto> Players { get; set; } = Array.Empty<LobbyPlayerItemDto>();
+        public IReadOnlyDictionary<string, PlayerModSyncInfo>? ModSync { get; set; }
+
+        public event EventHandler<LobbySessionState>? StateChanged;
+        public event EventHandler<LobbyStatusDto>? LobbyUpdated;
+        public event EventHandler<string>? TunnelAddressReady;
+        public event EventHandler<int>? TunnelPingUpdated;
+        public event EventHandler<string>? PlayerKicked;
+        public event EventHandler<string>? ErrorOccurred;
+
+        public string? CreatedBy { get; private set; }
+        public bool JoinResult { get; set; } = true;
+        public bool HasSubscribers => StateChanged != null || LobbyUpdated != null || TunnelPingUpdated != null || PlayerKicked != null || ErrorOccurred != null;
+
+        public void RaiseState(LobbySessionState s) { State = s; StateChanged?.Invoke(this, s); }
+        public void RaiseKicked(string code) => PlayerKicked?.Invoke(this, code);
+
+        public Task<string?> CreateLobbyAsync(string hostName, CancellationToken cancellationToken = default)
+        {
+            CreatedBy = hostName;
+            Role = LobbySessionRole.Host;
+            State = LobbySessionState.WaitingForWorld;
+            CurrentLobbyCode = "AURA-1111-2222";
+            CurrentHostToken = "host_tok";
+            HostNick = hostName;
+            Players = new[] { new LobbyPlayerItemDto(hostName, true) };
+            return Task.FromResult<string?>(CurrentLobbyCode);
+        }
+
+        public Task<string?> ClaimPersonalTunnelAsync(Action<string>? onBrowserUrl = null, CancellationToken cancellationToken = default) => Task.FromResult<string?>(null);
+
+        public Task<bool> JoinByCodeAsync(string code, string guestNick, CancellationToken cancellationToken = default)
+        {
+            if (!JoinResult)
+            {
+                State = LobbySessionState.Error;
+                LastError = "Лобби не найдено";
+                return Task.FromResult(false);
+            }
+            Role = LobbySessionRole.Guest;
+            State = LobbySessionState.Joining;
+            CurrentLobbyCode = code;
+            return Task.FromResult(true);
+        }
+
+        public Task OpenWorldAsync(int? localPort = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ConnectToGameAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<bool> KickPlayerAsync(string playerNick, CancellationToken cancellationToken = default) => Task.FromResult(true);
+
+        public Task LeaveLobbyAsync(CancellationToken cancellationToken = default)
+        {
+            Role = LobbySessionRole.None;
+            State = LobbySessionState.Idle;
+            CurrentLobbyCode = null;
+            Players = Array.Empty<LobbyPlayerItemDto>();
+            return Task.CompletedTask;
+        }
+
+        public void Dispose() { }
+    }
+
+    private static System.Text.Json.JsonElement PayloadOf(BridgeMessage msg)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(msg.Payload);
+        return System.Text.Json.JsonDocument.Parse(json).RootElement.Clone();
+    }
+
+    [Fact]
+    public async Task Handle_LobbyGet_WithoutService_ReturnsError()
+    {
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r1","type":"command","name":"lobby.get"}""");
+
+        Assert.NotNull(last);
+        Assert.Equal("lobby_service_unavailable", last.Error);
+    }
+
+    [Fact]
+    public async Task Handle_LobbyCreate_UsesConfigNickname_ReturnsSnapshot()
+    {
+        var lobby = new FakeLobbySession();
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), lobbySession: lobby, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r2","type":"command","name":"lobby.create"}""");
+
+        Assert.Equal("TestPlayer", lobby.CreatedBy);
+        Assert.NotNull(last);
+        Assert.Null(last.Error);
+        var p = PayloadOf(last);
+        Assert.Equal("host", p.GetProperty("role").GetString());
+        Assert.Equal("waitingForWorld", p.GetProperty("state").GetString());
+        Assert.Equal("AURA-1111-2222", p.GetProperty("code").GetString());
+        Assert.Equal(1, p.GetProperty("players").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Handle_LobbyCreate_WhenAlreadyInLobby_ReturnsError()
+    {
+        var lobby = new FakeLobbySession { Role = LobbySessionRole.Guest };
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), lobbySession: lobby, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r3","type":"command","name":"lobby.create"}""");
+
+        Assert.Equal("already_in_lobby", last!.Error);
+        Assert.Null(lobby.CreatedBy);
+    }
+
+    [Fact]
+    public async Task Handle_LobbyJoin_EmptyCode_And_Failure_ReturnErrors()
+    {
+        var lobby = new FakeLobbySession { JoinResult = false };
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), lobbySession: lobby, logger: _ => {});
+        var posted = new List<BridgeMessage>();
+        bridge.MessagePosted += m => posted.Add(m);
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r4","type":"command","name":"lobby.join","payload":{"code":"  "}}""");
+        await bridge.ProcessRawMessageAsync("""{"id":"r5","type":"command","name":"lobby.join","payload":{"code":"aura-9999-0000"}}""");
+
+        Assert.Equal("invalid_code", posted[0].Error);
+        Assert.Equal("Лобби не найдено", posted[1].Error);
+    }
+
+    [Fact]
+    public async Task Handle_LobbyJoin_UppercasesCode()
+    {
+        var lobby = new FakeLobbySession();
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), lobbySession: lobby, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r6","type":"command","name":"lobby.join","payload":{"code":"aura-1234-abcd"}}""");
+
+        Assert.Null(last!.Error);
+        Assert.Equal("AURA-1234-ABCD", lobby.CurrentLobbyCode);
+        Assert.Equal("guest", PayloadOf(last).GetProperty("role").GetString());
+    }
+
+    [Fact]
+    public async Task Handle_FriendsInvite_NotHost_ReturnsNotInLobby()
+    {
+        var lobby = new FakeLobbySession();
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"),
+            friendService: new FakeFriendService(), lobbySession: lobby, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r7","type":"command","name":"friends.invite","payload":{"friendId":"f_1"}}""");
+
+        Assert.Equal("not_in_lobby", last!.Error);
+    }
+
+    [Fact]
+    public async Task Handle_FriendsRespondInvite_Accept_JoinsLobby()
+    {
+        var lobby = new FakeLobbySession();
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"),
+            friendService: new FakeFriendService(), lobbySession: lobby, logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"r8","type":"command","name":"friends.respondInvite","payload":{"inviteId":"inv_1","accept":true}}""");
+
+        var p = PayloadOf(last!);
+        Assert.True(p.GetProperty("joined").GetBoolean());
+        Assert.Equal(LobbySessionRole.Guest, lobby.Role);
+        Assert.Equal("lob_1", lobby.CurrentLobbyCode);
+    }
+
+    [Fact]
+    public void LobbyEvents_AreForwarded_AndDisposeUnsubscribes()
+    {
+        var lobby = new FakeLobbySession();
+        var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), lobbySession: lobby, logger: _ => {});
+        var posted = new List<BridgeMessage>();
+        bridge.MessagePosted += m => posted.Add(m);
+
+        lobby.RaiseState(LobbySessionState.Active);
+        lobby.RaiseKicked("AURA-1");
+
+        Assert.Equal("lobby.updated", posted[0].Name);
+        Assert.Equal("active", PayloadOf(posted[0]).GetProperty("state").GetString());
+        Assert.Equal("lobby.kicked", posted[1].Name);
+
+        bridge.Dispose();
+        Assert.False(lobby.HasSubscribers);
+    }
 }

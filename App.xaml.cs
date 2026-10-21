@@ -266,7 +266,8 @@ public partial class App : Application
                 Services.GetRequiredService<IGameLaunchService>(),
                 Services.GetRequiredService<ISkinService>(),
                 Services.GetRequiredService<IFriendService>(),
-                Services.GetRequiredService<IReportService>());
+                Services.GetRequiredService<IReportService>(),
+                Services.GetRequiredService<ILobbySessionService>());
             activeWindow = webShell;
         }
         else

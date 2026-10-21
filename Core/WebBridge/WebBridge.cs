@@ -13,7 +13,7 @@ using Microsoft.Web.WebView2.Core;
 
 namespace AuraLauncher.Core.WebBridge;
 
-public class WebBridge : IDisposable
+public partial class WebBridge : IDisposable
 {
     private readonly Window? _window;
     private readonly IGameSessionService _gameSessionService;
@@ -25,6 +25,7 @@ public class WebBridge : IDisposable
     private readonly ISkinService? _skinService;
     private readonly IFriendService? _friendService;
     private readonly IReportService? _reportService;
+    private readonly ILobbySessionService? _lobbySession;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -43,6 +44,7 @@ public class WebBridge : IDisposable
         ISkinService? skinService = null,
         IFriendService? friendService = null,
         IReportService? reportService = null,
+        ILobbySessionService? lobbySession = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -71,6 +73,9 @@ public class WebBridge : IDisposable
             _friendService.FriendRequestReceived += OnFriendRequestReceived;
             _friendService.InviteReceived += OnInviteReceived;
         }
+
+        _lobbySession = lobbySession;
+        SubscribeLobby();
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -259,6 +264,42 @@ public class WebBridge : IDisposable
 
                 case "logs.export":
                     await HandleLogsExportAsync(msg);
+                    break;
+
+                case "lobby.get":
+                    HandleLobbyGet(msg);
+                    break;
+
+                case "lobby.create":
+                    await HandleLobbyCreateAsync(msg);
+                    break;
+
+                case "lobby.openWorld":
+                    HandleLobbyOpenWorld(msg);
+                    break;
+
+                case "lobby.join":
+                    await HandleLobbyJoinAsync(msg);
+                    break;
+
+                case "lobby.play":
+                    HandleLobbyPlay(msg);
+                    break;
+
+                case "lobby.kick":
+                    await HandleLobbyKickAsync(msg);
+                    break;
+
+                case "lobby.leave":
+                    await HandleLobbyLeaveAsync(msg);
+                    break;
+
+                case "friends.invite":
+                    await HandleFriendsInviteAsync(msg);
+                    break;
+
+                case "friends.respondInvite":
+                    await HandleFriendsRespondInviteAsync(msg);
                     break;
 
                 case "cache.clear":
@@ -1113,6 +1154,7 @@ public class WebBridge : IDisposable
             _friendService.FriendRequestReceived -= OnFriendRequestReceived;
             _friendService.InviteReceived -= OnInviteReceived;
         }
+        UnsubscribeLobby();
         if (_coreWebView2 != null)
         {
             _coreWebView2.WebMessageReceived -= OnWebMessageReceived;

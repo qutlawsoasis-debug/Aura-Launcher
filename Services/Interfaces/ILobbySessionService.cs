@@ -49,6 +49,7 @@ public interface ILobbySessionService : IDisposable
     LobbySessionRole Role { get; }
     LobbySessionState State { get; }
     string? CurrentLobbyCode { get; }
+    string? CurrentHostToken { get; }
     string? CurrentTunnelAddress { get; }
     int? CurrentTunnelPingMs { get; }
     string? HostNick { get; }

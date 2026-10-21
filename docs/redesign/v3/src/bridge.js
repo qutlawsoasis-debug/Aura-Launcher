@@ -449,6 +449,85 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
+    if (name.startsWith('lobby.') || name === 'friends.invite' || name === 'friends.respondInvite') {
+      return handleMockLobby(name, payload || {});
+    }
+
+    return Promise.resolve({ success: true, mock: true });
+  }
+
+  // --- Лобби (mock): тот же жизненный цикл, что у LobbySessionService ---
+  const mockLobby = { role: 'none', state: 'idle', code: null, hostName: null, tunnelAddress: null, pingMs: null, statusHint: null, lastError: null, max: 8, players: [] };
+  const mockLobbyTimers = [];
+
+  function lobbySnapshot() {
+    return JSON.parse(JSON.stringify(mockLobby));
+  }
+
+  function lobbyLater(ms, fn) {
+    mockLobbyTimers.push(setTimeout(() => { fn(); emit('lobby.updated', lobbySnapshot()); }, ms));
+  }
+
+  function resetMockLobby() {
+    mockLobbyTimers.splice(0).forEach(clearTimeout);
+    Object.assign(mockLobby, { role: 'none', state: 'idle', code: null, hostName: null, tunnelAddress: null, pingMs: null, statusHint: null, lastError: null, players: [] });
+  }
+
+  function handleMockLobby(name, payload) {
+    if (name === 'lobby.get') return Promise.resolve(lobbySnapshot());
+
+    if (name === 'lobby.create') {
+      if (mockLobby.role !== 'none') return Promise.reject(new Error('already_in_lobby'));
+      Object.assign(mockLobby, { role: 'host', state: 'waitingForWorld', code: 'AURA-7821-X9M2', hostName: 'Player', players: [{ nick: 'Player', isHost: true, isReady: true }] });
+      return Promise.resolve(lobbySnapshot());
+    }
+
+    if (name === 'lobby.openWorld') {
+      if (mockLobby.role !== 'host') return Promise.reject(new Error('not_host'));
+      lobbyLater(600, () => { mockLobby.statusHint = 'Зайдите в мир и откройте сеть (Esc → Открыть для сети)'; });
+      lobbyLater(2600, () => { mockLobby.state = 'tunnelStarting'; mockLobby.statusHint = null; });
+      lobbyLater(3800, () => { Object.assign(mockLobby, { state: 'active', tunnelAddress: 'aura-lobby.craft.ply.gg:25565', pingMs: 34 }); });
+      lobbyLater(6000, () => { mockLobby.players.push({ nick: 'zxcursed', isHost: false, isReady: true }); });
+      return Promise.resolve({ accepted: true });
+    }
+
+    if (name === 'lobby.join') {
+      const code = String(payload.code || '').trim().toUpperCase();
+      if (!code) return Promise.reject(new Error('invalid_code'));
+      if (code === 'AURA-0000') return Promise.reject(new Error('Лобби не найдено'));
+      Object.assign(mockLobby, { role: 'guest', state: 'joining', code, hostName: 'zxcursed', players: [{ nick: 'zxcursed', isHost: true, isReady: true }, { nick: 'Player', isHost: false, isReady: true }] });
+      lobbyLater(1800, () => { Object.assign(mockLobby, { state: 'readyToPlay', tunnelAddress: 'aura-lobby.craft.ply.gg:25565', pingMs: 41 }); });
+      return Promise.resolve(lobbySnapshot());
+    }
+
+    if (name === 'lobby.play') {
+      if (mockLobby.role !== 'guest') return Promise.reject(new Error('not_guest'));
+      lobbyLater(0, () => { mockLobby.state = 'connecting'; });
+      lobbyLater(2500, () => { mockLobby.state = 'readyToPlay'; });
+      return Promise.resolve({ accepted: true });
+    }
+
+    if (name === 'lobby.kick') {
+      mockLobby.players = mockLobby.players.filter(p => p.nick !== payload.nick);
+      setTimeout(() => emit('lobby.updated', lobbySnapshot()), 0);
+      return Promise.resolve({ ok: true });
+    }
+
+    if (name === 'lobby.leave') {
+      resetMockLobby();
+      return Promise.resolve(lobbySnapshot());
+    }
+
+    if (name === 'friends.invite') {
+      if (mockLobby.role !== 'host') return Promise.reject(new Error('not_in_lobby'));
+      return Promise.resolve({ ok: true, inviteId: 'inv-mock' });
+    }
+
+    if (name === 'friends.respondInvite') {
+      if (!payload.accept) return Promise.resolve({ ok: true, joined: false });
+      return handleMockLobby('lobby.join', { code: 'AURA-LOBBY-1' }).then(() => ({ ok: true, joined: true, code: 'AURA-LOBBY-1' }));
+    }
+
     return Promise.resolve({ success: true, mock: true });
   }
 

@@ -191,9 +191,33 @@
 
         const inviteBtn = item.querySelector('.btn-invite-friend');
         if (inviteBtn) {
-          inviteBtn.addEventListener('click', () => {
-            if (typeof window.showToast === 'function') {
-              window.showToast(`Приглашение в лобби будет доступно в лаунчере (${f.nick})`, 'info');
+          inviteBtn.addEventListener('click', async () => {
+            const lobby = window.AuraLobby && window.AuraLobby.getState();
+            if (!lobby || lobby.role !== 'host') {
+              if (typeof window.showToast === 'function') {
+                window.showToast('Сначала создайте лобби', 'info');
+              }
+              return;
+            }
+            inviteBtn.disabled = true;
+            try {
+              const res = await window.AuraLobby.invite(f.id);
+              if (res && res.ok) {
+                inviteBtn.textContent = 'Позван';
+                if (typeof window.showToast === 'function') {
+                  window.showToast(`${f.nick} получил приглашение`, 'success');
+                }
+              } else {
+                inviteBtn.disabled = false;
+                if (typeof window.showToast === 'function') {
+                  window.showToast(`Не удалось позвать: ${(res && res.error) || 'ошибка'}`, 'error');
+                }
+              }
+            } catch (err) {
+              inviteBtn.disabled = false;
+              if (typeof window.showToast === 'function') {
+                window.showToast(`Не удалось позвать: ${err.message || err}`, 'error');
+              }
             }
           });
         }
@@ -331,7 +355,7 @@
         if (data) {
           const fromNick = data.fromNick || 'Друг';
           if (typeof window.showToast === 'function') {
-            window.showToast(`${fromNick} приглашает вас в лобби`, 'info');
+            window.showToast(`${fromNick} приглашает вас в лобби — откройте «Лобби»`, 'info');
           }
         }
       });

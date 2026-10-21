@@ -69,6 +69,8 @@ public class LobbySessionService : ILobbySessionService
         }
     }
 
+    public string? CurrentHostToken => _lobbyService.CurrentHostToken;
+
     public string? CurrentLobbyCode
     {
         get { lock (_stateLock) return _currentLobbyCode; }

@@ -2,3 +2,292 @@
 #lobbySlotsContainer .slot.full .face {
   --s: 54px;
 }
+
+/* ---------- Смена видов: «нет лобби» ↔ «комната» ---------- */
+.lobby-stage {
+  display: grid;
+}
+.lobby-view {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-3) var(--ease-out),
+    transform var(--dur-spring-m) var(--spring),
+    visibility 0s linear var(--dur-3);
+}
+.lobby-stage[data-view="idle"] .lobby-view[data-view="idle"],
+.lobby-stage[data-view="room"] .lobby-view[data-view="room"] {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+/* Каскад: дети вида появляются друг за другом */
+.lobby-view .st {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity var(--dur-3) var(--ease-out),
+    transform var(--dur-spring-m) var(--spring);
+}
+.lobby-stage[data-view="idle"] .lobby-view[data-view="idle"] .st,
+.lobby-stage[data-view="room"] .lobby-view[data-view="room"] .st {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i, 0) * 55ms + 80ms);
+}
+
+/* ---------- Главный экран без лобби ---------- */
+.lobby-hero {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 18px auto 26px;
+  display: grid;
+  place-items: center;
+}
+.lobby-hero .orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(100, 210, 255, 0.28);
+  animation: lobby-orbit 3.6s var(--ease-out) infinite;
+}
+.lobby-hero .o2 { animation-delay: 1.2s; }
+.lobby-hero .o3 { animation-delay: 2.4s; }
+.lobby-hero .hero-core {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 34px;
+  font-weight: 300;
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: var(--accent-glow);
+  animation: lobby-breathe 3.6s ease-in-out infinite;
+}
+@keyframes lobby-orbit {
+  0%   { transform: scale(0.55); opacity: 0; }
+  25%  { opacity: 0.9; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+@keyframes lobby-breathe {
+  50% { transform: scale(1.06); }
+}
+
+.lobby-title {
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.lobby-text {
+  font-size: 15px;
+  line-height: 1.45;
+  text-align: center;
+  max-width: 420px;
+  margin: 0 auto 22px;
+}
+.lobby-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.lobby-view[data-view="room"] .lobby-actions { justify-content: space-between; }
+.lobby-view[data-view="room"] #btnLobbyMain { flex: 1; }
+
+/* ---------- Код комнаты: символы проявляются по очереди ---------- */
+#lobbyRoomCodeDisplay {
+  font-size: 40px;
+  white-space: nowrap;
+}
+#lobbyRoomCodeDisplay .ch {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.45em) scale(0.8);
+  animation: lobby-char var(--dur-spring-m) var(--spring) forwards;
+  animation-delay: calc(var(--c) * 28ms + 160ms);
+}
+#lobbyRoomCodeDisplay .ch.sep { color: var(--ink-3); }
+@keyframes lobby-char {
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Строка статуса ---------- */
+.lobby-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--fill);
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.lobby-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.lobby-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0;
+}
+.lobby-status[data-tone="wait"] .lobby-dot { background: #FFD60A; }
+.lobby-status[data-tone="wait"] .lobby-dot::after { animation: lobby-ping 1.6s var(--ease-out) infinite; }
+.lobby-status[data-tone="ok"] .lobby-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.lobby-status[data-tone="ok"] .lobby-dot::after { animation: lobby-ping 2.4s var(--ease-out) infinite; }
+.lobby-status[data-tone="err"] { color: var(--danger); }
+.lobby-status[data-tone="err"] .lobby-dot { background: var(--danger); }
+@keyframes lobby-ping {
+  0%   { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+#lobbyStatusText { transition: opacity var(--dur-2) var(--ease-out); }
+#lobbyStatusText.swap { opacity: 0; }
+
+/* ---------- Слоты игроков ---------- */
+#lobbySlotsContainer .slot.full {
+  position: relative;
+  animation: lobby-slot-in var(--dur-spring-m) var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+#lobbySlotsContainer .slot.host .ring { box-shadow: 0 0 0 4px var(--accent-soft); }
+#lobbySlotsContainer .slot .crown {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  z-index: 1;
+  translate: -50% 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 8px rgba(100, 210, 255, 0.7);
+}
+#lobbySlotsContainer .slot-kick {
+  position: absolute;
+  top: -4px;
+  right: calc(50% - 40px);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(255, 90, 90, 0.85);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-spring-s) var(--spring);
+  cursor: pointer;
+}
+#lobbySlotsContainer .slot.full:hover .slot-kick { opacity: 1; transform: none; }
+#lobbySlotsContainer .slot.full.leaving {
+  animation: lobby-slot-out var(--dur-3) var(--ease-out) forwards;
+}
+@keyframes lobby-slot-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.6); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes lobby-slot-out {
+  to { opacity: 0; transform: scale(0.6); }
+}
+
+/* Хост ждёт мир: «радар» вокруг своего аватара */
+.lobby-view[data-waiting="1"] #lobbySlotsContainer .slot.host .ring::before,
+.lobby-view[data-waiting="1"] #lobbySlotsContainer .slot.host .ring::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  opacity: 0;
+  animation: lobby-radar 2.2s var(--ease-out) infinite;
+}
+.lobby-view[data-waiting="1"] #lobbySlotsContainer .slot.host .ring::after { animation-delay: 1.1s; }
+#lobbySlotsContainer .slot.host .ring { position: relative; }
+@keyframes lobby-radar {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+#btnLobbyMain:disabled:not(.busy) {
+  background: var(--fill-2);
+  color: var(--ink-2);
+  cursor: default;
+}
+
+/* Кнопка в процессе: бегущий блик */
+#btnLobbyMain.busy {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.85;
+}
+#btnLobbyMain.busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: lobby-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes lobby-shimmer {
+  to { transform: translateX(100%); }
+}
+
+/* ---------- Приглашение ---------- */
+.lobby-invite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: var(--accent-soft);
+  animation: lobby-slot-in var(--dur-spring-m) var(--spring) both;
+}
+.lobby-invite[hidden] { display: none; }
+.lobby-invite .name { font-weight: 600; }
+
+/* ---------- Пауза и упрощение ---------- */
+.layer:not(.on) .lobby-hero *,
+.layer:not(.on) .lobby-dot::after,
+.layer:not(.on) #lobbySlotsContainer .ring::before,
+.layer:not(.on) #lobbySlotsContainer .ring::after,
+.layer:not(.on) #btnLobbyMain.busy::after {
+  animation-play-state: paused;
+}
+html[data-effects="off"] .lobby-view,
+html[data-effects="off"] .lobby-view .st {
+  transition: none;
+}
+html[data-effects="off"] .lobby-hero *,
+html[data-effects="off"] .lobby-dot::after,
+html[data-effects="off"] #lobbySlotsContainer .slot,
+html[data-effects="off"] #lobbySlotsContainer .ring::before,
+html[data-effects="off"] #lobbySlotsContainer .ring::after,
+html[data-effects="off"] #lobbyRoomCodeDisplay .ch,
+html[data-effects="off"] .lobby-invite {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+html[data-effects="off"] #lobbySlotsContainer .ring::before,
+html[data-effects="off"] #lobbySlotsContainer .ring::after { display: none; }
+html[data-effects="low"] .lobby-hero .o3,
+html[data-effects="low"] .lobby-hero .o2 { display: none; }
