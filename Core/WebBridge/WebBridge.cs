@@ -309,6 +309,54 @@ public partial class WebBridge : IDisposable
                     await HandleWorldsLocalAsync(msg);
                     break;
 
+                case "worlds.backup":
+                    await HandleWorldsBackupAsync(msg);
+                    break;
+
+                case "worlds.restore":
+                    await HandleWorldsRestoreAsync(msg);
+                    break;
+
+                case "worlds.deleteBackup":
+                    await HandleWorldsDeleteBackupAsync(msg);
+                    break;
+
+                case "worlds.delete":
+                    await HandleWorldsDeleteAsync(msg);
+                    break;
+
+                case "worlds.export":
+                    await HandleWorldsExportAsync(msg);
+                    break;
+
+                case "worlds.import":
+                    await HandleWorldsImportAsync(msg);
+                    break;
+
+                case "worlds.openFolder":
+                    await HandleWorldsOpenFolderAsync(msg);
+                    break;
+
+                case "screenshots.list":
+                    await HandleScreenshotsListAsync(msg);
+                    break;
+
+                case "screenshots.copy":
+                    HandleScreenshotsCopy(msg);
+                    break;
+
+                case "screenshots.open":
+                    HandleScreenshotsOpen(msg);
+                    break;
+
+                case "screenshots.delete":
+                    HandleScreenshotsDelete(msg);
+                    break;
+
+                case "screenshots.openFolder":
+                    HandleScreenshotsOpenFolder(msg);
+                    break;
+
                 case "startup.run":
                     HandleStartupRun(msg);
                     break;
@@ -407,9 +455,22 @@ public partial class WebBridge : IDisposable
             return Task.CompletedTask;
         }
 
+        // Сразу в мир (Мастерская) или на сервер (облачный мир) — как MainViewModel.LaunchGameAsync
+        string world = ReadString(msg, "world");
+        string server = ReadString(msg, "server");
+        LaunchOptions? options = null;
+        if (!string.IsNullOrWhiteSpace(world)) options = new LaunchOptions { QuickPlaySingleplayer = world };
+        else if (!string.IsNullOrWhiteSpace(server)) options = new LaunchOptions { QuickPlayMultiplayer = server };
+
         // Асинхронное подтверждение приема команды на запуск
         SendResponse(msg.Id, msg.Name, new { accepted = true });
+        StartGameLaunch(options);
+        return Task.CompletedTask;
+    }
 
+    /// <summary>Запуск игры с прогрессом в интерфейс (game.progress / game.status).</summary>
+    private void StartGameLaunch(LaunchOptions? options)
+    {
         _gameLaunchCts?.Cancel();
         _gameLaunchCts = new CancellationTokenSource();
 
@@ -431,7 +492,7 @@ public partial class WebBridge : IDisposable
             {
                 _logger("[WEBBRIDGE] Starting GameSessionService.LaunchAsync...");
                 var process = await _gameSessionService.LaunchAsync(
-                    options: null,
+                    options: options,
                     progress: progress,
                     cancellationToken: _gameLaunchCts.Token);
 
@@ -450,8 +511,6 @@ public partial class WebBridge : IDisposable
                 });
             }
         });
-
-        return Task.CompletedTask;
     }
 
     private async Task HandleGameStopAsync(BridgeMessage msg)

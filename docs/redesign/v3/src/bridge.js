@@ -449,7 +449,7 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
-    if (name.startsWith('cloud.') || name === 'worlds.local') {
+    if (name.startsWith('cloud.') || name.startsWith('worlds.') || name.startsWith('screenshots.')) {
       return handleMockCloud(name, payload || {});
     }
 
@@ -518,9 +518,38 @@
     { folder: 'Aura сервер (копия)', name: 'Aura сервер (копия)', size: '312.7 МБ', lastPlayed: '21.10.2026', mode: 'Выживание', backups: [{ file: 'backup-1.zip', created: '21.10.2026 06:40', size: '300 МБ' }] }
   ];
 
+  const mockShots = [1, 5, 9, 12, 3, 14].map((n, i) => ({
+    file: `2026-10-2${i}_18.0${i}.png`, url: `assets/images/bg_${n}.jpg`, date: `2${i}.10.2026 18:0${i}`, size: '2.4 МБ'
+  }));
+
+  function handleMockWorlds(name, p) {
+    if (name === 'screenshots.list') return Promise.resolve({ shots: mockShots });
+    if (name === 'screenshots.delete') {
+      const i = mockShots.findIndex(s => s.file === p.file);
+      if (i >= 0) mockShots.splice(i, 1);
+    }
+    if (name === 'worlds.delete') {
+      const i = mockLocalWorlds.findIndex(w => w.folder === p.folder);
+      if (i >= 0) mockLocalWorlds.splice(i, 1);
+    }
+    if (name === 'worlds.backup') {
+      const w = mockLocalWorlds.find(x => x.folder === p.folder);
+      if (w) w.backups.unshift({ file: `backup-${Date.now()}.zip`, created: new Date().toLocaleString('ru-RU').slice(0, 17), size: w.size });
+      return new Promise(r => setTimeout(() => r({ ok: true }), 700));
+    }
+    if (name === 'worlds.deleteBackup') {
+      const w = mockLocalWorlds.find(x => x.folder === p.folder);
+      if (w) w.backups = w.backups.filter(b => b.file !== p.file);
+    }
+    if (name === 'worlds.import') return Promise.resolve({ ok: true, name: 'Импортированный мир' });
+    if (name === 'worlds.export') return Promise.resolve({ ok: true, path: 'C:\\mock\\world.zip' });
+    return Promise.resolve({ ok: true });
+  }
+
   function handleMockCloud(name, p) {
     const find = id => mockCloud.find(w => w.id === id);
     if (name === 'worlds.local') return Promise.resolve({ worlds: mockLocalWorlds });
+    if (name.startsWith('worlds.') || name.startsWith('screenshots.')) return handleMockWorlds(name, p);
     if (name === 'cloud.list') {
       const active = mockCloud.filter(w => w.status !== 'sleeping').length;
       return Promise.resolve({ maxActive: 3, activeCount: active, worlds: JSON.parse(JSON.stringify(mockCloud)) });

@@ -375,7 +375,7 @@
         <div class="sec-head">
           <div>
             <h2>Мастерская</h2>
-            <div class="sub"><span class="acc">●</span> Сборка синхронизирована · 342.8 МБ</div>
+            <div class="sub">Шейдеры, моды, миры и скриншоты</div>
           </div>
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
@@ -383,14 +383,44 @@
           <div class="seg" data-seg="workshop" id="workshopSegmented">
   <span class="lens"></span>
   <button type="button" class="on" data-tab="shaders">Шейдеры</button>
-  <button type="button" data-tab="mods">Моды · 15</button>
+  <button type="button" data-tab="mods">Моды</button>
+  <button type="button" data-tab="worlds">Миры</button>
+  <button type="button" data-tab="shots">Скриншоты</button>
 </div>
 
 <div data-pane="shaders" id="paneShaders" style="margin-top:6px"></div>
 
 <div data-pane="mods" id="paneMods" style="margin-top:6px" hidden></div>
 
-<div style="display:flex;gap:10px;margin-top:14px">
+<div data-pane="worlds" id="paneWorlds" style="margin-top:6px" hidden>
+  <div class="ws-list" id="worldsList"></div>
+  <div class="ws-actions">
+    <button type="button" class="btn" id="btnWorldImport">Импорт из .zip</button>
+    <button type="button" class="btn ghost" id="btnWorldsFolder">Папка миров</button>
+    <button type="button" class="btn ghost" id="btnBackupsFolder">Папка бэкапов</button>
+  </div>
+</div>
+
+<div data-pane="shots" id="paneShots" style="margin-top:6px" hidden>
+  <div class="shots-grid" id="shotsGrid"></div>
+  <div class="ws-actions">
+    <button type="button" class="btn ghost" id="btnShotsFolder">Открыть папку</button>
+    <span class="small dim">F2 в игре — новый скриншот</span>
+  </div>
+</div>
+
+<div class="shot-viewer" id="shotViewer" hidden>
+  <img id="shotViewerImg" alt="">
+  <div class="shot-viewer-bar">
+    <span class="small dim" id="shotViewerInfo"></span>
+    <button type="button" class="btn sm" id="shotCopy">Копировать</button>
+    <button type="button" class="btn sm" id="shotOpen">Открыть</button>
+    <button type="button" class="btn sm ghost danger" id="shotDelete">Удалить</button>
+    <button type="button" class="btn sm ghost" id="shotClose" aria-label="Закрыть">✕</button>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-top:14px" id="workshopPackActions">
   <button type="button" class="btn" id="btnSyncMods" data-cmd="pack.sync">Синхронизировать</button>
   <button type="button" class="btn ghost" id="btnOpenModsFolder" data-cmd="fs.openModsFolder">Открыть папку</button>
 </div>

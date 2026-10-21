@@ -26,4 +26,5 @@ import '../screens/cloud.js';
 import '../screens/friends.js';
 import '../screens/wardrobe.js';
 import '../screens/workshop.js';
+import '../screens/worlds.js';
 import '../screens/settings.js';

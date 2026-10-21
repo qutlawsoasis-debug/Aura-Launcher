@@ -138,11 +138,7 @@ public partial class WebBridge
         string address = $"{_cloudLobbyService!.ServerHost}:{world.Port.Value}";
         _logger($"[WEBBRIDGE] cloud.connect {world.Id} -> {address}");
         SendResponse(msg.Id, msg.Name, new { accepted = true, address });
-        _ = Task.Run(async () =>
-        {
-            try { await _gameSessionService.LaunchAsync(new LaunchOptions { QuickPlayMultiplayer = address }); }
-            catch (Exception ex) { _logger($"[WEBBRIDGE: ERROR] cloud.connect: {ex.Message}"); }
-        });
+        StartGameLaunch(new LaunchOptions { QuickPlayMultiplayer = address });
     }
 
     private async Task HandleCloudStopAsync(BridgeMessage msg)

@@ -23,16 +23,21 @@
     const openFolderBtn = document.getElementById('btnOpenModsFolder');
     const modsTabBtn = document.querySelector('#workshopSegmented button[data-tab="mods"]');
 
-    // 1. Switch between Shaders & Mods panes with fade
+    // 1. Вкладки Шейдеры / Моды / Миры / Скриншоты: текущая панель гаснет, новая проявляется
+    const packActions = document.getElementById('workshopPackActions');
+    const workshopBody = paneShaders ? paneShaders.parentElement : null;
     segButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const tab = btn.dataset.tab;
-        const outPane = tab === 'shaders' ? paneMods : paneShaders;
-        const inPane = tab === 'shaders' ? paneShaders : paneMods;
-
+        if (!workshopBody) return;
+        const inPane = workshopBody.querySelector(`[data-pane="${tab}"]`);
+        const outPane = Array.from(workshopBody.querySelectorAll('[data-pane]')).find(p => !p.hidden && p !== inPane);
         if (typeof window.swapPane === 'function') {
           window.swapPane(outPane, inPane);
         }
+        // «Синхронизировать / Открыть папку» относятся только к сборке
+        if (packActions) packActions.hidden = tab === 'worlds' || tab === 'shots';
+        document.dispatchEvent(new CustomEvent('workshop:tab', { detail: tab }));
       });
     });
 
