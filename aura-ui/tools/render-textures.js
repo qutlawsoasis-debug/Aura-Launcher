@@ -1,9 +1,3 @@
-/**
- * Рендер текстур экрана загрузки из tools/textures.html в src/main/resources/assets/aura-ui/textures/gui/.
- * Headless Chrome, масштаб ×2, прозрачный фон. Фон мира — резкий bg_1.jpg 1920×1080.
- *
- * node tools/render-textures.js
- */
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -13,13 +7,12 @@ const PORT = 9677;
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'src', 'main', 'resources', 'assets', 'aura-ui', 'textures', 'gui');
 const SCALE = 2;
-const SHOTS = ['wordmark', 'subtitle', 'shine', 'label', 'tip1', 'tip2', 'tip3', 'tip4', 'vignette'];
+const SHOTS = ['wordmark', 'wordmark_mask', 'subtitle', 'label', 'tip1', 'tip2', 'tip3', 'tip4', 'vignette'];
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
 
-  // Удаляем устаревшие текстуры капсулы
-  for (const old of ['capsule.png', 'ring.png', 'glow.png', 'shadow.png']) {
+  for (const old of ['capsule.png', 'ring.png', 'glow.png', 'shadow.png', 'shine.png']) {
     const p = path.join(OUT, old);
     if (fs.existsSync(p)) fs.unlinkSync(p);
   }
@@ -34,7 +27,7 @@ async function main() {
       try {
         const list = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
         wsUrl = (list.find(t => t.type === 'page') || {}).webSocketDebuggerUrl;
-      } catch (e) { /* ещё стартует */ }
+      } catch (e) {}
     }
     if (!wsUrl) throw new Error('Chrome не поднялся');
 
@@ -64,6 +57,15 @@ async function main() {
       fs.writeFileSync(path.join(OUT, `${name}.png`), Buffer.from(data, 'base64'));
       console.log(`${name}.png  ${Math.round(b.w * SCALE)}×${Math.round(b.h * SCALE)}`);
     }
+
+    // Резкий фон мира bg_1.jpg: открываем прямо в Chrome и снимаем скриншот 1920×1080
+    const bgPath = path.resolve(ROOT, '..', 'docs', 'redesign', 'v3', 'public', 'assets', 'images', 'bg_1.jpg');
+    await send('Emulation.setDeviceMetricsOverride', { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false });
+    await send('Page.navigate', { url: 'file:///' + bgPath.replace(/\\/g, '/') });
+    await new Promise(r => setTimeout(r, 1000));
+    const { data: bgData } = await send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 1920, height: 1080, scale: 1 } });
+    fs.writeFileSync(path.join(OUT, 'background.png'), Buffer.from(bgData, 'base64'));
+    console.log('background.png  1920×1080');
 
     ws.close();
   } finally {

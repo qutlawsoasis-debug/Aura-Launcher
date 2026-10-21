@@ -39,6 +39,21 @@
     filter: drop-shadow(0 0 24px rgba(100, 210, 255, 0.45));
   }
 
+  /* 1b. Маска букв вордмарка: точно такой же размер и отступы, сплошной белый цвет без тени */
+  #wordmark_mask {
+    top: 0;
+    font-size: 88px;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #FFFFFF;
+    line-height: 1;
+    padding: 20px 30px;
+    background: transparent;
+    -webkit-text-fill-color: #FFFFFF;
+    filter: none;
+  }
+
   /* 2. Подзаголовок: СЕРВЕР ДРУЗЕЙ */
   #subtitle {
     top: 150px;
@@ -51,20 +66,6 @@
     line-height: 1;
     opacity: 0.95;
     text-shadow: 0 0 12px rgba(100, 210, 255, 0.4);
-  }
-
-  /* 3. Узкая диагональная полоса света для блика (shine) */
-  #shine {
-    top: 200px;
-    width: 60px;
-    height: 140px;
-    background: linear-gradient(105deg,
-      rgba(255,255,255,0) 0%,
-      rgba(100,210,255,0.2) 30%,
-      rgba(255,255,255,0.95) 50%,
-      rgba(100,210,255,0.2) 70%,
-      rgba(255,255,255,0) 100%);
-    filter: blur(2px);
   }
 
   /* 4. Метка статуса с точкой слева: • Загрузка */
@@ -112,8 +113,8 @@
 </head>
 <body>
   <div class="shot" id="wordmark">Aura</div>
+  <div class="shot" id="wordmark_mask">Aura</div>
   <div class="shot" id="subtitle">Сервер друзей</div>
-  <div class="shot" id="shine"></div>
   <div class="shot" id="label"><span class="dot"></span><span>Загрузка</span></div>
   <div class="shot tip" id="tip1">Подсказка: клавиша F3+T быстро перезагружает текстуры прямо в игре</div>
   <div class="shot tip" id="tip2">Совет: в лобби лаунчера можно позвать друга нажатием одной кнопки</div>

@@ -14,8 +14,8 @@ public final class AuraTextures {
     public static final Identifier BACKGROUND = id("background");
     public static final Identifier VIGNETTE = id("vignette");
     public static final Identifier WORDMARK = id("wordmark");
+    public static final Identifier WORDMARK_MASK = id("wordmark_mask");
     public static final Identifier SUBTITLE = id("subtitle");
-    public static final Identifier SHINE = id("shine");
     public static final Identifier LABEL = id("label");
     public static final Identifier TIP1 = id("tip1");
     public static final Identifier TIP2 = id("tip2");
@@ -38,7 +38,7 @@ public final class AuraTextures {
         if (registered) return;
         registered = true;
         for (Identifier tex : new Identifier[] {
-            BACKGROUND, VIGNETTE, WORDMARK, SUBTITLE, SHINE, LABEL, TIP1, TIP2, TIP3, TIP4
+            BACKGROUND, VIGNETTE, WORDMARK, WORDMARK_MASK, SUBTITLE, LABEL, TIP1, TIP2, TIP3, TIP4
         }) {
             try (InputStream in = AuraTextures.class.getResourceAsStream("/assets/" + tex.getNamespace() + "/" + tex.getPath())) {
                 if (in == null) {

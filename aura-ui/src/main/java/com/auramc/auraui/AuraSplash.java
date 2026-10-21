@@ -82,25 +82,29 @@ public final class AuraSplash {
 
         drawTex(ctx, AuraTextures.WORDMARK, cx, cy, ww, wh, 738, 256, 1f, 1f, 1f, alpha, false);
 
-        // Блик (shine) по вордмарку раз в 4 сек
+        // Блик только по буквам (wordmark_mask + scissor) раз в 4 сек
         float cycle = t % 4.0f;
-        if (cycle < 1.2f) {
-            float p = cycle / 1.2f; // 0..1
-            float shineW = (120f / 2f) * px;
-            float shineH = (280f / 2f) * px;
-            float sx = cx - shineW + p * (ww + shineW * 2f);
-            float sy = cy + (wh - shineH) / 2f;
+        if (cycle < 1.5f) {
+            float p = cycle / 1.5f;
+            float smoothP = p * p * (3f - 2f * p); // ease-in-out
+            float shineCenterX = cx + smoothP * ww;
 
-            // Ограничиваем блик прямоугольником вордмарка
-            int scissorX = (int) Math.max(0, cx);
-            int scissorY = (int) Math.max(0, cy);
-            int scissorW = (int) Math.min(sw - scissorX, ww);
-            int scissorH = (int) Math.min(sh - scissorY, wh);
+            // 3 мягких слоя scissor разной ширины: 20%, 12%, 6% ширины вордмарка
+            float[] widths = new float[] { ww * 0.20f, ww * 0.12f, ww * 0.06f };
+            float[] alphas = new float[] { 0.10f, 0.20f, 0.35f };
 
-            if (scissorW > 0 && scissorH > 0) {
-                ctx.enableScissor(scissorX, scissorY, scissorX + scissorW, scissorY + scissorH);
-                drawTex(ctx, AuraTextures.SHINE, sx, sy, shineW, shineH, 120, 280, 1f, 1f, 1f, alpha * 0.85f, true);
-                ctx.disableScissor();
+            int topY = (int) Math.max(0, cy);
+            int botY = (int) Math.min(sh, cy + wh);
+
+            for (int i = 0; i < 3; i++) {
+                float halfW = widths[i] / 2f;
+                int leftX = (int) Math.max(cx, shineCenterX - halfW);
+                int rightX = (int) Math.min(cx + ww, shineCenterX + halfW);
+                if (rightX > leftX && botY > topY) {
+                    ctx.enableScissor(leftX, topY, rightX, botY);
+                    drawTex(ctx, AuraTextures.WORDMARK_MASK, cx, cy, ww, wh, 740, 256, 1f, 1f, 1f, alpha * alphas[i], true);
+                    ctx.disableScissor();
+                }
             }
         }
 
