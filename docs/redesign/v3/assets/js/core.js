@@ -57,6 +57,7 @@
   const sizes = {
     idle: [400, 76],
     nav: [840, 76],
+    launching: [460, 76],
     running: [340, 76],
     lobby: [700, 560],
     friends: [700, 640],
@@ -94,6 +95,7 @@
       island.style.height = Math.min(h, maxH) + 'px';
       island.classList.toggle('open', sections.includes(m));
       island.classList.toggle('nav', m === 'nav');
+      island.classList.toggle('launching', m === 'launching');
       island.classList.toggle('running', m === 'running');
     }
 
@@ -206,8 +208,16 @@
   function initIslandInteractions() {
     if (!island) return;
 
+    function resolveTargetModeAfterClose() {
+      if (typeof window.isGameRunning === 'function' && window.isGameRunning()) return 'running';
+      if (typeof window.isGameLaunching === 'function' && window.isGameLaunching()) return 'launching';
+      return 'idle';
+    }
+
     island.addEventListener('mouseenter', () => {
-      if (islandMode === 'idle') {
+      const isLaunching = typeof window.isGameLaunching === 'function' && window.isGameLaunching();
+      const isRunning = typeof window.isGameRunning === 'function' && window.isGameRunning();
+      if (!isLaunching && !isRunning && islandMode === 'idle') {
         window.setIslandMode('nav', false);
       }
     });
@@ -226,8 +236,7 @@
       }
 
       if (e.target.closest('[data-close]')) {
-        const running = typeof window.isGameRunning === 'function' && window.isGameRunning();
-        window.setIslandMode(running ? 'running' : 'idle', true);
+        window.setIslandMode(resolveTargetModeAfterClose(), true);
         return;
       }
 
@@ -256,8 +265,7 @@
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && sections.includes(islandMode)) {
-        const running = typeof window.isGameRunning === 'function' && window.isGameRunning();
-        window.setIslandMode(running ? 'running' : 'idle', true);
+        window.setIslandMode(resolveTargetModeAfterClose(), true);
       }
     });
 

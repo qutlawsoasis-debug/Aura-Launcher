@@ -1,16 +1,85 @@
 /**
  * Aura Launcher v3 — Play / Launch Logic
+ * Unified game state machine: 'idle' | 'launching' | 'running' | 'failed'
  * Integrates with WebBridge for real C# launch / progress / status events.
  */
 
 (function () {
   'use strict';
 
-  let isRunning = false;
-  let activePlayBtn = null;
+  // Global Unified Game State: 'idle' | 'launching' | 'running'
+  let gameState = 'idle';
 
   function getBridge() {
     return window.AuraBridge || null;
+  }
+
+  // Update all Play buttons on page consistently
+  function updateAllPlayButtons(progressData) {
+    const playButtons = document.querySelectorAll('.play');
+
+    playButtons.forEach(btn => {
+      // Don't modify the in-game stop button in .running layer
+      if (btn.hasAttribute('data-stop')) return;
+
+      const fill = btn.querySelector('.fill');
+      const label = btn.querySelector('span');
+
+      if (gameState === 'idle') {
+        btn.removeAttribute('data-busy');
+        btn.classList.remove('is-launching');
+        if (fill) fill.style.transform = 'scaleX(0)';
+        if (label) label.innerHTML = '<span class="tri"></span>Играть';
+      } else if (gameState === 'launching') {
+        btn.setAttribute('data-busy', '1');
+        btn.classList.add('is-launching');
+
+        if (progressData) {
+          const pct = Math.max(0, Math.min(100, progressData.percentage || 0));
+          if (fill) fill.style.transform = `scaleX(${pct / 100})`;
+          if (label) {
+            const stageText = progressData.stage || (pct < 50 ? 'Проверка файлов' : 'Запуск');
+            label.textContent = `${stageText} · ${Math.round(pct)}%`;
+          }
+        } else {
+          if (label) label.textContent = 'Подготовка...';
+        }
+      } else if (gameState === 'running') {
+        btn.removeAttribute('data-busy');
+        btn.classList.remove('is-launching');
+        if (fill) fill.style.transform = 'scaleX(0)';
+      }
+    });
+  }
+
+  function setGameState(newState, payload = {}) {
+    if (gameState === newState && !payload.force) return;
+    gameState = newState;
+
+    if (newState === 'launching') {
+      updateAllPlayButtons(payload.progress);
+      if (typeof window.setIslandMode === 'function') {
+        window.setIslandMode('launching', false);
+      }
+    } else if (newState === 'running') {
+      updateAllPlayButtons();
+      if (typeof window.setIslandMode === 'function') {
+        window.setIslandMode('running', false);
+      }
+      if (payload.notify && typeof window.showToast === 'function') {
+        window.showToast('Minecraft запущен (Fabric 1.20.1)', 'success');
+      }
+    } else if (newState === 'idle') {
+      updateAllPlayButtons();
+      if (typeof window.setIslandMode === 'function') {
+        window.setIslandMode('idle', false);
+      }
+      if (payload.error && typeof window.showToast === 'function') {
+        window.showToast(`Ошибка запуска: ${payload.error}`, 'error');
+      } else if (payload.notify && typeof window.showToast === 'function') {
+        window.showToast('Сессия игры завершена', 'info');
+      }
+    }
   }
 
   function setupBridgeListeners() {
@@ -21,130 +90,60 @@
     }
 
     bridge.on('game.progress', (data) => {
-      if (!activePlayBtn) {
-        activePlayBtn = document.querySelector('.play[data-busy="1"]') || document.querySelector('.bar .play');
-      }
-      if (!activePlayBtn) return;
-
-      const fill = activePlayBtn.querySelector('.fill');
-      const label = activePlayBtn.querySelector('span');
-      activePlayBtn.style.minWidth = '240px';
-
-      const pct = Math.max(0, Math.min(100, data.percentage || 0));
-      if (fill) fill.style.transform = `scaleX(${pct / 100})`;
-      if (label) {
-        const stageText = data.stage || (pct < 50 ? 'Проверка файлов' : 'Запуск');
-        label.textContent = `${stageText} · ${Math.round(pct)}%`;
+      if (gameState === 'launching') {
+        updateAllPlayButtons(data);
       }
     });
 
     bridge.on('game.status', (status) => {
-      if (status.isRunning && !status.isLaunching) {
-        isRunning = true;
-        resetPlayButtonUi();
-        if (typeof window.setIslandMode === 'function') {
-          window.setIslandMode('running');
-        }
-        if (typeof window.showToast === 'function') {
-          window.showToast('Minecraft запущен (Fabric 1.20.1)', 'success');
-        }
-      } else if (!status.isRunning) {
-        isRunning = false;
-        resetPlayButtonUi();
-        if (typeof window.setIslandMode === 'function') {
-          window.setIslandMode('idle');
-        }
-        if (status.error && typeof window.showToast === 'function') {
-          window.showToast(`Ошибка запуска: ${status.error}`, 'error');
-        } else if (typeof window.showToast === 'function') {
-          window.showToast('Сессия игры завершена', 'info');
-        }
+      const state = (status.state || (status.isRunning ? 'running' : 'idle')).toLowerCase();
+
+      if (state === 'running' || status.isRunning) {
+        setGameState('running', { notify: true });
+      } else if (state === 'preparing' || state === 'launching' || status.isLaunching) {
+        setGameState('launching');
+      } else if (state === 'failed') {
+        setGameState('idle', { error: status.error || 'Сбой запуска' });
+      } else if (state === 'idle') {
+        setGameState('idle', { notify: gameState === 'running' });
       }
     });
   }
 
-  function resetPlayButtonUi() {
-    if (activePlayBtn) {
-      delete activePlayBtn.dataset.busy;
-      activePlayBtn.style.minWidth = '';
-      const fill = activePlayBtn.querySelector('.fill');
-      const label = activePlayBtn.querySelector('span');
-      if (fill) fill.style.transform = 'scaleX(0)';
-      if (label) label.innerHTML = '<span class="tri"></span>Играть';
-      activePlayBtn = null;
-    }
-  }
-
   window.startGame = function (btn) {
-    if (btn.dataset.busy) return;
-    btn.dataset.busy = '1';
-    activePlayBtn = btn;
+    // Guard against repeated calls during launching or running
+    if (gameState === 'launching' || gameState === 'running') {
+      return;
+    }
 
-    const label = btn.querySelector('span');
-    btn.style.minWidth = '240px';
-    if (label) label.textContent = 'Подготовка...';
+    setGameState('launching');
 
     const bridge = getBridge();
     if (bridge && typeof bridge.send === 'function') {
       bridge.send('game.launch').catch(err => {
-        resetPlayButtonUi();
-        if (typeof window.showToast === 'function') {
-          window.showToast(`Сбой запуска: ${err.message}`, 'error');
-        }
+        setGameState('idle', { error: err.message });
       });
-    } else {
-      simulateLocalLaunch(btn);
     }
   };
-
-  function simulateLocalLaunch(btn) {
-    const fill = btn.querySelector('.fill');
-    const label = btn.querySelector('span');
-    let t = 0;
-    const effects = document.documentElement.dataset.effects;
-
-    const step = () => {
-      t += effects === 'off' ? 1 : 0.02;
-      if (fill) fill.style.transform = `scaleX(${Math.min(t, 1)})`;
-      if (label) {
-        label.textContent = t < 0.45 
-          ? 'Проверка файлов · ' + Math.round(t * 100) + '%' 
-          : 'Запуск · ' + Math.round(Math.min(t, 1) * 100) + '%';
-      }
-
-      if (t < 1) {
-        requestAnimationFrame(step);
-      } else {
-        resetPlayButtonUi();
-        isRunning = true;
-        if (typeof window.setIslandMode === 'function') {
-          window.setIslandMode('running');
-        }
-        if (typeof window.showToast === 'function') {
-          window.showToast('Minecraft 1.20.1 запущен (Fabric 0.19.5)', 'success');
-        }
-      }
-    };
-    requestAnimationFrame(step);
-  }
 
   window.stopGame = function () {
     const bridge = getBridge();
     if (bridge && typeof bridge.send === 'function') {
       bridge.send('game.stop').catch(() => {});
     }
-    isRunning = false;
-    resetPlayButtonUi();
-    if (typeof window.setIslandMode === 'function') {
-      window.setIslandMode('idle');
-    }
-    if (typeof window.showToast === 'function') {
-      window.showToast('Сессия игры завершена', 'info');
-    }
+    setGameState('idle', { notify: true });
   };
 
   window.isGameRunning = function () {
-    return isRunning;
+    return gameState === 'running';
+  };
+
+  window.isGameLaunching = function () {
+    return gameState === 'launching';
+  };
+
+  window.getGameState = function () {
+    return gameState;
   };
 
   setupBridgeListeners();

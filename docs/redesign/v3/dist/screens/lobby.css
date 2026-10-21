@@ -1,0 +1,4 @@
+/* Lobby Section styles — uses core Island component classes */
+#lobbySlotsContainer .slot.full .face {
+  --s: 54px;
+}

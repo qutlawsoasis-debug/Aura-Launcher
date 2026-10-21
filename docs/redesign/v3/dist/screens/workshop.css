@@ -1,0 +1,5 @@
+/* Workshop Section styles — Island Concept */
+#paneShaders .pick,
+#paneMods .row {
+  cursor: pointer;
+}

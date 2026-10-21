@@ -117,29 +117,36 @@
   function handleMockCommand(name, payload) {
     if (name === 'game.launch') {
       if (mockGameRunning) {
-        return Promise.resolve({ started: false, reason: 'Already running' });
+        return Promise.reject(new Error('already_launching'));
       }
 
       mockGameRunning = true;
-      emit('game.status', { isRunning: true, isLaunching: true });
+      emit('game.status', { state: 'preparing', isRunning: false });
 
       let p = 0;
       const effects = document.documentElement.dataset.effects;
-      const interval = effects === 'off' ? 10 : 60;
+      const interval = effects === 'off' ? 10 : 50;
 
       clearInterval(mockLaunchTimer);
       mockLaunchTimer = setInterval(() => {
-        p += effects === 'off' ? 50 : 10;
-        if (p < 100) {
+        p += effects === 'off' ? 50 : 15;
+        if (p < 50) {
           emit('game.progress', {
             percentage: p,
-            stage: p < 50 ? 'Проверка файлов' : 'Запуск',
+            stage: 'Проверка файлов',
+            detail: `${p}%`
+          });
+        } else if (p < 100) {
+          emit('game.status', { state: 'launching', isRunning: false });
+          emit('game.progress', {
+            percentage: p,
+            stage: 'Запуск',
             detail: `${p}%`
           });
         } else {
           clearInterval(mockLaunchTimer);
           emit('game.progress', { percentage: 100, stage: 'Запуск', detail: 'Готово' });
-          emit('game.status', { isRunning: true, processId: 1337, exitCode: null });
+          emit('game.status', { state: 'running', isRunning: true, processId: 1337, exitCode: null });
         }
       }, interval);
 
@@ -149,7 +156,7 @@
     if (name === 'game.stop') {
       clearInterval(mockLaunchTimer);
       mockGameRunning = false;
-      emit('game.status', { isRunning: false, processId: null, exitCode: 0 });
+      emit('game.status', { state: 'idle', isRunning: false, processId: null, exitCode: 0 });
       return Promise.resolve({ stopped: true });
     }
 

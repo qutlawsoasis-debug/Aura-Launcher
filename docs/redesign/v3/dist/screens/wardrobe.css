@@ -1,0 +1,83 @@
+/* Wardrobe Section Styles — Island Concept */
+.wardrobe {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.wardrobe-viewer-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+}
+
+#skinCanvas3D {
+  width: 260px;
+  height: 380px;
+  cursor: grab;
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.45));
+  border-radius: 18px;
+}
+
+#skinCanvas3D:active {
+  cursor: grabbing;
+}
+
+.skin-anim-seg {
+  width: 220px;
+}
+
+.capes {
+  display: flex;
+  gap: 10px;
+}
+
+.cape {
+  width: 52px;
+  height: 80px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: var(--fill);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: var(--ink-3);
+  transition: border-color 0.25s, transform 0.4s var(--spring);
+}
+
+.cape:hover {
+  transform: translateY(-3px);
+}
+
+.cape.on {
+  border-color: var(--accent);
+}
+
+.cape .sw {
+  width: 28px;
+  height: 48px;
+  border-radius: 4px;
+}
+
+@media (max-height: 820px) {
+  #skinCanvas3D {
+    width: 220px !important;
+    height: 320px !important;
+  }
+
+  .wardrobe-controls-col .row {
+    min-height: 52px;
+    padding: 6px 0;
+  }
+
+  .wardrobe-controls-col .capes .cape {
+    height: 64px;
+    width: 44px;
+  }
+
+  .wardrobe-controls-col .capes .cape .sw {
+    height: 38px;
+    width: 22px;
+  }
+}

@@ -144,6 +144,10 @@ body.is-open .world-dim {
   width: 840px;
 }
 
+.island.launching {
+  width: 460px;
+}
+
 .island.running {
   width: 340px;
 }

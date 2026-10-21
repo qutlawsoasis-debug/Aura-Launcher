@@ -1,0 +1,495 @@
+<!-- GENERATED — не редактировать, правь shell.html и screens/* -->
+<!doctype html>
+<html lang="ru" data-effects="full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Aura — Остров</title>
+  
+  <!-- Дизайн-токены и ядро стилей -->
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="assets/css/core.css">
+
+  <!-- Стили экранов -->
+  <link rel="stylesheet" href="screens/play.css">
+  <link rel="stylesheet" href="screens/map.css">
+  <link rel="stylesheet" href="screens/lobby.css">
+  <link rel="stylesheet" href="screens/friends.css">
+  <link rel="stylesheet" href="screens/wardrobe.css">
+  <link rel="stylesheet" href="screens/workshop.css">
+  <link rel="stylesheet" href="screens/settings.css">
+
+</head>
+<body>
+  <div class="world" id="world"></div>
+  <div class="world-dim"></div>
+  <div class="shade"></div>
+  <div class="brand">Aura</div>
+  <div class="wincontrols">
+    <button type="button" class="win-btn" aria-label="Свернуть">—</button>
+    <button type="button" class="win-btn" aria-label="Развернуть">□</button>
+    <button type="button" class="win-btn" aria-label="Закрыть">✕</button>
+  </div>
+
+  <div class="island" id="island" data-glass>
+    <!-- покой -->
+    <div class="layer on" data-l="idle">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <div class="meta"><b>Coock0ld</b><span class="small dim">Aura Pack 1.2</span></div>
+        <button class="play" data-play><div class="fill"></div><span><span class="tri"></span>Играть</span></button>
+      </div>
+    </div>
+
+    <!-- навигация -->
+    <div class="layer" data-l="nav">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <nav class="navrow">
+          <button type="button" data-open="map">Карта</button>
+          <button type="button" data-open="lobby">Лобби</button>
+          <button type="button" data-open="friends">Друзья</button>
+          <button type="button" data-open="wardrobe">Гардероб</button>
+          <button type="button" data-open="workshop">Мастерская</button>
+          <button type="button" data-open="settings">Настройки</button>
+        </nav>
+        <button class="play" data-play><div class="fill"></div><span><span class="tri"></span>Играть</span></button>
+      </div>
+    </div>
+
+    <!-- запуск -->
+    <div class="layer" data-l="launching">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <button class="play" data-play style="width:100%;margin-left:0"><div class="fill"></div><span><span class="tri"></span>Подготовка...</span></button>
+      </div>
+    </div>
+
+    <!-- в игре -->
+    <div class="layer" data-l="running">
+      <div class="bar">
+        <div class="face" style="--s:44px"></div>
+        <div class="meta"><b>Coock0ld</b><span class="small dim">00:00:12</span></div>
+        <button class="play" data-stop><span><span class="live"></span>В игре</span></button>
+      </div>
+    </div>
+
+    <!-- КАРТА -->
+    <div class="layer" data-l="map">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Карта</h2>
+            <div class="sub">Мир Coock0ld · изученная область</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body" style="padding:0;overflow:hidden">
+          <div class="mapwrap">
+  <canvas id="mapCanvas"></canvas>
+  <div class="coords" id="coords">X 0 · Z 0</div>
+  <div class="map-list">
+    <button type="button" class="person" data-poi="0"><div class="face" style="--s:34px"></div><div style="flex:1"><div class="name">Вы</div><div class="small dim">Дом у озера</div></div></button>
+    <button type="button" class="person" data-poi="1"><div class="face" style="--s:34px"></div><div style="flex:1"><div class="name">zxcursed</div><div class="small dim">Шахта</div></div><span class="status"></span></button>
+    <button type="button" class="person" data-poi="2"><div style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:700">S</div><div style="flex:1"><div class="name">Спавн</div></div></button>
+  </div>
+  <div class="map-zoom">
+    <button type="button" id="zin" aria-label="Приблизить">+</button>
+    <button type="button" id="zout" aria-label="Отдалить">−</button>
+  </div>
+</div>
+
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- ЛОББИ -->
+    <div class="layer" data-l="lobby">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Лобби</h2>
+            <div class="sub"><span class="acc">●</span> Туннель активен · 34 мс</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <div class="small dim" style="margin-bottom:10px">Код комнаты для друзей</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+  <div class="code" id="lobbyRoomCodeDisplay">7821 · X9M2</div>
+  <button type="button" class="btn primary" id="btnCopyLobbyCode" data-copy>Скопировать</button>
+</div>
+<div class="slots" id="lobbySlotsContainer">
+  <div class="slot full"><div class="ring"><div class="face"></div></div><span class="slot-name">Coock0ld</span></div>
+  <button type="button" class="slot" data-open="friends"><div class="ring">+</div>Пригласить</button>
+  <button type="button" class="slot" data-open="friends"><div class="ring">+</div>Пригласить</button>
+  <button type="button" class="slot" data-open="friends"><div class="ring">+</div>Пригласить</button>
+</div>
+<div class="small dim" id="lobbyPlayersCountText" style="text-align:center;margin-bottom:18px">1 из 8 игроков</div>
+<button type="button" class="btn" data-reveal="joinBox">Войти по чужому коду</button>
+<div class="reveal" id="joinBox">
+  <div>
+    <div style="display:flex;gap:10px;padding-top:12px">
+      <input class="field" id="inputJoinCode" placeholder="AURA-0000-XXXX">
+      <button type="button" class="btn primary" id="btnSubmitJoinCode">Войти</button>
+    </div>
+  </div>
+</div>
+
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- ДРУЗЬЯ -->
+    <div class="layer" data-l="friends">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Друзья</h2>
+            <div class="sub">2 в игре · 1 в сети</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <div style="display:flex;gap:10px">
+  <div class="seg" style="flex:1" data-seg="friends" id="friendsSegmented">
+    <span class="lens"></span>
+    <button type="button" class="on" data-tab="all">Все</button>
+    <button type="button" data-tab="game">В игре</button>
+    <button type="button" data-tab="online">В сети</button>
+  </div>
+  <button type="button" class="btn" data-reveal="addBox">Добавить</button>
+</div>
+
+<div class="reveal" id="addBox">
+  <div>
+    <div style="display:flex;gap:10px;padding-top:12px">
+      <input class="field" id="inputFriendCode" placeholder="Код друга, например AURA-5491-MC88">
+      <button type="button" class="btn primary" id="btnSubmitAddFriend">Отправить</button>
+    </div>
+  </div>
+</div>
+
+<div class="group-title" id="requestsTitle">Заявки · 2</div>
+<div id="friendRequestsList">
+  <div class="person" data-request-id="req-1">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">RedstonePro</div>
+      <div class="small dim">хочет добавить вас</div>
+    </div>
+    <button type="button" class="btn sm primary btn-accept-req">Принять</button>
+    <button type="button" class="btn sm ghost btn-reject-req" aria-label="Отклонить">✕</button>
+  </div>
+  <div class="person" data-request-id="req-2">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">AuraPioneer</div>
+      <div class="small dim">хочет добавить вас</div>
+    </div>
+    <button type="button" class="btn sm primary btn-accept-req">Принять</button>
+    <button type="button" class="btn sm ghost btn-reject-req" aria-label="Отклонить">✕</button>
+  </div>
+</div>
+
+<div class="group-title">Список</div>
+<div id="friendList">
+  <div class="person" data-st="game">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">zxcursed</div>
+      <div class="small dim">В игре · мир Coock0ld</div>
+    </div>
+    <span class="status"></span>
+  </div>
+  <div class="person" data-st="game">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">Nekto</div>
+      <div class="small dim">В игре · мир Coock0ld</div>
+    </div>
+    <span class="status"></span>
+  </div>
+  <div class="person" data-st="online">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">Steve_Miner</div>
+      <div class="small dim">В лаунчере</div>
+    </div>
+    <button type="button" class="btn sm btn-invite-friend" data-cmd="friends.invite">Позвать</button>
+    <span class="status idle"></span>
+  </div>
+  <div class="person" data-st="off">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">Lumi</div>
+      <div class="small dim">Был 2 ч назад</div>
+    </div>
+    <span class="status off"></span>
+  </div>
+  <div class="person" data-st="off">
+    <div class="face"></div>
+    <div style="flex:1">
+      <div class="name">Frost</div>
+      <div class="small dim">Был вчера</div>
+    </div>
+    <span class="status off"></span>
+  </div>
+</div>
+
+<div class="row" style="border:0">
+  <span class="small muted">Ваш код: <b style="color:#fff" id="myFriendCodeDisplay">AURA-7821-X9M2</b></span>
+  <button type="button" class="btn sm" id="btnCopyMyFriendCode" data-copy>Копировать</button>
+</div>
+
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- ГАРДЕРОБ -->
+    <div class="layer" data-l="wardrobe">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Гардероб</h2>
+            <div class="sub">Так вас видят в игре</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <div class="wardrobe">
+  <div class="wardrobe-viewer-col">
+    <canvas id="skinCanvas3D" width="260" height="380" title="Потяните для вращения, колёсико — зум"></canvas>
+  </div>
+
+  <div class="wardrobe-controls-col" style="flex:1">
+    <div class="small dim" style="margin-bottom:8px">Плащ</div>
+    <div class="capes" id="capeSelector">
+      <button type="button" class="cape on" data-cape="cyan" title="Лазурный плащ"><span class="sw" style="background:linear-gradient(160deg,#5FD4E8,#2A6F8E)"></span></button>
+      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ"><span class="sw" style="background:linear-gradient(160deg,#C9CDD6,#6B7280)"></span></button>
+      <button type="button" class="cape" data-cape="none" title="Без плаща">нет</button>
+    </div>
+
+    <div class="row">
+      <span>Анимация</span>
+      <div class="seg skin-anim-seg" data-seg="anim" id="animModeSeg">
+        <span class="lens"></span>
+        <button type="button" class="on" data-anim="idle">Стоит</button>
+        <button type="button" data-anim="walk">Идёт</button>
+        <button type="button" data-anim="run">Бежит</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span>Модель</span>
+      <div class="seg" style="width:190px" data-seg="model" id="modelTypeSeg">
+        <span class="lens"></span>
+        <button type="button" class="on" data-model="default">Steve</button>
+        <button type="button" data-model="slim">Alex</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      <label class="btn sm" style="cursor:pointer">
+        Загрузить
+        <input type="file" id="skinFileInput" accept="image/png" style="display:none">
+      </label>
+    </div>
+
+    <div class="row">
+      <span>Ник</span>
+      <input class="field" id="inputPlayerNickname" value="Coock0ld" style="width:170px;height:40px">
+    </div>
+  </div>
+</div>
+
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- МАСТЕРСКАЯ -->
+    <div class="layer" data-l="workshop">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Мастерская</h2>
+            <div class="sub"><span class="acc">●</span> Сборка синхронизирована · 342.8 МБ</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <div class="seg" data-seg="workshop" id="workshopSegmented">
+  <span class="lens"></span>
+  <button type="button" class="on" data-tab="shaders">Шейдеры</button>
+  <button type="button" data-tab="mods">Моды · 15</button>
+</div>
+
+<div data-pane="shaders" id="paneShaders" style="margin-top:6px">
+  <button type="button" class="pick on" data-shader="complementary">
+    <span class="radio"></span>
+    <span>
+      <b>Complementary Reimagined</b>
+      <span class="small dim">Выбор Aura · нужна хорошая видеокарта</span>
+    </span>
+  </button>
+  <button type="button" class="pick" data-shader="sildurs">
+    <span class="radio"></span>
+    <span>
+      <b>Sildurs Enhanced Default</b>
+      <span class="small dim">Лёгкие шейдеры</span>
+    </span>
+  </button>
+  <button type="button" class="pick" data-shader="builders">
+    <span class="radio"></span>
+    <span>
+      <b>Builders QoL</b>
+      <span class="small dim">Максимум FPS</span>
+    </span>
+  </button>
+  <button type="button" class="pick" data-shader="none">
+    <span class="radio"></span>
+    <span>
+      <b>Без шейдеров</b>
+      <span class="small dim">Vanilla</span>
+    </span>
+  </button>
+</div>
+
+<div data-pane="mods" id="paneMods" style="margin-top:6px" hidden>
+  <div class="row">
+    <span>Sodium<span class="hint">Оптимизация видеоядра</span></span>
+    <span class="toggle on" data-mod="sodium"></span>
+  </div>
+  <div class="row">
+    <span>Iris Shaders<span class="hint">Графика и шейдеры</span></span>
+    <span class="toggle on" data-mod="iris"></span>
+  </div>
+  <div class="row">
+    <span>Distant Horizons<span class="hint">Сверхдальний рендеринг чанков</span></span>
+    <span class="toggle on" data-mod="dh"></span>
+  </div>
+  <div class="row">
+    <span>Simple Voice Chat<span class="hint">Голосовой чат по P2P</span></span>
+    <span class="toggle on" data-mod="voice"></span>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-top:14px">
+  <button type="button" class="btn" id="btnSyncMods" data-cmd="pack.sync">Синхронизировать</button>
+  <button type="button" class="btn ghost" id="btnOpenModsFolder" data-cmd="fs.openModsFolder">Открыть папку</button>
+</div>
+
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+
+    <!-- НАСТРОЙКИ -->
+    <div class="layer" data-l="settings">
+      <div class="sec">
+        <div class="sec-head">
+          <div>
+            <h2>Настройки</h2>
+            <div class="sub">Параметры графики, памяти и клиента</div>
+          </div>
+          <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
+        </div>
+        <div class="sec-body">
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;margin:4px 0 16px">
+  <div>
+    <div class="small dim" style="margin-bottom:8px">Память для игры</div>
+    <div class="ram-num" style="font-size:60px;font-weight:700;letter-spacing:-.04em;line-height:1"><span id="settingsRamVal">6</span> ГБ</div>
+  </div>
+  <div class="small dim" id="settingsRamHint">Оптимально · из 16 ГБ</div>
+</div>
+
+<input type="range" min="4" max="12" step="1" value="6" id="settingsRamSlider">
+
+<div class="group-title">Графика</div>
+<div class="seg" data-seg="preset" id="presetSegmented" style="margin-top:8px">
+  <span class="lens"></span>
+  <button type="button" data-preset-idx="0">Слабая</button>
+  <button type="button" data-preset-idx="1">Средняя</button>
+  <button type="button" class="on" data-preset-idx="2">Высокая</button>
+  <button type="button" data-preset-idx="3">Ультра</button>
+</div>
+<div class="small dim" style="margin:10px 2px 0" id="settingsPresetHint">16 чанков · шейдеры Sildurs · PBR-текстуры</div>
+
+<div class="group-title">Лаунчер</div>
+<div class="row">
+  <span>Эффекты</span>
+  <div class="seg" style="width:230px" data-seg="effects" id="effectsSegmented">
+    <span class="lens"></span>
+    <button type="button" class="on" data-fx="full">Полные</button>
+    <button type="button" data-fx="low">Лёгкие</button>
+    <button type="button" data-fx="off">Выкл</button>
+  </div>
+</div>
+<div class="row">
+  <span>Скрывать лаунчер в игре<span class="hint">Освобождает видеопамять</span></span>
+  <span class="toggle on" id="toggleHideOnLaunch"></span>
+</div>
+<div class="row">
+  <span>Автообновление<span class="hint">Фоновое обновление через Velopack</span></span>
+  <span class="toggle on" id="toggleAutoUpdate"></span>
+</div>
+<div class="row">
+  <span>Останавливать туннель при выходе</span>
+  <span class="toggle on" id="toggleStopTunnelOnExit"></span>
+</div>
+
+<div class="group-title">Игра</div>
+<div class="row">
+  <span>Версия<span class="hint" id="gameVersionHint">Fabric 1.20.1 · Aura Pack 1.2</span></span>
+  <button type="button" class="btn sm" id="btnChangeVersion" data-cmd="game.changeVersion">Сменить</button>
+</div>
+<div class="row">
+  <span>Папка игры<span class="hint" id="gameFolderHint">%APPDATA%\.aura</span></span>
+  <button type="button" class="btn sm" id="btnBrowseFolder" data-cmd="fs.openGameFolder">Обзор</button>
+</div>
+
+<div class="group-title">Если что-то сломалось</div>
+<div class="row">
+  <span>Логи и отчёт о сбое</span>
+  <button type="button" class="btn sm" id="btnExportLogs" data-cmd="logs.export">Экспорт</button>
+</div>
+<div class="row" id="rowClearCache">
+  <span>Кэш модов<span class="hint">Очистить скомпилированные шейдеры и временные архивы</span></span>
+  <div id="clearCacheActionWrap" style="display:inline-flex;gap:6px;align-items:center">
+    <button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>
+  </div>
+</div>
+
+        </div>
+        <div class="sec-foot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  
+  <!-- Сторонние библиотеки (skinview3d UMD) -->
+  <script src="assets/vendor/skinview3d.bundle.js"></script>
+
+  <!-- Базовые скрипты ядра и модулей -->
+  <script src="src/perf-hud.js"></script>
+  <script src="src/bridge.js"></script>
+  <script src="assets/js/demo-data.js"></script>
+  <script src="assets/js/core.js"></script>
+  <script src="screens/play.js"></script>
+  <script src="screens/map.js"></script>
+  <script src="screens/lobby.js"></script>
+  <script src="screens/friends.js"></script>
+  <script src="screens/wardrobe.js"></script>
+  <script src="screens/workshop.js"></script>
+  <script src="screens/settings.js"></script>
+
+</body>
+</html>

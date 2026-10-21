@@ -1,0 +1,4 @@
+/* Styles for play / launch button states inside Island capsule */
+.play.is-launching {
+  min-width: 240px;
+}
