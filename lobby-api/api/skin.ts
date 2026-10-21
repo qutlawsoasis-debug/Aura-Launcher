@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { getStore, SkinRecord } from '../src/store.js';
 import { validatePngSkin, isValidNickname, getClientIp } from '../src/skinUtils.js';
 import { parseJson, sendJson } from './_utils.js';
+import { isCapeId } from '../src/capes.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') {
@@ -27,6 +28,12 @@ export default async function handler(req: any, res: any) {
 
     const body = await parseJson(req);
     const { nickname, skinBase64, model, ownerToken } = body;
+    // Плащ: 'cyan' | 'silver' — выбрать, 'none' — снять, нет поля — не менять
+    const capeProvided = Object.prototype.hasOwnProperty.call(body, 'cape');
+    if (capeProvided && body.cape !== 'none' && !isCapeId(body.cape)) {
+      return sendJson(res, 400, { error: 'Invalid cape (cyan | silver | none)' });
+    }
+    const capeValue: 'cyan' | 'silver' | null = isCapeId(body.cape) ? body.cape : null;
 
     // Validate nickname
     if (!isValidNickname(nickname)) {
@@ -71,6 +78,17 @@ export default async function handler(req: any, res: any) {
       }
     }
 
+    // Только смена плаща, без загрузки скина
+    if (capeProvided && !skinBase64) {
+      if (!existing) {
+        return sendJson(res, 404, { error: 'Сначала загрузите скин' });
+      }
+      existing.cape = capeValue;
+      existing.updatedAt = Date.now();
+      await store.setSkin(existing, 30 * 24 * 3600);
+      return sendJson(res, 200, { success: true, nickname: existing.nickname, cape: capeValue });
+    }
+
     // Validate model
     const skinModel: 'default' | 'slim' = model === 'slim' ? 'slim' : 'default';
 
@@ -89,7 +107,8 @@ export default async function handler(req: any, res: any) {
       model: skinModel,
       sha1: validation.sha1,
       skinBase64: validation.buffer.toString('base64'),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      cape: capeProvided ? capeValue : (existing?.cape ?? null)
     };
 
     // TTL 30 days

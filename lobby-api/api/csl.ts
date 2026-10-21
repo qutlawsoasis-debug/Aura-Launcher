@@ -1,5 +1,6 @@
 import { getStore } from '../src/store.js';
 import { sendJson } from './_utils.js';
+import { CAPES } from '../src/capes.js';
 
 export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') {
@@ -16,6 +17,22 @@ export default async function handler(req: any, res: any) {
   try {
     const urlStr = req.url || '';
     const cleanUrl = urlStr.split('?')[0];
+
+    // Плащи Aura: /csl/textures/cape_cyan, /csl/textures/cape_silver
+    const capeMatch = cleanUrl.match(/\/(?:raw|textures)\/(cape_[a-z]+)(?:\.png)?$/);
+    if (capeMatch && CAPES[capeMatch[1]]) {
+      const capeBuffer = Buffer.from(CAPES[capeMatch[1]], 'base64');
+      if (res.setHeader) {
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+      }
+      if (typeof res.status === 'function' && typeof res.send === 'function') {
+        return res.status(200).send(capeBuffer);
+      }
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*' });
+      return res.end(capeBuffer);
+    }
 
     // Check if this is a texture request: /csl/textures/{hash} or /csl/raw/{hash} (with or without .png)
     const rawMatch = cleanUrl.match(/\/(?:raw|textures)\/([a-fA-F0-9]+?)(?:\.png)?$/);
@@ -83,7 +100,7 @@ export default async function handler(req: any, res: any) {
         default: isSlim ? null : textureHash,
         slim: isSlim ? textureHash : null
       },
-      cape: null
+      cape: skinRecord.cape ? `cape_${skinRecord.cape}` : null
     };
 
     return sendJson(res, 200, cslResponse);

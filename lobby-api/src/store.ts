@@ -181,6 +181,8 @@ export interface SkinRecord {
   sha1: string;
   skinBase64: string;
   updatedAt: number;
+  /** Выбранный плащ Aura (null/нет — без плаща) */
+  cape?: 'cyan' | 'silver' | null;
 }
 
 export interface UserRecord {
