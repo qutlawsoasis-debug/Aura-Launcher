@@ -279,7 +279,8 @@ public partial class App : Application
                 Services.GetRequiredService<IAchievementService>(),
                 Services.GetRequiredService<IDiscordRpcService>())
             {
-                IsUpdatedRestart = isUpdatedRestart
+                IsUpdatedRestart = isUpdatedRestart,
+                StartupProtocolUri = protocolArg
             };
             activeWindow = webShell;
         }
@@ -851,6 +852,10 @@ public partial class App : Application
                                 if (targetWindow is MainWindow mWin2 && mWin2.DataContext is MainViewModel mainVM)
                                 {
                                     mainVM.HandleProtocolUri(uri);
+                                }
+                                else if (targetWindow is WebShellWindow webShell)
+                                {
+                                    webShell.HandleProtocolUri(uri);
                                 }
                             }
                         });

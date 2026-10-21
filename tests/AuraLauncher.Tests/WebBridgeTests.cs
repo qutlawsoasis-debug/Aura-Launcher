@@ -1119,6 +1119,40 @@ public class WebBridgeTests
         Assert.Equal("TestPlayer", config.CurrentConfig.Nickname);
     }
 
+    [Theory]
+    [InlineData("aura://join/ab12cd", "join", "AB12CD")]
+    [InlineData("\"aura://friend/XY99ZZ77/\"", "friend", "XY99ZZ77")]
+    [InlineData("aura:join/ABC123", "join", "ABC123")]
+    public void HandleProtocolUri_ValidLinks_SendPrompt(string uri, string action, string code)
+    {
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        bridge.HandleProtocolUri(uri);
+
+        Assert.Equal("protocol.prompt", last!.Name);
+        var p = PayloadOf(last);
+        Assert.Equal(action, p.GetProperty("action").GetString());
+        Assert.Equal(code, p.GetProperty("code").GetString());
+    }
+
+    [Theory]
+    [InlineData("aura://join/AB")]
+    [InlineData("aura://hack/ABC123")]
+    [InlineData("https://example.com/join/ABC123")]
+    [InlineData("aura://join/ABC-123")]
+    public void HandleProtocolUri_BadLinks_AreIgnored(string uri)
+    {
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), logger: _ => {});
+        BridgeMessage? last = null;
+        bridge.MessagePosted += m => last = m;
+
+        bridge.HandleProtocolUri(uri);
+
+        Assert.Null(last);
+    }
+
     [Fact]
     public async Task Handle_CloudCommands_WithoutService_ReturnError()
     {

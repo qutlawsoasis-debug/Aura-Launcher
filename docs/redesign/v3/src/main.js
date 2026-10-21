@@ -19,6 +19,7 @@ import './profile.js';
 import './skins.js';
 import './update.js';
 import './boot.js';
+import './protocol.js';
 import '../assets/js/demo-data.js';
 import '../assets/js/core.js';
 import '../screens/play.js';

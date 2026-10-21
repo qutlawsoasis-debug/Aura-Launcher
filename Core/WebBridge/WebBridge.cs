@@ -395,6 +395,10 @@ public partial class WebBridge : IDisposable
                     await HandleLauncherApplyUpdateAsync(msg);
                     break;
 
+                case "protocol.pending":
+                    HandleProtocolPending(msg);
+                    break;
+
                 case "skin.setCape":
                     await HandleSkinSetCapeAsync(msg);
                     break;

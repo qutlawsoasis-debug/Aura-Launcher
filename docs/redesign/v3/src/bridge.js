@@ -481,6 +481,12 @@
       return handleMockCloud(name, payload || {});
     }
 
+    // Ссылки aura://: ?link=join-ABC123 | friend-ABC123
+    if (name === 'protocol.pending') {
+      const m = typeof location !== 'undefined' && location.search.match(/[?&]link=(join|friend)-([A-Z0-9]{6,8})/i);
+      return Promise.resolve({ pending: m ? { action: m[1].toLowerCase(), code: m[2].toUpperCase() } : null });
+    }
+
     // Экран загрузки: ?boot=update | updated | error
     if (name === 'startup.run' || name === 'startup.retry' || name === 'startup.skip' || name === 'changelog.get') {
       const mode = (typeof location !== 'undefined' && (location.search.match(/[?&]boot=(\w+)/) || [])[1]) || '';

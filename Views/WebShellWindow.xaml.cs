@@ -30,6 +30,16 @@ public partial class WebShellWindow : Window
     /// <summary>Лаунчер только что перезапущен после обновления — экран загрузки покажет «Что нового».</summary>
     public bool IsUpdatedRestart { get; init; }
 
+    /// <summary>Ссылка aura://, с которой запустили лаунчер (обрабатывается, когда мост готов).</summary>
+    public string? StartupProtocolUri { get; set; }
+
+    /// <summary>Ссылка aura:// из второго экземпляра лаунчера.</summary>
+    public void HandleProtocolUri(string? uri)
+    {
+        if (_bridge != null) _bridge.HandleProtocolUri(uri);
+        else StartupProtocolUri = uri;
+    }
+
     public WebShellWindow(
         IGameSessionService gameSessionService,
         IConfigService configService,
@@ -86,6 +96,7 @@ public partial class WebShellWindow : Window
                 IsUpdatedRestart = IsUpdatedRestart
             };
             _bridge.Attach(WebViewControl.CoreWebView2);
+            if (!string.IsNullOrWhiteSpace(StartupProtocolUri)) _bridge.HandleProtocolUri(StartupProtocolUri);
 
             _friendService?.Start();
 
