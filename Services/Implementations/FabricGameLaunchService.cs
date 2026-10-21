@@ -408,6 +408,14 @@ public class FabricGameLaunchService : IGameLaunchService
     }
 
     /// <summary>
+    /// Файлы, исключённые из сборки модов (удаляются перед запуском при наличии).
+    /// </summary>
+    public static readonly string[] DroppedModpackFiles = new[]
+    {
+        "resourcepacks/Transparent-GUI-White-Border.zip"
+    };
+
+    /// <summary>
     /// Автоматическое обнаружение и включение всех ресурспаков из папки resourcepacks в options.txt
     /// с дублированием в incompatibleResourcePacks перед запуском клиента.
     /// </summary>
@@ -420,6 +428,24 @@ public class FabricGameLaunchService : IGameLaunchService
 
         try
         {
+            // Удаление исключённых из сборки файлов
+            foreach (var droppedRelPath in DroppedModpackFiles)
+            {
+                try
+                {
+                    var fullDroppedPath = Path.Combine(gameDir, droppedRelPath.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(fullDroppedPath))
+                    {
+                        File.Delete(fullDroppedPath);
+                        LogLauncherEvent($"[PACK] removed {droppedRelPath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogLauncherEvent($"[PACK: ERROR] Не удалось удалить {droppedRelPath}: {ex.Message}");
+                }
+            }
+
             var rpDir = Path.Combine(gameDir, "resourcepacks");
             var foundPacks = new List<string>();
 
@@ -467,6 +493,15 @@ public class FabricGameLaunchService : IGameLaunchService
                 ? ParseOptionsList(lines[rpLineIndex])
                 : new List<string>();
 
+            // Удаляем исключённые из сборки ресурспаки из списков options.txt
+            foreach (var droppedRelPath in DroppedModpackFiles)
+            {
+                var packFileName = Path.GetFileName(droppedRelPath);
+                var packEntry = $"file/{packFileName}";
+                currentPacks.RemoveAll(p => string.Equals(p, packEntry, StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(p, packFileName, StringComparison.OrdinalIgnoreCase));
+            }
+
             // Гарантируем "vanilla"
             if (!currentPacks.Contains("vanilla", StringComparer.OrdinalIgnoreCase))
             {
@@ -507,6 +542,15 @@ public class FabricGameLaunchService : IGameLaunchService
             List<string> incompPacks = incompLineIndex >= 0
                 ? ParseOptionsList(lines[incompLineIndex])
                 : new List<string>();
+
+            // Удаляем исключённые из сборки ресурспаки из incompatibleResourcePacks
+            foreach (var droppedRelPath in DroppedModpackFiles)
+            {
+                var packFileName = Path.GetFileName(droppedRelPath);
+                var packEntry = $"file/{packFileName}";
+                incompPacks.RemoveAll(p => string.Equals(p, packEntry, StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(p, packFileName, StringComparison.OrdinalIgnoreCase));
+            }
 
             // Продублировать все ресурспаки из resourcepacks/ в incompatibleResourcePacks
             foreach (var packName in foundPacks)

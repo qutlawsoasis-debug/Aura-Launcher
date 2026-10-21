@@ -134,4 +134,48 @@ public class ResourcePacksOptionsTests : IDisposable
 
         Assert.Equal(linesAfterFirst, linesAfterSecond);
     }
+
+    [Fact]
+    public void EnsureDefaultResourcePacksEnabled_RemovesDroppedPacksAndCleansOptionsTxt()
+    {
+        var rpDir = Path.Combine(_testDir, "resourcepacks");
+        Directory.CreateDirectory(rpDir);
+
+        var droppedFile = Path.Combine(rpDir, "Transparent-GUI-White-Border.zip");
+        File.WriteAllBytes(droppedFile, new byte[] { 1, 2, 3 });
+
+        var remainingFile = Path.Combine(rpDir, "Universal Bushy Leaves.zip");
+        File.WriteAllBytes(remainingFile, new byte[] { 4, 5, 6 });
+
+        var optionsPath = Path.Combine(_testDir, "options.txt");
+        var initialContent = new[]
+        {
+            "version:3465",
+            "resourcePacks:[\"vanilla\",\"fabric\",\"file/Universal Bushy Leaves.zip\",\"file/Transparent-GUI-White-Border.zip\"]",
+            "incompatibleResourcePacks:[\"file/Universal Bushy Leaves.zip\",\"file/Transparent-GUI-White-Border.zip\"]"
+        };
+        File.WriteAllLines(optionsPath, initialContent, new UTF8Encoding(false));
+
+        FabricGameLaunchService.EnsureDefaultResourcePacksEnabled(_testDir);
+
+        // 1. Файл Transparent-GUI-White-Border.zip должен быть физически удалён
+        Assert.False(File.Exists(droppedFile));
+        Assert.True(File.Exists(remainingFile));
+
+        // 2. В options.txt он должен отсутствовать в обоих списках
+        var lines = File.ReadAllLines(optionsPath, Encoding.UTF8);
+        var rpLine = Assert.Single(lines, l => l.StartsWith("resourcePacks:"));
+        var incompLine = Assert.Single(lines, l => l.StartsWith("incompatibleResourcePacks:"));
+
+        var rpList = FabricGameLaunchService.ParseOptionsList(rpLine);
+        var incompList = FabricGameLaunchService.ParseOptionsList(incompLine);
+
+        Assert.DoesNotContain("file/Transparent-GUI-White-Border.zip", rpList);
+        Assert.DoesNotContain("Transparent-GUI-White-Border.zip", rpList);
+        Assert.DoesNotContain("file/Transparent-GUI-White-Border.zip", incompList);
+        Assert.DoesNotContain("Transparent-GUI-White-Border.zip", incompList);
+
+        Assert.Contains("file/Universal Bushy Leaves.zip", rpList);
+        Assert.Contains("file/Universal Bushy Leaves.zip", incompList);
+    }
 }
