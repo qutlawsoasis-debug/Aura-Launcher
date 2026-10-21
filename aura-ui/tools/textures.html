@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- Источник текстур экрана загрузки: те же токены и стекло, что у капсулы лаунчера (docs/redesign/v3).
+     Каждый #id снимается отдельно в PNG с прозрачным фоном (tools/render-textures.js). -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Onest; src: url('../../docs/redesign/v3/public/assets/fonts/Onest.woff2') format('woff2'); font-weight: 100 900; }
+  html, body { margin: 0; background: transparent; font-family: Onest, sans-serif; color: #fff; }
+  .shot { position: absolute; left: 0; }
+
+  /* Капсула 400×76 — как .boot-capsule: стекло поверх размытого мира */
+  #capsule {
+    top: 0;
+    width: 400px; height: 76px; box-sizing: border-box;
+    border-radius: 38px;
+    display: flex; align-items: center; gap: 14px; padding: 0 22px 0 14px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.03) 40%, rgba(0,0,0,.10)),
+      rgba(30, 32, 40, 0.62);
+    border: 1px solid rgba(255,255,255,.18);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  .core { width: 36px; height: 36px; margin: 6px; border-radius: 50%; display: grid; place-items: center;
+    font-weight: 800; font-size: 18px; color: #00283A; background: #64D2FF; box-shadow: 0 0 18px rgba(100,210,255,.55); }
+  .meta { display: flex; flex-direction: column; gap: 2px; }
+  .meta b { font-size: 17px; }
+  .meta span { font-size: 14px; color: rgba(255,255,255,.76); }
+
+  /* Бегущее световое кольцо вокруг знака (вращается в игре) */
+  #ring {
+    top: 100px; width: 48px; height: 48px; border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 0 55%, rgba(100,210,255,.9) 80%, #fff 88%, transparent 92%);
+    -webkit-mask: radial-gradient(circle, transparent 20px, #000 21px);
+            mask: radial-gradient(circle, transparent 20px, #000 21px);
+  }
+
+  /* Мягкое пятно света для «северного сияния» (цвет задаётся в игре) */
+  #glow {
+    top: 160px; width: 256px; height: 256px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,255,255,.45) 35%, rgba(255,255,255,0) 68%);
+  }
+
+  /* Тень под капсулой */
+  #shadow {
+    top: 440px; width: 480px; height: 140px;
+    background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(0,0,0,.45), rgba(0,0,0,0) 70%);
+  }
+</style>
+</head>
+<body>
+  <div class="shot" id="capsule">
+    <div class="core">A</div>
+    <div class="meta"><b>Aura</b><span>Загружаем мир</span></div>
+  </div>
+  <div class="shot" id="ring"></div>
+  <div class="shot" id="glow"></div>
+  <div class="shot" id="shadow"></div>
+</body>
+</html>

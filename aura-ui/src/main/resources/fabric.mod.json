@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "aura-ui",
+  "version": "${version}",
+  "name": "Aura UI",
+  "description": "Интерфейс сборки Aura в стиле лаунчера: экран загрузки игры.",
+  "authors": ["Aura"],
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "mixins": ["aura-ui.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": "1.20.x",
+    "java": ">=17"
+  }
+}

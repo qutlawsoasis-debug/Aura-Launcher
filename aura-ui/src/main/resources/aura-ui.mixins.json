@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.auramc.auraui.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "SplashOverlayMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
