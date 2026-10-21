@@ -8,6 +8,7 @@ using System.Windows;
 using AuraLauncher.Models;
 using AuraLauncher.Services.Implementations;
 using AuraLauncher.Services.Interfaces;
+using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
 
 namespace AuraLauncher.Core.WebBridge;
@@ -23,6 +24,7 @@ public class WebBridge : IDisposable
     private readonly IGameLaunchService? _launchService;
     private readonly ISkinService? _skinService;
     private readonly IFriendService? _friendService;
+    private readonly IReportService? _reportService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -40,6 +42,7 @@ public class WebBridge : IDisposable
         IGameLaunchService? launchService = null,
         ISkinService? skinService = null,
         IFriendService? friendService = null,
+        IReportService? reportService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -51,6 +54,7 @@ public class WebBridge : IDisposable
         _launchService = launchService;
         _skinService = skinService;
         _friendService = friendService;
+        _reportService = reportService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
@@ -245,6 +249,22 @@ public class WebBridge : IDisposable
                     await HandleFriendsRespondAsync(msg);
                     break;
 
+                case "game.setVersion":
+                    await HandleGameSetVersionAsync(msg);
+                    break;
+
+                case "fs.pickGameFolder":
+                    await HandleFsPickGameFolderAsync(msg);
+                    break;
+
+                case "logs.export":
+                    await HandleLogsExportAsync(msg);
+                    break;
+
+                case "cache.clear":
+                    await HandleCacheClearAsync(msg);
+                    break;
+
                 default:
                     _logger($"[WEBBRIDGE: WARN] Unknown command: {msg.Name}");
                     SendError(msg.Id, "unknown.command", $"Command '{msg.Name}' is not implemented yet");
@@ -371,14 +391,17 @@ public class WebBridge : IDisposable
     private void HandleConfigGet(BridgeMessage msg)
     {
         var cfg = _configService.CurrentConfig;
-        _logger($"[WEBBRIDGE] config.get: ram={cfg.RamMb}, preset={cfg.GraphicsPreset}, fx={cfg.VisualEffectsMode}");
+        string normVer = GameVersionProfiles.NormalizeVersion(cfg.SelectedVersion);
+        _logger($"[WEBBRIDGE] config.get: ram={cfg.RamMb}, preset={cfg.GraphicsPreset}, fx={cfg.VisualEffectsMode}, ver={normVer}, dir={cfg.GameDir}");
         SendResponse(msg.Id, msg.Name, new
         {
             nickname = cfg.Nickname,
             ramMb = cfg.RamMb,
             hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
             graphicsPreset = cfg.GraphicsPreset,
-            visualEffectsMode = cfg.VisualEffectsMode
+            visualEffectsMode = cfg.VisualEffectsMode,
+            selectedVersion = normVer,
+            gameDir = cfg.GameDir
         });
     }
 
@@ -1236,5 +1259,145 @@ public class WebBridge : IDisposable
 
         bool success = await _friendService.RespondFriendRequestAsync(fromId, accept);
         SendResponse(msg.Id, msg.Name, new { ok = success });
+    }
+
+    private async Task HandleGameSetVersionAsync(BridgeMessage msg)
+    {
+        if (_gameSessionService.State != GameSessionState.Idle && _gameSessionService.State != GameSessionState.Failed)
+        {
+            _logger("[WEBBRIDGE: WARN] game.setVersion rejected: busy");
+            SendError(msg.Id, msg.Name, "busy");
+            return;
+        }
+
+        string? ver = null;
+        if (msg.Payload is JsonElement elem && elem.TryGetProperty("version", out var verProp))
+        {
+            ver = verProp.GetString()?.Trim();
+        }
+
+        if (ver != GameVersionProfiles.Version120 && ver != GameVersionProfiles.Version121)
+        {
+            _logger($"[WEBBRIDGE: WARN] game.setVersion rejected: invalid_value ({ver})");
+            SendError(msg.Id, msg.Name, "invalid_value");
+            return;
+        }
+
+        await _configService.UpdateConfigAsync(c => c.SelectedVersion = ver);
+        var cfg = _configService.CurrentConfig;
+        string normVer = GameVersionProfiles.NormalizeVersion(cfg.SelectedVersion);
+        _logger($"[WEBBRIDGE] game.setVersion -> {normVer}");
+
+        SendResponse(msg.Id, msg.Name, new
+        {
+            nickname = cfg.Nickname,
+            ramMb = cfg.RamMb,
+            hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
+            graphicsPreset = cfg.GraphicsPreset,
+            visualEffectsMode = cfg.VisualEffectsMode,
+            selectedVersion = normVer,
+            gameDir = cfg.GameDir
+        });
+    }
+
+    private async Task HandleFsPickGameFolderAsync(BridgeMessage msg)
+    {
+        _logger("[WEBBRIDGE] fs.pickGameFolder requested");
+        string currentDir = _configService.CurrentConfig.GameDir;
+        string? chosenFolder = null;
+        bool cancelled = true;
+
+        if (_window != null)
+        {
+            await _window.Dispatcher.InvokeAsync(() =>
+            {
+                var dialog = new OpenFolderDialog
+                {
+                    Title = "Выберите рабочую папку игры",
+                    Multiselect = false,
+                    InitialDirectory = Directory.Exists(currentDir) ? currentDir : Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+                };
+
+                if (dialog.ShowDialog(_window) == true && !string.IsNullOrWhiteSpace(dialog.FolderName))
+                {
+                    chosenFolder = dialog.FolderName;
+                    cancelled = false;
+                }
+            });
+        }
+
+        if (!cancelled && !string.IsNullOrWhiteSpace(chosenFolder))
+        {
+            await _configService.UpdateConfigAsync(c => c.GameDir = chosenFolder);
+            _logger($"[WEBBRIDGE] fs.pickGameFolder selected: {chosenFolder}");
+            SendResponse(msg.Id, msg.Name, new { gameDir = chosenFolder });
+        }
+        else
+        {
+            _logger("[WEBBRIDGE] fs.pickGameFolder cancelled");
+            SendResponse(msg.Id, msg.Name, new { cancelled = true });
+        }
+    }
+
+    private async Task HandleLogsExportAsync(BridgeMessage msg)
+    {
+        _logger("[WEBBRIDGE] logs.export requested");
+        if (_reportService == null)
+        {
+            SendError(msg.Id, msg.Name, "report_service_unavailable");
+            return;
+        }
+
+        string reportPath = await _reportService.GenerateReportZipAsync();
+        _logger($"[WEBBRIDGE] logs.export generated: {reportPath}");
+        SendResponse(msg.Id, msg.Name, new { path = reportPath });
+    }
+
+    private async Task HandleCacheClearAsync(BridgeMessage msg)
+    {
+        _logger("[WEBBRIDGE] cache.clear requested");
+        string instanceDir = GetInstanceDir();
+
+        long freedBytes = await Task.Run(() =>
+        {
+            long total = 0;
+            var logsDir = Path.Combine(instanceDir, "logs");
+            if (Directory.Exists(logsDir))
+            {
+                foreach (var f in Directory.GetFiles(logsDir, "*.log.gz"))
+                {
+                    try
+                    {
+                        var len = new FileInfo(f).Length;
+                        File.Delete(f);
+                        total += len;
+                    }
+                    catch { }
+                }
+            }
+
+            var crashDir = Path.Combine(instanceDir, "crash-reports");
+            if (Directory.Exists(crashDir))
+            {
+                foreach (var f in Directory.GetFiles(crashDir, "*.*"))
+                {
+                    try
+                    {
+                        var fi = new FileInfo(f);
+                        if (fi.LastWriteTimeUtc < DateTime.UtcNow.AddDays(-7))
+                        {
+                            total += fi.Length;
+                            fi.Delete();
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            return total;
+        });
+
+        _logger($"[WEBBRIDGE] cache.clear freed {freedBytes} bytes in {instanceDir}");
+        SendResponse(msg.Id, msg.Name, new { freedBytes = freedBytes });
     }
 }

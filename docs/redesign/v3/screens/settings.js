@@ -21,7 +21,9 @@
     ramMb: 6144,
     hideLauncherWhilePlaying: true,
     graphicsPreset: 'Medium',
-    visualEffectsMode: 'full'
+    visualEffectsMode: 'full',
+    selectedVersion: '1.20.1',
+    gameDir: ''
   };
 
   let ramDebounceTimer = null;
@@ -322,64 +324,148 @@
         if (toggleHide && typeof activeConfig.hideLauncherWhilePlaying === 'boolean') {
           toggleHide.classList.toggle('on', activeConfig.hideLauncherWhilePlaying);
         }
+
+        // Version & Folder hints
+        updateVersionHint(activeConfig.selectedVersion);
+        updateFolderHint(activeConfig.gameDir);
       })
       .catch(() => {});
 
     syncEffectsSegment();
 
+    function updateVersionHint(ver) {
+      const hint = document.getElementById('gameVersionHint');
+      if (hint) {
+        hint.textContent = `Fabric ${ver || '1.20.1'} · Aura Pack 1.2`;
+      }
+    }
+
+    function updateFolderHint(folder) {
+      const hint = document.getElementById('gameFolderHint');
+      if (hint && folder) {
+        hint.textContent = folder;
+        hint.title = folder;
+      }
+    }
+
     // 5. Game version and Folder actions
     const changeVerBtn = document.getElementById('btnChangeVersion');
     if (changeVerBtn) {
-      changeVerBtn.addEventListener('click', () => {
-        if (typeof window.showToast === 'function') {
-          window.showToast('Смена версии будет доступна в лаунчере', 'info');
+      changeVerBtn.onclick = async () => {
+        const nextVer = activeConfig.selectedVersion === '1.21.1' ? '1.20.1' : '1.21.1';
+        changeVerBtn.disabled = true;
+        try {
+          const res = await sendBridge('game.setVersion', { version: nextVer });
+          if (res && res.selectedVersion) {
+            activeConfig.selectedVersion = res.selectedVersion;
+            updateVersionHint(res.selectedVersion);
+            if (typeof window.showToast === 'function') {
+              window.showToast(`Выбрана версия Fabric ${res.selectedVersion}`, 'success');
+            }
+          }
+        } catch (err) {
+          const msg = err.message || String(err);
+          if (typeof window.showToast === 'function') {
+            window.showToast(msg === 'busy' ? 'Нельзя менять версию во время запуска игры' : `Ошибка смены версии: ${msg}`, 'error');
+          }
+        } finally {
+          changeVerBtn.disabled = false;
         }
-      });
+      };
     }
 
     const browseFolderBtn = document.getElementById('btnBrowseFolder');
     if (browseFolderBtn) {
-      browseFolderBtn.addEventListener('click', () => {
-        if (typeof window.showToast === 'function') {
-          window.showToast('Выбор папки будет доступен в лаунчере', 'info');
+      browseFolderBtn.onclick = async () => {
+        browseFolderBtn.disabled = true;
+        try {
+          const res = await sendBridge('fs.pickGameFolder');
+          if (res && res.gameDir) {
+            activeConfig.gameDir = res.gameDir;
+            updateFolderHint(res.gameDir);
+            if (typeof window.showToast === 'function') {
+              window.showToast('Папка игры обновлена', 'success');
+            }
+          }
+        } catch (err) {
+          if (typeof window.showToast === 'function') {
+            window.showToast(`Ошибка выбора папки: ${err.message || err}`, 'error');
+          }
+        } finally {
+          browseFolderBtn.disabled = false;
         }
-      });
+      };
     }
 
     const exportLogsBtn = document.getElementById('btnExportLogs');
     if (exportLogsBtn) {
-      exportLogsBtn.addEventListener('click', () => {
-        if (typeof window.showToast === 'function') {
-          window.showToast('Экспорт отчёта будет доступен в лаунчере', 'info');
+      exportLogsBtn.onclick = async () => {
+        exportLogsBtn.disabled = true;
+        try {
+          const res = await sendBridge('logs.export');
+          if (res && res.path) {
+            if (typeof window.showToast === 'function') {
+              window.showToast('Отчёт сохранён', 'success');
+            }
+          }
+        } catch (err) {
+          if (typeof window.showToast === 'function') {
+            window.showToast(`Ошибка экспорта логов: ${err.message || err}`, 'error');
+          }
+        } finally {
+          exportLogsBtn.disabled = false;
         }
-      });
+      };
     }
 
     // 6. Inline Cache Clear Confirmation (No modals)
     const clearWrap = document.getElementById('clearCacheActionWrap');
-    const startClearBtn = document.getElementById('btnStartClearCache');
-    if (startClearBtn && clearWrap) {
-      startClearBtn.addEventListener('click', () => {
-        clearWrap.innerHTML = `
-          <span class="small dim" style="margin-right:4px">Точно удалить?</span>
-          <button type="button" class="btn sm danger" id="btnConfirmClear">Да, очистить</button>
-          <button type="button" class="btn sm ghost" id="btnCancelClear">Отмена</button>
-        `;
+    function wireCacheClearButton() {
+      const startClearBtn = document.getElementById('btnStartClearCache');
+      if (startClearBtn && clearWrap) {
+        startClearBtn.onclick = () => {
+          clearWrap.innerHTML = `
+            <span class="small dim" style="margin-right:4px">Точно удалить?</span>
+            <button type="button" class="btn sm danger" id="btnConfirmClear">Да, очистить</button>
+            <button type="button" class="btn sm ghost" id="btnCancelClear">Отмена</button>
+          `;
 
-        document.getElementById('btnConfirmClear')?.addEventListener('click', () => {
-          clearWrap.innerHTML = '<button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>';
-          initSettings();
-          if (typeof window.showToast === 'function') {
-            window.showToast('Кэш шейдеров и временные файлы очищены', 'success');
+          const confirmBtn = document.getElementById('btnConfirmClear');
+          const cancelBtn = document.getElementById('btnCancelClear');
+
+          if (confirmBtn) {
+            confirmBtn.onclick = async () => {
+              confirmBtn.disabled = true;
+              if (cancelBtn) cancelBtn.disabled = true;
+              try {
+                const res = await sendBridge('cache.clear');
+                const freedBytes = (res && typeof res.freedBytes === 'number') ? res.freedBytes : 0;
+                const mb = freedBytes / (1024.0 * 1024.0);
+                const toastMsg = mb > 0.05 ? `Освобождено ${mb.toFixed(1)} МБ` : 'Временные файлы не найдены';
+                if (typeof window.showToast === 'function') {
+                  window.showToast(toastMsg, 'info');
+                }
+              } catch (err) {
+                if (typeof window.showToast === 'function') {
+                  window.showToast(`Ошибка очистки кэша: ${err.message || err}`, 'error');
+                }
+              } finally {
+                clearWrap.innerHTML = '<button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>';
+                wireCacheClearButton();
+              }
+            };
           }
-        });
 
-        document.getElementById('btnCancelClear')?.addEventListener('click', () => {
-          clearWrap.innerHTML = '<button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>';
-          initSettings();
-        });
-      });
+          if (cancelBtn) {
+            cancelBtn.onclick = () => {
+              clearWrap.innerHTML = '<button type="button" class="btn sm danger" id="btnStartClearCache">Очистить</button>';
+              wireCacheClearButton();
+            };
+          }
+        };
+      }
     }
+    wireCacheClearButton();
   }
 
   if (document.readyState === 'loading') {

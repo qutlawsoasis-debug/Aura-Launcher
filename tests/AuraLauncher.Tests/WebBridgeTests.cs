@@ -791,4 +791,98 @@ public class WebBridgeTests
         Assert.False(friendService.HasInviteReceivedSubscribers);
     }
 
+    [Fact]
+    public async Task Handle_GameSetVersion_InvalidVersion_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+
+        using var bridge = new WebBridge(null, sessionService, configService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_v_err","type":"command","name":"game.setVersion","payload":{"version":"1.19.4"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("invalid_value", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_GameSetVersion_WhileBusy_ReturnsError()
+    {
+        var configService = new TestConfigService(@"C:\test\dir");
+        var sessionService = new TestGameSessionService();
+        sessionService.State = GameSessionState.Launching;
+
+        using var bridge = new WebBridge(null, sessionService, configService, logger: _ => {});
+
+        BridgeMessage? lastResponse = null;
+        bridge.MessagePosted += msg => lastResponse = msg;
+
+        await bridge.ProcessRawMessageAsync("""{"id":"req_v_busy","type":"command","name":"game.setVersion","payload":{"version":"1.21.1"}}""");
+
+        Assert.NotNull(lastResponse);
+        Assert.Equal("busy", lastResponse.Error);
+    }
+
+    [Fact]
+    public async Task Handle_CacheClear_DeletesOldCrashReportAndLogGz_KeepsFreshCrashReport()
+    {
+        string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "aura_test_cache_" + Guid.NewGuid().ToString("N"));
+        string instanceDir = System.IO.Path.Combine(tempDir, "instances", "1.20.1");
+        string logsDir = System.IO.Path.Combine(instanceDir, "logs");
+        string crashDir = System.IO.Path.Combine(instanceDir, "crash-reports");
+
+        System.IO.Directory.CreateDirectory(logsDir);
+        System.IO.Directory.CreateDirectory(crashDir);
+
+        try
+        {
+            // 1. *.log.gz file (should be deleted)
+            string logGzFile = System.IO.Path.Combine(logsDir, "2026-10-01-1.log.gz");
+            System.IO.File.WriteAllBytes(logGzFile, new byte[100]);
+
+            // 2. Fresh crash report (modified today - should NOT be deleted)
+            string freshCrash = System.IO.Path.Combine(crashDir, "crash-2026-10-21.txt");
+            System.IO.File.WriteAllBytes(freshCrash, new byte[200]);
+
+            // 3. Old crash report (modified 10 days ago - should be deleted)
+            string oldCrash = System.IO.Path.Combine(crashDir, "crash-2026-10-10.txt");
+            System.IO.File.WriteAllBytes(oldCrash, new byte[300]);
+            System.IO.File.SetLastWriteTimeUtc(oldCrash, DateTime.UtcNow.AddDays(-10));
+
+            var configService = new TestConfigService(tempDir);
+            configService.CurrentConfig.SelectedVersion = "1.20.1";
+            var sessionService = new TestGameSessionService();
+            var launchService = new TestBridgeLaunchService
+            {
+                InstanceDirToReturn = instanceDir
+            };
+
+            using var bridge = new WebBridge(null, sessionService, configService, launchService: launchService, logger: _ => {});
+
+            BridgeMessage? lastResponse = null;
+            bridge.MessagePosted += msg => lastResponse = msg;
+
+            await bridge.ProcessRawMessageAsync("""{"id":"req_cc","type":"command","name":"cache.clear"}""");
+
+            Assert.NotNull(lastResponse);
+            Assert.Null(lastResponse.Error);
+
+            var json = System.Text.Json.JsonSerializer.Serialize(lastResponse.Payload);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            long freed = doc.RootElement.GetProperty("freedBytes").GetInt64();
+            Assert.Equal(400, freed); // 100 + 300
+
+            Assert.False(System.IO.File.Exists(logGzFile));
+            Assert.False(System.IO.File.Exists(oldCrash));
+            Assert.True(System.IO.File.Exists(freshCrash));
+        }
+        finally
+        {
+            try { System.IO.Directory.Delete(tempDir, true); } catch { }
+        }
+    }
+
 }

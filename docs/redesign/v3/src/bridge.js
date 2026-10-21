@@ -179,7 +179,9 @@
         ramMb: 6144,
         hideLauncherWhilePlaying: true,
         graphicsPreset: 'Medium',
-        visualEffectsMode: 'full'
+        visualEffectsMode: 'full',
+        selectedVersion: '1.20.1',
+        gameDir: 'C:\\Users\\Player\\AppData\\Roaming\\.aura'
       };
       try {
         const stored = localStorage.getItem('aura_mock_config');
@@ -406,6 +408,45 @@
       const accept = Boolean(payload && payload.accept);
       scope.__mockFriendsData.requests = scope.__mockFriendsData.requests.filter(r => r.id !== fromId);
       return Promise.resolve({ ok: true });
+    }
+
+    if (name === 'game.setVersion') {
+      const ver = payload && payload.version;
+      if (ver !== '1.20.1' && ver !== '1.21.1') {
+        return Promise.reject(new Error('invalid_value'));
+      }
+      let cfg = {
+        nickname: 'Player',
+        ramMb: 6144,
+        hideLauncherWhilePlaying: true,
+        graphicsPreset: 'Medium',
+        visualEffectsMode: 'full',
+        selectedVersion: '1.20.1',
+        gameDir: 'C:\\Users\\Player\\AppData\\Roaming\\.aura'
+      };
+      try {
+        const stored = localStorage.getItem('aura_mock_config');
+        if (stored) {
+          cfg = Object.assign(cfg, JSON.parse(stored));
+        }
+        cfg.selectedVersion = ver;
+        localStorage.setItem('aura_mock_config', JSON.stringify(cfg));
+      } catch (e) {
+        cfg.selectedVersion = ver;
+      }
+      return Promise.resolve(cfg);
+    }
+
+    if (name === 'fs.pickGameFolder') {
+      return Promise.resolve({ gameDir: 'C:\\MockGameFolder\\.aura' });
+    }
+
+    if (name === 'logs.export') {
+      return Promise.resolve({ path: 'C:\\MockReports\\aura-report.zip' });
+    }
+
+    if (name === 'cache.clear') {
+      return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
     return Promise.resolve({ success: true, mock: true });
