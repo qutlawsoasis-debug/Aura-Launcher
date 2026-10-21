@@ -60,7 +60,15 @@ public partial class WebBridge
     private async Task RunStartupFlowAsync()
     {
         // Сразу после обновления повторно не проверяем — как StartupWindow (он пропускается при --updated-restart)
-        if (!_configService.CurrentConfig.AutoUpdateEnabled && !IsUpdatedRestart)
+        // Сразу после обновления — продолжение прошлого окна: без повторной проверки
+        if (IsUpdatedRestart)
+        {
+            SendStartup("updated");
+            SendStartup("ready");
+            return;
+        }
+
+        if (!_configService.CurrentConfig.AutoUpdateEnabled)
         {
             SendStartup("ready");
             return;

@@ -30,6 +30,9 @@ public partial class WebShellWindow : Window
     /// <summary>Лаунчер только что перезапущен после обновления — экран загрузки покажет «Что нового».</summary>
     public bool IsUpdatedRestart { get; init; }
 
+    // Флаг в адресе виден странице до первой отрисовки: заставка сразу продолжает «после обновления»
+    private string StartupQuery => IsUpdatedRestart ? "?updated=1" : string.Empty;
+
     /// <summary>Ссылка aura://, с которой запустили лаунчер (обрабатывается, когда мост готов).</summary>
     public string? StartupProtocolUri { get; set; }
 
@@ -154,7 +157,7 @@ public partial class WebShellWindow : Window
             var res = client.GetAsync("http://localhost:5173").GetAwaiter().GetResult();
             if (res.IsSuccessStatusCode)
             {
-                return Task.FromResult("http://localhost:5173");
+                return Task.FromResult("http://localhost:5173/" + StartupQuery);
             }
         }
         catch { }
@@ -168,7 +171,7 @@ public partial class WebShellWindow : Window
                 "aura.local",
                 uiFolder,
                 CoreWebView2HostResourceAccessKind.Allow);
-            return Task.FromResult("https://aura.local/index.html");
+            return Task.FromResult("https://aura.local/index.html" + StartupQuery);
         }
 
         return Task.FromResult("about:blank");

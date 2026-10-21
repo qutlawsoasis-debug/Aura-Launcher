@@ -34,6 +34,15 @@
     </div>
     <div class="boot-version" id="bootVersion"></div>
   </div>
+  <script>
+    // До первой отрисовки: после обновления заставка сразу продолжает прошлое окно
+    if (/[?&]updated=1/.test(location.search)) {
+      document.getElementById('boot').classList.add('continued');
+      var bs = document.getElementById('bootStatus');
+      bs.textContent = 'Обновление установлено';
+      bs.className += ' ok';
+    }
+  </script>
   <div class="world" id="world"></div>
   <div class="world-dim"></div>
   <div class="shade"></div>

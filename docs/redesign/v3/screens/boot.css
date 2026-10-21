@@ -259,3 +259,21 @@ html[data-effects="off"] .boot-news li,
 
 /* «Что нового» из Настроек — в окне витрины достижений */
 .changelog-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+/* После обновления: окно — продолжение прошлого, без «влёта» капсулы */
+.boot.continued .boot-capsule,
+.boot.continued .boot-bg { animation: none; }
+.boot.continued .boot-bg { transform: scale(1.02); }
+
+/* Перед перезапуском окно мягко гаснет в тот же тёмный фон, с которого стартует новое */
+.boot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #0B0F16;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 900ms var(--ease-out);
+}
+.boot.restarting::after { opacity: 1; }
+.boot.restarting .boot-float { transform: scale(0.97); transition: transform 900ms var(--ease-out); }

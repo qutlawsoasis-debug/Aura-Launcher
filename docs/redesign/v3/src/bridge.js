@@ -504,6 +504,11 @@
       if (name === 'changelog.get') return Promise.resolve({ version: 'beta 1.0.133', changelog });
       if (name === 'startup.skip') { st(100, 'ready'); return Promise.resolve({ ok: true }); }
       if (name === 'startup.retry') { st(50, 'checking'); st(900, 'upToDate'); st(1500, 'ready'); return Promise.resolve({ ok: true }); }
+      if (/[?&]updated=1/.test(location.search)) {
+        st(30, 'updated');
+        st(60, 'ready');
+        return Promise.resolve({ version: 'beta 1.0.136', updated: true, changelog });
+      }
       st(30, 'checking');
       if (mode === 'error') {
         st(900, 'error', { text: 'Не удалось проверить обновления' });

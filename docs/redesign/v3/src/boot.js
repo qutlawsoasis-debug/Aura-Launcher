@@ -27,6 +27,17 @@
     const newsVersion = document.getElementById('bootNewsVersion');
     const newsGo = document.getElementById('bootNewsGo');
 
+    // Окно открылось после обновления: заставка — продолжение прошлого окна,
+    // капсула уже на месте и сразу «Обновление установлено»
+    const continued = /[?&]updated=1/.test(location.search);
+    if (continued) {
+      boot.classList.add('continued');
+      status.textContent = 'Обновление установлено';
+      status.classList.add('ok');
+      status.dataset.html = 'Обновление установлено';
+      status.dataset.tone = 'ok';
+    }
+
     const startedAt = performance.now();
     const effectsOff = () => root.dataset.effects === 'off';
     let finished = false;
@@ -72,7 +83,9 @@
         }
         case 'installing':
           bar.style.transform = 'scaleX(1)';
-          setStatus('Установка и перезапуск' + DOTS);
+          setStatus('Перезапуск' + DOTS);
+          // Окно плавно гаснет — новое после перезапуска продолжит с того же места
+          setTimeout(() => boot.classList.add('restarting'), 300);
           break;
         case 'error':
           setStatus(x.text || 'Ошибка', 'err');
