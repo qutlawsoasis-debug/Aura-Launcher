@@ -191,7 +191,8 @@ html.booting .brand { opacity: 0; }
 }
 .boot-news-title { margin: 12px 0 10px; font-size: 26px; font-weight: 700; }
 .boot-news ul { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.boot-news li {
+.boot-news li,
+.changelog-list li {
   position: relative;
   padding-left: 18px;
   font-size: 15px;
@@ -202,7 +203,8 @@ html.booting .brand { opacity: 0; }
   animation: boot-li 500ms var(--spring) forwards;
   animation-delay: calc(var(--i) * 70ms + 300ms);
 }
-.boot-news li::before {
+.boot-news li::before,
+.changelog-list li::before {
   content: "";
   position: absolute;
   left: 2px;
@@ -231,4 +233,8 @@ html[data-effects="low"] .boot-aurora .a3 { display: none; }
 html[data-effects="off"] .boot *,
 html[data-effects="off"] .boot { animation: none !important; transition: none !important; }
 html[data-effects="off"] .boot-aurora { display: none; }
-html[data-effects="off"] .boot-news li { opacity: 1; transform: none; }
+html[data-effects="off"] .boot-news li,
+.changelog-list li { opacity: 1; transform: none; }
+
+/* «Что нового» из Настроек — в окне витрины достижений */
+.changelog-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }

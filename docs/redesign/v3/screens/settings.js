@@ -289,6 +289,43 @@
       });
     }
 
+    // 4b. Автообновление и статус в Discord — те же правила, что у «Скрывать лаунчер»
+    const boolToggles = [
+      { el: document.getElementById('toggleAutoUpdate'), key: 'autoUpdate' },
+      { el: document.getElementById('toggleDiscordRpc'), key: 'discordRpc' }
+    ].filter(t => t.el);
+    boolToggles.forEach(({ el, key }) => {
+      el.addEventListener('click', () => {
+        setTimeout(() => {
+          const nextVal = el.classList.contains('on');
+          const prevVal = activeConfig[key];
+          if (nextVal === prevVal) return;
+          activeConfig[key] = nextVal;
+          sendBridge('config.set', { key, value: nextVal })
+            .catch(err => {
+              if (typeof window.showToast === 'function') {
+                window.showToast(`Ошибка сохранения настроек: ${err.message}`, 'error');
+              }
+              activeConfig[key] = prevVal;
+              el.classList.toggle('on', prevVal);
+            });
+        }, 0);
+      });
+    });
+
+    // 4c. «Что нового» — та же карточка, что после обновления, но из Настроек
+    const changelogBtn = document.getElementById('btnChangelog');
+    if (changelogBtn) {
+      changelogBtn.addEventListener('click', async () => {
+        try {
+          const res = await sendBridge('changelog.get');
+          if (typeof window.AuraChangelog === 'function') window.AuraChangelog(res);
+        } catch (err) {
+          if (typeof window.showToast === 'function') window.showToast(err.message || 'Список изменений недоступен', 'error');
+        }
+      });
+    }
+
     // Initial load from Bridge (config.get)
     sendBridge('config.get')
       .then(cfg => {
@@ -324,6 +361,9 @@
         if (toggleHide && typeof activeConfig.hideLauncherWhilePlaying === 'boolean') {
           toggleHide.classList.toggle('on', activeConfig.hideLauncherWhilePlaying);
         }
+        boolToggles.forEach(({ el, key }) => {
+          if (typeof activeConfig[key] === 'boolean') el.classList.toggle('on', activeConfig[key]);
+        });
 
         // Version & Folder hints
         updateVersionHint(activeConfig.selectedVersion);

@@ -193,7 +193,7 @@
     }
 
     if (name === 'config.set') {
-      const allowed = ['ramMb', 'hideLauncherWhilePlaying', 'visualEffectsMode'];
+      const allowed = ['ramMb', 'hideLauncherWhilePlaying', 'visualEffectsMode', 'autoUpdate', 'discordRpc'];
       if (!payload || !allowed.includes(payload.key)) {
         return Promise.reject(new Error('invalid_key'));
       }

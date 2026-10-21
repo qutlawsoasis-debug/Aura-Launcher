@@ -48,6 +48,8 @@ public class LauncherConfig
     public string VisualEffectsMode { get; set; } = "full";
     /// <summary>Плащ Aura: "cyan" | "silver" | "none" (виден всем через lobby-api / CustomSkinLoader).</summary>
     public string CapeId { get; set; } = "none";
+    /// <summary>Проверять и ставить обновления лаунчера (при запуске и в фоне).</summary>
+    public bool AutoUpdateEnabled { get; set; } = true;
     public string? JvmArgs { get; set; }
     public bool ShareStatsWithFriends { get; set; } = true;
     public bool ShareAchievementsWithFriends { get; set; } = true;

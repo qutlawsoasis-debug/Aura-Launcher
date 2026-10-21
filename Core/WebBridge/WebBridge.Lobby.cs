@@ -93,6 +93,7 @@ public partial class WebBridge
     {
         SendLobbySnapshotEvent();
         ReportLobbyAchievements();
+        UpdatePresence();
     }
 
     private void OnLobbyPingUpdated(object? sender, int ms) => SendLobbySnapshotEvent();

@@ -24,6 +24,7 @@ public partial class WebShellWindow : Window
     private readonly ILauncherUpdateService? _launcherUpdateService;
     private readonly ICloudLobbyService? _cloudLobbyService;
     private readonly IAchievementService? _achievementService;
+    private readonly IDiscordRpcService? _discordRpcService;
     private WebBridge? _bridge;
 
     /// <summary>Лаунчер только что перезапущен после обновления — экран загрузки покажет «Что нового».</summary>
@@ -42,7 +43,8 @@ public partial class WebShellWindow : Window
         ILobbySessionService? lobbySession = null,
         ILauncherUpdateService? launcherUpdateService = null,
         ICloudLobbyService? cloudLobbyService = null,
-        IAchievementService? achievementService = null)
+        IAchievementService? achievementService = null,
+        IDiscordRpcService? discordRpcService = null)
     {
         InitializeComponent();
         _gameSessionService = gameSessionService;
@@ -58,6 +60,7 @@ public partial class WebShellWindow : Window
         _launcherUpdateService = launcherUpdateService;
         _cloudLobbyService = cloudLobbyService;
         _achievementService = achievementService;
+        _discordRpcService = discordRpcService;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -78,7 +81,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService, _cloudLobbyService, _achievementService)
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService, _cloudLobbyService, _achievementService, _discordRpcService)
             {
                 IsUpdatedRestart = IsUpdatedRestart
             };

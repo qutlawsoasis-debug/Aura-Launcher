@@ -15,16 +15,14 @@ public partial class WebBridge
 
     private void SubscribeAchievements()
     {
-        if (_achievementService == null) return;
-        _achievementService.AchievementUnlocked += OnAchievementUnlocked;
         _gameSessionService.GameStarted += OnGameStartedForAchievements;
+        if (_achievementService != null) _achievementService.AchievementUnlocked += OnAchievementUnlocked;
     }
 
     private void UnsubscribeAchievements()
     {
-        if (_achievementService == null) return;
-        _achievementService.AchievementUnlocked -= OnAchievementUnlocked;
         _gameSessionService.GameStarted -= OnGameStartedForAchievements;
+        if (_achievementService != null) _achievementService.AchievementUnlocked -= OnAchievementUnlocked;
     }
 
     private void ReportAchievement(string eventId, double value = 1.0)
@@ -33,7 +31,11 @@ public partial class WebBridge
         catch (Exception ex) { _logger($"[WEBBRIDGE: WARN] achievement {eventId}: {ex.Message}"); }
     }
 
-    private void OnGameStartedForAchievements(object? sender, System.Diagnostics.Process e) => ReportAchievement("game_launch");
+    private void OnGameStartedForAchievements(object? sender, System.Diagnostics.Process e)
+    {
+        ReportAchievement("game_launch");
+        UpdatePresence();
+    }
 
     private void OnAchievementUnlocked(object? sender, AchievementDefinition def)
     {

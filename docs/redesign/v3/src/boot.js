@@ -160,6 +160,39 @@
     setTimeout(() => { if (!finished && actions.hidden && !boot.classList.contains('downloading')) finish(); }, 20000);
   }
 
+  // «Что нового» по кнопке в Настройках: стеклянное окно со списком изменений версии
+  window.AuraChangelog = function (info) {
+    const items = (info && info.changelog) || [];
+    const sheet = document.createElement('div');
+    sheet.className = 'ach-sheet';
+    sheet.innerHTML = `<div class="ach-panel" style="width:min(560px,100%)">
+      <div class="ach-head">
+        <div style="flex:1"><h2 style="margin:0">Что нового</h2><div class="small dim"></div></div>
+        <button type="button" class="close" aria-label="Закрыть">✕</button>
+      </div>
+      <ul class="changelog-list"></ul>
+    </div>`;
+    sheet.querySelector('.small').textContent = (info && info.version) || '';
+    const list = sheet.querySelector('ul');
+    (items.length ? items : ['Список изменений пуст']).forEach((line, i) => {
+      const li = document.createElement('li');
+      li.style.setProperty('--i', i);
+      li.textContent = String(line).replace(/^\[[^\]]+\]\s*/, '');
+      list.appendChild(li);
+    });
+    const close = () => {
+      sheet.classList.remove('show');
+      setTimeout(() => sheet.remove(), 320);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+    sheet.querySelector('.close').addEventListener('click', close);
+    sheet.addEventListener('click', e => { if (e.target === sheet) close(); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(sheet);
+    requestAnimationFrame(() => sheet.classList.add('show'));
+  };
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initBoot);
   } else {

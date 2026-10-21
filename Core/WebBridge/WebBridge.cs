@@ -29,6 +29,7 @@ public partial class WebBridge : IDisposable
     private readonly ILauncherUpdateService? _launcherUpdateService;
     private readonly ICloudLobbyService? _cloudLobbyService;
     private readonly IAchievementService? _achievementService;
+    private readonly IDiscordRpcService? _discordRpcService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -51,6 +52,7 @@ public partial class WebBridge : IDisposable
         ILauncherUpdateService? launcherUpdateService = null,
         ICloudLobbyService? cloudLobbyService = null,
         IAchievementService? achievementService = null,
+        IDiscordRpcService? discordRpcService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -84,6 +86,7 @@ public partial class WebBridge : IDisposable
         SubscribeLobby();
         _achievementService = achievementService;
         SubscribeAchievements();
+        _discordRpcService = discordRpcService;
         _launcherUpdateService = launcherUpdateService;
         _cloudLobbyService = cloudLobbyService;
     }
@@ -113,6 +116,7 @@ public partial class WebBridge : IDisposable
         // Отправка начального статуса окна
         SendWindowState();
         StartUpdatePolling();
+        StartPresence();
 
         // Отправка начального статуса
         SendEvent("game.status", new
@@ -150,6 +154,7 @@ public partial class WebBridge : IDisposable
     {
         _logger($"[WEBBRIDGE] GameExited -> exitCode={e.ExitCode}");
         ReportAchievement("game_exit");
+        UpdatePresence();
         SendEvent("game.status", new
         {
             state = e.ExitCode == 0 ? "idle" : "failed",
@@ -585,7 +590,9 @@ public partial class WebBridge : IDisposable
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
             selectedVersion = normVer,
-            gameDir = cfg.GameDir
+            gameDir = cfg.GameDir,
+            autoUpdate = cfg.AutoUpdateEnabled,
+            discordRpc = cfg.DiscordRpcEnabled
         });
     }
 
@@ -671,6 +678,32 @@ public partial class WebBridge : IDisposable
                 break;
             }
 
+            case "autoUpdate":
+            case "discordRpc":
+            {
+                if (valProp.ValueKind != JsonValueKind.True && valProp.ValueKind != JsonValueKind.False)
+                {
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                bool on = valProp.GetBoolean();
+                if (key == "autoUpdate")
+                {
+                    await _configService.UpdateConfigAsync(c => c.AutoUpdateEnabled = on);
+                    if (on && _updatePollCts == null) StartUpdatePolling();
+                    if (!on) StopUpdatePolling();
+                }
+                else
+                {
+                    await _configService.UpdateConfigAsync(c => c.DiscordRpcEnabled = on);
+                    _discordRpcService?.UpdateSettings();
+                    if (on) UpdatePresence();
+                }
+                _logger($"[WEBBRIDGE] config.set {key} -> {on}");
+                break;
+            }
+
             default:
                 _logger($"[WEBBRIDGE: WARN] config.set rejected: unknown key '{key}'");
                 SendError(msg.Id, msg.Name, "invalid_key");
@@ -684,7 +717,9 @@ public partial class WebBridge : IDisposable
             ramMb = cfg.RamMb,
             hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
             graphicsPreset = cfg.GraphicsPreset,
-            visualEffectsMode = cfg.VisualEffectsMode
+            visualEffectsMode = cfg.VisualEffectsMode,
+            autoUpdate = cfg.AutoUpdateEnabled,
+            discordRpc = cfg.DiscordRpcEnabled
         });
     }
 
@@ -1486,7 +1521,9 @@ public partial class WebBridge : IDisposable
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
             selectedVersion = normVer,
-            gameDir = cfg.GameDir
+            gameDir = cfg.GameDir,
+            autoUpdate = cfg.AutoUpdateEnabled,
+            discordRpc = cfg.DiscordRpcEnabled
         });
     }
 

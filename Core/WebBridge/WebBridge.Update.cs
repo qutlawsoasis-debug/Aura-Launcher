@@ -33,6 +33,7 @@ public partial class WebBridge
     private void StartUpdatePolling()
     {
         if (_launcherUpdateService == null || !_launcherUpdateService.IsInstalled) return;
+        if (!_configService.CurrentConfig.AutoUpdateEnabled) return;
 
         _updatePollCts = new CancellationTokenSource();
         var token = _updatePollCts.Token;
