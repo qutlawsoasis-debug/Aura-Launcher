@@ -13,6 +13,7 @@
 # Aura Launcher — Правила проекта для ИИ-агента (AGENTS.md)
 
 Полный контекст проекта, версий и путей находится в [docs/HANDOFF.md](docs/HANDOFF.md).
+Что менялось без тебя 21.10.2026 (v3, WebView2, мост, сервер) — [docs/redesign/reports/handoff-2026-10-21.md](docs/redesign/reports/handoff-2026-10-21.md). Прочитай перед любой задачей по v3 или WebView2.
 Эталон дизайна и вёрстки — в [DESIGN.md](DESIGN.md).
 
 ---
