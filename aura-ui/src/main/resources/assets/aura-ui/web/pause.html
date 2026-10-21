@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Aura — Пауза</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="./game.css">
+</head>
+<body>
+  <!-- Underneath: in-game world -->
+  <div class="world-viewport" style="background-image: url('./images/bg_1.jpg');"></div>
+
+  <!-- Static pause blur & darken overlay -->
+  <div class="pause-overlay">
+    <div class="pause-panel">
+      <div class="pause-title">Игра на паузе</div>
+
+      <div class="pause-actions">
+        <button class="pause-btn primary" type="button" data-action="resume">
+          <span>Продолжить</span>
+        </button>
+
+        <button class="pause-btn" type="button" data-action="invite">
+          <span>Пригласить друга</span>
+        </button>
+
+        <button class="pause-btn" type="button" data-action="open_lan">
+          <span>Открыть для сети</span>
+        </button>
+
+        <button class="pause-btn" type="button" data-action="settings">
+          <span>Настройки</span>
+        </button>
+
+        <button class="pause-btn danger" type="button" data-action="main_menu">
+          <span>В главное меню</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function sendAction(action) {
+      if (window.cefQuery) {
+        window.cefQuery({
+          request: action,
+          persistent: false,
+          onSuccess: function(res) {},
+          onFailure: function(errCode, errMsg) {
+            console.error('Action failed:', errCode, errMsg);
+          }
+        });
+      } else {
+        console.log('cefQuery not available, action:', action);
+      }
+    }
+
+    document.querySelectorAll('.pause-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.getAttribute('data-action');
+        if (action) {
+          sendAction(action);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
