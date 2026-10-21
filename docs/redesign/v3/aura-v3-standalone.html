@@ -1005,16 +1005,24 @@ html[data-effects="full"] .wincontrols {
 .mapwrap {
   position: relative;
   flex: 1;
-  margin: 0 -28px;
-  overflow: hidden;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
+  opacity: 0;
+  animation: mapFadeIn var(--dur-2) var(--ease-out) forwards;
+}
+
+@keyframes mapFadeIn {
+  to { opacity: 1; }
 }
 
 #mapCanvas {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  display: block;
   cursor: grab;
 }
 
@@ -1031,6 +1039,7 @@ html[data-effects="full"] .wincontrols {
   padding: 6px 16px;
   background: rgba(44, 46, 54, 0.72);
   border: 1px solid var(--line);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   z-index: 5;
 }
 
@@ -1101,6 +1110,16 @@ html[data-effects="full"] .wincontrols {
   flex-direction: column;
   align-items: center;
   flex: none;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: viewerEnter var(--dur-3) var(--spring) forwards;
+}
+
+@keyframes viewerEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 #skinCanvas3D {
@@ -1121,34 +1140,77 @@ html[data-effects="full"] .wincontrols {
 
 .capes {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cape {
-  width: 52px;
-  height: 80px;
-  border-radius: 12px;
-  border: 2px solid transparent;
+  width: 64px;
+  height: 88px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
   background: var(--fill);
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  color: var(--ink-3);
-  transition: border-color 0.25s, transform 0.4s var(--spring);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out),
+              transform var(--dur-3) var(--spring),
+              background var(--dur-2) var(--ease-out);
 }
 
 .cape:hover {
-  transform: translateY(-3px);
+  background: var(--fill-2);
+  transform: translateY(-2px);
 }
 
 .cape.on {
   border-color: var(--accent);
+  background: var(--fill-2);
+  transform: scale(1.03);
+  box-shadow: 0 4px 14px rgba(100, 210, 255, 0.2);
 }
 
-.cape .sw {
-  width: 28px;
+.cape-thumb {
+  width: 32px;
   height: 48px;
-  border-radius: 4px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cape-thumb-cyan {
+  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAA1ElEQVR4nOXDYWcCAQAG4Pf3lGxSZprZJCXNTDNLsp8QEX2IGPsQWSmO4zjKUiqOiNgszZLjOMqIGCP6F+9+yPvw4Gl7pHIU/AOVI+/9UTly7i+V43G1p3I8fO2oHPeLHypH9mND5bib+1SO25lH5biZulSOjLOmcqTH31SO1HBJ5Uj2P6kcid47lSNuz6kc19aMynFlTqkcl4ZD5bhoT6gcseaIynHeGFA5zupvVI7oS5fKEXm2qRzhmkXlOK2aVI6TikHlCJU7VI5gqUXlCBRfqfwfEgr17SzBjQEAAAAASUVORK5CYII=') -2px -2px / 64px 32px no-repeat;
+  background-size: 128px 64px;
+  background-position: -2px -2px;
+}
+
+.cape-thumb-silver {
+  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAAu0lEQVR4nOXDiwbCAAAF0Pu/ESUiYpqmqZRSxpimlKX0fr80TTVGRL9z+5B7OHgnPypHFH+pHOHzQ+W4PRIqx/keUzkO1xeVY3uKqByrfUjlmG9uVI7p8kLlGM+OVI7RZEflGARrKoc/XFA5vP6MyuH2JlQOxwuoHB13SOVoOQMqR6PjUzlqLY/KYTdcKodVc6gcpt2lchhWm8pRNJtUjoJRp3Lki1UqR65QoXJk8mUqRzpXonKksgaV/wEyuBIasfDO4AAAAABJRU5ErkJggg==') -2px -2px / 64px 32px no-repeat;
+  background-size: 128px 64px;
+  background-position: -2px -2px;
+}
+
+.cape-thumb-none {
+  background: var(--fill-2);
+  color: var(--ink-3);
+}
+
+.cape-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cape.on .cape-title {
+  color: #fff;
 }
 
 @media (max-height: 820px) {
@@ -1163,13 +1225,13 @@ html[data-effects="full"] .wincontrols {
   }
 
   .wardrobe-controls-col .capes .cape {
-    height: 64px;
-    width: 44px;
+    height: 78px;
+    width: 58px;
   }
 
-  .wardrobe-controls-col .capes .cape .sw {
-    height: 38px;
-    width: 22px;
+  .wardrobe-controls-col .capes .cape-thumb {
+    height: 40px;
+    width: 28px;
   }
 }
 
@@ -1445,9 +1507,18 @@ html[data-effects="full"] .wincontrols {
   <div class="wardrobe-controls-col" style="flex:1">
     <div class="small dim" style="margin-bottom:8px">Плащ</div>
     <div class="capes" id="capeSelector">
-      <button type="button" class="cape on" data-cape="cyan" title="Лазурный плащ"><span class="sw" style="background:linear-gradient(160deg,#5FD4E8,#2A6F8E)"></span></button>
-      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ"><span class="sw" style="background:linear-gradient(160deg,#C9CDD6,#6B7280)"></span></button>
-      <button type="button" class="cape" data-cape="none" title="Без плаща">нет</button>
+      <button type="button" class="cape on" data-cape="cyan" title="Плащ Aura">
+        <div class="cape-thumb cape-thumb-cyan"></div>
+        <span class="cape-title">Aura</span>
+      </button>
+      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ">
+        <div class="cape-thumb cape-thumb-silver"></div>
+        <span class="cape-title">Серебряный</span>
+      </button>
+      <button type="button" class="cape" data-cape="none" title="Без плаща">
+        <div class="cape-thumb cape-thumb-none">✕</div>
+        <span class="cape-title">Без плаща</span>
+      </button>
     </div>
 
     <div class="row">
@@ -1470,7 +1541,10 @@ html[data-effects="full"] .wincontrols {
     </div>
 
     <div class="row">
-      <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="face" id="skinFacePreview" style="--s:28px"></div>
+        <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      </div>
       <label class="btn sm" style="cursor:pointer">
         Загрузить
         <input type="file" id="skinFileInput" accept="image/png" style="display:none">
@@ -4778,16 +4852,25 @@ window.AURA_DEMO_DATA = (function () {
       cv.width = w;
       cv.height = h;
     }
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
   }
 
   function drawMap() {
     if (!ctx || !cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cssW = cv.width / dpr;
+    const cssH = cv.height / dpr;
+
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#0b1622';
-    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillRect(0, 0, cssW, cssH);
 
-    const ox = cv.width / 2 - view.x * view.z;
-    const oy = cv.height / 2 - view.y * view.z;
+    const ox = cssW / 2 - view.x * view.z;
+    const oy = cssH / 2 - view.y * view.z;
     ctx.drawImage(tiles, ox, oy, N * view.z, N * view.z);
 
     pois.forEach(p => {
@@ -5186,15 +5269,45 @@ window.AURA_DEMO_DATA = (function () {
     silver: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAgCAYAAACinX6EAAAAu0lEQVR4nOXDiwbCAAAF0Pu/ESUiYpqmqZRSxpimlKX0fr80TTVGRL9z+5B7OHgnPypHFH+pHOHzQ+W4PRIqx/keUzkO1xeVY3uKqByrfUjlmG9uVI7p8kLlGM+OVI7RZEflGARrKoc/XFA5vP6MyuH2JlQOxwuoHB13SOVoOQMqR6PjUzlqLY/KYTdcKodVc6gcpt2lchhWm8pRNJtUjoJRp3Lki1UqR65QoXJk8mUqRzpXonKksgaV/wEyuBIasfDO4AAAAABJRU5ErkJggg=='
   };
 
+  let turnBackTimer = null;
+
+  function turnModelBack() {
+    if (!viewer || !viewer.playerObject) return;
+    clearTimeout(turnBackTimer);
+    viewer.autoRotate = false;
+
+    // Smoothly rotate model back to show cape
+    viewer.playerObject.rotation.y = Math.PI * 0.95; // ~170 deg
+
+    turnBackTimer = setTimeout(() => {
+      const effects = document.documentElement.dataset.effects;
+      if (viewer && viewer.playerObject) {
+        viewer.playerObject.rotation.y = 0;
+        if (effects !== 'low' && effects !== 'off' && !isHovered) {
+          viewer.autoRotate = true;
+        }
+      }
+    }, 1500);
+  }
+
   function initSkinview() {
     const canvas = document.getElementById('skinCanvas3D');
     if (!canvas || typeof skinview3d === 'undefined') return;
 
-    // Create skinview3d viewer instance with capped pixelRatio
+    if (viewer) {
+      updateRenderPauseState();
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width > 50 ? rect.width : 260;
+    const h = rect.height > 50 ? rect.height : 380;
+
+    // Create skinview3d viewer instance
     viewer = new skinview3d.SkinViewer({
       canvas: canvas,
-      width: 260,
-      height: 380,
+      width: w,
+      height: h,
       skin: DEFAULT_SKIN
     });
 
@@ -5205,6 +5318,11 @@ window.AURA_DEMO_DATA = (function () {
         viewer.composer.setPixelRatio(cappedRatio);
       }
     }
+
+    // Set preserveDrawingBuffer to true or force initial render once skin loads
+    viewer.loadSkin(DEFAULT_SKIN).then(() => {
+      viewer.render();
+    }).catch(() => {});
 
     viewer.fov = 70;
     viewer.zoom = 0.9;
@@ -5224,13 +5342,19 @@ window.AURA_DEMO_DATA = (function () {
 
     viewer.animation = idleAnimation;
 
-    // Throttled render loop: ~30 FPS for 'idle' (Стоит), 60 FPS for 'walk'/'run' (Идёт/Бежит)
+    // Throttled render loop with single-frame render in 'off' mode
     const originalDraw = viewer.draw.bind(viewer);
     let lastRenderTime = 0;
     viewer.draw = function () {
+      const effects = document.documentElement.dataset.effects;
+      if (effects === 'off') {
+        originalDraw();
+        return;
+      }
+
       const now = performance.now();
       const targetFps = (activeAnimationMode === 'idle' && !isHovered) ? 30 : 60;
-      const minInterval = 1000 / targetFps - 2; // small epsilon for smooth vsync
+      const minInterval = 1000 / targetFps - 2;
 
       if (now - lastRenderTime >= minInterval) {
         lastRenderTime = now;
@@ -5247,6 +5371,19 @@ window.AURA_DEMO_DATA = (function () {
       viewer.controls.enableZoom = true;
       viewer.controls.minDistance = 15;
       viewer.controls.maxDistance = 60;
+    }
+
+    // Resize observer on wardrobe container to update viewer size dynamically
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        if (viewer && canvas) {
+          const r = canvas.getBoundingClientRect();
+          if (r.width > 50 && r.height > 50) {
+            viewer.setSize(r.width, r.height);
+          }
+        }
+      });
+      ro.observe(canvas);
     }
 
     // Hover walking animation transition
@@ -5267,7 +5404,7 @@ window.AURA_DEMO_DATA = (function () {
       applyAnimationMode(activeAnimationMode);
     });
 
-    // Animation Segment buttons (Стоит / Идёт / Бежит)
+    // Animation Segment buttons
     document.querySelectorAll('.skin-anim-seg button').forEach(btn => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.anim;
@@ -5276,18 +5413,25 @@ window.AURA_DEMO_DATA = (function () {
       });
     });
 
-    // Model type (Steve / Alex slim)
+    // Model type
     document.querySelectorAll('#modelTypeSeg button').forEach(btn => {
       btn.addEventListener('click', () => {
         const model = btn.dataset.model || 'default';
         if (viewer && viewer.playerObject) {
           viewer.playerObject.skin.modelType = model;
+          if (document.documentElement.dataset.effects === 'off') {
+            viewer.render();
+          }
         }
       });
     });
 
-    // Cape selector
+    // Cape selector with turnModelBack on hover and click
     document.querySelectorAll('#capeSelector .cape').forEach(btn => {
+      btn.addEventListener('mouseenter', () => {
+        turnModelBack();
+      });
+
       btn.addEventListener('click', () => {
         document.querySelectorAll('#capeSelector .cape').forEach(b => b.classList.remove('on'));
         btn.classList.add('on');
@@ -5297,12 +5441,18 @@ window.AURA_DEMO_DATA = (function () {
         } else if (CAPE_MAP[capeType]) {
           viewer.loadCape(CAPE_MAP[capeType]).catch(() => {});
         }
+        turnModelBack();
+        if (document.documentElement.dataset.effects === 'off') {
+          setTimeout(() => viewer && viewer.render(), 100);
+        }
       });
     });
 
-    // Custom skin file upload
+    // Custom skin file upload with face preview update
     const skinFileInput = document.getElementById('skinFileInput');
     const skinNameLabel = document.getElementById('currentSkinFileName');
+    const skinFacePreview = document.getElementById('skinFacePreview');
+
     if (skinFileInput) {
       skinFileInput.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
@@ -5311,12 +5461,23 @@ window.AURA_DEMO_DATA = (function () {
         const reader = new FileReader();
         reader.onload = (ev) => {
           const dataUrl = ev.target.result;
+          canvas.style.transition = 'opacity var(--dur-1) var(--ease-out)';
+          canvas.style.opacity = '0.3';
+
           viewer.loadSkin(dataUrl).then(() => {
+            canvas.style.opacity = '1';
             if (skinNameLabel) skinNameLabel.textContent = file.name;
+            if (skinFacePreview) {
+              skinFacePreview.style.backgroundImage = `url('${dataUrl}'), url('${dataUrl}')`;
+            }
+            if (document.documentElement.dataset.effects === 'off') {
+              viewer.render();
+            }
             if (typeof window.showToast === 'function') {
               window.showToast('Скин успешно загружен', 'success');
             }
           }).catch(() => {
+            canvas.style.opacity = '1';
             if (typeof window.showToast === 'function') {
               window.showToast('Не удалось загрузить скин', 'error');
             }
@@ -5341,23 +5502,48 @@ window.AURA_DEMO_DATA = (function () {
 
   function applyAnimationMode(mode) {
     if (!viewer) return;
+    const effects = document.documentElement.dataset.effects;
+    if (effects === 'off') {
+      viewer.animation = null;
+      viewer.render();
+      return;
+    }
     if (mode === 'idle') viewer.animation = idleAnimation;
     else if (mode === 'walk') viewer.animation = walkingAnimation;
     else if (mode === 'run') viewer.animation = runningAnimation;
   }
 
   function updateRenderPauseState() {
-    if (!viewer) return;
     const isWardrobeOpen = document.body.classList.contains('is-open') && 
       document.querySelector('[data-l="wardrobe"]')?.classList.contains('on');
     const effects = document.documentElement.dataset.effects;
     const isHidden = document.hidden;
 
-    if (!isWardrobeOpen || isHidden || effects === 'off') {
+    if (isWardrobeOpen && !viewer) {
+      initSkinview();
+      return;
+    }
+
+    if (!viewer) return;
+
+    if (!isWardrobeOpen || isHidden) {
       viewer.renderPaused = true;
-    } else {
+    } else if (effects === 'off') {
+      // In 'off' mode: static single frame render, no animations, no autoRotate
+      viewer.renderPaused = true;
+      viewer.autoRotate = false;
+      viewer.animation = null;
+      viewer.render();
+    } else if (effects === 'low') {
+      // In 'low' mode: animation active, autoRotate off
       viewer.renderPaused = false;
-      viewer.autoRotate = (effects !== 'low' && !isHovered);
+      viewer.autoRotate = false;
+      applyAnimationMode(activeAnimationMode);
+    } else {
+      // In 'full' mode: full animations + autoRotate
+      viewer.renderPaused = false;
+      viewer.autoRotate = !isHovered;
+      applyAnimationMode(activeAnimationMode);
     }
   }
 

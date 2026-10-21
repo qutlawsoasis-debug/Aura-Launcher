@@ -178,26 +178,56 @@ async function runSmokeForTarget(target) {
     await new Promise(r => setTimeout(r, target.effects === 'off' ? 150 : 800));
     result.sectionsVisited++;
 
-    // If map, check canvas size
+    // If map, check canvas size, wrap match and insets
     if (sec === 'map') {
       const mapCheck = await sendSession('Runtime.evaluate', {
         expression: `(() => {
           if (typeof window.renderMapNow === 'function') window.renderMapNow();
+          const wrap = document.querySelector('.mapwrap');
           const cv = document.getElementById('mapCanvas');
-          if (!cv) return null;
-          const rect = cv.getBoundingClientRect();
+          const list = document.querySelector('.map-list');
+          const zoom = document.querySelector('.map-zoom');
+          if (!wrap || !cv) return null;
+          const wrapRect = wrap.getBoundingClientRect();
+          const cvRect = cv.getBoundingClientRect();
           const dpr = window.devicePixelRatio || 1;
+
+          const rectMatches = Math.abs(wrapRect.width - cvRect.width) <= 2 && Math.abs(wrapRect.height - cvRect.height) <= 2;
+          const listInside = list ? (list.getBoundingClientRect().left >= wrapRect.left - 2) : true;
+          const zoomInside = zoom ? (zoom.getBoundingClientRect().right <= wrapRect.right + 2) : true;
+
           return {
-            cssWidth: Math.round(rect.width),
-            cssHeight: Math.round(rect.height),
-            bufWidth: cv.width,
-            bufHeight: cv.height,
-            isMatch: cv.width > 300 && cv.height > 200 && Math.abs(cv.width - Math.round(rect.width * dpr)) <= 4
+            rectMatches,
+            listInside,
+            zoomInside,
+            isMatch: rectMatches && listInside && zoomInside && cv.width > 300 && cv.height > 200
           };
         })()`,
         returnByValue: true
       });
       result.mapCanvasSizeOk = !!mapCheck.result.value?.isMatch;
+    }
+
+    // If wardrobe, test that skinview3d renders non-transparent pixels
+    if (sec === 'wardrobe') {
+      const skinRenderCheck = await sendSession('Runtime.evaluate', {
+        expression: `(() => {
+          const cv = document.getElementById('skinCanvas3D');
+          if (!cv) return false;
+          const v = window.AuraWardrobe?.viewer;
+          if (v && typeof v.render === 'function') v.render();
+          const gl = cv.getContext('webgl2') || cv.getContext('webgl');
+          if (!gl) return false;
+          const pixels = new Uint8Array(4);
+          gl.readPixels(Math.floor(cv.width / 2), Math.floor(cv.height / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          // Check center or slightly below center
+          if (pixels[3] > 0) return true;
+          gl.readPixels(Math.floor(cv.width / 2), Math.floor(cv.height * 0.4), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+          return pixels[3] > 0;
+        })()`,
+        returnByValue: true
+      });
+      result.skinview3dOk = result.skinview3dOk && Boolean(skinRenderCheck.result.value);
     }
 
     // Inspect and click elements inside active .sec-body

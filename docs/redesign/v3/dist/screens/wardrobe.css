@@ -10,6 +10,16 @@
   flex-direction: column;
   align-items: center;
   flex: none;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: viewerEnter var(--dur-3) var(--spring) forwards;
+}
+
+@keyframes viewerEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 #skinCanvas3D {
@@ -30,34 +40,77 @@
 
 .capes {
   display: flex;
-  gap: 10px;
+  gap: 12px;
 }
 
 .cape {
-  width: 52px;
-  height: 80px;
-  border-radius: 12px;
-  border: 2px solid transparent;
+  width: 64px;
+  height: 88px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
   background: var(--fill);
-  display: grid;
-  place-items: center;
-  font-size: 12px;
-  color: var(--ink-3);
-  transition: border-color 0.25s, transform 0.4s var(--spring);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out),
+              transform var(--dur-3) var(--spring),
+              background var(--dur-2) var(--ease-out);
 }
 
 .cape:hover {
-  transform: translateY(-3px);
+  background: var(--fill-2);
+  transform: translateY(-2px);
 }
 
 .cape.on {
   border-color: var(--accent);
+  background: var(--fill-2);
+  transform: scale(1.03);
+  box-shadow: 0 4px 14px rgba(100, 210, 255, 0.2);
 }
 
-.cape .sw {
-  width: 28px;
+.cape-thumb {
+  width: 32px;
   height: 48px;
-  border-radius: 4px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cape-thumb-cyan {
+  background: url('../images/cape_cyan.png') -2px -2px / 64px 32px no-repeat;
+  background-size: 128px 64px;
+  background-position: -2px -2px;
+}
+
+.cape-thumb-silver {
+  background: url('../images/cape_silver.png') -2px -2px / 64px 32px no-repeat;
+  background-size: 128px 64px;
+  background-position: -2px -2px;
+}
+
+.cape-thumb-none {
+  background: var(--fill-2);
+  color: var(--ink-3);
+}
+
+.cape-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cape.on .cape-title {
+  color: #fff;
 }
 
 @media (max-height: 820px) {
@@ -72,12 +125,12 @@
   }
 
   .wardrobe-controls-col .capes .cape {
-    height: 64px;
-    width: 44px;
+    height: 78px;
+    width: 58px;
   }
 
-  .wardrobe-controls-col .capes .cape .sw {
-    height: 38px;
-    width: 22px;
+  .wardrobe-controls-col .capes .cape-thumb {
+    height: 40px;
+    width: 28px;
   }
 }

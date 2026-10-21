@@ -138,9 +138,19 @@ async function build() {
   coreCss = coreCss.replace(/url\(['"]?\.\.\/fonts\/Onest\.woff2['"]?\)\s+format\(['"]woff2['"]\)/g, `url('data:font/woff2;charset=utf-8;base64,${onestBase64}') format('woff2')`);
 
   const screenCssFiles = ['play.css', 'map.css', 'lobby.css', 'friends.css', 'wardrobe.css', 'workshop.css', 'settings.css'];
+  const cyanCapeBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'cape_cyan.png')).toString('base64');
+  const silverCapeBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'cape_silver.png')).toString('base64');
+  const cyanCapeDataUrl = `data:image/png;base64,${cyanCapeBase64}`;
+  const silverCapeDataUrl = `data:image/png;base64,${silverCapeBase64}`;
+
   let screensCombinedCss = '';
   for (const sc of screenCssFiles) {
     let cssContent = fs.readFileSync(path.join(BASE_DIR, 'screens', sc), 'utf-8');
+    if (sc === 'wardrobe.css') {
+      cssContent = cssContent
+        .replace(/url\(['"]?\.\.\/images\/cape_cyan\.png['"]?\)/g, `url('${cyanCapeDataUrl}')`)
+        .replace(/url\(['"]?\.\.\/images\/cape_silver\.png['"]?\)/g, `url('${silverCapeDataUrl}')`);
+    }
     screensCombinedCss += `\n/* === SCREEN CSS: ${sc} === */\n` + cssContent;
   }
 
@@ -189,8 +199,6 @@ ${screensCombinedCss}
   }
 
   // Base64 inline capes if present in wardrobe.js
-  const cyanCapeBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'cape_cyan.png')).toString('base64');
-  const silverCapeBase64 = fs.readFileSync(path.join(BASE_DIR, 'assets', 'images', 'cape_silver.png')).toString('base64');
   combinedJs = combinedJs.replace(/assets\/images\/cape_cyan\.png/g, `data:image/png;base64,${cyanCapeBase64}`);
   combinedJs = combinedJs.replace(/assets\/images\/cape_silver\.png/g, `data:image/png;base64,${silverCapeBase64}`);
 

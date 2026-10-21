@@ -2,16 +2,24 @@
 .mapwrap {
   position: relative;
   flex: 1;
-  margin: 0 -28px;
-  overflow: hidden;
+  width: 100%;
   height: 100%;
+  overflow: hidden;
+  opacity: 0;
+  animation: mapFadeIn var(--dur-2) var(--ease-out) forwards;
+}
+
+@keyframes mapFadeIn {
+  to { opacity: 1; }
 }
 
 #mapCanvas {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  display: block;
   cursor: grab;
 }
 
@@ -28,6 +36,7 @@
   padding: 6px 16px;
   background: rgba(44, 46, 54, 0.72);
   border: 1px solid var(--line);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
   z-index: 5;
 }
 

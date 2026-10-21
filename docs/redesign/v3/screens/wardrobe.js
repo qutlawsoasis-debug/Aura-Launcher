@@ -19,15 +19,45 @@
     silver: 'assets/images/cape_silver.png'
   };
 
+  let turnBackTimer = null;
+
+  function turnModelBack() {
+    if (!viewer || !viewer.playerObject) return;
+    clearTimeout(turnBackTimer);
+    viewer.autoRotate = false;
+
+    // Smoothly rotate model back to show cape
+    viewer.playerObject.rotation.y = Math.PI * 0.95; // ~170 deg
+
+    turnBackTimer = setTimeout(() => {
+      const effects = document.documentElement.dataset.effects;
+      if (viewer && viewer.playerObject) {
+        viewer.playerObject.rotation.y = 0;
+        if (effects !== 'low' && effects !== 'off' && !isHovered) {
+          viewer.autoRotate = true;
+        }
+      }
+    }, 1500);
+  }
+
   function initSkinview() {
     const canvas = document.getElementById('skinCanvas3D');
     if (!canvas || typeof skinview3d === 'undefined') return;
 
-    // Create skinview3d viewer instance with capped pixelRatio
+    if (viewer) {
+      updateRenderPauseState();
+      return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width > 50 ? rect.width : 260;
+    const h = rect.height > 50 ? rect.height : 380;
+
+    // Create skinview3d viewer instance
     viewer = new skinview3d.SkinViewer({
       canvas: canvas,
-      width: 260,
-      height: 380,
+      width: w,
+      height: h,
       skin: DEFAULT_SKIN
     });
 
@@ -38,6 +68,11 @@
         viewer.composer.setPixelRatio(cappedRatio);
       }
     }
+
+    // Set preserveDrawingBuffer to true or force initial render once skin loads
+    viewer.loadSkin(DEFAULT_SKIN).then(() => {
+      viewer.render();
+    }).catch(() => {});
 
     viewer.fov = 70;
     viewer.zoom = 0.9;
@@ -57,13 +92,19 @@
 
     viewer.animation = idleAnimation;
 
-    // Throttled render loop: ~30 FPS for 'idle' (Стоит), 60 FPS for 'walk'/'run' (Идёт/Бежит)
+    // Throttled render loop with single-frame render in 'off' mode
     const originalDraw = viewer.draw.bind(viewer);
     let lastRenderTime = 0;
     viewer.draw = function () {
+      const effects = document.documentElement.dataset.effects;
+      if (effects === 'off') {
+        originalDraw();
+        return;
+      }
+
       const now = performance.now();
       const targetFps = (activeAnimationMode === 'idle' && !isHovered) ? 30 : 60;
-      const minInterval = 1000 / targetFps - 2; // small epsilon for smooth vsync
+      const minInterval = 1000 / targetFps - 2;
 
       if (now - lastRenderTime >= minInterval) {
         lastRenderTime = now;
@@ -80,6 +121,19 @@
       viewer.controls.enableZoom = true;
       viewer.controls.minDistance = 15;
       viewer.controls.maxDistance = 60;
+    }
+
+    // Resize observer on wardrobe container to update viewer size dynamically
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => {
+        if (viewer && canvas) {
+          const r = canvas.getBoundingClientRect();
+          if (r.width > 50 && r.height > 50) {
+            viewer.setSize(r.width, r.height);
+          }
+        }
+      });
+      ro.observe(canvas);
     }
 
     // Hover walking animation transition
@@ -100,7 +154,7 @@
       applyAnimationMode(activeAnimationMode);
     });
 
-    // Animation Segment buttons (Стоит / Идёт / Бежит)
+    // Animation Segment buttons
     document.querySelectorAll('.skin-anim-seg button').forEach(btn => {
       btn.addEventListener('click', () => {
         const mode = btn.dataset.anim;
@@ -109,18 +163,25 @@
       });
     });
 
-    // Model type (Steve / Alex slim)
+    // Model type
     document.querySelectorAll('#modelTypeSeg button').forEach(btn => {
       btn.addEventListener('click', () => {
         const model = btn.dataset.model || 'default';
         if (viewer && viewer.playerObject) {
           viewer.playerObject.skin.modelType = model;
+          if (document.documentElement.dataset.effects === 'off') {
+            viewer.render();
+          }
         }
       });
     });
 
-    // Cape selector
+    // Cape selector with turnModelBack on hover and click
     document.querySelectorAll('#capeSelector .cape').forEach(btn => {
+      btn.addEventListener('mouseenter', () => {
+        turnModelBack();
+      });
+
       btn.addEventListener('click', () => {
         document.querySelectorAll('#capeSelector .cape').forEach(b => b.classList.remove('on'));
         btn.classList.add('on');
@@ -130,12 +191,18 @@
         } else if (CAPE_MAP[capeType]) {
           viewer.loadCape(CAPE_MAP[capeType]).catch(() => {});
         }
+        turnModelBack();
+        if (document.documentElement.dataset.effects === 'off') {
+          setTimeout(() => viewer && viewer.render(), 100);
+        }
       });
     });
 
-    // Custom skin file upload
+    // Custom skin file upload with face preview update
     const skinFileInput = document.getElementById('skinFileInput');
     const skinNameLabel = document.getElementById('currentSkinFileName');
+    const skinFacePreview = document.getElementById('skinFacePreview');
+
     if (skinFileInput) {
       skinFileInput.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
@@ -144,12 +211,23 @@
         const reader = new FileReader();
         reader.onload = (ev) => {
           const dataUrl = ev.target.result;
+          canvas.style.transition = 'opacity var(--dur-1) var(--ease-out)';
+          canvas.style.opacity = '0.3';
+
           viewer.loadSkin(dataUrl).then(() => {
+            canvas.style.opacity = '1';
             if (skinNameLabel) skinNameLabel.textContent = file.name;
+            if (skinFacePreview) {
+              skinFacePreview.style.backgroundImage = `url('${dataUrl}'), url('${dataUrl}')`;
+            }
+            if (document.documentElement.dataset.effects === 'off') {
+              viewer.render();
+            }
             if (typeof window.showToast === 'function') {
               window.showToast('Скин успешно загружен', 'success');
             }
           }).catch(() => {
+            canvas.style.opacity = '1';
             if (typeof window.showToast === 'function') {
               window.showToast('Не удалось загрузить скин', 'error');
             }
@@ -174,23 +252,48 @@
 
   function applyAnimationMode(mode) {
     if (!viewer) return;
+    const effects = document.documentElement.dataset.effects;
+    if (effects === 'off') {
+      viewer.animation = null;
+      viewer.render();
+      return;
+    }
     if (mode === 'idle') viewer.animation = idleAnimation;
     else if (mode === 'walk') viewer.animation = walkingAnimation;
     else if (mode === 'run') viewer.animation = runningAnimation;
   }
 
   function updateRenderPauseState() {
-    if (!viewer) return;
     const isWardrobeOpen = document.body.classList.contains('is-open') && 
       document.querySelector('[data-l="wardrobe"]')?.classList.contains('on');
     const effects = document.documentElement.dataset.effects;
     const isHidden = document.hidden;
 
-    if (!isWardrobeOpen || isHidden || effects === 'off') {
+    if (isWardrobeOpen && !viewer) {
+      initSkinview();
+      return;
+    }
+
+    if (!viewer) return;
+
+    if (!isWardrobeOpen || isHidden) {
       viewer.renderPaused = true;
-    } else {
+    } else if (effects === 'off') {
+      // In 'off' mode: static single frame render, no animations, no autoRotate
+      viewer.renderPaused = true;
+      viewer.autoRotate = false;
+      viewer.animation = null;
+      viewer.render();
+    } else if (effects === 'low') {
+      // In 'low' mode: animation active, autoRotate off
       viewer.renderPaused = false;
-      viewer.autoRotate = (effects !== 'low' && !isHovered);
+      viewer.autoRotate = false;
+      applyAnimationMode(activeAnimationMode);
+    } else {
+      // In 'full' mode: full animations + autoRotate
+      viewer.renderPaused = false;
+      viewer.autoRotate = !isHovered;
+      applyAnimationMode(activeAnimationMode);
     }
   }
 

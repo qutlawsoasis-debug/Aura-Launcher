@@ -87,16 +87,25 @@
       cv.width = w;
       cv.height = h;
     }
+    if (ctx) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
   }
 
   function drawMap() {
     if (!ctx || !cv) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cssW = cv.width / dpr;
+    const cssH = cv.height / dpr;
+
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#0b1622';
-    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillRect(0, 0, cssW, cssH);
 
-    const ox = cv.width / 2 - view.x * view.z;
-    const oy = cv.height / 2 - view.y * view.z;
+    const ox = cssW / 2 - view.x * view.z;
+    const oy = cssH / 2 - view.y * view.z;
     ctx.drawImage(tiles, ox, oy, N * view.z, N * view.z);
 
     pois.forEach(p => {

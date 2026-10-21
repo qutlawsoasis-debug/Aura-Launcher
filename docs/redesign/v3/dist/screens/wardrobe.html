@@ -6,9 +6,18 @@
   <div class="wardrobe-controls-col" style="flex:1">
     <div class="small dim" style="margin-bottom:8px">Плащ</div>
     <div class="capes" id="capeSelector">
-      <button type="button" class="cape on" data-cape="cyan" title="Лазурный плащ"><span class="sw" style="background:linear-gradient(160deg,#5FD4E8,#2A6F8E)"></span></button>
-      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ"><span class="sw" style="background:linear-gradient(160deg,#C9CDD6,#6B7280)"></span></button>
-      <button type="button" class="cape" data-cape="none" title="Без плаща">нет</button>
+      <button type="button" class="cape on" data-cape="cyan" title="Плащ Aura">
+        <div class="cape-thumb cape-thumb-cyan"></div>
+        <span class="cape-title">Aura</span>
+      </button>
+      <button type="button" class="cape" data-cape="silver" title="Серебряный плащ">
+        <div class="cape-thumb cape-thumb-silver"></div>
+        <span class="cape-title">Серебряный</span>
+      </button>
+      <button type="button" class="cape" data-cape="none" title="Без плаща">
+        <div class="cape-thumb cape-thumb-none">✕</div>
+        <span class="cape-title">Без плаща</span>
+      </button>
     </div>
 
     <div class="row">
@@ -31,7 +40,10 @@
     </div>
 
     <div class="row">
-      <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="face" id="skinFacePreview" style="--s:28px"></div>
+        <span>Скин<span class="hint" id="currentSkinFileName">steve.png</span></span>
+      </div>
       <label class="btn sm" style="cursor:pointer">
         Загрузить
         <input type="file" id="skinFileInput" accept="image/png" style="display:none">
