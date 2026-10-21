@@ -14,6 +14,12 @@ from PIL import Image
 
 AREA, ASSETS, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 MC = os.path.join(ASSETS, 'assets', 'minecraft')
+
+
+def ns_path(ref, kind, ext):
+    """'ns:path' или 'path' → файл ассета нужного вида в assets/<ns>/<kind>/."""
+    ns, _, path = ref.rpartition(':')
+    return os.path.join(ASSETS, 'assets', ns or 'minecraft', kind, path + ext)
 os.makedirs(OUT, exist_ok=True)
 
 area = json.load(open(AREA))
@@ -52,8 +58,7 @@ def load_json(path):
 
 
 def model_path(ref):
-    ref = ref.split(':')[-1]
-    return os.path.join(MC, 'models', ref + '.json')
+    return ns_path(ref, 'models', '.json')
 
 
 @lru_cache(None)
@@ -62,9 +67,13 @@ def resolve_model(ref):
     textures, elements, chain = {}, None, ref
     seen = 0
     while chain and seen < 20:
-        m = load_json(model_path(chain))
+        m = chain if isinstance(chain, dict) else load_json(model_path(chain))
         if m is None:
             break
+        if 'loader' in m and 'support' in m:
+            chain = m['support']
+            seen += 1
+            continue
         for k, v in m.get('textures', {}).items():
             textures.setdefault(k, v)
         if elements is None and 'elements' in m:
@@ -77,7 +86,9 @@ def resolve_model(ref):
         while v.startswith('#') and hops < 10:
             v = textures.get(v[1:], '')
             hops += 1
-        return v.split(':')[-1] if v else None
+        if not v:
+            return None
+        return v if ':' in v else 'minecraft:' + v
 
     return elements or [], tex
 
@@ -94,7 +105,7 @@ def matches(when, props):
 def block_models(state):
     """Список (model_ref, x_rot, y_rot, uvlock) для состояния блока."""
     name, props = split_state(state)
-    bs = load_json(os.path.join(MC, 'blockstates', name.split(':')[-1] + '.json')) if name.startswith('minecraft:') else None
+    bs = load_json(ns_path(name, 'blockstates', '.json'))
     if not bs:
         return []
     out = []
@@ -123,8 +134,6 @@ NONSOLID_HINT = ('leaves', 'glass', 'grass', 'fern', 'flower', 'sapling', 'torch
 def is_full_opaque(state):
     name = state.split('[')[0]
     if name in ('minecraft:air', 'minecraft:cave_air', 'minecraft:void_air'):
-        return False
-    if not name.startswith('minecraft:'):
         return False
     base = name.split(':')[1]
     if any(h in base for h in NONSOLID_HINT) or any(t in base for t in TRANSLUCENT):
@@ -189,24 +198,28 @@ class Atlas:
         n = len(self.slots)
         cols = math.ceil(math.sqrt(n))
         self.cols = cols
-        size = cols * 16
+        C = self.CELL
+        size = cols * C
         img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
         for tex, i in self.slots.items():
-            p = os.path.join(MC, 'textures', tex + '.png')
+            p = ns_path(tex, 'textures', '.png')
             try:
                 t = Image.open(p).convert('RGBA')
-                t = t.crop((0, 0, t.width, t.width)).resize((16, 16), Image.NEAREST)
+                t = t.crop((0, 0, t.width, t.width)).resize((C, C), Image.NEAREST)
             except FileNotFoundError:
-                t = Image.new('RGBA', (16, 16), (255, 0, 255, 255))
-            img.paste(t, ((i % cols) * 16, (i // cols) * 16))
+                t = Image.new('RGBA', (C, C), (255, 0, 255, 255))
+            img.paste(t, ((i % cols) * C, (i // cols) * C))
         self.size = size
         return img
 
-    def uv(self, tex, u, v):
-        """u, v в пикселях текстуры 0..16 → координаты атласа 0..1 (v вниз, three.js flipY=false)."""
+    CELL = 64
+
+    def uv(self, tex, u, v, base=16):
+        """u, v в пикселях текстуры 0..base → координаты атласа 0..1 (v вниз, three.js flipY=false)."""
         i = self.slots[tex]
-        x0, y0 = (i % self.cols) * 16, (i // self.cols) * 16
-        return ((x0 + u) / self.size, (y0 + v) / self.size)
+        k = self.CELL / base
+        x0, y0 = (i % self.cols) * self.CELL, (i // self.cols) * self.CELL
+        return ((x0 + u * k) / self.size, (y0 + v * k) / self.size)
 
 
 atlas = Atlas()
@@ -281,8 +294,19 @@ def rot_dir(d, xr, yr):
 layers = {k: {'pos': [], 'uv': [], 'col': []} for k in ('opaque', 'cutout', 'translucent')}
 
 
-def emit(layer, corners, uvs, color, shades=None):
+def emit(layer, corners, uvs, color, shades=None, outward=None):
     L = layers[layer]
+    # Лицевая сторона треугольника (против часовой) должна смотреть наружу, иначе three.js её отбросит
+    if outward:
+        a, b, c = corners[0], corners[1], corners[2]
+        u = (b[0] - a[0], b[1] - a[1], b[2] - a[2])
+        v = (c[0] - a[0], c[1] - a[1], c[2] - a[2])
+        n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        if n[0] * outward[0] + n[1] * outward[1] + n[2] * outward[2] < 0:
+            corners = corners[::-1]
+            uvs = uvs[::-1]
+            if shades:
+                shades = shades[::-1]
     order = (0, 1, 2, 0, 2, 3)
     # Диагональ квадрата выбираем по AO, чтобы не было «залома» тени (как в Minecraft)
     if shades and shades[0] + shades[2] < shades[1] + shades[3]:
@@ -320,6 +344,72 @@ def vertex_ao(x, y, z, face, corner):
 
 missing = set()
 
+CHEST_TEX = {'minecraft:chest': 'minecraft:entity/chest/normal', 'minecraft:trapped_chest': 'minecraft:entity/chest/trapped',
+             'minecraft:ender_chest': 'minecraft:entity/chest/ender'}
+FACING_Y = {'north': 0, 'east': 90, 'south': 180, 'west': 270}
+
+
+def box_faces(u, v, w, h, d):
+    """Стандартная развёртка кубоида модели сущности: uv-прямоугольники граней в пикселях текстуры."""
+    return {
+        'up': [u + d, v, u + d + w, v + d], 'down': [u + d + w, v, u + d + 2 * w, v + d],
+        'west': [u, v + d, u + d, v + d + h], 'north': [u + d, v + d, u + d + w, v + d + h],
+        'east': [u + d + w, v + d, u + 2 * d + w, v + d + h], 'south': [u + 2 * d + w, v + d, u + 2 * d + 2 * w, v + d + h],
+    }
+
+
+def chest_elements(tex):
+    parts = [((1, 0, 1), (15, 10, 15), (0, 19, 14, 10, 14)),
+             ((1, 9, 1), (15, 14, 15), (0, 0, 14, 5, 14)),
+             ((7, 7, 0), (9, 11, 1), (0, 0, 2, 4, 1))]
+    out = []
+    for f, t, (u, v, w, h, d) in parts:
+        faces = {k: {'uv': uv, 'texture': tex, 'base': 64} for k, uv in box_faces(u, v, w, h, d).items()}
+        out.append({'from': list(f), 'to': list(t), 'faces': faces})
+    return out
+
+
+def add_elements(x, y, z, state, elements, xr, yr, layer, offset=(0, 0, 0)):
+    for el in elements:
+        f = [el['from'][i] + offset[i] for i in range(3)]
+        t = [el['to'][i] + offset[i] for i in range(3)]
+        for face, fd in el['faces'].items():
+            tname = fd['texture']
+            base = fd.get('base', 16)
+            corners = [rot_block(c, xr, yr) for c in face_corners(face, f, t)]
+            world = [(x + c[0] / 16, y + c[1] / 16, z + c[2] / 16) for c in corners]
+            u0, v0, u1, v1 = fd['uv']
+            atlas.slot(tname)
+            uvs = [atlas.uv(tname, a, b, base) for a, b in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
+            wf = rot_dir(FACE_DIR[face], xr, yr) or face
+            k = SHADE[wf]
+            emit(layer, world, uvs, (int(255 * k),) * 3, [vertex_ao(x, y, z, wf, c) for c in corners], FACE_DIR[wf])
+
+
+def add_special(x, y, z, state):
+    """Блоки, которые игра рисует как сущности. True — блок обработан."""
+    name, props = split_state(state)
+    if name in CHEST_TEX:
+        add_elements(x, y, z, state, chest_elements(CHEST_TEX[name]), 0, FACING_Y.get(props.get('facing', 'north'), 0), 'opaque')
+        return True
+    return False
+
+
+def add_lantern_for(x, y, z, state):
+    """У настенного фонаря Amendments кронштейн — модель, а сам фонарь — ванильный висячий на его конце."""
+    name, props = split_state(state)
+    if name != 'amendments:wall_lantern':
+        return
+    yr = FACING_Y.get(props.get('facing', 'north'), 0)
+    els, tex = resolve_model('minecraft:block/lantern_hanging')
+    for el in els:
+        faces = {}
+        for face, fd in el.get('faces', {}).items():
+            tn = tex(fd.get('texture', ''))
+            if tn:
+                faces[face] = {'uv': fd.get('uv') or default_uv(face, el['from'], el['to']), 'texture': tn}
+        add_elements(x, y, z, state, [{'from': el['from'], 'to': el['to'], 'faces': faces}], 0, yr, 'cutout', offset=(0, -3, -1))
+
 
 def add_block(x, y, z, state):
     name = state.split('[')[0]
@@ -328,6 +418,9 @@ def add_block(x, y, z, state):
     if name in ('minecraft:water', 'minecraft:bubble_column'):
         add_water(x, y, z)
         return
+    if add_special(x, y, z, state):
+        return
+    add_lantern_for(x, y, z, state)
     models = block_models(state)
     if not models:
         missing.add(name)
@@ -366,17 +459,17 @@ def add_block(x, y, z, state):
                 tr, tg, tb = tint_for(state, fd.get('tintindex'))
                 color = (int(tr * shade), int(tg * shade), int(tb * shade))
                 shades = [vertex_ao(x, y, z, wf, c) for c in corners] if layer != 'translucent' else None
-                emit(layer, world, uvs, color, shades)
+                emit(layer, world, uvs, color, shades, FACE_DIR[wf])
 
 
 def add_water(x, y, z):
     above = state_at(x, y + 1, z).split('[')[0]
     h = 1.0 if above in ('minecraft:water', 'minecraft:bubble_column') else 14 / 16
-    atlas.slot('block/water_still')
-    uv = [atlas.uv('block/water_still', u, v) for u, v in ((0, 0), (16, 0), (16, 16), (0, 16))]
+    atlas.slot('minecraft:block/water_still')
+    uv = [atlas.uv('minecraft:block/water_still', u, v) for u, v in ((0, 0), (16, 0), (16, 16), (0, 16))]
     col = WATER_TINT
     if h < 1:
-        emit('translucent', [(x, y + h, z), (x + 1, y + h, z), (x + 1, y + h, z + 1), (x, y + h, z + 1)], uv, col)
+        emit('translucent', [(x, y + h, z), (x + 1, y + h, z), (x + 1, y + h, z + 1), (x, y + h, z + 1)], uv, col, None, (0, 1, 0))
     for face, (dx, dy, dz) in FACE_DIR.items():
         if face in ('up', 'down'):
             continue
@@ -384,7 +477,7 @@ def add_water(x, y, z):
         if nb.split('[')[0] in ('minecraft:water', 'minecraft:bubble_column') or is_full_opaque(nb):
             continue
         c = face_corners(face, (0, 0, 0), (16, h * 16, 16))
-        emit('translucent', [(x + p[0] / 16, y + p[1] / 16, z + p[2] / 16) for p in c], uv, tuple(int(v * 0.8) for v in col))
+        emit('translucent', [(x + p[0] / 16, y + p[1] / 16, z + p[2] / 16) for p in c], uv, tuple(int(v * 0.8) for v in col), None, FACE_DIR[face])
 
 
 def main():
@@ -410,7 +503,11 @@ if __name__ == '__main__':
                             t = tex(fd.get('texture', ''))
                             if t:
                                 atlas.slot(t)
-    atlas.slot('block/water_still')
+    atlas.slot('minecraft:block/water_still')
+    for t in CHEST_TEX.values():
+        atlas.slot(t)
+    for t in ('minecraft:block/lantern', 'minecraft:block/soul_lantern'):
+        atlas.slot(t)
     img = atlas.build()
     img.save(os.path.join(OUT, 'atlas.png'))
     for y in range(SY):

@@ -89,7 +89,15 @@ const dir = new THREE.Vector3(-Math.sin(yaw) * Math.cos(pitch), -Math.sin(pitch)
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 1200);
 camera.position.copy(eye);
 camera.lookAt(eye.clone().add(dir));
-const view = new URLSearchParams(location.search).get('view');
+const qs = new URLSearchParams(location.search);
+const view = qs.get('view');
+// ?cam=x,y,z,yaw,pitch — кадр в координатах мира (как в F3: XYZ ног, поворот, наклон)
+if (qs.get('cam')) {
+  const [cx, cy, cz, cyaw, cpitch] = qs.get('cam').split(',').map(Number);
+  const yw = THREE.MathUtils.degToRad(cyaw), pt = THREE.MathUtils.degToRad(cpitch);
+  camera.position.set(cx - OX, cy + 1.62 - OY, cz - OZ);
+  camera.lookAt(camera.position.clone().add(new THREE.Vector3(-Math.sin(yw) * Math.cos(pt), -Math.sin(pt), Math.cos(yw) * Math.cos(pt))));
+}
 if (view === 'top') { scene.fog = null; camera.position.set(48, 150, 48 + 0.01); camera.lookAt(48, 40, 48); camera.fov = 50; camera.updateProjectionMatrix(); }
 if (view === 'side') { camera.position.set(48 + 75, 18, 48 + 60); camera.lookAt(48, 38, 48); }
 
