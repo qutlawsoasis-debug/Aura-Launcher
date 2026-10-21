@@ -12,24 +12,33 @@ namespace AuraLauncher.Core.WebBridge;
 
 public class WebBridge : IDisposable
 {
-    private readonly Window _window;
+    private readonly Window? _window;
     private readonly IGameSessionService _gameSessionService;
     private readonly IConfigService _configService;
+    private readonly IGraphicsPresetService? _presetService;
+    private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
 
     public WebBridge(
-        Window window,
+        Window? window,
         IGameSessionService gameSessionService,
-        IConfigService configService)
+        IConfigService configService,
+        IGraphicsPresetService? presetService = null,
+        Action<string>? logger = null)
     {
         _window = window;
         _gameSessionService = gameSessionService;
         _configService = configService;
+        _presetService = presetService;
+        _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
         _gameSessionService.GameExited += OnSessionGameExited;
-        _window.StateChanged += OnWindowStateChanged;
+        if (_window != null)
+        {
+            _window.StateChanged += OnWindowStateChanged;
+        }
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -39,6 +48,7 @@ public class WebBridge : IDisposable
 
     public void SendWindowState()
     {
+        if (_window == null) return;
         string state = _window.WindowState switch
         {
             WindowState.Maximized => "maximized",
@@ -78,7 +88,7 @@ public class WebBridge : IDisposable
 
     private void OnSessionStateChanged(object? sender, GameSessionState state)
     {
-        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] StateChanged -> {state}");
+        _logger($"[WEBBRIDGE] StateChanged -> {state}");
         SendEvent("game.status", new
         {
             state = MapState(state),
@@ -90,7 +100,7 @@ public class WebBridge : IDisposable
 
     private void OnSessionGameExited(object? sender, GameExitedEventArgs e)
     {
-        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] GameExited -> exitCode={e.ExitCode}");
+        _logger($"[WEBBRIDGE] GameExited -> exitCode={e.ExitCode}");
         SendEvent("game.status", new
         {
             state = e.ExitCode == 0 ? "idle" : "failed",
@@ -116,15 +126,20 @@ public class WebBridge : IDisposable
             rawInput = e.WebMessageAsJson;
         }
 
+        await ProcessRawMessageAsync(rawInput);
+    }
+
+    public async Task ProcessRawMessageAsync(string? rawInput)
+    {
         var (msg, parseError) = BridgeMessageParser.Parse(rawInput);
         if (parseError != null || msg == null)
         {
-            FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] JSON parse failed: {parseError}");
+            _logger($"[WEBBRIDGE: ERROR] JSON parse failed: {parseError}");
             SendError(null, "parse.error", parseError ?? "unknown_parse_error");
             return;
         }
 
-        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] Command received: {msg.Name} (id={msg.Id})");
+        _logger($"[WEBBRIDGE] Command received: {msg.Name} (id={msg.Id})");
 
         try
         {
@@ -142,15 +157,27 @@ public class WebBridge : IDisposable
                     HandleWindowAction(msg);
                     break;
 
+                case "config.get":
+                    HandleConfigGet(msg);
+                    break;
+
+                case "config.set":
+                    await HandleConfigSetAsync(msg);
+                    break;
+
+                case "preset.apply":
+                    HandlePresetApply(msg);
+                    break;
+
                 default:
-                    FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: WARN] Unknown command: {msg.Name}");
+                    _logger($"[WEBBRIDGE: WARN] Unknown command: {msg.Name}");
                     SendError(msg.Id, "unknown.command", $"Command '{msg.Name}' is not implemented yet");
                     break;
             }
         }
         catch (Exception ex)
         {
-            FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] Error handling {msg.Name}: {ex.Message}");
+            _logger($"[WEBBRIDGE: ERROR] Error handling {msg.Name}: {ex.Message}");
             SendError(msg.Id, msg.Name, ex.Message);
         }
     }
@@ -159,7 +186,7 @@ public class WebBridge : IDisposable
     {
         if (_gameSessionService.State != GameSessionState.Idle && _gameSessionService.State != GameSessionState.Failed)
         {
-            FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE: WARN] game.launch rejected: already_launching");
+            _logger("[WEBBRIDGE: WARN] game.launch rejected: already_launching");
             SendError(msg.Id, msg.Name, "already_launching");
             return Task.CompletedTask;
         }
@@ -167,7 +194,7 @@ public class WebBridge : IDisposable
         string nickname = _configService.CurrentConfig.Nickname?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(nickname) || !NicknameValidator.Validate(nickname).IsValid)
         {
-            FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE: WARN] game.launch rejected: invalid_nickname");
+            _logger("[WEBBRIDGE: WARN] game.launch rejected: invalid_nickname");
             SendError(msg.Id, msg.Name, "invalid_nickname");
             return Task.CompletedTask;
         }
@@ -194,17 +221,17 @@ public class WebBridge : IDisposable
         {
             try
             {
-                FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE] Starting GameSessionService.LaunchAsync...");
+                _logger("[WEBBRIDGE] Starting GameSessionService.LaunchAsync...");
                 var process = await _gameSessionService.LaunchAsync(
                     options: null,
                     progress: progress,
                     cancellationToken: _gameLaunchCts.Token);
 
-                FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] Game launched successfully! PID={process.Id}");
+                _logger($"[WEBBRIDGE] Game launched successfully! PID={process.Id}");
             }
             catch (Exception ex)
             {
-                FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] Launch failed: {ex.Message}");
+                _logger($"[WEBBRIDGE: ERROR] Launch failed: {ex.Message}");
                 SendEvent("game.status", new
                 {
                     state = "failed",
@@ -221,10 +248,10 @@ public class WebBridge : IDisposable
 
     private async Task HandleGameStopAsync(BridgeMessage msg)
     {
-        FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE] game.stop requested");
+        _logger("[WEBBRIDGE] game.stop requested");
         _gameLaunchCts?.Cancel();
         bool stopped = await _gameSessionService.StopAsync(5000);
-        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] game.stop completed: stopped={stopped}");
+        _logger($"[WEBBRIDGE] game.stop completed: stopped={stopped}");
         SendResponse(msg.Id, msg.Name, new { stopped });
     }
 
@@ -236,30 +263,177 @@ public class WebBridge : IDisposable
             action = prop.GetString() ?? string.Empty;
         }
 
-        FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] window.action: {action}");
+        _logger($"[WEBBRIDGE] window.action: {action}");
 
-        _window.Dispatcher.Invoke(() =>
+        if (_window != null)
         {
-            switch (action)
+            _window.Dispatcher.Invoke(() =>
             {
-                case "minimize":
-                    _window.WindowState = WindowState.Minimized;
-                    break;
-                case "maximize":
-                    _window.WindowState = _window.WindowState == WindowState.Maximized
-                        ? WindowState.Normal
-                        : WindowState.Maximized;
-                    break;
-                case "close":
-                    _window.Close();
-                    break;
-                case "drag":
-                    try { _window.DragMove(); } catch { }
-                    break;
-            }
-        });
+                switch (action)
+                {
+                    case "minimize":
+                        _window.WindowState = WindowState.Minimized;
+                        break;
+                    case "maximize":
+                        _window.WindowState = _window.WindowState == WindowState.Maximized
+                            ? WindowState.Normal
+                            : WindowState.Maximized;
+                        break;
+                    case "close":
+                        _window.Close();
+                        break;
+                    case "drag":
+                        try { _window.DragMove(); } catch { }
+                        break;
+                }
+            });
+        }
 
         SendResponse(msg.Id, msg.Name, new { action, success = true });
+    }
+
+    private void HandleConfigGet(BridgeMessage msg)
+    {
+        var cfg = _configService.CurrentConfig;
+        _logger($"[WEBBRIDGE] config.get: ram={cfg.RamMb}, preset={cfg.GraphicsPreset}, fx={cfg.VisualEffectsMode}");
+        SendResponse(msg.Id, msg.Name, new
+        {
+            nickname = cfg.Nickname,
+            ramMb = cfg.RamMb,
+            hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
+            graphicsPreset = cfg.GraphicsPreset,
+            visualEffectsMode = cfg.VisualEffectsMode
+        });
+    }
+
+    private async Task HandleConfigSetAsync(BridgeMessage msg)
+    {
+        if (msg.Payload is not JsonElement el || el.ValueKind != JsonValueKind.Object)
+        {
+            SendError(msg.Id, msg.Name, "invalid_payload");
+            return;
+        }
+
+        if (!el.TryGetProperty("key", out var keyProp) || keyProp.ValueKind != JsonValueKind.String)
+        {
+            SendError(msg.Id, msg.Name, "invalid_key");
+            return;
+        }
+
+        string key = keyProp.GetString() ?? string.Empty;
+        if (!el.TryGetProperty("value", out var valProp))
+        {
+            SendError(msg.Id, msg.Name, "invalid_value");
+            return;
+        }
+
+        switch (key)
+        {
+            case "ramMb":
+            {
+                if (valProp.ValueKind != JsonValueKind.Number || !valProp.TryGetInt32(out int ramVal))
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set ramMb rejected: not an integer");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                int maxRam = GraphicsPresetService.GetPhysicalRamMb();
+                if (ramVal < 2048 || ramVal > maxRam)
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set ramMb rejected: {ramVal} outside 2048..{maxRam}");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                await _configService.UpdateConfigAsync(c => c.RamMb = ramVal);
+                _logger($"[WEBBRIDGE] config.set ramMb -> {ramVal}");
+                break;
+            }
+
+            case "hideLauncherWhilePlaying":
+            {
+                if (valProp.ValueKind != JsonValueKind.True && valProp.ValueKind != JsonValueKind.False)
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set hideLauncherWhilePlaying rejected: not a bool");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                bool hideVal = valProp.GetBoolean();
+                await _configService.UpdateConfigAsync(c => c.HideLauncherWhilePlaying = hideVal);
+                _logger($"[WEBBRIDGE] config.set hideLauncherWhilePlaying -> {hideVal}");
+                break;
+            }
+
+            case "visualEffectsMode":
+            {
+                if (valProp.ValueKind != JsonValueKind.String)
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set visualEffectsMode rejected: not a string");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                string fxVal = valProp.GetString() ?? string.Empty;
+                if (fxVal != "full" && fxVal != "low" && fxVal != "off")
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set visualEffectsMode rejected: unknown '{fxVal}'");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                await _configService.UpdateConfigAsync(c => c.VisualEffectsMode = fxVal);
+                _logger($"[WEBBRIDGE] config.set visualEffectsMode -> {fxVal}");
+                break;
+            }
+
+            default:
+                _logger($"[WEBBRIDGE: WARN] config.set rejected: unknown key '{key}'");
+                SendError(msg.Id, msg.Name, "invalid_key");
+                return;
+        }
+
+        var cfg = _configService.CurrentConfig;
+        SendResponse(msg.Id, msg.Name, new
+        {
+            nickname = cfg.Nickname,
+            ramMb = cfg.RamMb,
+            hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
+            graphicsPreset = cfg.GraphicsPreset,
+            visualEffectsMode = cfg.VisualEffectsMode
+        });
+    }
+
+    private void HandlePresetApply(BridgeMessage msg)
+    {
+        if (_presetService == null)
+        {
+            _logger("[WEBBRIDGE: ERROR] preset.apply failed: IGraphicsPresetService not available");
+            SendError(msg.Id, msg.Name, "service_unavailable");
+            return;
+        }
+
+        string presetKey = string.Empty;
+        if (msg.Payload is JsonElement el && el.TryGetProperty("presetKey", out var prop) && prop.ValueKind == JsonValueKind.String)
+        {
+            presetKey = prop.GetString() ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(presetKey))
+        {
+            _logger("[WEBBRIDGE: WARN] preset.apply rejected: empty presetKey");
+            SendError(msg.Id, msg.Name, "invalid_preset");
+            return;
+        }
+
+        _logger($"[WEBBRIDGE] preset.apply: {presetKey}");
+
+        var cfg = _configService.CurrentConfig;
+        var result = _presetService.ApplyPreset(cfg.GameDir, presetKey, persistConfig: true);
+
+        _logger($"[WEBBRIDGE] preset.apply result: success={result.Success}, ram={result.FinalRamMb}, shader={result.ChosenShader}");
+        SendResponse(msg.Id, msg.Name, result);
     }
 
     public void SendEvent(string eventName, object payload)
@@ -294,14 +468,17 @@ public class WebBridge : IDisposable
         });
     }
 
+    public event Action<BridgeMessage>? MessagePosted;
+
     private void Post(BridgeMessage msg)
     {
+        MessagePosted?.Invoke(msg);
         if (_coreWebView2 == null) return;
-        string json = JsonSerializer.Serialize(msg);
-        _window.Dispatcher.Invoke(() =>
+        _window?.Dispatcher.Invoke(() =>
         {
             try
             {
+                string json = JsonSerializer.Serialize(msg);
                 _coreWebView2?.PostWebMessageAsJson(json);
             }
             catch { }
@@ -312,6 +489,10 @@ public class WebBridge : IDisposable
     {
         _gameSessionService.StateChanged -= OnSessionStateChanged;
         _gameSessionService.GameExited -= OnSessionGameExited;
+        if (_window != null)
+        {
+            _window.StateChanged -= OnWindowStateChanged;
+        }
         if (_coreWebView2 != null)
         {
             _coreWebView2.WebMessageReceived -= OnWebMessageReceived;

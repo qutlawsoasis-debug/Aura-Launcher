@@ -259,7 +259,8 @@ public partial class App : Application
         {
             var webShell = new WebShellWindow(
                 Services.GetRequiredService<IGameSessionService>(),
-                Services.GetRequiredService<IConfigService>());
+                Services.GetRequiredService<IConfigService>(),
+                Services.GetRequiredService<IGraphicsPresetService>());
             activeWindow = webShell;
         }
         else

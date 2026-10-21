@@ -45,6 +45,7 @@ public class LauncherConfig
     public string StartMode { get; set; } = "Maximized";
     public bool AutoRotateBackgrounds { get; set; } = true;
     public string GraphicsPreset { get; set; } = "Medium";
+    public string VisualEffectsMode { get; set; } = "full";
     public string? JvmArgs { get; set; }
     public bool ShareStatsWithFriends { get; set; } = true;
     public bool ShareAchievementsWithFriends { get; set; } = true;

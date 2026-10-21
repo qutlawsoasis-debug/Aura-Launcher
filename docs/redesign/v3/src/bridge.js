@@ -173,6 +173,83 @@
       return Promise.resolve({ action: payload.action, success: true });
     }
 
+    if (name === 'config.get') {
+      let cfg = {
+        nickname: 'Player',
+        ramMb: 6144,
+        hideLauncherWhilePlaying: true,
+        graphicsPreset: 'Medium',
+        visualEffectsMode: 'full'
+      };
+      try {
+        const stored = localStorage.getItem('aura_mock_config');
+        if (stored) {
+          cfg = Object.assign(cfg, JSON.parse(stored));
+        }
+      } catch (e) {}
+      return Promise.resolve(cfg);
+    }
+
+    if (name === 'config.set') {
+      const allowed = ['ramMb', 'hideLauncherWhilePlaying', 'visualEffectsMode'];
+      if (!payload || !allowed.includes(payload.key)) {
+        return Promise.reject(new Error('invalid_key'));
+      }
+      if (payload.key === 'ramMb') {
+        const v = Number(payload.value);
+        if (!Number.isInteger(v) || v < 2048 || v > 65536) {
+          return Promise.reject(new Error('invalid_value'));
+        }
+      }
+      if (payload.key === 'hideLauncherWhilePlaying') {
+        if (typeof payload.value !== 'boolean') {
+          return Promise.reject(new Error('invalid_value'));
+        }
+      }
+      if (payload.key === 'visualEffectsMode') {
+        if (!['full', 'low', 'off'].includes(payload.value)) {
+          return Promise.reject(new Error('invalid_value'));
+        }
+      }
+      let cfg = {
+        nickname: 'Player',
+        ramMb: 6144,
+        hideLauncherWhilePlaying: true,
+        graphicsPreset: 'Medium',
+        visualEffectsMode: 'full'
+      };
+      try {
+        const stored = localStorage.getItem('aura_mock_config');
+        if (stored) {
+          cfg = Object.assign(cfg, JSON.parse(stored));
+        }
+        cfg[payload.key] = payload.value;
+        localStorage.setItem('aura_mock_config', JSON.stringify(cfg));
+      } catch (e) {
+        cfg[payload.key] = payload.value;
+      }
+      return Promise.resolve(cfg);
+    }
+
+    if (name === 'preset.apply') {
+      const presetKey = payload && payload.presetKey;
+      if (!presetKey) {
+        return Promise.reject(new Error('invalid_preset'));
+      }
+      try {
+        const stored = localStorage.getItem('aura_mock_config');
+        const cfg = stored ? JSON.parse(stored) : {};
+        cfg.graphicsPreset = presetKey;
+        localStorage.setItem('aura_mock_config', JSON.stringify(cfg));
+      } catch (e) {}
+      return Promise.resolve({
+        Success: true,
+        PresetKey: presetKey,
+        FinalRamMb: 6144,
+        ChosenShader: 'MockShader'
+      });
+    }
+
     return Promise.resolve({ success: true, mock: true });
   }
 

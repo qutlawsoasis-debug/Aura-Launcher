@@ -13,15 +13,18 @@ public partial class WebShellWindow : Window
 {
     private readonly IGameSessionService _gameSessionService;
     private readonly IConfigService _configService;
+    private readonly IGraphicsPresetService? _presetService;
     private WebBridge? _bridge;
 
     public WebShellWindow(
         IGameSessionService gameSessionService,
-        IConfigService configService)
+        IConfigService configService,
+        IGraphicsPresetService? presetService = null)
     {
         InitializeComponent();
         _gameSessionService = gameSessionService;
         _configService = configService;
+        _presetService = presetService;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -42,7 +45,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService);
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService);
             _bridge.Attach(WebViewControl.CoreWebView2);
 
             string targetUrl = await ResolveTargetUrlAsync();

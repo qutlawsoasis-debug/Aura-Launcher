@@ -1,6 +1,7 @@
 /**
  * Aura Launcher v3 — Settings Section Controller (Island Concept)
  * RAM slider, graphics preset segment, visual effects mode, inline cache clear.
+ * Integrated with WebBridge (config.get, config.set, preset.apply).
  */
 
 (function () {
@@ -13,11 +14,36 @@
     '24 чанка · Complementary · Distant Horizons'
   ];
 
+  const PRESET_KEYS = ['Low', 'Medium', 'High', 'Ultra'];
+
+  let activeConfig = {
+    nickname: 'Player',
+    ramMb: 6144,
+    hideLauncherWhilePlaying: true,
+    graphicsPreset: 'Medium',
+    visualEffectsMode: 'full'
+  };
+
+  let ramDebounceTimer = null;
+
+  function sendBridge(name, payload) {
+    if (window.AuraBridge && typeof window.AuraBridge.send === 'function') {
+      return window.AuraBridge.send(name, payload);
+    }
+    return Promise.resolve(null);
+  }
+
   function initSettings() {
     const ramSlider = document.getElementById('settingsRamSlider');
     const ramVal = document.getElementById('settingsRamVal');
     const ramHint = document.getElementById('settingsRamHint');
     const presetHint = document.getElementById('settingsPresetHint');
+    const presetSeg = document.getElementById('presetSegmented');
+    const effectsSeg = document.getElementById('effectsSegmented');
+    const toggleHide = document.getElementById('toggleHideOnLaunch');
+
+    let rollFn = null;
+    let glideToFn = null;
 
     // 1. Память: ручка едет плавно, цифра прокручивается, при отпускании ручка доезжает до целого ГБ
     if (ramSlider && ramVal && ramHint) {
@@ -45,6 +71,7 @@
         ramVal.firstChild && ramVal.animate([{ transform: `translateY(${dir * 0.55}em)`, opacity: 0 }, { transform: 'translateY(0)', opacity: 1 }],
           { duration: 320, easing: ease });
       };
+      rollFn = roll;
 
       const render = () => {
         const raw = Number(ramSlider.value);
@@ -65,19 +92,54 @@
         }
       };
 
-      const glideTo = target => {
+      const glideTo = (target, commitBridge = true) => {
         cancelAnimationFrame(glide);
         const from = Number(ramSlider.value);
-        if (!animated() || Math.abs(target - from) < 0.001) { ramSlider.value = target; render(); return; }
+        const onSettled = (finalVal) => {
+          if (!commitBridge) return;
+          const prevRam = activeConfig.ramMb;
+          const nextRamMb = finalVal * 1024;
+          if (prevRam === nextRamMb) return;
+
+          clearTimeout(ramDebounceTimer);
+          ramDebounceTimer = setTimeout(() => {
+            sendBridge('config.set', { key: 'ramMb', value: nextRamMb })
+              .then(res => {
+                if (res && res.ramMb) {
+                  activeConfig.ramMb = res.ramMb;
+                }
+              })
+              .catch(err => {
+                if (typeof window.showToast === 'function') {
+                  window.showToast(`Ошибка сохранения памяти: ${err.message}`, 'error');
+                }
+                const fallbackGb = Math.round(prevRam / 1024);
+                glideTo(fallbackGb, false);
+              });
+          }, 300);
+        };
+
+        if (!animated() || Math.abs(target - from) < 0.001) {
+          ramSlider.value = target;
+          render();
+          onSettled(target);
+          return;
+        }
+
         const start = performance.now();
         const step = now => {
           const t = Math.min((now - start) / 260, 1);
           ramSlider.value = from + (target - from) * (1 - Math.pow(1 - t, 3));
           render();
-          if (t < 1) glide = requestAnimationFrame(step);
+          if (t < 1) {
+            glide = requestAnimationFrame(step);
+          } else {
+            onSettled(target);
+          }
         };
         glide = requestAnimationFrame(step);
       };
+      glideToFn = glideTo;
 
       ramSlider.step = 'any';
       ramSlider.addEventListener('input', () => { cancelAnimationFrame(glide); render(); });
@@ -93,54 +155,179 @@
       render();
     }
 
-    // 2. Graphics Preset Segmented Buttons with crossfade hint
-    document.querySelectorAll('#presetSegmented button').forEach((btn, idx) => {
-      btn.addEventListener('click', () => {
-        if (presetHint && PRESETS_INFO[idx]) {
-          presetHint.style.transition = 'opacity var(--dur-1) var(--ease-out)';
-          presetHint.style.opacity = '0';
-          setTimeout(() => {
-            presetHint.textContent = PRESETS_INFO[idx];
-            presetHint.style.opacity = '1';
-          }, 120);
+    // 2. Graphics Preset Segmented Buttons with crossfade hint & preset.apply
+    const syncPresetButtons = (presetKey) => {
+      let idx = PRESET_KEYS.findIndex(k => k.toLowerCase() === (presetKey || '').toLowerCase());
+      if (idx === -1) idx = 1; // Medium fallback
+      if (presetSeg) {
+        presetSeg.querySelectorAll('button').forEach((btn, i) => {
+          const isActive = i === idx;
+          btn.classList.toggle('on', isActive);
+          btn.classList.toggle('active', isActive);
+          btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+        });
+        if (typeof window.placeLens === 'function') {
+          window.placeLens(presetSeg);
         }
+      }
+      if (presetHint && PRESETS_INFO[idx]) {
+        presetHint.textContent = PRESETS_INFO[idx];
+      }
+    };
+
+    if (presetSeg) {
+      presetSeg.querySelectorAll('button').forEach((btn, idx) => {
+        btn.addEventListener('click', () => {
+          const prevKey = activeConfig.graphicsPreset;
+          const nextKey = PRESET_KEYS[idx] || 'Medium';
+          if (nextKey === prevKey) return;
+
+          activeConfig.graphicsPreset = nextKey;
+          syncPresetButtons(nextKey);
+
+          if (presetHint && PRESETS_INFO[idx]) {
+            presetHint.style.transition = 'opacity var(--dur-1) var(--ease-out)';
+            presetHint.style.opacity = '0';
+            setTimeout(() => {
+              presetHint.textContent = PRESETS_INFO[idx];
+              presetHint.style.opacity = '1';
+            }, 120);
+          }
+
+          sendBridge('preset.apply', { presetKey: nextKey })
+            .then(res => {
+              const finalRam = (res && (res.FinalRamMb || res.finalRamMb)) || null;
+              if (finalRam) {
+                activeConfig.ramMb = finalRam;
+                if (ramSlider && glideToFn) {
+                  const targetGb = Math.round(finalRam / 1024);
+                  if (targetGb >= Number(ramSlider.min) && targetGb <= Number(ramSlider.max)) {
+                    glideToFn(targetGb, false);
+                  }
+                }
+              }
+            })
+            .catch(err => {
+              if (typeof window.showToast === 'function') {
+                window.showToast(`Ошибка применения пресета: ${err.message}`, 'error');
+              }
+              activeConfig.graphicsPreset = prevKey;
+              syncPresetButtons(prevKey);
+            });
+        });
       });
-    });
+    }
 
     // 3. Effects Mode Segment
     const syncEffectsSegment = () => {
-      const currentMode = document.documentElement.dataset.effects || 'full';
-      const seg = document.getElementById('effectsSegmented');
-      if (seg) {
-        seg.querySelectorAll('button').forEach(btn => {
+      const currentMode = document.documentElement.dataset.effects || activeConfig.visualEffectsMode || 'full';
+      if (effectsSeg) {
+        effectsSeg.querySelectorAll('button').forEach(btn => {
           const isActive = btn.dataset.fx === currentMode;
           btn.classList.toggle('on', isActive);
           btn.classList.toggle('active', isActive);
           btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
         });
         if (typeof window.placeLens === 'function') {
-          window.placeLens(seg);
+          window.placeLens(effectsSeg);
         }
       }
     };
 
-    document.querySelectorAll('#effectsSegmented button').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const fx = btn.dataset.fx;
-        if (typeof window.setEffectsMode === 'function') {
-          window.setEffectsMode(fx);
+    if (effectsSeg) {
+      effectsSeg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const prevFx = activeConfig.visualEffectsMode;
+          const fx = btn.dataset.fx;
+          if (fx === prevFx) return;
+
+          activeConfig.visualEffectsMode = fx;
+          if (typeof window.setEffectsMode === 'function') {
+            window.setEffectsMode(fx);
+          }
+          syncEffectsSegment();
+          if (typeof window.updateWardrobeRenderState === 'function') {
+            window.updateWardrobeRenderState();
+          }
+
+          sendBridge('config.set', { key: 'visualEffectsMode', value: fx })
+            .catch(err => {
+              if (typeof window.showToast === 'function') {
+                window.showToast(`Ошибка сохранения эффектов: ${err.message}`, 'error');
+              }
+              activeConfig.visualEffectsMode = prevFx;
+              if (typeof window.setEffectsMode === 'function') {
+                window.setEffectsMode(prevFx);
+              }
+              syncEffectsSegment();
+            });
+        });
+      });
+    }
+
+    // 4. Hide Launcher While Playing Toggle
+    if (toggleHide) {
+      toggleHide.addEventListener('click', () => {
+        setTimeout(() => {
+          const nextVal = toggleHide.classList.contains('on');
+          const prevVal = activeConfig.hideLauncherWhilePlaying;
+          if (nextVal === prevVal) return;
+
+          activeConfig.hideLauncherWhilePlaying = nextVal;
+          sendBridge('config.set', { key: 'hideLauncherWhilePlaying', value: nextVal })
+            .catch(err => {
+              if (typeof window.showToast === 'function') {
+                window.showToast(`Ошибка сохранения настроек: ${err.message}`, 'error');
+              }
+              activeConfig.hideLauncherWhilePlaying = prevVal;
+              toggleHide.classList.toggle('on', prevVal);
+            });
+        }, 0);
+      });
+    }
+
+    // Initial load from Bridge (config.get)
+    sendBridge('config.get')
+      .then(cfg => {
+        if (!cfg) return;
+        activeConfig = Object.assign(activeConfig, cfg);
+
+        // RAM slider
+        if (ramSlider && glideToFn && activeConfig.ramMb) {
+          const gb = Math.round(activeConfig.ramMb / 1024);
+          if (gb >= Number(ramSlider.min) && gb <= Number(ramSlider.max)) {
+            glideToFn(gb, false);
+          }
+        }
+
+        // Preset
+        if (activeConfig.graphicsPreset) {
+          syncPresetButtons(activeConfig.graphicsPreset);
+        }
+
+        // Effects Mode: if URL/hash already specified effects (e.g. smoke test ?effects=off), do not overwrite it from stored config
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlFx = urlParams.get('effects');
+        if (urlFx && ['full', 'low', 'off'].includes(urlFx)) {
+          activeConfig.visualEffectsMode = urlFx;
+        } else if (activeConfig.visualEffectsMode) {
+          if (typeof window.setEffectsMode === 'function') {
+            window.setEffectsMode(activeConfig.visualEffectsMode);
+          }
         }
         syncEffectsSegment();
-        if (typeof window.updateWardrobeRenderState === 'function') {
-          window.updateWardrobeRenderState();
+
+        // Hide toggle
+        if (toggleHide && typeof activeConfig.hideLauncherWhilePlaying === 'boolean') {
+          toggleHide.classList.toggle('on', activeConfig.hideLauncherWhilePlaying);
         }
-      });
-    });
+      })
+      .catch(() => {});
 
     syncEffectsSegment();
 
-    // 4. Game version and Folder actions
+    // 5. Game version and Folder actions
     const changeVerBtn = document.getElementById('btnChangeVersion');
     if (changeVerBtn) {
       changeVerBtn.addEventListener('click', () => {
@@ -168,7 +355,7 @@
       });
     }
 
-    // 5. Inline Cache Clear Confirmation (No modals)
+    // 6. Inline Cache Clear Confirmation (No modals)
     const clearWrap = document.getElementById('clearCacheActionWrap');
     const startClearBtn = document.getElementById('btnStartClearCache');
     if (startClearBtn && clearWrap) {
