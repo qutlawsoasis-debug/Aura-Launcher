@@ -490,7 +490,16 @@
     // Экран загрузки: ?boot=update | updated | error
     if (name === 'startup.run' || name === 'startup.retry' || name === 'startup.skip' || name === 'changelog.get') {
       const mode = (typeof location !== 'undefined' && (location.search.match(/[?&]boot=(\w+)/) || [])[1]) || '';
-      const changelog = ['[Интерфейс] Новый интерфейс «Остров»', '[Лобби] Комнаты и приглашения друзей', '[Гардероб] Смена ника и 3D-скин'];
+      const changelog = [
+        '[Загрузка] Новый экран запуска: парящая капсула, проверка обновления и «Что нового»',
+        '[Лобби] Миры на сервере: запуск, подключение, доступ друзьям, создание и загрузка своего мира',
+        '[Мастерская] Свои миры: бэкапы, восстановление, экспорт и импорт; галерея скриншотов',
+        '[Достижения] Витрина в Гардеробе и всплывашки при получении',
+        '[Гардероб] Плащ теперь видят все игроки в игре',
+        '[Друзья] Настоящие аватарки игроков в лобби и списке друзей',
+        '[Настройки] Статус в Discord, автообновление, «Что нового»',
+        '[Ссылки] Приглашения aura:// открываются в новом окне'
+      ];
       const st = (ms, stage, extra) => setTimeout(() => emit('startup.state', { stage, extra }), ms);
       if (name === 'changelog.get') return Promise.resolve({ version: 'beta 1.0.133', changelog });
       if (name === 'startup.skip') { st(100, 'ready'); return Promise.resolve({ ok: true }); }

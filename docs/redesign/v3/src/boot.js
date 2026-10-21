@@ -136,8 +136,8 @@
       });
       news.hidden = false;
       waitNews = new Promise(resolve => newsGo.addEventListener('click', () => {
-        news.hidden = true;
-        resolve();
+        news.classList.add('gone');
+        setTimeout(resolve, 200);
       }, { once: true }));
     }
 

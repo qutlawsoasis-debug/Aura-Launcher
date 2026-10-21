@@ -2,12 +2,17 @@
    Парящая стеклянная капсула над размытым миром и «северным сиянием».
    В конце капсула уплывает вниз на место настоящей (.island) и растворяется в ней. */
 
+/* Колонка по центру: «Что нового» (если есть) над капсулой — ничего не уезжает за край экрана */
 .boot {
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 28px 24px 64px;
   pointer-events: none;
 }
 html.booting .island,
@@ -168,10 +173,14 @@ html.booting .brand { opacity: 0; }
 
 /* «Что нового» после обновления */
 .boot-news {
-  position: absolute;
-  bottom: calc(50% + 70px);
-  width: min(460px, calc(100% - 48px));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(100vh - 230px);
+  width: min(460px, 100%);
   padding: 22px 24px 20px;
+  transition: opacity 320ms var(--ease-out), transform 320ms var(--ease-out);
   border-radius: 26px;
   pointer-events: auto;
   background: var(--glass-sheen), rgba(30, 32, 40, 0.7);
@@ -180,6 +189,8 @@ html.booting .brand { opacity: 0; }
   animation: boot-in 800ms var(--spring) both;
 }
 .boot-news[hidden] { display: none; }
+/* «Поехали»: карточка гаснет, но держит место — капсула не прыгает перед полётом */
+.boot-news.gone { opacity: 0; transform: translateY(-10px) scale(0.98); pointer-events: none; }
 .boot-news-head { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 14px; }
 .boot-news-badge {
   padding: 4px 10px;
@@ -190,7 +201,17 @@ html.booting .brand { opacity: 0; }
   background: var(--accent);
 }
 .boot-news-title { margin: 12px 0 10px; font-size: 26px; font-weight: 700; }
-.boot-news ul { list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.boot-news ul {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.boot-news .btn { flex: none; }
 .boot-news li,
 .changelog-list li {
   position: relative;

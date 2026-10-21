@@ -69,12 +69,42 @@
 
   let islandMode = 'idle';
 
+  // Высота раздела по содержимому: заголовок + всё тело + нижняя строка, без лишней прокрутки.
+  // Число в sizes — запас на случай, если раздел ещё не отрисован.
+  const MIN_SECTION_H = 380;
+  function naturalSectionHeight(m) {
+    const layer = document.querySelector(`.layer[data-l="${m}"]`);
+    const sec = layer && layer.querySelector('.sec');
+    const head = sec && sec.querySelector('.sec-head');
+    const body = sec && sec.querySelector('.sec-body');
+    const foot = sec && sec.querySelector('.sec-foot');
+    if (!sec || !head || !body || !foot) return 0;
+    const prev = [body.style.flex, body.style.height];
+    body.style.flex = 'none';
+    body.style.height = 'auto';
+    const bodyH = body.scrollHeight;
+    body.style.flex = prev[0];
+    body.style.height = prev[1];
+    const cs = getComputedStyle(sec);
+    const headCs = getComputedStyle(head);
+    return Math.ceil(parseFloat(cs.paddingTop) + head.offsetHeight + parseFloat(headCs.marginBottom) + bodyH + foot.offsetHeight + 4);
+  }
+
   function initSectionFooters() {
     document.querySelectorAll('.sec-foot').forEach(foot => {
       foot.innerHTML = sections.map(s => `<button type="button" data-open="${s}">${names[s]}</button>`).join('') +
         '<button type="button" class="play" data-play style="margin-left:auto"><div class="fill"></div><span><span class="tri"></span>Играть</span></button>';
     });
   }
+
+  // Подогнать высоту открытого раздела, когда его содержимое изменилось (вкладка, форма, список)
+  window.fitIsland = function () {
+    if (!island || !sections.includes(islandMode) || islandMode === 'map') return;
+    const natural = naturalSectionHeight(islandMode);
+    if (!natural) return;
+    const h = Math.min(Math.max(MIN_SECTION_H, natural), window.innerHeight - 110);
+    if (Math.abs(parseFloat(island.style.height) - h) > 1) island.style.height = h + 'px';
+  };
 
   window.setIslandMode = function (m, updateHash = true) {
     if (!sizes[m]) return;
@@ -91,8 +121,13 @@
     }
 
     if (island) {
+      let targetH = h;
+      if (sections.includes(m) && m !== 'map') {
+        const natural = naturalSectionHeight(m);
+        if (natural > 0) targetH = Math.max(MIN_SECTION_H, natural);
+      }
       island.style.width = Math.min(w, maxW) + 'px';
-      island.style.height = Math.min(h, maxH) + 'px';
+      island.style.height = Math.min(targetH, maxH) + 'px';
       island.classList.toggle('open', sections.includes(m));
       island.classList.toggle('nav', m === 'nav');
       island.classList.toggle('launching', m === 'launching');
@@ -222,6 +257,18 @@
   function initIslandInteractions() {
     if (!island) return;
 
+    // Содержимое раздела поменялось — подгоняем высоту капсулы сразу и после анимаций раскрытия
+    let fitTimer = 0;
+    let fitLate = 0;
+    new MutationObserver(() => {
+      if (!sections.includes(islandMode)) return;
+      clearTimeout(fitTimer);
+      clearTimeout(fitLate);
+      fitTimer = setTimeout(window.fitIsland, 40);
+      fitLate = setTimeout(window.fitIsland, 420);
+    }).observe(island, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'hidden', 'data-view'] });
+    window.addEventListener('resize', () => window.fitIsland());
+
     function resolveTargetModeAfterClose() {
       if (typeof window.isGameRunning === 'function' && window.isGameRunning()) return 'running';
       if (typeof window.isGameLaunching === 'function' && window.isGameLaunching()) return 'launching';
@@ -230,24 +277,38 @@
 
     // Меню раскрывается по задержке курсора на капсуле, но не над «Играть»:
     // иначе кнопка уезжает из-под курсора на ~220px и клик попадает в пункт меню.
+    // Таймер запускается один раз и не сбрасывается от движения мыши — меню открывается,
+    // даже пока курсор ещё едет. Уход за край закрывает с запасом: во время морфа край
+    // капсулы «убегает» из-под курсора, и без запаса она дёргалась (закрыть → открыть).
+    const OPEN_DELAY = 120;
+    const CLOSE_GRACE = 200;
     let hoverIntent = 0;
+    let leaveTimer = 0;
     const canExpand = () => {
       const isLaunching = typeof window.isGameLaunching === 'function' && window.isGameLaunching();
       const isRunning = typeof window.isGameRunning === 'function' && window.isGameRunning();
       return !isLaunching && !isRunning && islandMode === 'idle';
     };
-    island.addEventListener('mousemove', (e) => {
-      if (!canExpand()) return;
-      clearTimeout(hoverIntent);
-      if (e.target.closest('[data-play]')) return;
-      hoverIntent = setTimeout(() => { if (canExpand()) window.setIslandMode('nav', false); }, 180);
+    const cancelOpen = () => { clearTimeout(hoverIntent); hoverIntent = 0; };
+    island.addEventListener('pointermove', (e) => {
+      clearTimeout(leaveTimer);
+      if (!canExpand()) { cancelOpen(); return; }
+      if (e.target.closest('[data-play]')) { cancelOpen(); return; }
+      if (hoverIntent) return;
+      hoverIntent = setTimeout(() => {
+        hoverIntent = 0;
+        if (canExpand()) window.setIslandMode('nav', false);
+      }, OPEN_DELAY);
     });
 
-    island.addEventListener('mouseleave', () => {
-      clearTimeout(hoverIntent);
-      if (islandMode === 'nav') {
-        window.setIslandMode('idle', false);
-      }
+    island.addEventListener('pointerleave', () => {
+      cancelOpen();
+      clearTimeout(leaveTimer);
+      leaveTimer = setTimeout(() => {
+        if (islandMode === 'nav' && !island.matches(':hover')) {
+          window.setIslandMode('idle', false);
+        }
+      }, CLOSE_GRACE);
     });
 
     island.addEventListener('click', (e) => {
