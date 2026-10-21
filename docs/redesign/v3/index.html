@@ -153,6 +153,43 @@
           <button type="button" class="close" data-close aria-label="Закрыть">✕</button>
         </div>
         <div class="sec-body">
+          <div class="seg" data-seg="lobby" id="lobbySegmented" style="margin-bottom:16px">
+            <span class="lens"></span>
+            <button type="button" class="on" data-tab="room">Комната</button>
+            <button type="button" data-tab="cloud">Миры на сервере</button>
+          </div>
+
+          <div data-pane="cloud" id="paneCloud" hidden>
+            <div class="cloud-head">
+              <div class="small dim">Мир спит, пока в нём никого нет, и просыпается по кнопке «Играть».</div>
+              <span class="small dim" id="cloudSlots"></span>
+            </div>
+            <div class="cloud-list" id="cloudList"></div>
+            <div class="cloud-actions">
+              <button type="button" class="btn primary" data-reveal="cloudCreateBox">Создать мир</button>
+              <button type="button" class="btn" data-reveal="cloudUploadBox" id="btnCloudUploadOpen">Загрузить свой</button>
+            </div>
+            <div class="reveal" id="cloudCreateBox">
+              <div>
+                <div class="cloud-form">
+                  <input class="field" id="cloudNewName" placeholder="Название мира" maxlength="40" autocomplete="off">
+                  <input class="field" id="cloudNewSeed" placeholder="Сид (необязательно)" maxlength="40" autocomplete="off">
+                  <button type="button" class="btn primary" id="btnCloudCreate">Создать</button>
+                </div>
+              </div>
+            </div>
+            <div class="reveal" id="cloudUploadBox">
+              <div>
+                <div class="cloud-form">
+                  <select class="field" id="cloudUploadSelect"></select>
+                  <button type="button" class="btn primary" id="btnCloudUpload">Загрузить</button>
+                </div>
+                <div class="small dim" id="cloudUploadStatus" style="margin-top:8px"></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-pane="room" id="paneRoom">
           <div class="lobby-invite" id="lobbyInviteCard" hidden>
             <div class="face" style="--s:40px"></div>
             <div style="flex:1;min-width:0">
@@ -204,6 +241,7 @@
                 <button type="button" class="btn ghost danger" id="btnLeaveLobby">Покинуть</button>
               </div>
             </div>
+          </div>
           </div>
         </div>
         <div class="sec-foot"></div>

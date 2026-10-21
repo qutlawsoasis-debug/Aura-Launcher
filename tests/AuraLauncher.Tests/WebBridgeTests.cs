@@ -1120,6 +1120,19 @@ public class WebBridgeTests
     }
 
     [Fact]
+    public async Task Handle_CloudCommands_WithoutService_ReturnError()
+    {
+        using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), logger: _ => {});
+        var posted = new List<BridgeMessage>();
+        bridge.MessagePosted += m => posted.Add(m);
+
+        await bridge.ProcessRawMessageAsync("""{"id":"c1","type":"command","name":"cloud.list"}""");
+        await bridge.ProcessRawMessageAsync("""{"id":"c2","type":"command","name":"cloud.create","payload":{"name":"Мир"}}""");
+
+        Assert.All(posted, m => Assert.NotNull(m.Error));
+    }
+
+    [Fact]
     public async Task Handle_LauncherApplyUpdate_NotInstalled_ReturnsError()
     {
         using var bridge = new WebBridge(null, new TestGameSessionService(), new TestConfigService(@"C:\test\dir"), logger: _ => {});

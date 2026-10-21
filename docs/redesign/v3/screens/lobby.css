@@ -302,3 +302,127 @@ html[data-effects="off"] #lobbySlotsContainer .ring::before,
 html[data-effects="off"] #lobbySlotsContainer .ring::after { display: none; }
 html[data-effects="low"] .lobby-hero .o3,
 html[data-effects="low"] .lobby-hero .o2 { display: none; }
+
+/* ---------- Миры на сервере ---------- */
+.cloud-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.cloud-list { display: flex; flex-direction: column; gap: 6px; min-height: 64px; }
+.cloud-empty { padding: 18px 4px; text-align: center; }
+.cw {
+  border-radius: 16px;
+  background: var(--fill);
+  overflow: hidden;
+  animation: lobby-slot-in var(--dur-spring-m) var(--spring) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+.cw-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 12px 12px 14px;
+}
+.cw-icon {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.cw[data-status="running"] .cw-icon::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #30D158;
+  border: 2px solid rgba(30, 32, 40, 0.9);
+  box-shadow: 0 0 8px #30D158;
+}
+.cw-main { flex: 1; min-width: 0; }
+.cw-name { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cw-owner { font-weight: 400; color: var(--ink-3); font-size: 14px; }
+.cw-status { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+.cw[data-status="running"] .cw-status { color: #30D158; }
+.cw-bar {
+  height: 3px;
+  margin-top: 7px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  display: none;
+}
+.cw[data-status="starting"] .cw-bar,
+.cw[data-status="stopping"] .cw-bar { display: block; }
+.cw-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: 0 50%;
+  transform: scaleX(var(--p, 0.05));
+  transition: transform var(--dur-3) var(--ease-out);
+}
+.cw[data-status="stopping"] .cw-bar i {
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  transform: none;
+  animation: lobby-shimmer 1.2s ease-in-out infinite;
+}
+.cw-more-btn { width: 36px; padding: 0; font-size: 18px; }
+.cw-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-spring-m) var(--spring);
+}
+.cw.open .cw-panel { grid-template-rows: 1fr; }
+.cw-panel > div { overflow: hidden; }
+.cw-panel-inner {
+  padding: 4px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.cw-access { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.cw-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 99px;
+  border: none;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: var(--fill-2);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out), transform var(--dur-1) var(--ease-out);
+}
+.cw-chip:active { transform: scale(0.95); }
+.cw-chip.on { color: var(--accent-ink); background: var(--accent); }
+.cw-chip[disabled] { opacity: 0.5; pointer-events: none; }
+.cw-panel-actions { display: flex; gap: 8px; }
+.cw-play.busy { position: relative; overflow: hidden; pointer-events: none; }
+.cw-play.busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: lobby-shimmer 1.4s ease-in-out infinite;
+}
+.cloud-actions { display: flex; gap: 10px; margin-top: 14px; }
+.cloud-form { display: flex; gap: 10px; padding-top: 12px; }
+.cloud-form .field { flex: 1; min-width: 0; }
+select.field { appearance: none; cursor: pointer; }
+
+html[data-effects="off"] .cw,
+html[data-effects="off"] .cw-bar i { animation: none; }
+html[data-effects="off"] .cw-panel { transition: none; }

@@ -22,6 +22,7 @@ import '../assets/js/core.js';
 import '../screens/play.js';
 import '../screens/map.js';
 import '../screens/lobby.js';
+import '../screens/cloud.js';
 import '../screens/friends.js';
 import '../screens/wardrobe.js';
 import '../screens/workshop.js';

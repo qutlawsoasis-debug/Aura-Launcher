@@ -449,6 +449,10 @@
       return Promise.resolve({ freedBytes: 15728640 }); // 15 MB
     }
 
+    if (name.startsWith('cloud.') || name === 'worlds.local') {
+      return handleMockCloud(name, payload || {});
+    }
+
     // Экран загрузки: ?boot=update | updated | error
     if (name === 'startup.run' || name === 'startup.retry' || name === 'startup.skip' || name === 'changelog.get') {
       const mode = (typeof location !== 'undefined' && (location.search.match(/[?&]boot=(\w+)/) || [])[1]) || '';
@@ -502,6 +506,56 @@
     }
 
     return Promise.resolve({ success: true, mock: true });
+  }
+
+  // --- Облачные миры (mock) ---
+  const mockCloud = [
+    { id: 'w1', name: 'Выживание с друзьями', owner: 'Player', isOwner: true, status: 'sleeping', progress: 0, port: null, online: [], max: 8, allowed: ['zxcursed'] },
+    { id: 'w2', name: 'Стройка у озера', owner: 'zxcursed', isOwner: false, status: 'running', progress: 100, port: 25570, online: ['zxcursed', 'Lumi'], max: 8, allowed: [] }
+  ];
+  const mockLocalWorlds = [
+    { folder: 'Новый мир', name: 'Новый мир', size: '48.2 МБ', lastPlayed: '20.10.2026', mode: 'Выживание', backups: [] },
+    { folder: 'Aura сервер (копия)', name: 'Aura сервер (копия)', size: '312.7 МБ', lastPlayed: '21.10.2026', mode: 'Выживание', backups: [{ file: 'backup-1.zip', created: '21.10.2026 06:40', size: '300 МБ' }] }
+  ];
+
+  function handleMockCloud(name, p) {
+    const find = id => mockCloud.find(w => w.id === id);
+    if (name === 'worlds.local') return Promise.resolve({ worlds: mockLocalWorlds });
+    if (name === 'cloud.list') {
+      const active = mockCloud.filter(w => w.status !== 'sleeping').length;
+      return Promise.resolve({ maxActive: 3, activeCount: active, worlds: JSON.parse(JSON.stringify(mockCloud)) });
+    }
+    if (name === 'cloud.create' || name === 'cloud.start' || name === 'cloud.upload') {
+      let w = name === 'cloud.start' ? find(p.id) : null;
+      if (!w) {
+        const title = p.name || (p.folder ? p.folder : 'Мир');
+        w = { id: 'w' + Date.now(), name: title, owner: 'Player', isOwner: true, status: 'sleeping', progress: 0, port: null, online: [], max: 8, allowed: [] };
+        mockCloud.unshift(w);
+      }
+      if (name === 'cloud.upload') return Promise.resolve(Object.assign({}, w));
+      Object.assign(w, { status: 'starting', progress: 10, stageText: 'Запуск виртуальной машины Java…', port: 25571 });
+      [[1500, 45, 'Загрузка мира…'], [3000, 80, 'Подготовка спавна…']].forEach(([ms, pr, t]) => setTimeout(() => Object.assign(w, { progress: pr, stageText: t }), ms));
+      setTimeout(() => Object.assign(w, { status: 'running', progress: 100, stageText: 'В сети' }), 4500);
+      return Promise.resolve({ worldId: w.id, port: w.port, status: 'starting' });
+    }
+    if (name === 'cloud.connect') return Promise.resolve({ accepted: true, address: '89.168.82.200:' + ((find(p.id) || {}).port || 25565) });
+    if (name === 'cloud.stop') {
+      const w = find(p.id);
+      if (w) { w.status = 'stopping'; setTimeout(() => Object.assign(w, { status: 'sleeping', online: [] }), 2000); }
+      return Promise.resolve({ ok: true });
+    }
+    if (name === 'cloud.delete') {
+      const i = mockCloud.findIndex(w => w.id === p.id);
+      if (i >= 0) mockCloud.splice(i, 1);
+      return Promise.resolve({ ok: true });
+    }
+    if (name === 'cloud.share') {
+      const w = find(p.id);
+      if (!w) return Promise.reject(new Error('Мир не найден'));
+      w.allowed = p.add ? [...new Set([...w.allowed, p.nick])] : w.allowed.filter(n => n !== p.nick);
+      return Promise.resolve({ ok: true, allowed: w.allowed });
+    }
+    return Promise.resolve({ ok: true });
   }
 
   // --- Лобби (mock): тот же жизненный цикл, что у LobbySessionService ---

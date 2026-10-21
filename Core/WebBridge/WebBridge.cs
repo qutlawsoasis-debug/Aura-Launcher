@@ -27,6 +27,7 @@ public partial class WebBridge : IDisposable
     private readonly IReportService? _reportService;
     private readonly ILobbySessionService? _lobbySession;
     private readonly ILauncherUpdateService? _launcherUpdateService;
+    private readonly ICloudLobbyService? _cloudLobbyService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -47,6 +48,7 @@ public partial class WebBridge : IDisposable
         IReportService? reportService = null,
         ILobbySessionService? lobbySession = null,
         ILauncherUpdateService? launcherUpdateService = null,
+        ICloudLobbyService? cloudLobbyService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -79,6 +81,7 @@ public partial class WebBridge : IDisposable
         _lobbySession = lobbySession;
         SubscribeLobby();
         _launcherUpdateService = launcherUpdateService;
+        _cloudLobbyService = cloudLobbyService;
     }
 
     private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -268,6 +271,42 @@ public partial class WebBridge : IDisposable
 
                 case "logs.export":
                     await HandleLogsExportAsync(msg);
+                    break;
+
+                case "cloud.list":
+                    await HandleCloudListAsync(msg);
+                    break;
+
+                case "cloud.create":
+                    await HandleCloudCreateAsync(msg);
+                    break;
+
+                case "cloud.start":
+                    await HandleCloudStartAsync(msg);
+                    break;
+
+                case "cloud.connect":
+                    await HandleCloudConnectAsync(msg);
+                    break;
+
+                case "cloud.stop":
+                    await HandleCloudStopAsync(msg);
+                    break;
+
+                case "cloud.delete":
+                    await HandleCloudDeleteAsync(msg);
+                    break;
+
+                case "cloud.share":
+                    await HandleCloudShareAsync(msg);
+                    break;
+
+                case "cloud.upload":
+                    await HandleCloudUploadAsync(msg);
+                    break;
+
+                case "worlds.local":
+                    await HandleWorldsLocalAsync(msg);
                     break;
 
                 case "startup.run":
