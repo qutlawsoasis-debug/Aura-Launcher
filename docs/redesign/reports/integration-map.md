@@ -47,13 +47,14 @@
 | Синхронизация сборки модов | [workshop.js:47](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/workshop.js#L47) | `Services/Interfaces/IPackUpdateService.cs` `Task<PackUpdateResult> CheckAndApplyAsync(...)` | Возврат: `PackUpdateResult` (FilesChanged, Status) | **Есть** |
 | Открытие папки модов в Проводнике | [workshop.js:56](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/workshop.js#L56) | `System.Diagnostics.Process.Start("explorer.exe", modsDir)` | Команда вызова ОС | **Есть** |
 | **Настройки** | | | | |
-| Выделение памяти RAM (слайдер) | [settings.js:24](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L24) | `Services/Interfaces/IConfigService.cs` `LauncherConfig.AllocatedRamMb` | Чтение/запись `int` (МБ) | **Есть** |
+| Выделение памяти RAM (слайдер) | [settings.js:24](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L24) | `Services/Interfaces/IConfigService.cs` `LauncherConfig.RamMb` | Чтение/запись `int` (МБ) | **Есть** |
 | Пресеты графики (Слабая..Ультра) | [settings.js:38](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L38) | `Services/Interfaces/IGraphicsPresetService.cs` `ApplyPreset(string gameDir, string presetKey)` | Передать: `presetKey`; Возврат: `PresetApplyResult` | **Есть** |
 | Режим визуальных эффектов (full/low/off) | [settings.js:63](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L63) | `Services/Interfaces/IConfigService.cs` (сохранение в `LauncherConfig.VisualEffectsMode`) | Чтение/запись строки `"full" | "low" | "off"` | **Частично** (в конфиге пока сохраняется через localStorage) |
-| Тумблеры: скрыть в игре, автообновление | [settings.html:31](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.html#L31) | `Services/Interfaces/IConfigService.cs` `HideLauncherWhilePlaying`, `AutoUpdateEnabled` | Чтение/запись `bool` | **Есть** |
+| Скрывать лаунчер при запуске | [settings.html:31](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.html#L31) | `Services/Interfaces/IConfigService.cs` `LauncherConfig.HideLauncherWhilePlaying` | Чтение/запись `bool` | **Есть** |
+| Автообновление (тумблер) | [settings.html:36](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.html#L36) | Нет поля в `LauncherConfig` (автообновление всегда управляется Velopack на старте) | Чтение/запись `bool` | **Нет** |
 | Экспорт логов и отчёта о сбое | [settings.js:80](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L80) | `Services/Interfaces/IReportService.cs` `Task<string> GenerateReportZipAsync(...)` | Возврат: путь к созданному `.zip` | **Есть** |
 | Очистка кэша модов и шейдеров | [settings.js:98](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L98) | Удаление `.aura/mods/.cache`, `.aura/shaderpacks/.cache` | Команда файловой системы | **Есть** |
-| Выбор папки игры (Диалог обзора) | [settings.js:69](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L69) | `Microsoft.Win32.OpenFolderDialog` / `IConfigService.CurrentConfig.CustomGameDirectory` | Вызов Win32 API диалога | **Есть** |
+| Выбор папки игры (Диалог обзора) | [settings.js:69](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/settings.js#L69) | `Microsoft.Win32.OpenFolderDialog` / `IConfigService.CurrentConfig.GameDir` | Вызов Win32 API диалога | **Есть** |
 | **Карта** | | | | |
 | Отображение карты мира (холст) | [map.js:42](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/map.js#L42) | Нет сервиса JourneyMap/тайлов (в прототипе процедурный генератор шума Перлина) | Передача тайлов из `.aura/journeymap/data/sp/` | **Нет** |
 | Координаты и метки друзей на карте | [map.js:176](file:///c:/Users/magne/Documents/GitHub/Aura-Launcher/docs/redesign/v3/screens/map.js#L176) | Нет трекинга игровых координат (требуется свой Fabric-мод на клиенте) | Потоковые координаты `{ x, z, player }` | **Нет** |
@@ -115,32 +116,50 @@
    - Payload: `{ "ramGb": 6, "model": "default", "nickname": "Coock0ld" }`
 2. **`game.stop`**: запрос принудительной остановки процесса игры.
    - Payload: `{}`
-3. **`lobby.create`**: создание нового сетевого лобби.
-   - Payload: `{ "hostName": "Coock0ld" }`
-4. **`lobby.join`**: подключение к существующей комнате.
-   - Payload: `{ "code": "AURA-7731-PLAY", "playerName": "Coock0ld" }`
-5. **`lobby.leave`**: выход из текущего лобби.
+3. **`game.changeVersion`** (`data-cmd="game.changeVersion"`): смена профиля версии Minecraft.
+   - Payload: `{ "version": "1.20.1" }`
+4. **`fs.openGameFolder`** (`data-cmd="fs.openGameFolder"`): открытие рабочей папки игры в Проводнике Windows.
    - Payload: `{}`
-6. **`skin.upload`**: загрузка локального скина игрока.
-   - Payload: `{ "fileName": "steve.png", "base64Data": "..." }`
-7. **`preset.apply`**: применение выбранного пресета графики.
-   - Payload: `{ "presetKey": "high" }`
-8. **`workshop.toggleMod`**: включение/выключение мода.
-   - Payload: `{ "modId": "sodium", "enabled": true }`
-9. **`window.action`**: управление окном WPF.
-   - Payload: `{ "action": "minimize | maximize | close | drag" }`
+5. **`fs.openModsFolder`** (`data-cmd="fs.openModsFolder"`): открытие директории модов `%APPDATA%\.aura\mods`.
+   - Payload: `{}`
+6. **`logs.export`** (`data-cmd="logs.export"`): генерация и экспорт архива диагностики логов.
+   - Payload: `{}`
+7. **`pack.sync`** (`data-cmd="pack.sync"`): принудительная сверка и синхронизация модпака с манифестом.
+   - Payload: `{}`
+8. **`friends.invite`** (`data-cmd="friends.invite"`): отправка приглашения другу в лобби.
+   - Payload: `{ "friendId": "string", "nickname": "string" }`
+9. **`lobby.create`**: создание нового сетевого лобби.
+   - Payload: `{ "hostName": "Coock0ld" }`
+10. **`lobby.join`**: подключение к существующей комнате по коду.
+    - Payload: `{ "code": "AURA-7731-PLAY", "playerName": "Coock0ld" }`
+11. **`lobby.leave`**: выход из текущего лобби.
+    - Payload: `{}`
+12. **`skin.upload`**: валидация и синхронизация локального скина игрока.
+    - Payload: `{ "fileName": "steve.png", "base64Data": "..." }`
+13. **`preset.apply`**: применение выбранного пресета графики.
+    - Payload: `{ "presetKey": "high" }`
+14. **`workshop.toggleMod`**: включение/выключение мода.
+    - Payload: `{ "modId": "sodium", "enabled": true }`
+15. **`window.action`**: управление окном WPF.
+    - Payload: `{ "action": "minimize | maximize | close | drag" }`
 
 #### События (C# → JS)
-1. **`game.progress`**: потоковый статус проверки и скачивания файлов.
-   - Payload: `{ "stage": "downloading", "file": "assets.jar", "percentage": 45 }`
-2. **`game.status`**: изменение жизненного цикла игры.
+1. **`game.progress`**: потоковый статус проверки и скачивания файлов (`IProgress<InstallProgressReport>`).
+   - Payload: `{ "stage": "downloading", "file": "assets.jar", "percentage": 45, "message": "Загрузка ресурсов..." }`
+2. **`game.status`**: изменение жизненного цикла процесса игры (`IsGameRunning`, `GameExited`).
    - Payload: `{ "isRunning": true, "processId": 14208, "exitCode": null }`
-3. **`tunnel.status`**: состояние сетевого туннеля Playit.
+3. **`tunnel.status`**: состояние сетевого туннеля Playit (`ITunnelProvider`).
    - Payload: `{ "status": "active", "address": "eu.aura.playit.gg", "port": 25565, "pingMs": 34 }`
-4. **`friends.presence`**: обновление списка и статусов друзей.
+4. **`friends.presence`**: обновление списка и статусов друзей (`IFriendService.FriendsListUpdated`).
    - Payload: `[{ "id": "f_1", "nickname": "Notch", "status": "game", "lobbyCode": "AURA-7731" }]`
-5. **`notification.toast`**: вывод системного всплывающего сообщения.
+5. **`friends.inviteReceived`**: уведомление о входящем инвайте в комнату.
+   - Payload: `{ "inviteId": "inv_123", "fromNick": "zxcursed", "lobbyCode": "AURA-7731" }`
+6. **`friends.requestReceived`**: уведомление о входящей заявке в друзья.
+   - Payload: `{ "fromId": "usr_99", "fromNick": "RedstonePro", "friendCode": "AURA-1234" }`
+7. **`notification.toast`**: вывод системного всплывающего сообщения в тост-контейнере.
    - Payload: `{ "type": "info | success | error", "title": "Лобби", "message": "Игрок Alex подключился" }`
+8. **`background.changed`**: уведомление о смене динамического фонового изображения мира.
+   - Payload: `{ "imageUrl": "https://aura.local/backgrounds/bg_2.jpg" }`
 
 ---
 
@@ -161,16 +180,16 @@
 > Приложение открывает `https://aura.local/index.html`.
 
 ### Расположение ассетов и скинов
-- Статические файлы UI (`shell.html`, `screens/`, `tokens.css`, `assets/fonts/Onest.woff2`, `assets/vendor/skinview3d.bundle.js`) компилируются и разворачиваются в `%LOCALAPPDATA%\Aura\ui\`.
-- Пользовательские скины и кэш аватаров читаются через специальный виртуальный эндпоинт `https://aura.local/skins/{nick}.png`, который мапится на `%APPDATA%\.aura\CustomSkinLoader\LocalSkin\skins\`.
+- Статические файлы UI (`shell.html`, `screens/`, `tokens.css`, `assets/fonts/Onest.woff2`, `assets/vendor/skinview3d.bundle.js` или бандл Vite `dist/`) разворачиваются в подпапку `ui/` рабочего каталога приложения.
+- Пользовательские скины читаются через локальный сервис или прямой маппинг `%APPDATA%\.aura\CustomSkinLoader\LocalSkin\skins\`.
 
-### Управление окном без системной рамки (Custom Chrome)
-- Окно WPF настраивается как `WindowStyle="None"`, `AllowsTransparency="False"` (WebView2 не поддерживает прозрачность при `AllowsTransparency="True"` в старых версиях .NET; в .NET 8 с `DefaultBackgroundColor = Color.Transparent` прозрачность поддерживается через композицию Windows).
-- Для перетаскивания окна (`Window.DragMove`) в HTML-разметке шапки добавляется CSS-свойство:
-  `-webkit-app-region: drag;`
-  Для интерактивных кнопок (закрыть, свернуть):
-  `-webkit-app-region: no-drag;`
-- Клик по кнопкам окна отправляет в C# команду `window.action { action: "minimize" | "close" }`, которая выполняется в потоке WPF `Dispatcher`.
+### Управление окном без системной рамки и требования к `app-region`
+- Для нативной поддержки перетаскивания окна через CSS (`app-region: drag` / `-webkit-app-region: drag`):
+  - Требуется свойство: `CoreWebView2Settings.IsNonClientRegionSupportEnabled = true`.
+  - Требуется SDK WebView2 версии **1.0.1823.32 или новее** (в проекте подключена актуальная `1.0.4258.31`).
+  - Окно WPF конфигурируется: `WindowStyle="None"`, `ResizeMode="CanResize"`, фон `#070b10`.
+  - При отсутствии или сбое поддержки неклиентской области (фолбэк): JS отправляет команду `window.action { action: "drag" }`, и C#-обработчик окна вызывает `Window.DragMove()` на событии мыши `Dispatcher.Invoke`.
+  - Кнопки окна (Свернуть / Закрыть) используют `-webkit-app-region: no-drag;` и отправляют `window.action { action: "minimize" | "close" }`.
 
 ---
 
