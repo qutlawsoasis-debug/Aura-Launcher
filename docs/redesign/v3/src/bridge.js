@@ -75,14 +75,17 @@
         payload
       };
 
-      window.chrome.webview.postMessage(JSON.stringify(message));
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(message);
+      }
 
+      const timeoutMs = name === 'game.launch' ? 10000 : 30000;
       setTimeout(() => {
         if (pendingRequests.has(id)) {
           pendingRequests.delete(id);
           reject(new Error(`[Bridge] Timeout waiting for response to ${name}`));
         }
-      }, 30000);
+      }, timeoutMs);
     });
   }
 
@@ -121,7 +124,9 @@
       }
 
       mockGameRunning = true;
-      emit('game.status', { state: 'preparing', isRunning: false });
+      setTimeout(() => {
+        emit('game.status', { state: 'preparing', isRunning: false });
+      }, 0);
 
       let p = 0;
       const effects = document.documentElement.dataset.effects;

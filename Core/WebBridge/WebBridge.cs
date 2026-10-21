@@ -29,12 +29,32 @@ public class WebBridge : IDisposable
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
         _gameSessionService.GameExited += OnSessionGameExited;
+        _window.StateChanged += OnWindowStateChanged;
+    }
+
+    private void OnWindowStateChanged(object? sender, EventArgs e)
+    {
+        SendWindowState();
+    }
+
+    public void SendWindowState()
+    {
+        string state = _window.WindowState switch
+        {
+            WindowState.Maximized => "maximized",
+            WindowState.Minimized => "minimized",
+            _ => "normal"
+        };
+        SendEvent("window.state", new { state });
     }
 
     public void Attach(CoreWebView2 coreWebView2)
     {
         _coreWebView2 = coreWebView2;
         _coreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+        // Отправка начального статуса окна
+        SendWindowState();
 
         // Отправка начального статуса
         SendEvent("game.status", new
@@ -82,20 +102,27 @@ public class WebBridge : IDisposable
 
     private async void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
-        string rawJson = e.WebMessageAsJson;
-        BridgeMessage? msg;
+        string rawInput;
         try
         {
-            msg = JsonSerializer.Deserialize<BridgeMessage>(rawJson);
+            rawInput = e.TryGetWebMessageAsString();
+            if (string.IsNullOrEmpty(rawInput))
+            {
+                rawInput = e.WebMessageAsJson;
+            }
         }
-        catch (Exception ex)
+        catch
         {
-            FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] JSON parse failed: {ex.Message}");
-            SendError(null, "parse.error", ex.Message);
-            return;
+            rawInput = e.WebMessageAsJson;
         }
 
-        if (msg == null) return;
+        var (msg, parseError) = BridgeMessageParser.Parse(rawInput);
+        if (parseError != null || msg == null)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] JSON parse failed: {parseError}");
+            SendError(null, "parse.error", parseError ?? "unknown_parse_error");
+            return;
+        }
 
         FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] Command received: {msg.Name} (id={msg.Id})");
 
@@ -137,6 +164,17 @@ public class WebBridge : IDisposable
             return Task.CompletedTask;
         }
 
+        string nickname = _configService.CurrentConfig.Nickname?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(nickname) || !NicknameValidator.Validate(nickname).IsValid)
+        {
+            FabricGameLaunchService.LogLauncherEvent("[WEBBRIDGE: WARN] game.launch rejected: invalid_nickname");
+            SendError(msg.Id, msg.Name, "invalid_nickname");
+            return Task.CompletedTask;
+        }
+
+        // Асинхронное подтверждение приема команды на запуск
+        SendResponse(msg.Id, msg.Name, new { accepted = true });
+
         _gameLaunchCts?.Cancel();
         _gameLaunchCts = new CancellationTokenSource();
 
@@ -163,12 +201,10 @@ public class WebBridge : IDisposable
                     cancellationToken: _gameLaunchCts.Token);
 
                 FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE] Game launched successfully! PID={process.Id}");
-                SendResponse(msg.Id, msg.Name, new { started = true, processId = process.Id });
             }
             catch (Exception ex)
             {
                 FabricGameLaunchService.LogLauncherEvent($"[WEBBRIDGE: ERROR] Launch failed: {ex.Message}");
-                SendError(msg.Id, msg.Name, ex.Message);
                 SendEvent("game.status", new
                 {
                     state = "failed",
