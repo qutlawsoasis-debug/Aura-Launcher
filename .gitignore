@@ -19,3 +19,8 @@ progress.md
 .planning/
 .active_plan
 *.bak
+
+# Рабочие материалы редизайна — только локально (решение пользователя 22.10)
+/docs/redesign/*
+!/docs/redesign/v3/
+!/docs/redesign/ingame/

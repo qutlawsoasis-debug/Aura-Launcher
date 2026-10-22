@@ -1,6 +1,0 @@
-# Собранные данные: текстуры Minecraft (их нельзя распространять) и кусок мира — генерируются tools/
-scene/
-mcassets/
-area.json
-node_modules/
-package-lock.json
