@@ -1,0 +1,13 @@
+Задание от Claude (по живой проверке пользователя). Параллельно чат «плеер» правит player/**, player.html, FloatingLyrics; чат «HUD» — hud/**, InGameHudMixin, hud.html. Их файлы НЕ трогай. runClient — только через aura-ui\run\agent-run.lock (если внутри написано claude-for-user — НЕ запускать вообще, ждать). Отчёт в файл, не в чат.
+
+TARGET: aura-ui\src\main\java\com\auramc\auraui\screen\McefHtmlScreen.java, HtmlScreen.java, web\HtmlBridge.java, mixin\GameMenuScreenMixin.java, docs\redesign\ingame\index.html
+
+БАГ 1 (главный): в игре ни один ползунок/переключатель не применяется. В latest.log за всю сессию только BRIDGE op=get, ни одного op=set. Та же страница в Chrome с заглушкой cefQuery шлёт set правильно (я проверил: render=20, vsync=true). Значит, ломается ввод мыши в MCEF: подозрение — mouseDragged/mouseMoved шлют sendMouseMove без флага зажатой кнопки, Chromium считает кнопку отпущенной (pointerup сразу) или клики не доходят как click. Найди точную причину: временно добавь в index.html console.log на pointerdown/pointerup/click (видно в latest.log как [aura-ui CEF]), в автосъёмке эмулируй реальный ввод через this.mouseClicked/mouseDragged/mouseReleased по координатам ползунка и переключателя. Исправь (модификаторы кнопок в MCEF — смотри javap MCEFBrowser: sendMousePress/Release/Move/ sendMouseWheel и что они принимают). Критерий: в игре движение ползунка «Дальность прорисовки» и клик по V-Sync дают BRIDGE op=set в логе и меняют options.txt.
+
+ЗАДАЧА 2: открытие ESC сейчас моргает и с задержкой. Нужно: мгновенно и плавно. Браузер ESC создавать заранее (при входе в мир, скрытно) и переиспользовать, не закрывать при закрытии паузы; при открытии — размытие мира нарастает плавно 0→полное за 250 мс (анимировать радиус blur-пост-эффекта через его uniform Radius, или смешивать размытый кадр с резким по альфе), меню одновременно появляется opacity 0→1 + scale 0.97→1 (CSS, по сообщению из Java «opened»). Закрытие — обратная анимация 180 мс, потом setScreen(null). Никакого белого/чёрного кадра между.
+
+ЗАДАЧА 3: проверь свою прошлую работу (agy-settings-game-report.md) в живой игре после фиксов: шестерёнка в хабе → наши настройки → Esc обратно.
+
+DONT: git checkout/restore/stash/reset/clean; не добавлять второй CefMessageRouter (только McefHtmlScreen.registerHandlersOnce); не коммитить; не пушить.
+
+REPORT в docs\redesign\reports\agy-fix-input-esc-report.md: причина бага 1 (одной фразой) и фикс, цитаты BRIDGE op=set из лога, options.txt до/после, как сделана анимация, кадр середины анимации docs\redesign\ingame\shots\esc-anim.png, что не сделал — честно. Последней строкой: ГОТОВО
