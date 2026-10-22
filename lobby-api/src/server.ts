@@ -17,8 +17,10 @@ import {
 } from './friendRoutes.js';
 import handleReport from '../api/report.js';
 import handleMusicResolve from '../api/music/resolve.js';
+import handleMusicBlocked from '../api/music/blocked.js';
 import handleMusicSearch from '../api/music/search.js';
 import handleMusicList from '../api/music/list.js';
+import handleMusicSoundCloud from '../api/music/soundcloud.js';
 import { generateLandingHtml } from './landing.js';
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
@@ -127,8 +129,14 @@ export const server = http.createServer(async (req, res) => {
     if (pathname === '/api/music/resolve') {
       return await handleMusicResolve(req, res);
     }
+    if (pathname === '/api/music/blocked') {
+      return await handleMusicBlocked(req, res);
+    }
     if (pathname === '/api/music/search') {
       return await handleMusicSearch(req, res);
+    }
+    if (pathname === '/api/music/soundcloud') {
+      return await handleMusicSoundCloud(req, res);
     }
     if (pathname === '/api/music/list') {
       return await handleMusicList(req, res);
