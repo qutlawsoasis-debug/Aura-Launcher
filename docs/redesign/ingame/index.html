@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aura — игровое меню</title>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+@font-face { font-family: 'Onest'; src: url('../v3/public/assets/fonts/Onest.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
+
+:root {
+  --accent: #64D2FF;
+  --accent-rgb: 100, 210, 255;
+  --accent-ink: #00283A;
+
+  --ink: #fff;
+  --ink-2: rgba(255,255,255,.72);
+  --ink-3: rgba(255,255,255,.48);
+  --ink-4: rgba(255,255,255,.30);
+
+  --fill: rgba(118,118,128,.24);
+  --fill-2: rgba(118,118,128,.36);
+  --fill-3: rgba(118,118,128,.50);
+  --hair: rgba(255,255,255,.08);
+  --line: rgba(255,255,255,.14);
+
+  --glass: rgba(22,26,34,.58);
+  --glass-2: rgba(30,35,45,.62);
+  --card: rgba(255,255,255,.045);
+  --card-hover: rgba(255,255,255,.075);
+  --sheen: inset 0 1px 0 rgba(255,255,255,.14);
+  --shadow: 0 30px 80px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.25);
+
+  --danger: #FF6B6B;
+  --r-xl: 28px; --r-lg: 20px; --r-md: 14px; --r-sm: 10px;
+  --ease: cubic-bezier(.22,1,.36,1);
+  --spring: cubic-bezier(.34,1.56,.64,1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  background: #05070b; color: var(--ink); overflow: hidden;
+  font-family: 'Onest', system-ui, sans-serif; font-size: 15px;
+  -webkit-font-smoothing: antialiased; user-select: none;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input { font: inherit; color: inherit; }
+svg.lucide { width: 18px; height: 18px; stroke-width: 1.8; flex: none; }
+
+/* ============ МИР ============ */
+.world { position: fixed; inset: 0; background: url('../v3/public/assets/images/bg_13.jpg') center/cover; }
+.world::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.35)); }
+
+/* Единственный живой слой размытия (в игре — шейдер) */
+.veil {
+  position: fixed; inset: 0; z-index: 5; pointer-events: none;
+  backdrop-filter: blur(0px) saturate(100%); -webkit-backdrop-filter: blur(0px) saturate(100%);
+  background: rgba(4,8,14,0);
+  transition: backdrop-filter .45s var(--ease), -webkit-backdrop-filter .45s var(--ease), background .45s var(--ease);
+}
+body:not([data-view="game"]) .veil {
+  backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%);
+  background: rgba(4,8,14,.38);
+}
+body[data-fx="off"] .veil { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body[data-fx="off"]:not([data-view="game"]) .veil { background: rgba(6,10,16,.82); }
+
+/* ============ HUD ============ */
+.hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; transition: opacity .35s var(--ease); }
+body:not([data-view="game"]) .hud { opacity: .0; }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px;
+  border-radius: 999px; background: rgba(14,18,24,.55); border: 1px solid var(--hair);
+  box-shadow: var(--sheen); font-size: 12.5px; color: var(--ink-2); font-weight: 500;
+}
+.pill b { color: var(--ink); font-weight: 600; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb),.8); }
+.hud-tl { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; gap: 8px; }
+.hud-card { width: 168px; padding: 10px 12px; border-radius: 14px; background: rgba(14,18,24,.55); border: 1px solid var(--hair); box-shadow: var(--sheen); display: grid; gap: 7px; font-size: 12.5px; color: var(--ink-2); }
+.hud-card div { display: flex; align-items: center; gap: 8px; }
+.hud-card svg.lucide { width: 14px; height: 14px; color: var(--accent); }
+.hud-tc { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; }
+.crosshair { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; transform: translate(-50%,-50%); }
+.crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,.9); }
+.crosshair::before { left: 6px; top: 0; width: 2px; height: 14px; }
+.crosshair::after { top: 6px; left: 0; height: 2px; width: 14px; }
+.hotbar { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 5px; border-radius: 14px; background: rgba(14,18,24,.5); border: 1px solid var(--hair); }
+.hotbar i { width: 38px; height: 38px; border-radius: 9px; background: rgba(255,255,255,.05); border: 1px solid transparent; }
+.hotbar i.on { border-color: rgba(var(--accent-rgb),.8); background: rgba(var(--accent-rgb),.12); }
+.hint-esc { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); }
+
+/* ============ ОБЩИЕ СЛОИ ============ */
+.layer { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; pointer-events: none; }
+.layer > * { opacity: 0; transform: translateY(14px) scale(.975); transition: opacity .32s var(--ease), transform .45s var(--ease); }
+body[data-view="esc"] #esc, body[data-view="settings"] #settings { pointer-events: auto; }
+body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opacity: 1; transform: none; }
+.glass {
+  background: var(--glass); border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow); border-radius: var(--r-xl);
+  position: relative;
+}
+.glass::before { /* блик по верхнему краю */
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(180deg, rgba(255,255,255,.07), transparent 22%);
+}
+.kbd { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 6px; background: var(--fill); border: 1px solid var(--hair); font-size: 11px; font-weight: 600; color: var(--ink-2); }
+
+/* ============ ESC ============ */
+#esc .wrap { display: grid; grid-template-columns: 400px 340px; gap: 16px; align-items: start; }
+.esc-main { padding: 22px; display: grid; gap: 16px; }
+.me { display: flex; align-items: center; gap: 12px; }
+.head { width: 44px; height: 44px; border-radius: 12px; background: url('../v3/public/assets/images/Coock0ld.png') -44px -44px / 352px 352px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--line); flex: none; }
+.me-name { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.me-sub { font-size: 13px; color: var(--ink-3); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.me .ping { margin-left: auto; }
+.btn-play {
+  height: 56px; border-radius: 16px; background: var(--accent); color: var(--accent-ink);
+  font-size: 17px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px;
+  box-shadow: 0 10px 30px rgba(var(--accent-rgb),.35), inset 0 1px 0 rgba(255,255,255,.5);
+  transition: transform .25s var(--spring), box-shadow .25s var(--ease), filter .2s;
+}
+.btn-play:hover { transform: translateY(-1px) scale(1.01); filter: brightness(1.06); box-shadow: 0 14px 40px rgba(var(--accent-rgb),.45), inset 0 1px 0 rgba(255,255,255,.5); }
+.btn-play:active { transform: scale(.985); }
+.btn-play svg.lucide { width: 20px; height: 20px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 18px; padding: 14px; border-radius: 16px;
+  background: var(--card); border: 1px solid var(--hair); text-align: left;
+  transition: background .2s, border-color .2s, transform .3s var(--ease);
+}
+.tile:hover { background: var(--card-hover); border-color: var(--line); transform: translateY(-2px); }
+.tile .ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: var(--fill); color: var(--ink); transition: background .2s, color .2s, box-shadow .2s; }
+.tile:hover .ic { background: rgba(var(--accent-rgb),.18); color: var(--accent); box-shadow: 0 0 18px rgba(var(--accent-rgb),.25); }
+.tile b { font-size: 15px; font-weight: 600; display: block; }
+.tile small { font-size: 12.5px; color: var(--ink-3); display: block; margin-top: 3px; }
+.esc-foot { display: flex; gap: 8px; }
+.btn-ghost { flex: 1; height: 44px; border-radius: 13px; background: var(--fill); display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 500; font-size: 14px; color: var(--ink-2); transition: background .2s, color .2s; }
+.btn-ghost:hover { background: var(--fill-2); color: var(--ink); }
+.btn-ghost.danger:hover { background: rgba(255,107,107,.16); color: var(--danger); }
+
+.esc-side { display: grid; gap: 16px; }
+.side-card { padding: 18px; }
+.cap { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.world-name { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.world-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.meta { padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--hair); }
+.meta small { font-size: 11.5px; color: var(--ink-3); display: block; }
+.meta b { font-size: 15px; font-weight: 600; display: block; margin-top: 2px; }
+.player { display: flex; align-items: center; gap: 10px; padding: 8px; margin: 0 -8px; border-radius: 12px; transition: background .2s; }
+.player:hover { background: var(--card); }
+.player .av { flex: none !important; width: 30px; height: 30px; border-radius: 9px; background: var(--fill-2); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+.player span { font-size: 14px; font-weight: 500; flex: 1; }
+.player em { font-style: normal; font-size: 12px; color: var(--ink-3); }
+
+/* ============ НАСТРОЙКИ ============ */
+#settings .win { width: min(1180px, calc(100vw - 48px)); height: min(720px, calc(100vh - 48px)); display: grid; grid-template-columns: 248px 340px 1fr; padding: 10px; gap: 10px; }
+.col { border-radius: 20px; min-height: 0; display: flex; flex-direction: column; }
+.nav { background: rgba(255,255,255,.035); border: 1px solid var(--hair); padding: 14px 10px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 14px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 9px; background: radial-gradient(circle at 30% 30%, #b8ecff, var(--accent) 45%, #1b6f92); box-shadow: 0 0 18px rgba(var(--accent-rgb),.5); }
+.brand b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+.brand small { display: block; font-size: 11.5px; color: var(--ink-3); }
+.search { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-radius: 12px; background: var(--fill); border: 1px solid transparent; margin: 0 2px 12px; transition: border-color .2s, background .2s; }
+.search:focus-within { border-color: rgba(var(--accent-rgb),.6); background: var(--fill-2); }
+.search svg.lucide { width: 16px; height: 16px; color: var(--ink-3); }
+.search input { flex: 1; background: none; border: 0; outline: 0; font-size: 13.5px; }
+.search input::placeholder { color: var(--ink-3); }
+.nav-group { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-4); padding: 10px 10px 6px; }
+.nav-item { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border-radius: 11px; font-size: 14px; font-weight: 500; color: var(--ink-2); width: 100%; position: relative; transition: background .2s, color .2s; }
+.nav-item:hover { background: var(--card); color: var(--ink); }
+.nav-item.on { background: rgba(var(--accent-rgb),.14); color: var(--ink); }
+.nav-item.on svg.lucide { color: var(--accent); }
+.nav-item.on::before { content: ''; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.nav-item .count { margin-left: auto; font-size: 11.5px; color: var(--ink-3); }
+.nav-foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px 8px 2px; border-top: 1px solid var(--hair); }
+.nav-foot .head { width: 32px; height: 32px; border-radius: 9px; background-size: 256px 256px; background-position: -32px -32px; }
+.nav-foot b { font-size: 13.5px; font-weight: 600; display: block; }
+.nav-foot small { font-size: 11.5px; color: var(--ink-3); display: block; }
+
+.list { padding: 16px 8px 8px; }
+.col-head { padding: 0 10px 12px; }
+.col-head h2 { font-size: 24px; font-weight: 600; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; }
+.col-head h2 svg.lucide { width: 22px; height: 22px; color: var(--accent); }
+.col-head p { font-size: 13px; color: var(--ink-3); margin-top: 4px; }
+.scroll { overflow-y: auto; min-height: 0; flex: 1; padding: 0 2px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+.row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 8px 10px; border-radius: 14px; text-align: left; border: 1px solid transparent; transition: background .2s, border-color .2s; opacity: 0; transform: translateY(6px); animation: rowIn .4s var(--ease) forwards; }
+@keyframes rowIn { to { opacity: 1; transform: none; } }
+.row:hover { background: var(--card); }
+.row.on { background: var(--card-hover); border-color: var(--line); }
+.row .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--fill); flex: none; transition: background .2s, color .2s; }
+.row.on .ic { background: rgba(var(--accent-rgb),.18); color: var(--accent); }
+.row .t { flex: 1; min-width: 0; }
+.row .t b { font-size: 14.5px; font-weight: 500; display: block; }
+.row .t small { font-size: 12px; color: var(--ink-3); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.row .val { font-size: 13px; color: var(--ink-2); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.switch { width: 42px; height: 25px; border-radius: 999px; background: var(--fill-2); position: relative; flex: none; transition: background .25s var(--ease), box-shadow .25s; cursor: pointer; }
+.switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); transition: transform .35s var(--spring); }
+.switch.on { background: var(--accent); box-shadow: 0 0 16px rgba(var(--accent-rgb),.45); }
+.switch.on::after { transform: translateX(17px); }
+
+.detail { background: rgba(255,255,255,.035); border: 1px solid var(--hair); padding: 20px 22px; position: relative; overflow: hidden; }
+.detail-inner { display: flex; flex-direction: column; gap: 18px; height: 100%; min-height: 0; }
+.detail-inner.swap { animation: swapIn .38s var(--ease); }
+@keyframes swapIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
+.d-head { display: flex; align-items: flex-start; gap: 14px; }
+.d-head .ic { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; background: rgba(var(--accent-rgb),.16); color: var(--accent); box-shadow: 0 0 24px rgba(var(--accent-rgb),.2); flex: none; }
+.d-head .ic svg.lucide { width: 22px; height: 22px; }
+.d-head h3 { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.d-head p { font-size: 13.5px; color: var(--ink-2); margin-top: 4px; line-height: 1.45; max-width: 460px; }
+.d-head .close { margin-left: auto; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--fill); color: var(--ink-2); transition: background .2s, color .2s, transform .3s var(--spring); }
+.d-head .close:hover { background: var(--fill-2); color: var(--ink); transform: rotate(90deg); }
+.d-tabs { display: flex; gap: 6px; }
+.d-tab { height: 30px; padding: 0 12px; border-radius: 9px; background: var(--fill); font-size: 12.5px; font-weight: 500; color: var(--ink-2); display: flex; align-items: center; gap: 6px; transition: background .2s; }
+.d-tab:hover { background: var(--fill-2); }
+.d-tab svg.lucide { width: 14px; height: 14px; }
+.d-body { overflow-y: auto; min-height: 0; flex: 1; display: grid; gap: 18px; align-content: start; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+.field { display: grid; gap: 10px; }
+.field-top { display: flex; align-items: baseline; justify-content: space-between; }
+.field-top b { font-size: 14px; font-weight: 500; }
+.field-top span { font-size: 13px; color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+.field small { font-size: 12px; color: var(--ink-3); margin-top: -4px; }
+
+.slider { position: relative; height: 22px; cursor: pointer; touch-action: none; }
+.slider .track { position: absolute; left: 0; right: 0; top: 9px; height: 4px; border-radius: 4px; background: var(--fill-2); overflow: hidden; }
+.slider .fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); box-shadow: 0 0 12px rgba(var(--accent-rgb),.6); border-radius: 4px; }
+.slider .knob { position: absolute; top: 3px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(var(--accent-rgb),.25), 0 2px 6px rgba(0,0,0,.4); transition: box-shadow .2s, transform .25s var(--spring); }
+.slider:hover .knob, .slider.drag .knob { transform: scale(1.15); box-shadow: 0 0 0 6px rgba(var(--accent-rgb),.25), 0 2px 6px rgba(0,0,0,.4); }
+.slider .ticks { position: absolute; left: 0; right: 0; top: 18px; display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-4); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { height: 34px; padding: 0 14px; border-radius: 10px; background: var(--fill); border: 1px solid transparent; font-size: 13px; font-weight: 500; color: var(--ink-2); transition: background .2s, color .2s, border-color .2s, box-shadow .2s; }
+.chip:hover { background: var(--fill-2); color: var(--ink); }
+.chip.on { background: rgba(var(--accent-rgb),.16); border-color: rgba(var(--accent-rgb),.7); color: var(--ink); box-shadow: 0 0 14px rgba(var(--accent-rgb),.2); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 10px; }
+.d-hero { position: relative; height: 150px; border-radius: 18px; overflow: hidden; flex: none; border: 1px solid var(--hair); background-size: cover; background-position: center; }
+.d-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,12,18,0) 30%, rgba(8,12,18,.78)); }
+.d-hero .big { position: absolute; left: 18px; bottom: 14px; z-index: 1; font-size: 34px; font-weight: 600; letter-spacing: -.03em; line-height: 1; transition: transform .3s var(--spring); }
+.d-hero .big small { font-size: 15px; font-weight: 500; color: var(--ink-2); margin-left: 6px; letter-spacing: 0; }
+.d-hero .tag { position: absolute; right: 14px; bottom: 14px; z-index: 1; }
+.d-hero .rings { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; pointer-events: none; }
+.d-hero .rings i { position: absolute; border-radius: 50%; border: 1px solid rgba(var(--accent-rgb),.55); box-shadow: 0 0 18px rgba(var(--accent-rgb),.25), inset 0 0 18px rgba(var(--accent-rgb),.12); transition: width .35s var(--ease), height .35s var(--ease); }
+.d-hero .rings i.far { border-style: dashed; border-color: rgba(255,255,255,.35); box-shadow: none; }
+.cfg-thumb { height: 74px; border-radius: 11px; background-size: cover; background-position: center; position: relative; }
+.cfg-thumb span { position: absolute; left: 8px; bottom: 8px; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.45); color: var(--ink-2); }
+.pcard { border-radius: 16px; padding: 10px; background: var(--card); border: 1px solid var(--hair); text-align: left; display: grid; gap: 10px; transition: transform .3s var(--ease), border-color .2s, background .2s, box-shadow .2s; position: relative; }
+.pcard:hover { transform: translateY(-2px); background: var(--card-hover); border-color: var(--line); }
+.pcard.on { border-color: rgba(var(--accent-rgb),.8); box-shadow: 0 0 0 1px rgba(var(--accent-rgb),.5), 0 10px 30px rgba(var(--accent-rgb),.15); }
+.pcard .thumb { height: 74px; border-radius: 11px; background-size: cover; background-position: center; position: relative; overflow: hidden; }
+.pcard .thumb::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); border-radius: inherit; }
+.pcard b { font-size: 13.5px; font-weight: 600; display: block; }
+.pcard small { font-size: 11.5px; color: var(--ink-3); display: block; margin-top: 2px; }
+.pcard .tick { position: absolute; top: 16px; right: 16px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; transform: scale(0); transition: transform .35s var(--spring); }
+.pcard.on .tick { transform: scale(1); }
+.pcard .tick svg.lucide { width: 14px; height: 14px; stroke-width: 3; }
+.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-weight: 600; background: rgba(var(--accent-rgb),.16); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
+
+.theme-thumb { height: 74px; border-radius: 11px; position: relative; overflow: hidden; background: #0d1219; }
+.theme-thumb i { position: absolute; border-radius: 6px; }
+
+.keys { display: grid; gap: 4px; }
+.key-row { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; }
+.key-row .kbd { height: 26px; min-width: 34px; font-size: 12px; transition: background .2s, color .2s, border-color .2s; }
+.key-row:hover .kbd { border-color: rgba(var(--accent-rgb),.6); color: var(--ink); }
+
+.d-foot { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--ink-3); }
+.d-foot .btn-sm { height: 32px; padding: 0 12px; border-radius: 10px; background: var(--fill); color: var(--ink-2); font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: background .2s, color .2s; }
+.d-foot .btn-sm:hover { background: var(--fill-2); color: var(--ink); }
+.d-foot .btn-sm svg.lucide { width: 14px; height: 14px; }
+.d-foot .spacer { flex: 1; }
+
+.empty { padding: 30px 10px; text-align: center; color: var(--ink-3); font-size: 13.5px; }
+
+/* мини-тулбар режима эффектов (только для макета) */
+.mock-bar { position: fixed; right: 14px; bottom: 14px; z-index: 30; display: flex; gap: 6px; }
+.mock-bar button { height: 30px; padding: 0 12px; border-radius: 9px; background: rgba(14,18,24,.7); border: 1px solid var(--hair); font-size: 12px; color: var(--ink-2); }
+.mock-bar button.on { color: var(--accent-ink); background: var(--accent); }
+
+@media (max-width: 1100px) {
+  #settings .win { grid-template-columns: 210px 1fr; }
+  #settings .detail { display: none; }
+  #esc .wrap { grid-template-columns: 380px; }
+  .esc-side { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+</style>
+</head>
+<body data-view="esc" data-fx="full">
+
+<div class="world"></div>
+
+<div class="hud">
+  <div class="hud-tl">
+    <span class="pill"><span class="dot"></span><b>Aura</b> · 144 fps · 17:35</span>
+    <div class="hud-card">
+      <div><i data-lucide="map-pin"></i>-161, 64, -191</div>
+      <div><i data-lucide="compass"></i>Север</div>
+      <div><i data-lucide="trees"></i>Заснеженная тайга</div>
+    </div>
+  </div>
+  <div class="hud-tc"><span class="pill"><span class="dot"></span>Новый мир · 3 игрока</span></div>
+  <div class="crosshair"></div>
+  <span class="pill hint-esc"><span class="kbd">Esc</span> меню</span>
+  <div class="hotbar"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</div>
+
+<div class="veil"></div>
+
+<!-- ============ ESC ============ -->
+<section class="layer" id="esc">
+  <div class="wrap">
+    <div class="glass esc-main">
+      <div class="me">
+        <div class="head"></div>
+        <div>
+          <div class="me-name">Coock0ld</div>
+          <div class="me-sub"><span class="dot"></span>Новый мир · сервер друзей</div>
+        </div>
+        <span class="pill ping"><i data-lucide="wifi"></i>38 мс</span>
+      </div>
+      <button class="btn-play" data-act="game"><i data-lucide="play"></i>Продолжить</button>
+      <div class="tiles">
+        <button class="tile" data-act="settings"><span class="ic"><i data-lucide="sliders-horizontal"></i></span><span><b>Настройки</b><small>Графика, звук, управление</small></span></button>
+        <button class="tile"><span class="ic"><i data-lucide="user-plus"></i></span><span><b>Пригласить</b><small>Позвать друга в мир</small></span></button>
+        <button class="tile"><span class="ic"><i data-lucide="trophy"></i></span><span><b>Достижения</b><small>34 из 122</small></span></button>
+        <button class="tile"><span class="ic"><i data-lucide="images"></i></span><span><b>Скриншоты</b><small>12 за сессию</small></span></button>
+        <button class="tile"><span class="ic"><i data-lucide="bar-chart-3"></i></span><span><b>Статистика</b><small>Время, мобы, блоки</small></span></button>
+        <button class="tile"><span class="ic"><i data-lucide="radio-tower"></i></span><span><b>Открыть для сети</b><small>Локальная игра</small></span></button>
+      </div>
+      <div class="esc-foot">
+        <button class="btn-ghost"><i data-lucide="message-square"></i>Обратная связь</button>
+        <button class="btn-ghost danger"><i data-lucide="log-out"></i>Выйти в меню</button>
+      </div>
+    </div>
+
+    <div class="esc-side">
+      <div class="glass side-card">
+        <div class="cap">Мир <span class="pill" style="height:24px;font-size:11.5px"><span class="dot"></span>онлайн</span></div>
+        <div class="world-name">Новый мир</div>
+        <div class="world-meta">
+          <div class="meta"><small>В игре</small><b>1 ч 24 мин</b></div>
+          <div class="meta"><small>День</small><b>42 · 17:35</b></div>
+          <div class="meta"><small>Версия</small><b>1.21.1</b></div>
+          <div class="meta"><small>Сохранено</small><b>2 мин назад</b></div>
+        </div>
+      </div>
+      <div class="glass side-card">
+        <div class="cap">Игроки <span>3</span></div>
+        <div class="player"><span class="av" style="background:rgba(100,210,255,.2);color:var(--accent)">C</span><span>Coock0ld</span><em>вы</em></div>
+        <div class="player"><span class="av">V</span><span>Vetements</span><em>12 блоков</em></div>
+        <div class="player"><span class="av">S</span><span>shalun</span><em>в Аду</em></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ НАСТРОЙКИ ============ -->
+<section class="layer" id="settings">
+  <div class="glass win">
+    <aside class="col nav">
+      <div class="brand"><span class="brand-mark"></span><div><b>Aura</b><small>Настройки игры</small></div></div>
+      <label class="search"><i data-lucide="search"></i><input id="q" placeholder="Поиск настроек" autocomplete="off"></label>
+      <div id="nav"></div>
+      <div class="nav-foot"><div class="head"></div><div><b>Coock0ld</b><small>Пресет: Высокий</small></div></div>
+    </aside>
+
+    <section class="col list">
+      <div class="col-head"><h2 id="secTitle"></h2><p id="secSub"></p></div>
+      <div class="scroll" id="rows"></div>
+    </section>
+
+    <section class="col detail"><div class="detail-inner" id="detail"></div></section>
+  </div>
+</section>
+
+<div class="mock-bar">
+  <button data-fx="full" class="on">Эффекты: full</button>
+  <button data-fx="off">off</button>
+</div>
+
+<script>
+const IMG = '../v3/public/assets/images/';
+const THEMES = [
+  { id: 'cyan',   name: 'Бирюза',  rgb: '100,210,255', hex: '#64D2FF', ink: '#00283A' },
+  { id: 'mint',   name: 'Мята',    rgb: '102,226,180', hex: '#66E2B4', ink: '#00301F' },
+  { id: 'violet', name: 'Фиалка',  rgb: '176,140,255', hex: '#B08CFF', ink: '#1E0B45' },
+  { id: 'rose',   name: 'Роза',    rgb: '255,128,160', hex: '#FF80A0', ink: '#3D0012' },
+  { id: 'ice',    name: 'Лёд',     rgb: '214,228,240', hex: '#D6E4F0', ink: '#14202B' },
+];
+
+const S = {
+  presets: { name: 'Пресеты', icon: 'gauge', sub: 'Готовые наборы графики под ваш ПК', group: 'Графика', items: [
+    { id: 'preset', name: 'Пресет графики', icon: 'gauge', desc: 'Одним кликом настраивает прорисовку, шейдеры и Distant Horizons под мощность ПК.', type: 'cards', value: 'high',
+      options: [
+        { v: 'low',    n: 'Слабый ПК', s: '6 чанков · Complementary', img: 'bg_6.jpg' },
+        { v: 'medium', n: 'Средний',   s: '8 чанков · LOD 128',       img: 'bg_2.jpg' },
+        { v: 'high',   n: 'Высокий',   s: '8 чанков · LOD 256',       img: 'bg_1.jpg', badge: 'ваш ПК' },
+        { v: 'ultra',  n: 'Ультра',    s: '10 чанков · LOD 512',      img: 'bg_12.jpg' },
+      ] },
+    { id: 'auto', name: 'Автоподбор', icon: 'cpu', desc: 'Aura определила видеокарту GTX 1660 SUPER и советует «Высокий». Если FPS просядет — пресет понизится сам.', type: 'toggle', value: true },
+    { id: 'configs', name: 'Мои конфиги', icon: 'bookmark', desc: 'Сохранённые наборы настроек: графика, звук, HUD. Можно поделиться с другом кодом.', type: 'configs', value: 'night',
+      options: [
+        { v: 'night', n: 'Ночь', s: '14 настроек · вчера', img: 'bg_12.jpg', tag: 'Скриншоты' },
+        { v: 'pvp',   n: 'PvP',  s: '9 настроек · 3 дня', img: 'bg_7.jpg', tag: 'Макс FPS' },
+        { v: 'cozy',  n: 'Уют',  s: '11 настроек · неделю', img: 'bg_14.jpg', tag: 'Стрим' },
+      ] },
+  ]},
+  graphics: { name: 'Графика', icon: 'monitor', sub: 'Дальность, качество и плавность', group: 'Графика', items: [
+    { id: 'render', name: 'Дальность прорисовки', icon: 'eye', desc: 'Сколько чанков вокруг рисуется полностью. Дальше — упрощённый ландшафт Distant Horizons.', type: 'slider', value: 8, min: 2, max: 32, unit: ' чанков' },
+    { id: 'sim', name: 'Дальность симуляции', icon: 'activity', desc: 'В каком радиусе живут мобы, растут фермы и работает редстоун.', type: 'slider', value: 6, min: 5, max: 16, unit: ' чанков' },
+    { id: 'dh', name: 'Distant Horizons', icon: 'mountain-snow', desc: 'Далёкий горизонт без потери FPS: дальние горы и леса рисуются упрощённо.', type: 'toggle', value: true, extra: { name: 'Дальность LOD', value: 256, min: 64, max: 512, unit: ' чанков' } },
+    { id: 'quality', name: 'Качество графики', icon: 'sparkles', desc: 'Прозрачная листва, тени облаков и детали погоды.', type: 'chips', value: 'fancy', options: [['fast','Быстро'],['fancy','Красиво'],['fabulous','Потрясающе']] },
+    { id: 'fps', name: 'Ограничение FPS', icon: 'zap', desc: 'Выше — плавнее, ниже — тише кулеры и холоднее ноутбук.', type: 'chips', value: '144', options: [['60','60'],['120','120'],['144','144'],['240','240'],['0','Без лимита']] },
+    { id: 'vsync', name: 'V-Sync', icon: 'monitor-check', desc: 'Убирает разрывы кадра, но добавляет задержку.', type: 'toggle', value: false },
+    { id: 'fov', name: 'Поле зрения', icon: 'scan', desc: 'Угол обзора камеры.', type: 'slider', value: 90, min: 30, max: 110, unit: '°' },
+    { id: 'bright', name: 'Яркость', icon: 'sun', desc: 'Насколько светлы тёмные места.', type: 'slider', value: 60, min: 0, max: 100, unit: '%' },
+    { id: 'particles', name: 'Частицы', icon: 'wind', desc: 'Дым, искры, брызги и пыль.', type: 'chips', value: 'all', options: [['min','Мало'],['dec','Меньше'],['all','Все']] },
+    { id: 'clouds', name: 'Облака', icon: 'cloud', desc: 'Объёмные облака заметно влияют на FPS.', type: 'chips', value: 'fancy', options: [['off','Выкл'],['fast','Плоские'],['fancy','Объёмные']] },
+  ]},
+  shaders: { name: 'Шейдеры', icon: 'sun-medium', sub: 'Свет, тени и вода', group: 'Графика', items: [
+    { id: 'shader', name: 'Шейдер', icon: 'sun-medium', desc: 'Пакет шейдеров для Iris. Все поддерживают Distant Horizons.', type: 'cards', value: 'noble',
+      options: [
+        { v: 'off',   n: 'Без шейдеров', s: 'Максимум FPS', img: 'bg_7.jpg', dim: true },
+        { v: 'compl', n: 'Complementary', s: 'Лёгкий, красивый', img: 'bg_6.jpg' },
+        { v: 'deriv', n: 'Derivative', s: 'Мягкий свет', img: 'bg_9.jpg' },
+        { v: 'noble', n: 'Noble', s: 'Сочные цвета', img: 'bg_1.jpg' },
+        { v: 'bliss', n: 'Bliss', s: 'Кино, тяжёлый', img: 'bg_5.jpg' },
+      ] },
+    { id: 'shadows', name: 'Качество теней', icon: 'contrast', desc: 'Самая тяжёлая часть шейдеров.', type: 'chips', value: 'mid', options: [['low','Низкое'],['mid','Среднее'],['high','Высокое']] },
+    { id: 'reflect', name: 'Отражения в воде', icon: 'waves', desc: 'Вода отражает небо и берег.', type: 'toggle', value: true },
+  ]},
+  sound: { name: 'Звук', icon: 'volume-2', sub: 'Громкость по категориям', group: 'Игра', items: [
+    { id: 'master', name: 'Общая громкость', icon: 'volume-2', desc: 'Влияет на все звуки игры.', type: 'slider', value: 80, min: 0, max: 100, unit: '%' },
+    { id: 'music', name: 'Музыка', icon: 'music', desc: 'Фоновая музыка C418 и Лены Рейн.', type: 'slider', value: 35, min: 0, max: 100, unit: '%' },
+    { id: 'blocks', name: 'Блоки', icon: 'box', desc: 'Ломание и установка блоков.', type: 'slider', value: 100, min: 0, max: 100, unit: '%' },
+    { id: 'mobs', name: 'Враждебные', icon: 'skull', desc: 'Зомби, скелеты, криперы.', type: 'slider', value: 100, min: 0, max: 100, unit: '%' },
+    { id: 'players', name: 'Игроки', icon: 'users', desc: 'Шаги и удары других игроков.', type: 'slider', value: 90, min: 0, max: 100, unit: '%' },
+    { id: 'voice', name: 'Голосовой чат', icon: 'mic', desc: 'Простой голосовой чат: друзья рядом слышны громче.', type: 'toggle', value: true },
+  ]},
+  controls: { name: 'Управление', icon: 'keyboard', sub: 'Клавиши и мышь', group: 'Игра', items: [
+    { id: 'sens', name: 'Чувствительность мыши', icon: 'mouse', desc: 'Скорость поворота камеры.', type: 'slider', value: 50, min: 1, max: 200, unit: '%' },
+    { id: 'binds', name: 'Клавиши', icon: 'keyboard', desc: 'Нажмите на клавишу, чтобы переназначить.', type: 'keys', value: 'W A S D' },
+    { id: 'toggleSprint', name: 'Бег переключением', icon: 'footprints', desc: 'Не нужно держать Ctrl.', type: 'toggle', value: true },
+    { id: 'raw', name: 'Прямой ввод мыши', icon: 'crosshair', desc: 'Без ускорения Windows — точнее в бою.', type: 'toggle', value: true },
+  ]},
+  ui: { name: 'Интерфейс', icon: 'layout-panel-left', sub: 'Тема, HUD и масштаб', group: 'Внешний вид', items: [
+    { id: 'theme', name: 'Тема', icon: 'palette', desc: 'Цвет акцента для меню, HUD и кнопок.', type: 'themes', value: 'cyan' },
+    { id: 'hud', name: 'HUD', icon: 'layout-dashboard', desc: 'Координаты, FPS, часы и клавиши на экране.', type: 'toggle', value: true },
+    { id: 'scale', name: 'Масштаб интерфейса', icon: 'maximize-2', desc: 'Размер меню и HUD.', type: 'chips', value: '100', options: [['90','90%'],['100','100%'],['110','110%'],['125','125%']] },
+    { id: 'fx', name: 'Эффекты стекла', icon: 'droplets', desc: 'Размытие мира под меню. На слабом ПК выключите.', type: 'chips', value: 'full', options: [['full','Полные'],['low','Лёгкие'],['off','Выкл']] },
+    { id: 'anim', name: 'Анимации меню', icon: 'sparkle', desc: 'Плавные переходы между экранами.', type: 'toggle', value: true },
+  ]},
+  chat: { name: 'Чат', icon: 'message-circle', sub: 'Сообщения и фильтры', group: 'Внешний вид', items: [
+    { id: 'chatOpacity', name: 'Прозрачность фона', icon: 'square-dashed', desc: 'Подложка под сообщениями.', type: 'slider', value: 40, min: 0, max: 100, unit: '%' },
+    { id: 'chatTime', name: 'Время сообщений', icon: 'clock', desc: 'Показывать время отправки.', type: 'toggle', value: true },
+    { id: 'chatFilter', name: 'Фильтр мата', icon: 'shield', desc: 'Заменяет грубые слова звёздочками.', type: 'toggle', value: false },
+  ]},
+  lang: { name: 'Язык', icon: 'languages', sub: 'Язык игры', group: 'Внешний вид', items: [
+    { id: 'language', name: 'Язык игры', icon: 'languages', desc: 'Меняет язык меню, предметов и подсказок.', type: 'chips', value: 'ru', options: [['ru','Русский'],['uk','Українська'],['en','English']] },
+  ]},
+};
+
+const state = { section: 'graphics', item: 'render', q: '' };
+const $ = s => document.querySelector(s);
+const icon = n => `<i data-lucide="${n}"></i>`;
+const paint = () => window.lucide && lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+
+function fmt(it) {
+  if (it.type === 'slider') return it.value + (it.unit || '');
+  if (it.type === 'chips') return (it.options.find(o => o[0] === it.value) || [,''])[1];
+  if (it.type === 'cards') return (it.options.find(o => o.v === it.value) || {}).n || '';
+  if (it.type === 'themes') return THEMES.find(t => t.id === it.value).name;
+  if (it.type === 'keys') return 'WASD';
+  if (it.type === 'configs') return it.options.length;
+  return '';
+}
+
+const HERO = { presets: 'bg_1.jpg', graphics: 'bg_2.jpg', shaders: 'bg_5.jpg', sound: 'bg_9.jpg', controls: 'bg_11.jpg', ui: 'bg_13.jpg', chat: 'bg_14.jpg', lang: 'bg_15.jpg' };
+
+function heroValue(it) {
+  if (it.type === 'slider') { const m = it.unit.trim(); return `${it.value}<small>${m}</small>`; }
+  if (it.type === 'toggle') return it.value ? 'Включено' : 'Выключено';
+  return fmt(it);
+}
+
+function rings(it) {
+  if (it.id !== 'render') return '';
+  const near = 30 + it.value * 4, far = Math.min(420, near + findItem('dh').extra.value * .55);
+  return `<div class="rings">${findItem('dh').value ? `<i class="far" style="width:${far}px;height:${far}px"></i>` : ''}<i style="width:${near}px;height:${near}px"></i></div>`;
+}
+
+function hero(secKey, it) {
+  if (!['slider', 'toggle', 'chips'].includes(it.type)) return '';
+  return `<div class="d-hero" style="background-image:url('${IMG + HERO[secKey]}')">${rings(it)}
+    <div class="big" data-hero="${it.id}">${heroValue(it)}</div>
+    ${it.id === 'render' ? `<span class="pill tag"><span class="dot"></span>${findItem('dh').value ? 'Дальше — Distant Horizons' : 'Без LOD'}</span>` : ''}</div>`;
+}
+
+function renderNav() {
+  const groups = {};
+  for (const [k, s] of Object.entries(S)) (groups[s.group] ||= []).push([k, s]);
+  $('#nav').innerHTML = Object.entries(groups).map(([g, list]) =>
+    `<div class="nav-group">${g}</div>` + list.map(([k, s]) =>
+      `<button class="nav-item ${k === state.section && !state.q ? 'on' : ''}" data-sec="${k}">${icon(s.icon)}${s.name}<span class="count">${s.items.length}</span></button>`).join('')
+  ).join('');
+}
+
+function visibleItems() {
+  if (!state.q) return S[state.section].items.map(it => [state.section, it]);
+  const q = state.q.toLowerCase(), out = [];
+  for (const [k, s] of Object.entries(S)) for (const it of s.items)
+    if ((it.name + ' ' + it.desc).toLowerCase().includes(q)) out.push([k, it]);
+  return out;
+}
+
+function renderRows() {
+  const sec = S[state.section];
+  $('#secTitle').innerHTML = state.q ? icon('search') + 'Поиск' : icon(sec.icon) + sec.name;
+  $('#secSub').textContent = state.q ? `«${state.q}»` : sec.sub;
+  const items = visibleItems();
+  if (!items.length) { $('#rows').innerHTML = '<div class="empty">Ничего не нашлось</div>'; return; }
+  $('#rows').innerHTML = items.map(([k, it], i) => `
+    <button class="row ${it.id === state.item ? 'on' : ''}" data-sec="${k}" data-item="${it.id}" style="animation-delay:${i * 28}ms">
+      <span class="ic">${icon(it.icon)}</span>
+      <span class="t"><b>${it.name}</b><small>${it.desc}</small></span>
+      ${it.type === 'toggle' ? `<span class="switch ${it.value ? 'on' : ''}" data-toggle="${it.id}"></span>` : `<span class="val">${fmt(it)}</span>`}
+    </button>`).join('');
+}
+
+function slider(id, val, min, max, unit, ticks = true) {
+  const p = (val - min) / (max - min) * 100;
+  return `<div class="slider" data-slider="${id}" data-min="${min}" data-max="${max}" data-unit="${unit}">
+    <div class="track"><div class="fill" style="width:${p}%"></div></div><div class="knob" style="left:${p}%"></div>
+    ${ticks ? `<div class="ticks"><span>${min}</span><span>${max}</span></div>` : ''}</div>`;
+}
+
+function themeThumb(t) {
+  return `<div class="theme-thumb">
+    <i style="left:8px;top:8px;width:34px;bottom:8px;background:rgba(255,255,255,.06)"></i>
+    <i style="left:48px;top:8px;right:8px;height:14px;background:rgba(255,255,255,.08)"></i>
+    <i style="left:48px;top:28px;width:52px;height:10px;background:rgba(${t.rgb},.9);box-shadow:0 0 12px rgba(${t.rgb},.7)"></i>
+    <i style="right:10px;top:28px;width:22px;height:12px;border-radius:99px;background:rgb(${t.rgb})"></i>
+    <i style="left:48px;top:46px;right:30px;height:6px;background:rgba(255,255,255,.08)"></i>
+    <i style="left:12px;top:14px;width:8px;height:8px;border-radius:3px;background:rgb(${t.rgb})"></i></div>`;
+}
+
+function renderDetail(anim = true) {
+  const secKey = Object.keys(S).find(k => S[k].items.some(i => i.id === state.item));
+  const it = S[secKey].items.find(i => i.id === state.item);
+  let body = '';
+  if (it.type === 'slider') {
+    body = `<div class="field"><div class="field-top"><b>Значение</b><span data-out="${it.id}">${it.value}${it.unit}</span></div>${slider(it.id, it.value, it.min, it.max, it.unit)}</div>`;
+    if (it.id === 'render') body += `<div class="field"><div class="field-top"><b>Быстрый выбор</b></div><div class="chips">${[6,8,12,16,24].map(v => `<button class="chip ${v === it.value ? 'on' : ''}" data-set="${it.id}" data-v="${v}">${v}</button>`).join('')}</div><small>Рекомендуем 8 вместе с Distant Horizons — горизонт останется далёким.</small></div>`;
+  } else if (it.type === 'toggle') {
+    body = `<div class="field"><div class="field-top"><b>${it.value ? 'Включено' : 'Выключено'}</b><span class="switch ${it.value ? 'on' : ''}" data-toggle="${it.id}"></span></div></div>`;
+    if (it.extra) body += `<div class="field" style="opacity:${it.value ? 1 : .4};transition:opacity .3s"><div class="field-top"><b>${it.extra.name}</b><span data-out="${it.id}-x">${it.extra.value}${it.extra.unit}</span></div>${slider(it.id + '-x', it.extra.value, it.extra.min, it.extra.max, it.extra.unit)}</div>`;
+  } else if (it.type === 'chips') {
+    body = `<div class="field"><div class="chips">${it.options.map(([v, n]) => `<button class="chip ${v === it.value ? 'on' : ''}" data-set="${it.id}" data-v="${v}">${n}</button>`).join('')}</div></div>`;
+  } else if (it.type === 'cards') {
+    body = `<div class="cards">${it.options.map(o => `<button class="pcard ${o.v === it.value ? 'on' : ''}" data-set="${it.id}" data-v="${o.v}">
+      <div class="thumb" style="background-image:url('${IMG + o.img}')${o.dim ? ';filter:saturate(.2) brightness(.7)' : ''}"></div>
+      <span><b>${o.n}${o.badge ? `<span class="badge">${o.badge}</span>` : ''}</b><small>${o.s}</small></span>
+      <span class="tick">${icon('check')}</span></button>`).join('')}</div>`;
+  } else if (it.type === 'themes') {
+    body = `<div class="cards">${THEMES.map(t => `<button class="pcard ${t.id === it.value ? 'on' : ''}" data-theme="${t.id}">${themeThumb(t)}<span><b>${t.name}</b><small>${t.hex}</small></span><span class="tick">${icon('check')}</span></button>`).join('')}</div>`;
+  } else if (it.type === 'configs') {
+    body = `<div class="cards">${it.options.map(o => `<button class="pcard ${o.v === it.value ? 'on' : ''}" data-set="${it.id}" data-v="${o.v}">
+      <div class="cfg-thumb" style="background-image:url('${IMG + o.img}')"><span>${o.tag}</span></div>
+      <span><b>${o.n}</b><small>${o.s}</small></span><span class="tick">${icon('check')}</span></button>`).join('')}
+      <button class="pcard" style="place-content:center;justify-items:center;min-height:150px;border-style:dashed;color:var(--ink-3)">${icon('plus')}<small>Сохранить текущие</small></button></div>`;
+  } else if (it.type === 'keys') {
+    const keys = [['Вперёд','W'],['Назад','S'],['Влево','A'],['Вправо','D'],['Прыжок','Space'],['Присесть','Shift'],['Бег','Ctrl'],['Инвентарь','E'],['Чат','T'],['Список игроков','Tab'],['Скриншот','F2'],['Голосовой чат','V']];
+    body = `<div class="keys">${keys.map(([n, k]) => `<div class="key-row"><span>${n}</span><span class="kbd">${k}</span></div>`).join('')}</div>`;
+  }
+  const el = $('#detail');
+  el.innerHTML = `
+    <div class="d-head"><span class="ic">${icon(it.icon)}</span><div><h3>${it.name}</h3><p>${it.desc}</p></div><button class="close" data-act="esc" title="Закрыть (Esc)">${icon('x')}</button></div>
+    <div class="d-tabs"><button class="d-tab">${icon('star')}В избранное</button><button class="d-tab">${icon('rotate-ccw')}Сбросить</button></div>
+    <div class="d-body">${hero(secKey, it)}${body}</div>
+    <div class="d-foot"><span class="kbd">Esc</span>назад<span class="kbd">Ctrl</span><span class="kbd">F</span>поиск<span class="spacer"></span><button class="btn-sm">${icon('undo-2')}Всё по умолчанию</button></div>`;
+  if (anim) { el.classList.remove('swap'); void el.offsetWidth; el.classList.add('swap'); }
+  paint();
+}
+
+function findItem(id) { for (const s of Object.values(S)) { const i = s.items.find(x => x.id === id); if (i) return i; } }
+
+function renderAll(anim = true) { renderNav(); renderRows(); renderDetail(anim); paint(); }
+
+function setView(v) {
+  document.body.dataset.view = v;
+  if (v === 'settings') { renderAll(); }
+}
+
+function applyTheme(id) {
+  const t = THEMES.find(x => x.id === id);
+  const r = document.documentElement.style;
+  r.setProperty('--accent', t.hex); r.setProperty('--accent-rgb', t.rgb); r.setProperty('--accent-ink', t.ink);
+}
+
+/* ---------- события ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-sec],[data-toggle],[data-set],[data-theme],.mock-bar button');
+  if (!t) return;
+  if (t.closest('.mock-bar')) {
+    document.body.dataset.fx = t.dataset.fx;
+    document.querySelectorAll('.mock-bar button').forEach(b => b.classList.toggle('on', b === t));
+    return;
+  }
+  if (t.dataset.act) return setView(t.dataset.act);
+  if (t.dataset.toggle) {
+    e.stopPropagation();
+    const it = findItem(t.dataset.toggle); it.value = !it.value;
+    if (it.id === 'anim') document.body.style.setProperty('--ease', it.value ? '' : 'linear');
+    renderRows(); renderDetail(false); paint(); return;
+  }
+  if (t.dataset.set) {
+    const it = findItem(t.dataset.set);
+    it.value = it.type === 'slider' ? +t.dataset.v : t.dataset.v;
+    if (it.id === 'fx') { document.body.dataset.fx = it.value === 'off' ? 'off' : 'full'; }
+    renderRows(); renderDetail(false); paint(); return;
+  }
+  if (t.dataset.theme) {
+    findItem('theme').value = t.dataset.theme; applyTheme(t.dataset.theme);
+    renderRows(); renderDetail(false); paint(); return;
+  }
+  if (t.dataset.item) { state.item = t.dataset.item; state.section = t.dataset.sec; renderRows(); renderDetail(); paint(); return; }
+  if (t.dataset.sec) {
+    state.section = t.dataset.sec; state.item = S[state.section].items[0].id; state.q = ''; $('#q').value = '';
+    renderAll();
+  }
+});
+
+/* слайдеры */
+let drag = null;
+function slideTo(el, x) {
+  const r = el.getBoundingClientRect(), min = +el.dataset.min, max = +el.dataset.max;
+  const p = Math.min(1, Math.max(0, (x - r.left) / r.width));
+  const v = Math.round(min + p * (max - min));
+  const pp = (v - min) / (max - min) * 100;
+  el.querySelector('.fill').style.width = pp + '%';
+  el.querySelector('.knob').style.left = pp + '%';
+  const id = el.dataset.slider;
+  const out = document.querySelector(`[data-out="${id}"]`); if (out) out.textContent = v + el.dataset.unit;
+  if (id.endsWith('-x')) findItem(id.slice(0, -2)).extra.value = v; else findItem(id).value = v;
+  const it = findItem(id.replace(/-x$/, ''));
+  const big = document.querySelector(`[data-hero="${it.id}"]`); if (big && !id.endsWith('-x')) big.innerHTML = heroValue(it);
+  const rg = document.querySelector('.d-hero .rings'); if (rg && it.id === 'render') rg.outerHTML = rings(it);
+  const row = document.querySelector(`.row[data-item="${id}"] .val`); if (row) row.textContent = v + el.dataset.unit;
+  document.querySelectorAll(`.chip[data-set="${id}"]`).forEach(c => c.classList.toggle('on', +c.dataset.v === v));
+}
+document.addEventListener('pointerdown', e => {
+  const s = e.target.closest('.slider'); if (!s) return;
+  drag = s; s.classList.add('drag'); s.setPointerCapture(e.pointerId); slideTo(s, e.clientX);
+});
+document.addEventListener('pointermove', e => { if (drag) slideTo(drag, e.clientX); });
+document.addEventListener('pointerup', () => { if (drag) { drag.classList.remove('drag'); drag = null; } });
+
+/* поиск */
+$('#q').addEventListener('input', e => {
+  state.q = e.target.value.trim();
+  const items = visibleItems(); if (items.length) { state.item = items[0][1].id; }
+  renderNav(); renderRows(); if (items.length) renderDetail(); paint();
+});
+
+/* клавиатура: Esc — назад, Ctrl+F — поиск */
+document.addEventListener('keydown', e => {
+  const v = document.body.dataset.view;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (v === 'settings' && state.q) { state.q = ''; $('#q').value = ''; renderAll(false); return; }
+    setView(v === 'game' ? 'esc' : v === 'esc' ? 'game' : 'esc');
+  }
+  if (e.ctrlKey && e.key.toLowerCase() === 'f' && v === 'settings') { e.preventDefault(); $('#q').focus(); }
+});
+
+renderAll(false);
+paint();
+const qs = new URLSearchParams(location.search);
+if (qs.get('sec') && S[qs.get('sec')]) { state.section = qs.get('sec'); state.item = qs.get('item') || S[state.section].items[0].id; }
+if (qs.get('theme')) { findItem('theme').value = qs.get('theme'); applyTheme(qs.get('theme')); }
+if (qs.get('view')) setView(qs.get('view'));
+</script>
+</body>
+</html>
