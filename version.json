@@ -1,7 +1,7 @@
 {
-  "internalVersion": "1.2.148",
-  "userFacingVersion": "beta 1.0.140",
+  "internalVersion": "1.2.149",
+  "userFacingVersion": "beta 1.0.141",
   "changelog": [
-    "Пресеты графики: прорисовка 6/8/8/10, Distant Horizons + LOD 128/256/512, «Слабый ПК» = Complementary LOW, «Высокий» = Noble, пак Punchy под 1.21.1, убран Transparent-GUI"
+    "Очистка осиротевших модов .disabled при обновлении, защита от краша Distant Horizons на 1.21.1, устранение мерцания капсулы обновления и исправление границы кнопки Играть"
   ]
 }
