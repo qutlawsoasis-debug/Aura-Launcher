@@ -18,10 +18,10 @@
 ## Доска
 | Задача | Исполнитель (чат) | Файлы | Стадия | Заметки |
 |--------|-------------------|-------|--------|---------|
-| ESC плавно + матовое размытие + разрешение экрана | 7f592cf9 | McefHtmlScreen, HtmlScreen, HtmlBridge, GameMenuScreenMixin, index.html | проверка | ждёт снятия lock: кадр середины анимации с видимым меню |
-| Чат в стиле Aura | c7560004 | ChatHudMixin, ChatScreenMixin | создание | |
-| Слова в воздухе: Onest + эффекты | c7560004 | FloatingLyrics, LyricsDemo | создание (после чата) | |
-| Экран загрузки «After Effects» + пропуск Experimental | 925366ce | AuraSplash, SplashOverlayMixin, IntegratedServerLoaderMixin | проверка | нет кадров — после снятия lock |
+| ESC плавно + матовое размытие + разрешение экрана | 7f592cf9 | McefHtmlScreen, HtmlScreen, HtmlBridge, Blur, GameMenuScreenMixin, index.html | проверка | gradlew build зелёный; ждёт снятия lock для runClient |
+| Чат в стиле Aura | c7560004 | ChatHudMixin, ChatScreenMixin | проверка | код готов, gradlew build зелёный; ждёт снятия lock для кадров в игре |
+| Слова в воздухе: Onest + эффекты | c7560004 | FloatingLyrics, LyricsDemo | создание | в работе |
+| Экран загрузки «After Effects» + пропуск Experimental | 925366ce | AuraSplash, SplashOverlayMixin, IntegratedServerLoaderMixin | проверка | сборка зелёная (14с); ждёт снятия lock для 4 кадров |
 | Aura Music: предзагрузка, YouTube, E2E | 925366ce | player/**, player.html | проверка | E2E принят; в игре проверить открытие без чёрного экрана |
 | Порт всего aura-ui на 1.21.1 (общий код + mc1201/mc1211) | — | aura-ui, aura-ui-1.21 | ожидает | после стабилизации волны |
-| Пресеты графики (лаунчер) | релиз-агент 8418a0db | — | к релизу | release-queue.md, строка 1 |
+| Пресеты графики (лаунчер) | релиз-агент 8418a0db | — | к релизу | тесты 283/283 и Release-сборка готовы, ждёт снятия lock |
