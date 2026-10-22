@@ -932,6 +932,56 @@ public class GraphicsPresetService : IGraphicsPresetService
         }
     }
 
+    public static bool IsDistantHorizonsInManifest(string gameDir, string targetVersion)
+    {
+        try
+        {
+            var searchPaths = new List<string>
+            {
+                Path.Combine(gameDir, $"manifest-{targetVersion}.json"),
+                Path.Combine(gameDir, "manifest-cache.json"),
+                Path.Combine(gameDir, "manifest.json"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", $"manifest-{targetVersion}.json"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura", "manifest.json"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "Aura-Pack", targetVersion == "1.21.1" ? "manifest-1.21.1.json" : "manifest.json"),
+                Path.Combine(Directory.GetCurrentDirectory(), "..", "Aura-Pack", targetVersion == "1.21.1" ? "manifest-1.21.1.json" : "manifest.json")
+            };
+
+            foreach (var p in searchPaths)
+            {
+                if (File.Exists(p))
+                {
+                    try
+                    {
+                        var json = File.ReadAllText(p, Encoding.UTF8);
+                        using var doc = JsonDocument.Parse(json);
+                        if (doc.RootElement.TryGetProperty("files", out var filesProp) && filesProp.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var f in filesProp.EnumerateArray())
+                            {
+                                if (f.TryGetProperty("path", out var pProp))
+                                {
+                                    var pathVal = pProp.GetString();
+                                    if (!string.IsNullOrEmpty(pathVal) &&
+                                        pathVal.StartsWith("mods/", StringComparison.OrdinalIgnoreCase) &&
+                                        pathVal.Contains("DistantHorizons", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        return true;
+                                    }
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+
+        return !string.Equals(targetVersion, "1.21.1", StringComparison.OrdinalIgnoreCase);
+    }
+
     private void SynchronizeDistantHorizons(string gameDir, bool enable, int lodRadius)
     {
         try
@@ -939,7 +989,13 @@ public class GraphicsPresetService : IGraphicsPresetService
             var modsDir = Path.Combine(gameDir, "mods");
             if (!Directory.Exists(modsDir)) return;
 
-            if (enable)
+            string targetVersion = !string.IsNullOrWhiteSpace(_configService.CurrentConfig.SelectedVersion)
+                ? _configService.CurrentConfig.SelectedVersion
+                : "1.20.1";
+
+            bool allowedInManifest = IsDistantHorizonsInManifest(gameDir, targetVersion);
+
+            if (enable && allowedInManifest)
             {
                 SetDistantHorizonsLodRadius(gameDir, lodRadius);
 
@@ -976,6 +1032,11 @@ public class GraphicsPresetService : IGraphicsPresetService
                     {
                         FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка отключения Distant Horizons: {ex.Message}");
                     }
+                }
+
+                if (enable && !allowedInManifest)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[PRESET] Distant Horizons пропущен для версии {targetVersion}: отсутствует в манифесте сборки");
                 }
             }
         }

@@ -789,4 +789,65 @@ public class PackUpdateServiceTests : IDisposable
         Assert.Equal(PackUpdateStatus.Updated, results[1].Status);
         Assert.Equal(1, manifestRequests);
     }
+    [Fact]
+    public async Task Sync_OrphanDisabledJarInModsDeleted_LegitimateDisabledPreserved()
+    {
+        var modBytes = Encoding.UTF8.GetBytes("Legit Disabled Mod");
+        var manifestFiles = new[]
+        {
+            new { path = "mods/legit.jar.disabled", sha256 = Sha256(modBytes), size = (long)modBytes.Length, mode = "default" }
+        };
+        var manifestContent = BuildManifestJson(files: manifestFiles);
+
+        var modsDir = Path.Combine(_gameDir, "mods");
+        Directory.CreateDirectory(modsDir);
+        File.WriteAllBytes(Path.Combine(modsDir, "legit.jar.disabled"), modBytes);
+        File.WriteAllText(Path.Combine(modsDir, "DistantHorizons-2.2.1-a-1.21.1.jar.disabled"), "Old Orphan DH");
+
+        var handler = new MockHttpMessageHandler
+        {
+            Handler = req =>
+            {
+                var uri = req.RequestUri!.ToString();
+                if (uri.Contains("manifest.json"))
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifestContent) });
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+            }
+        };
+
+        var configService = new TestConfigService(_gameDir);
+        using var service = new PackUpdateService(configService, new HttpClient(handler), _stateFilePath);
+
+        var result = await service.CheckAndApplyAsync();
+
+        Assert.Equal(PackUpdateStatus.Updated, result.Status);
+        Assert.False(File.Exists(Path.Combine(modsDir, "DistantHorizons-2.2.1-a-1.21.1.jar.disabled")));
+        Assert.True(File.Exists(Path.Combine(modsDir, "legit.jar.disabled")));
+    }
+
+    [Fact]
+    public void GraphicsPreset_DistantHorizons_NotEnabledWhenMissingInManifest()
+    {
+        var manifestJsonWithoutDh = "{\"minecraft\": \"1.21.1\", \"files\": [{\"path\": \"mods/sodium.jar\"}]}";
+        var cachePath = Path.Combine(_gameDir, "manifest-1.21.1.json");
+        File.WriteAllText(cachePath, manifestJsonWithoutDh, Encoding.UTF8);
+
+        var modsDir = Path.Combine(_gameDir, "mods");
+        Directory.CreateDirectory(modsDir);
+        var dhDisabledPath = Path.Combine(modsDir, "DistantHorizons-2.2.1-a-1.21.1.jar.disabled");
+        File.WriteAllText(dhDisabledPath, "dummy");
+
+        bool isInManifest = GraphicsPresetService.IsDistantHorizonsInManifest(_gameDir, "1.21.1");
+        Assert.False(isInManifest);
+
+        var configService = new TestConfigService(_gameDir);
+        configService.CurrentConfig.SelectedVersion = "1.21.1";
+        var presetService = new GraphicsPresetService(configService, new WorkshopService());
+
+        var applyResult = presetService.ApplyPreset(_gameDir, "High", persistConfig: false);
+
+        Assert.True(applyResult.Success);
+        Assert.True(File.Exists(dhDisabledPath));
+        Assert.False(File.Exists(Path.Combine(modsDir, "DistantHorizons-2.2.1-a-1.21.1.jar")));
+    }
 }

@@ -45,7 +45,10 @@
 
     const DOTS = '<span class="boot-dots"><i>.</i><i>.</i><i>.</i></span>';
 
-    function setStatus(html, tone) {
+    let lastDownloadUpdate = 0;
+    let pendingDownloadAnim = null;
+
+    function setStatus(html, tone, immediate = false) {
       if (status.dataset.html === html && status.dataset.tone === (tone || '')) return;
       status.dataset.html = html;
       status.dataset.tone = tone || '';
@@ -55,7 +58,7 @@
         status.classList.toggle('err', tone === 'err');
         status.classList.remove('swap');
       };
-      if (effectsOff()) { apply(); return; }
+      if (immediate || effectsOff()) { apply(); return; }
       status.classList.add('swap');
       setTimeout(apply, 160);
     }
@@ -77,8 +80,23 @@
           break;
         case 'downloading': {
           const pct = Math.max(0, Math.min(100, Number(x.percentage) || 0));
-          bar.style.transform = `scaleX(${pct / 100})`;
-          setStatus(`Скачиваем ${x.version || 'обновление'} · ${Math.round(pct)}%${x.speed ? ' · ' + x.speed : ''}`);
+          const text = `Скачиваем ${x.version || 'обновление'} · ${Math.round(pct)}%${x.speed ? ' · ' + x.speed : ''}`;
+          const now = performance.now();
+
+          const updateDownloadUi = () => {
+            bar.style.transform = `scaleX(${pct / 100})`;
+            // Обновляем статус без мерцания (.swap анимации)
+            setStatus(text, '', true);
+            lastDownloadUpdate = performance.now();
+            pendingDownloadAnim = null;
+          };
+
+          if (now - lastDownloadUpdate >= 100 || pct >= 100 || lastDownloadUpdate === 0) {
+            if (pendingDownloadAnim) cancelAnimationFrame(pendingDownloadAnim);
+            updateDownloadUi();
+          } else if (!pendingDownloadAnim) {
+            pendingDownloadAnim = requestAnimationFrame(updateDownloadUi);
+          }
           break;
         }
         case 'installing':

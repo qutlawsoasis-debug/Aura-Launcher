@@ -268,6 +268,8 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             };
         }
 
+        SaveManifestCache(gameDir, targetVersion, manifestJson);
+
         // Проверка версии Minecraft
         if (!string.Equals(manifest.Minecraft, targetVersion, StringComparison.OrdinalIgnoreCase))
         {
@@ -356,6 +358,12 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 .Select(f => Path.GetFileName(f.Path)),
             StringComparer.OrdinalIgnoreCase);
 
+        var manifestDisabledMods = new HashSet<string>(
+            manifest.Files
+                .Where(f => f.Path.StartsWith("mods/", StringComparison.OrdinalIgnoreCase) && f.Path.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase))
+                .Select(f => Path.GetFileName(f.Path)),
+            StringComparer.OrdinalIgnoreCase);
+
         var jarsToDelete = new List<string>();
         if (Directory.Exists(modsDir))
         {
@@ -366,11 +374,23 @@ public class PackUpdateService : IPackUpdateService, IDisposable
                 if (!manifestModsJars.Contains(fileName))
                 {
                     // Если в манифесте этот мод присутствует как .disabled, не удаляем его
-                    if (manifest.Files.Any(f => string.Equals(Path.GetFileName(f.Path), fileName + ".disabled", StringComparison.OrdinalIgnoreCase)))
+                    if (manifestDisabledMods.Contains(fileName + ".disabled"))
                     {
                         continue;
                     }
                     jarsToDelete.Add(jar);
+                }
+            }
+
+            // Удаление осиротевших *.jar.disabled
+            var existingDisabled = Directory.GetFiles(modsDir, "*.jar.disabled", SearchOption.TopDirectoryOnly);
+            foreach (var dis in existingDisabled)
+            {
+                var fileName = Path.GetFileName(dis);
+                var baseJarName = fileName[..^".disabled".Length];
+                if (!manifestDisabledMods.Contains(fileName) && !manifestModsJars.Contains(baseJarName))
+                {
+                    jarsToDelete.Add(dis);
                 }
             }
         }
@@ -779,6 +799,20 @@ public class PackUpdateService : IPackUpdateService, IDisposable
             return IsNetworkException(ex.InnerException, false, false);
 
         return false;
+    }
+
+    public static void SaveManifestCache(string gameDir, string targetVersion, string manifestJson)
+    {
+        try
+        {
+            Directory.CreateDirectory(gameDir);
+            var versionSpecific = Path.Combine(gameDir, $"manifest-{targetVersion}.json");
+            File.WriteAllText(versionSpecific, manifestJson, new System.Text.UTF8Encoding(false));
+
+            var general = Path.Combine(gameDir, "manifest-cache.json");
+            File.WriteAllText(general, manifestJson, new System.Text.UTF8Encoding(false));
+        }
+        catch { }
     }
 
     public static ManifestModel ParseAndValidateManifest(string json, string gameDir)

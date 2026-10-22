@@ -51,10 +51,28 @@
     });
 
     window.AuraBridge.on('launcher.update', show);
+
+    let lastPillProgress = 0;
+    let pendingPillAnim = null;
+
     window.AuraBridge.on('launcher.updateProgress', p => {
       const pct = Math.max(0, Math.min(100, Number(p && p.percentage) || 0));
-      bar.style.transform = `scaleX(${pct / 100})`;
-      text.textContent = `Скачиваем обновление · ${Math.round(pct)}%`;
+      const str = `Скачиваем обновление · ${Math.round(pct)}%`;
+      const now = performance.now();
+
+      const updatePill = () => {
+        bar.style.transform = `scaleX(${pct / 100})`;
+        text.textContent = str;
+        lastPillProgress = performance.now();
+        pendingPillAnim = null;
+      };
+
+      if (now - lastPillProgress >= 100 || pct >= 100 || lastPillProgress === 0) {
+        if (pendingPillAnim) cancelAnimationFrame(pendingPillAnim);
+        updatePill();
+      } else if (!pendingPillAnim) {
+        pendingPillAnim = requestAnimationFrame(updatePill);
+      }
     });
 
     window.AuraBridge.send('launcher.updateGet').then(show).catch(() => {});

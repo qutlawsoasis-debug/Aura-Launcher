@@ -117,12 +117,19 @@ public partial class WebBridge
 
             _logger($"[WEBBRIDGE] startup: downloading {newVersion}");
             SendStartup("downloading", new { percentage = 0.0, speed = "", version = DisplayVersion(newVersion) });
-            var progress = new Progress<DownloadProgressReport>(p => SendStartup("downloading", new
+            long lastProgressTick = 0;
+            var progress = new Progress<DownloadProgressReport>(p =>
             {
-                percentage = p.Percentage,
-                speed = p.SpeedMBs > 0 ? $"{p.SpeedMBs:F1} МБ/с" : "",
-                version = DisplayVersion(newVersion)
-            }));
+                long now = Environment.TickCount64;
+                if (now - lastProgressTick < 100 && p.Percentage < 100) return;
+                lastProgressTick = now;
+                SendStartup("downloading", new
+                {
+                    percentage = p.Percentage,
+                    speed = p.SpeedMBs > 0 ? $"{p.SpeedMBs:F1} МБ/с" : "",
+                    version = DisplayVersion(newVersion)
+                });
+            });
 
             var result = await _launcherUpdateService.DownloadAndApplyAsync(progress);
             if (result.Status == LauncherUpdateStatus.UpdatedRestarting)

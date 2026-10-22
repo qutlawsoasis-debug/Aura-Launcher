@@ -124,8 +124,14 @@ public partial class WebBridge
         {
             if (IsInLobby) await _lobbySession!.LeaveLobbyAsync();
 
+            long lastProgressTick = 0;
             var progress = new Progress<DownloadProgressReport>(p =>
-                SendEvent("launcher.updateProgress", new { percentage = p.Percentage, status = p.StatusText }));
+            {
+                long now = Environment.TickCount64;
+                if (now - lastProgressTick < 100 && p.Percentage < 100) return;
+                lastProgressTick = now;
+                SendEvent("launcher.updateProgress", new { percentage = p.Percentage, status = p.StatusText });
+            });
             var result = await _launcherUpdateService.DownloadAndApplyAsync(progress);
 
             if (result.Status == LauncherUpdateStatus.UpdatedRestarting)

@@ -1,4 +1,38 @@
 /* Styles for play / launch button states inside Island capsule */
-.play.is-launching {
-  min-width: 240px;
+.layer[data-l="launching"] .bar {
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 0 16px;
 }
+
+.play {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.play > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play.is-launching {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.layer[data-l="launching"] .play {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  overflow: hidden;
+}
+
