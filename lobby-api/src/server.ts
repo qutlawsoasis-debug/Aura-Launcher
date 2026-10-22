@@ -16,6 +16,9 @@ import {
   handleUserProfile
 } from './friendRoutes.js';
 import handleReport from '../api/report.js';
+import handleMusicResolve from '../api/music/resolve.js';
+import handleMusicSearch from '../api/music/search.js';
+import handleMusicList from '../api/music/list.js';
 import { generateLandingHtml } from './landing.js';
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
@@ -120,6 +123,15 @@ export const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/user/profile' || pathname === '/api/profile') {
       return await handleUserProfile(req, res);
+    }
+    if (pathname === '/api/music/resolve') {
+      return await handleMusicResolve(req, res);
+    }
+    if (pathname === '/api/music/search') {
+      return await handleMusicSearch(req, res);
+    }
+    if (pathname === '/api/music/list') {
+      return await handleMusicList(req, res);
     }
 
     // 0. GET /api/tunnel-config
