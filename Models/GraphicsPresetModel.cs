@@ -21,6 +21,7 @@ public class GraphicsPresetModel
     public string ShaderPack { get; set; } = "Sildurs-Enhanced-Default-Fancy.zip";
     public List<string> ShaderPacks { get; set; } = new();
     public bool DistantHorizons { get; set; } = false;
+    public int DistantHorizonsLodRadius { get; set; } = 256;
     public bool EnableShaders { get; set; } = true;
     public Dictionary<string, string> ShaderOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public List<string> ResourcePacks { get; set; } = new();

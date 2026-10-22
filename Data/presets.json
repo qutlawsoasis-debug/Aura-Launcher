@@ -3,8 +3,8 @@
     "Low": {
       "name": "Слабый ПК",
       "hardware": "GTX 1050/1650, RX 550/560, Vega, Intel HD",
-      "renderDistance": 12,
-      "simulationDistance": 6,
+      "renderDistance": 6,
+      "simulationDistance": 5,
       "graphics": "fast",
       "particles": "decreased",
       "clouds": "off",
@@ -21,14 +21,17 @@
         "-XX:MaxGCPauseMillis=50",
         "-XX:G1HeapRegionSize=16M"
       ],
-      "shaderPack": "Sildurs-Enhanced-Default-Fancy.zip",
+      "shaderPack": "ComplementaryReimagined_r5.9.3.zip",
       "shaderPacks": [
-        "Sildurs-Enhanced-Default-Fancy.zip",
+        "ComplementaryReimagined_r5.9.3.zip",
         "Builders-QOL.zip"
       ],
       "distantHorizons": false,
+      "distantHorizonsLodRadius": 64,
       "enableShaders": true,
-      "shaderOptions": {},
+      "shaderOptions": {
+        "profile": "LOW"
+      },
       "resourcePacks": [
         "Sodium_Russian_Translation.zip",
         "AnimatedDoors-RP-2.0.0.zip",
@@ -36,15 +39,14 @@
         "Drigo-3D-Lanterns-x-Punchy.zip",
         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
         "FreshAnimations_v1.10.4.zip",
-        "Universal Bushy Leaves.zip",
-        "Transparent-GUI-White-Border.zip"
+        "Universal Bushy Leaves.zip"
       ]
     },
     "Medium": {
       "name": "Средний",
       "hardware": "GTX 1660, RTX 2060, RX 6600",
-      "renderDistance": 16,
-      "simulationDistance": 8,
+      "renderDistance": 8,
+      "simulationDistance": 6,
       "graphics": "fancy",
       "particles": "decreased",
       "clouds": "on",
@@ -64,9 +66,10 @@
       "shaderPack": "Derivative.zip",
       "shaderPacks": [
         "Derivative.zip",
-        "Nostalgia_v5.1.zip"
+        "ComplementaryReimagined_r5.9.3.zip"
       ],
-      "distantHorizons": false,
+      "distantHorizons": true,
+      "distantHorizonsLodRadius": 128,
       "enableShaders": true,
       "shaderOptions": {},
       "resourcePacks": [
@@ -77,15 +80,14 @@
         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
         "FreshAnimations_v1.10.4.zip",
         "Universal Bushy Leaves.zip",
-        "SPBR.zip",
-        "Transparent-GUI-White-Border.zip"
+        "SPBR.zip"
       ]
     },
     "High": {
       "name": "Высокий",
       "hardware": "RTX 30",
-      "renderDistance": 24,
-      "simulationDistance": 10,
+      "renderDistance": 8,
+      "simulationDistance": 6,
       "graphics": "fancy",
       "particles": "all",
       "clouds": "on",
@@ -102,12 +104,13 @@
         "-XX:MaxGCPauseMillis=50",
         "-XX:G1HeapRegionSize=16M"
       ],
-      "shaderPack": "ProjectLUMA.zip",
+      "shaderPack": "Noble_v1.9.9.zip",
       "shaderPacks": [
-        "ProjectLUMA.zip",
-        "Noble_v1.9.9.zip"
+        "Noble_v1.9.9.zip",
+        "Derivative.zip"
       ],
-      "distantHorizons": false,
+      "distantHorizons": true,
+      "distantHorizonsLodRadius": 256,
       "enableShaders": true,
       "shaderOptions": {},
       "resourcePacks": [
@@ -120,15 +123,14 @@
         "Universal Bushy Leaves.zip",
         "SPBR.zip",
         "Classic-3D.zip",
-        "Even-Better-Enchants.zip",
-        "Transparent-GUI-White-Border.zip"
+        "Even-Better-Enchants.zip"
       ]
     },
     "Ultra": {
       "name": "Ультра",
       "hardware": "RTX 40 и 50",
-      "renderDistance": 32,
-      "simulationDistance": 12,
+      "renderDistance": 10,
+      "simulationDistance": 8,
       "graphics": "fancy",
       "particles": "all",
       "clouds": "on",
@@ -151,6 +153,7 @@
         "Sildurs-Vibrant-Shaders-Extreme-VL.zip"
       ],
       "distantHorizons": true,
+      "distantHorizonsLodRadius": 512,
       "enableShaders": true,
       "shaderOptions": {},
       "resourcePacks": [
@@ -163,8 +166,7 @@
         "Universal Bushy Leaves.zip",
         "SPBR.zip",
         "Mels-3D-Items.zip",
-        "Even-Better-Enchants.zip",
-        "Transparent-GUI-White-Border.zip"
+        "Even-Better-Enchants.zip"
       ]
     }
   }

@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Management;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AuraLauncher.Models;
 using AuraLauncher.Services.Interfaces;
 
@@ -127,8 +128,8 @@ public class GraphicsPresetService : IGraphicsPresetService
         {
             Name = "Слабый ПК",
             Hardware = "GTX 1050/1650, RX 550/560, Vega, Intel HD",
-            RenderDistance = 12,
-            SimulationDistance = 6,
+            RenderDistance = 6,
+            SimulationDistance = 5,
             Graphics = "fast",
             Particles = "decreased",
             Clouds = "off",
@@ -146,15 +147,16 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=16M"
             },
-            ShaderPack = "Sildurs-Enhanced-Default-Fancy.zip",
+            ShaderPack = "ComplementaryReimagined_r5.9.3.zip",
             ShaderPacks = new List<string>
             {
-                "Sildurs-Enhanced-Default-Fancy.zip",
+                "ComplementaryReimagined_r5.9.3.zip",
                 "Builders-QOL.zip"
             },
             DistantHorizons = false,
+            DistantHorizonsLodRadius = 64,
             EnableShaders = true,
-            ShaderOptions = new Dictionary<string, string>(),
+            ShaderOptions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["profile"] = "LOW" },
             ResourcePacks = new List<string>
             {
                 "Sodium_Russian_Translation.zip",
@@ -163,8 +165,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Drigo-3D-Lanterns-x-Punchy.zip",
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
-                "Universal Bushy Leaves.zip",
-                "Transparent-GUI-White-Border.zip"
+                "Universal Bushy Leaves.zip"
             }
         };
 
@@ -172,8 +173,8 @@ public class GraphicsPresetService : IGraphicsPresetService
         {
             Name = "Средний",
             Hardware = "GTX 1660, RTX 2060, RX 6600",
-            RenderDistance = 16,
-            SimulationDistance = 8,
+            RenderDistance = 8,
+            SimulationDistance = 6,
             Graphics = "fancy",
             Particles = "decreased",
             Clouds = "on",
@@ -195,9 +196,10 @@ public class GraphicsPresetService : IGraphicsPresetService
             ShaderPacks = new List<string>
             {
                 "Derivative.zip",
-                "Nostalgia_v5.1.zip"
+                "ComplementaryReimagined_r5.9.3.zip"
             },
-            DistantHorizons = false,
+            DistantHorizons = true,
+            DistantHorizonsLodRadius = 128,
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
@@ -209,8 +211,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip",
                 "FreshAnimations_v1.10.4.zip",
                 "Universal Bushy Leaves.zip",
-                "SPBR.zip",
-                "Transparent-GUI-White-Border.zip"
+                "SPBR.zip"
             }
         };
 
@@ -218,8 +219,8 @@ public class GraphicsPresetService : IGraphicsPresetService
         {
             Name = "Высокий",
             Hardware = "RTX 30",
-            RenderDistance = 24,
-            SimulationDistance = 10,
+            RenderDistance = 8,
+            SimulationDistance = 6,
             Graphics = "fancy",
             Particles = "all",
             Clouds = "on",
@@ -237,13 +238,14 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "-XX:MaxGCPauseMillis=50",
                 "-XX:G1HeapRegionSize=16M"
             },
-            ShaderPack = "ProjectLUMA.zip",
+            ShaderPack = "Noble_v1.9.9.zip",
             ShaderPacks = new List<string>
             {
-                "ProjectLUMA.zip",
-                "Noble_v1.9.9.zip"
+                "Noble_v1.9.9.zip",
+                "Derivative.zip"
             },
-            DistantHorizons = false,
+            DistantHorizons = true,
+            DistantHorizonsLodRadius = 256,
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
@@ -257,8 +259,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Universal Bushy Leaves.zip",
                 "SPBR.zip",
                 "Classic-3D.zip",
-                "Even-Better-Enchants.zip",
-                "Transparent-GUI-White-Border.zip"
+                "Even-Better-Enchants.zip"
             }
         };
 
@@ -266,8 +267,8 @@ public class GraphicsPresetService : IGraphicsPresetService
         {
             Name = "Ультра",
             Hardware = "RTX 40 и 50",
-            RenderDistance = 32,
-            SimulationDistance = 12,
+            RenderDistance = 10,
+            SimulationDistance = 8,
             Graphics = "fancy",
             Particles = "all",
             Clouds = "on",
@@ -292,6 +293,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Sildurs-Vibrant-Shaders-Extreme-VL.zip"
             },
             DistantHorizons = true,
+            DistantHorizonsLodRadius = 512,
             EnableShaders = true,
             ShaderOptions = new Dictionary<string, string>(),
             ResourcePacks = new List<string>
@@ -305,8 +307,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                 "Universal Bushy Leaves.zip",
                 "SPBR.zip",
                 "Mels-3D-Items.zip",
-                "Even-Better-Enchants.zip",
-                "Transparent-GUI-White-Border.zip"
+                "Even-Better-Enchants.zip"
             }
         };
     }
@@ -515,7 +516,7 @@ public class GraphicsPresetService : IGraphicsPresetService
 
             // 2. Синхронизация шейдеров пресета и переключение Distant Horizons
             SynchronizePresetShaders(gameDir, preset);
-            SynchronizeDistantHorizons(gameDir, preset.DistantHorizons);
+            SynchronizeDistantHorizons(gameDir, preset.DistantHorizons, preset.DistantHorizonsLodRadius);
 
             string chosenShader = "OFF";
             if (preset.EnableShaders)
@@ -677,8 +678,16 @@ public class GraphicsPresetService : IGraphicsPresetService
                         "Modded-Swords-x-Punchy-1.20.1-v1.3.2.zip"
                     });
 
-            foreach (var cp in candidatePacks)
+            foreach (var candidate in candidatePacks)
             {
+                // В сборке 1.21.1 у паков под 1.20.1 есть своя версия рядом — берём её
+                var cp = candidate;
+                if (cp.Contains("-1.20.1-", StringComparison.OrdinalIgnoreCase))
+                {
+                    var v121 = cp.Replace("-1.20.1-", "-1.21.1-", StringComparison.OrdinalIgnoreCase);
+                    if (File.Exists(Path.Combine(rpDir, v121))) cp = v121;
+                }
+
                 if (File.Exists(Path.Combine(rpDir, cp)))
                 {
                     var entry = $"\"file/{cp}\"";
@@ -923,7 +932,7 @@ public class GraphicsPresetService : IGraphicsPresetService
         }
     }
 
-    private void SynchronizeDistantHorizons(string gameDir, bool enable)
+    private void SynchronizeDistantHorizons(string gameDir, bool enable, int lodRadius)
     {
         try
         {
@@ -932,6 +941,8 @@ public class GraphicsPresetService : IGraphicsPresetService
 
             if (enable)
             {
+                SetDistantHorizonsLodRadius(gameDir, lodRadius);
+
                 var disabledFiles = Directory.GetFiles(modsDir, "DistantHorizons*.jar.disabled", SearchOption.TopDirectoryOnly);
                 foreach (var disabledPath in disabledFiles)
                 {
@@ -940,7 +951,7 @@ public class GraphicsPresetService : IGraphicsPresetService
                     {
                         if (File.Exists(targetPath)) File.Delete(targetPath);
                         File.Move(disabledPath, targetPath);
-                        FabricGameLaunchService.LogLauncherEvent($"[PRESET] Distant Horizons включен для пресета Ultra: {Path.GetFileName(targetPath)}");
+                        FabricGameLaunchService.LogLauncherEvent($"[PRESET] Distant Horizons включен: {Path.GetFileName(targetPath)}");
                     }
                     catch (Exception ex)
                     {
@@ -971,6 +982,29 @@ public class GraphicsPresetService : IGraphicsPresetService
         catch (Exception ex)
         {
             FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка переключения Distant Horizons: {ex.Message}");
+        }
+    }
+
+    private static void SetDistantHorizonsLodRadius(string gameDir, int lodRadius)
+    {
+        if (lodRadius <= 0) return;
+        try
+        {
+            var tomlPath = Path.Combine(gameDir, "config", "DistantHorizons.toml");
+            if (!File.Exists(tomlPath)) return;
+
+            var text = File.ReadAllText(tomlPath, Encoding.UTF8);
+            var updated = Regex.Replace(text, @"(?m)^(\s*lodChunkRenderDistanceRadius\s*=\s*)\d+",
+                m => m.Groups[1].Value + lodRadius.ToString(CultureInfo.InvariantCulture));
+            if (updated != text)
+            {
+                File.WriteAllText(tomlPath, updated, new UTF8Encoding(false));
+                FabricGameLaunchService.LogLauncherEvent($"[PRESET] Distant Horizons: дальность LOD {lodRadius} чанков");
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[PRESET: WARN] Ошибка записи дальности LOD: {ex.Message}");
         }
     }
 }

@@ -243,13 +243,13 @@ public class WorkshopServiceTests : IDisposable
 
         FabricGameLaunchService.ApplyGraphicsPreset(_tempDir, "Low");
         string optionsText = File.ReadAllText(Path.Combine(_tempDir, "options.txt"));
-        Assert.Contains("renderDistance:12", optionsText);
-        Assert.Contains("simulationDistance:6", optionsText);
+        Assert.Contains("renderDistance:6", optionsText);
+        Assert.Contains("simulationDistance:5", optionsText);
 
         FabricGameLaunchService.ApplyGraphicsPreset(_tempDir, "Ultra");
         optionsText = File.ReadAllText(Path.Combine(_tempDir, "options.txt"));
-        Assert.Contains("renderDistance:32", optionsText);
-        Assert.Contains("simulationDistance:12", optionsText);
+        Assert.Contains("renderDistance:10", optionsText);
+        Assert.Contains("simulationDistance:8", optionsText);
     }
 
     [Fact]
@@ -258,33 +258,36 @@ public class WorkshopServiceTests : IDisposable
         string dirHigh = Path.Combine(_tempDir, "game_high");
         Directory.CreateDirectory(Path.Combine(dirHigh, "shaderpacks"));
         File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "OldShader.zip"), "dummy old shader");
-        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "ProjectLUMA.zip"), "dummy luma");
+        File.WriteAllText(Path.Combine(dirHigh, "shaderpacks", "Noble_v1.9.9.zip"), "dummy noble");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirHigh, "High");
 
         Assert.True(File.Exists(Path.Combine(dirHigh, "options.txt")));
         string highOptions = File.ReadAllText(Path.Combine(dirHigh, "options.txt"));
-        Assert.Contains("renderDistance:24", highOptions);
-        Assert.Contains("simulationDistance:10", highOptions);
+        Assert.Contains("renderDistance:8", highOptions);
+        Assert.Contains("simulationDistance:6", highOptions);
         // Old shader not belonging to High preset should be deleted
         Assert.False(File.Exists(Path.Combine(dirHigh, "shaderpacks", "OldShader.zip")));
-        Assert.True(File.Exists(Path.Combine(dirHigh, "shaderpacks", "ProjectLUMA.zip")));
+        Assert.True(File.Exists(Path.Combine(dirHigh, "shaderpacks", "Noble_v1.9.9.zip")));
 
         string dirUltra = Path.Combine(_tempDir, "game_ultra");
         Directory.CreateDirectory(Path.Combine(dirUltra, "shaderpacks"));
         Directory.CreateDirectory(Path.Combine(dirUltra, "mods"));
         File.WriteAllText(Path.Combine(dirUltra, "shaderpacks", "Bliss_v2.1.2.zip"), "dummy bliss");
         File.WriteAllText(Path.Combine(dirUltra, "mods", "DistantHorizons-2.2.1-a-1.20.1.jar.disabled"), "dummy dh");
+        Directory.CreateDirectory(Path.Combine(dirUltra, "config"));
+        File.WriteAllText(Path.Combine(dirUltra, "config", "DistantHorizons.toml"), "[client]\n\t\t\t\tlodChunkRenderDistanceRadius = 256\n");
 
         FabricGameLaunchService.ApplyGraphicsPreset(dirUltra, "Ultra");
 
         Assert.True(File.Exists(Path.Combine(dirUltra, "options.txt")));
         string ultraOptions = File.ReadAllText(Path.Combine(dirUltra, "options.txt"));
-        Assert.Contains("renderDistance:32", ultraOptions);
-        Assert.Contains("simulationDistance:12", ultraOptions);
+        Assert.Contains("renderDistance:10", ultraOptions);
+        Assert.Contains("simulationDistance:8", ultraOptions);
         // Distant Horizons enabled on Ultra
         Assert.True(File.Exists(Path.Combine(dirUltra, "mods", "DistantHorizons-2.2.1-a-1.20.1.jar")));
         Assert.False(File.Exists(Path.Combine(dirUltra, "mods", "DistantHorizons-2.2.1-a-1.20.1.jar.disabled")));
+        Assert.Contains("lodChunkRenderDistanceRadius = 512", File.ReadAllText(Path.Combine(dirUltra, "config", "DistantHorizons.toml")));
     }
 
     [Fact]
