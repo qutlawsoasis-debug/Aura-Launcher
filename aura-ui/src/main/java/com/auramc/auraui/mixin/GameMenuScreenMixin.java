@@ -1,6 +1,7 @@
 package com.auramc.auraui.mixin;
 
 import com.auramc.auraui.screen.AuraPauseScreen;
+import com.auramc.auraui.screen.HtmlScreen;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,7 +15,7 @@ public class GameMenuScreenMixin {
     private void aura$replaceWithAuraPauseScreen(CallbackInfo ci) {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc != null) {
-            mc.setScreen(new AuraPauseScreen());
+            mc.setScreen(HtmlScreen.isEnabled() ? HtmlScreen.pause() : new AuraPauseScreen());
             ci.cancel();
         }
     }

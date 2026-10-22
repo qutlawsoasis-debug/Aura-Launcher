@@ -6,7 +6,8 @@
   "client": [
     "SplashOverlayMixin",
     "TitleScreenMixin",
-    "GameMenuScreenMixin"
+    "GameMenuScreenMixin",
+    "MinecraftClientMixin"
   ],
   "injectors": {
     "defaultRequire": 1

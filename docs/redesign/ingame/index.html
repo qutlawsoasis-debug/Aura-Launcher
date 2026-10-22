@@ -64,6 +64,11 @@ body:not([data-view="game"]) .veil {
   background: rgba(4,8,14,.38);
 }
 body[data-fx="off"] .veil { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+/* Внутри игры: мир и размытие рисует Minecraft, страница прозрачная */
+body.ingame { background: transparent; }
+body.ingame .world, body.ingame .hud, body.ingame .mock-bar { display: none; }
+body.ingame .veil { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.ingame:not([data-view="game"]) .veil { background: rgba(4,8,14,.30); }
 body[data-fx="off"]:not([data-view="game"]) .veil { background: rgba(6,10,16,.82); }
 
 /* ============ HUD ============ */
@@ -331,7 +336,7 @@ body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opaci
       </div>
       <div class="esc-foot">
         <button class="btn-ghost"><i data-lucide="message-square"></i>Обратная связь</button>
-        <button class="btn-ghost danger"><i data-lucide="log-out"></i>Выйти в меню</button>
+        <button class="btn-ghost danger" data-act="main_menu"><i data-lucide="log-out"></i>Выйти в меню</button>
       </div>
     </div>
 
@@ -588,7 +593,11 @@ function findItem(id) { for (const s of Object.values(S)) { const i = s.items.fi
 
 function renderAll(anim = true) { renderNav(); renderRows(); renderDetail(anim); paint(); }
 
+const INGAME = new URLSearchParams(location.search).has('ingame');
+const toGame = action => { try { window.cefQuery({ request: action, onSuccess() {}, onFailure() {} }); } catch (e) { console.warn('cefQuery', e); } };
+
 function setView(v) {
+  if (INGAME && v === 'game') return toGame('resume');
   document.body.dataset.view = v;
   if (v === 'settings') { renderAll(); }
 }
@@ -608,6 +617,7 @@ document.addEventListener('click', e => {
     document.querySelectorAll('.mock-bar button').forEach(b => b.classList.toggle('on', b === t));
     return;
   }
+  if (t.dataset.act === 'main_menu') return INGAME ? toGame('main_menu') : setView('game');
   if (t.dataset.act) return setView(t.dataset.act);
   if (t.dataset.toggle) {
     e.stopPropagation();
@@ -678,6 +688,7 @@ document.addEventListener('keydown', e => {
 renderAll(false);
 paint();
 const qs = new URLSearchParams(location.search);
+if (INGAME) document.body.classList.add('ingame');
 if (qs.get('sec') && S[qs.get('sec')]) { state.section = qs.get('sec'); state.item = qs.get('item') || S[state.section].items[0].id; }
 if (qs.get('theme')) { findItem('theme').value = qs.get('theme'); applyTheme(qs.get('theme')); }
 if (qs.get('view')) setView(qs.get('view'));
