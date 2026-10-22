@@ -23,5 +23,6 @@
 | Слова в воздухе: Onest + эффекты | c7560004 | FloatingLyrics, LyricsDemo | создание | в работе |
 | Экран загрузки «After Effects» + пропуск Experimental | 925366ce | AuraSplash, SplashOverlayMixin, IntegratedServerLoaderMixin | проверка | сборка зелёная (14с); ждёт снятия lock для 4 кадров |
 | Aura Music: предзагрузка, YouTube, E2E | 925366ce | player/**, player.html | проверка | E2E принят; в игре проверить открытие без чёрного экрана |
-| Порт всего aura-ui на 1.21.1 (общий код + mc1201/mc1211) | — | aura-ui, aura-ui-1.21 | ожидает | после стабилизации волны |
+| Порт всего aura-ui на 1.21.1 (общий код + mc1201/mc1211) | 7f592cf9 | aura-ui-1.21\** | создание | agy-task-port-121.md |
+| Служебные экраны: загрузка мира, подключение, отключено, смерть | 925366ce | mixin\LevelLoading/Connect/Disconnected/DeathScreenMixin, screen\AuraWorldScreens | создание | agy-task-world-screens.md |
 | Пресеты графики (лаунчер) | релиз-агент 8418a0db | — | к релизу | тесты 283/283 и Release-сборка готовы, ждёт снятия lock |
