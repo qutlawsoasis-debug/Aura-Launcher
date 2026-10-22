@@ -58,13 +58,13 @@ public final class AuraRenderer {
                     AuraUi.LOGGER.info("[aura-ui] NanoVG loaded font Onest (handle={})", fontOnest);
                 }
             } else {
-                AuraUi.LOGGER.warn("[aura-ui] Font fonts/onest.ttf not found in assets");
+                AuraUi.LOGGER.warn("[aura-ui] Could not find font onest.ttf in assets");
             }
 
             initialized = true;
             return true;
         } catch (Throwable t) {
-            AuraUi.LOGGER.error("[aura-ui] NanoVG init failed", t);
+            AuraUi.LOGGER.error("[aura-ui] Error initializing NanoVG", t);
             return false;
         }
     }
@@ -156,6 +156,37 @@ public final class AuraRenderer {
         NanoVG.nvgStrokeWidth(vg, strokeWidth);
         NanoVG.nvgStrokeColor(vg, colorA);
         NanoVG.nvgStroke(vg);
+    }
+
+    public static void circle(float cx, float cy, float radius, int color) {
+        if (vg == 0) return;
+        setNvgColor(colorA, color);
+        NanoVG.nvgBeginPath(vg);
+        NanoVG.nvgCircle(vg, cx, cy, radius);
+        NanoVG.nvgFillColor(vg, colorA);
+        NanoVG.nvgFill(vg);
+    }
+
+    public static void circleStroke(float cx, float cy, float radius, float strokeWidth, int color) {
+        if (vg == 0) return;
+        setNvgColor(colorA, color);
+        NanoVG.nvgBeginPath(vg);
+        NanoVG.nvgCircle(vg, cx, cy, Math.max(0, radius - strokeWidth * 0.5f));
+        NanoVG.nvgStrokeWidth(vg, strokeWidth);
+        NanoVG.nvgStrokeColor(vg, colorA);
+        NanoVG.nvgStroke(vg);
+    }
+
+    public static void triangle(float x1, float y1, float x2, float y2, float x3, float y3, int color) {
+        if (vg == 0) return;
+        setNvgColor(colorA, color);
+        NanoVG.nvgBeginPath(vg);
+        NanoVG.nvgMoveTo(vg, x1, y1);
+        NanoVG.nvgLineTo(vg, x2, y2);
+        NanoVG.nvgLineTo(vg, x3, y3);
+        NanoVG.nvgClosePath(vg);
+        NanoVG.nvgFillColor(vg, colorA);
+        NanoVG.nvgFill(vg);
     }
 
     public static void gradient(float x, float y, float w, float h, float radius, int topColor, int bottomColor) {

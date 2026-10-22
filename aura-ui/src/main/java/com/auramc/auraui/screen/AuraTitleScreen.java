@@ -25,15 +25,15 @@ import org.lwjgl.nanovg.NanoVG;
 public class AuraTitleScreen extends Screen {
     public static class NavItem {
         public String label;
-        public String desc;
-        public String badge;
         public Runnable action;
         public float hover = 0.0f;
+        public float x = 0.0f;
+        public float y = 0.0f;
+        public float width = 0.0f;
+        public float height = 0.0f;
 
-        public NavItem(String label, String desc, String badge, Runnable action) {
+        public NavItem(String label, Runnable action) {
             this.label = label;
-            this.desc = desc;
-            this.badge = badge;
             this.action = action;
         }
     }
@@ -44,6 +44,21 @@ public class AuraTitleScreen extends Screen {
     private long lastTimeNanos = 0;
     private float mouseParallaxX = 0.0f;
     private float mouseParallaxY = 0.0f;
+
+    // Island spring expand progress: 0.0 = idle (400px), 1.0 = expanded (780px)
+    private float expandProgress = 0.0f;
+    private float playButtonHover = 0.0f;
+
+    // Hitbox bounds in current frame
+    private float islandX = 0.0f;
+    private float islandY = 0.0f;
+    private float islandW = 0.0f;
+    private float islandH = 76.0f;
+
+    private float playX = 0.0f;
+    private float playY = 0.0f;
+    private float playW = 150.0f;
+    private float playH = 52.0f;
 
     public AuraTitleScreen() {
         super(Text.literal("Aura Title"));
@@ -56,9 +71,12 @@ public class AuraTitleScreen extends Screen {
         lastTimeNanos = System.nanoTime();
 
         navItems.clear();
+        // Items: Одиночная · Сервер · Друзья · Настройки · Выход
+        navItems.add(new NavItem("Одиночная", () -> {
+            if (client != null) client.setScreen(new SelectWorldScreen(this));
+        }));
 
-        // 1. Играть на сервере
-        navItems.add(new NavItem("Играть на сервере", "Подключиться к миру сервера", "СЕТЬ", () -> {
+        navItems.add(new NavItem("Сервер", () -> {
             if (client == null) return;
             ServerList serverList = new ServerList(client);
             serverList.loadFile();
@@ -71,23 +89,15 @@ public class AuraTitleScreen extends Screen {
             }
         }));
 
-        // 2. Одиночная игра
-        navItems.add(new NavItem("Одиночная игра", "Локальные миры и приключения", null, () -> {
-            if (client != null) client.setScreen(new SelectWorldScreen(this));
-        }));
-
-        // 3. Друзья онлайн
-        navItems.add(new NavItem("Друзья онлайн", "Список контактов и совместная игра", null, () -> {
+        navItems.add(new NavItem("Друзья", () -> {
             AuraUi.LOGGER.info("[aura-ui] Friends clicked");
         }));
 
-        // 4. Настройки
-        navItems.add(new NavItem("Настройки", "Графика, звук и управление", null, () -> {
+        navItems.add(new NavItem("Настройки", () -> {
             if (client != null) client.setScreen(new OptionsScreen(this, client.options));
         }));
 
-        // 5. Выход
-        navItems.add(new NavItem("Выход", "Выйти на рабочий стол", null, () -> {
+        navItems.add(new NavItem("Выход", () -> {
             if (client != null) client.scheduleStop();
         }));
     }
@@ -97,14 +107,8 @@ public class AuraTitleScreen extends Screen {
         return false;
     }
 
-    private static boolean loggedFirstRender = false;
-
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float deltaTick) {
-        if (!loggedFirstRender) {
-            AuraUi.LOGGER.info("[aura-ui] AuraTitleScreen.render called! width={}, height={}", width, height);
-            loggedFirstRender = true;
-        }
         if (client == null) return;
 
         long now = System.nanoTime();
@@ -124,7 +128,7 @@ public class AuraTitleScreen extends Screen {
         float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
         float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
-        // Target mouse parallax
+        // Smooth mouse parallax
         float targetPx = (realMouseX / winW - 0.5f) * 20.0f;
         float targetPy = (realMouseY / winH - 0.5f) * 20.0f;
         mouseParallaxX = Anim.lerp(mouseParallaxX, targetPx, dt * 4.0f);
@@ -134,170 +138,154 @@ public class AuraTitleScreen extends Screen {
             return;
         }
 
-        // 1. Background image cover with slow continuous zoom
+        // 1. Fullscreen background image (clean cover, subtle vignette)
         int bgImage = AuraRenderer.getImage(bgTexture);
         float zoomProgress = (float) (Math.sin(openTime * 0.15f) * 0.5 + 0.5);
         float bgScale = 1.04f + zoomProgress * 0.05f;
         float bgW = winW * bgScale;
         float bgH = winH * bgScale;
-        float bgX = (winW - bgW) * 0.5f - mouseParallaxX;
-        float bgY = (winH - bgH) * 0.5f - mouseParallaxY;
+        float bgX = (winW - bgW) * 0.5f + mouseParallaxX;
+        float bgY = (winH - bgH) * 0.5f + mouseParallaxY;
+
         if (bgImage > 0) {
             AuraRenderer.drawImage(bgImage, bgX, bgY, bgW, bgH, 1.0f);
         } else {
-            AuraRenderer.rect(0, 0, winW, winH, 0xFF080B12);
+            AuraRenderer.rect(0, 0, winW, winH, 0xFF070B10);
         }
 
-        // Atmospheric vignette and contrast shade
-        AuraRenderer.gradient(0, 0, winW * 0.55f, winH, 0,
-                Theme.rgba(8, 11, 18, 0.85f), Theme.rgba(8, 11, 18, 0.40f));
-        AuraRenderer.gradient(0, 0, winW, winH * 0.25f, 0,
-                Theme.rgba(8, 11, 18, 0.50f), Theme.rgba(8, 11, 18, 0.0f));
-        AuraRenderer.gradient(0, winH * 0.75f, winW, winH * 0.25f, 0,
-                Theme.rgba(8, 11, 18, 0.0f), Theme.rgba(8, 11, 18, 0.65f));
+        // Subtle vignette around borders (shade from island.html)
+        AuraRenderer.gradient(0, 0, winW, winH * 0.22f, 0.0f,
+                Theme.rgba(4, 8, 14, 0.35f), Theme.rgba(4, 8, 14, 0.0f));
+        AuraRenderer.gradient(0, winH * 0.70f, winW, winH * 0.30f, 0.0f,
+                Theme.rgba(4, 8, 14, 0.0f), Theme.rgba(4, 8, 14, 0.50f));
 
-        // 2. Header (Top Bar)
-        float topPad = 32.0f;
-        float rightPad = 36.0f;
+        // 2. Brand "Aura" top-left (island.html)
+        AuraRenderer.text("Aura", 40.0f, 48.0f, 26.0f, Theme.TEXT_PRIMARY, NanoVG.NVG_ALIGN_LEFT);
 
-        // Player badge on top-right
+        // 3. Version text in bottom-right corner (40% alpha, small)
+        String versionStr = "1.20.1";
+        var containerOpt = FabricLoader.getInstance().getModContainer("aura-ui");
+        if (containerOpt.isPresent()) {
+            versionStr = containerOpt.get().getMetadata().getVersion().getFriendlyString();
+        }
+        AuraRenderer.text("Aura UI v" + versionStr, winW - 32.0f, winH - 24.0f, 13.0f,
+                Theme.TEXT_DIM, NanoVG.NVG_ALIGN_RIGHT);
+
+        // 4. Island Capsule Bottom Center (island.html)
+        float idleW = 400.0f;
+        float expandedW = Math.min(780.0f, winW - 40.0f);
+
+        // Check if mouse is hovering over island
+        float currentW = Anim.lerp(idleW, expandedW, Anim.easeOutCubic(expandProgress));
+        islandW = currentW;
+        islandH = 76.0f;
+        islandX = (winW - islandW) * 0.5f;
+        islandY = winH - 36.0f - islandH;
+
+        boolean isMouseOverIsland = realMouseX >= islandX && realMouseX <= islandX + islandW
+                && realMouseY >= islandY && realMouseY <= islandY + islandH;
+
+        float targetExpand = isMouseOverIsland ? 1.0f : 0.0f;
+        expandProgress = Anim.lerp(expandProgress, targetExpand, dt * 8.5f);
+
+        float radius = islandH * 0.5f; // 38px capsule border radius
+
+        // Capsule backdrop shadow
+        AuraRenderer.shadow(islandX, islandY, islandW, islandH, radius, 32.0f, 0.0f, Theme.GLASS_SHADOW);
+
+        // Glass capsule fill: rgba(118, 118, 128, .24)
+        AuraRenderer.roundRect(islandX, islandY, islandW, islandH, radius, Theme.GLASS_BG);
+
+        // Glass capsule border: 1px line rgba(255, 255, 255, .22)
+        AuraRenderer.outline(islandX, islandY, islandW, islandH, radius, 1.0f, Theme.GLASS_BORDER);
+
+        // Glass sheen 1px top highlight
+        AuraRenderer.rect(islandX + radius * 0.4f, islandY + 1.0f, islandW - radius * 0.8f, 1.0f, Theme.GLASS_SHEEN);
+
+        // Inside the capsule:
+        // Left: Avatar circle with first letter of nick
         String playerNick = client.getSession() != null ? client.getSession().getUsername() : "Player";
-        float badgeH = 36.0f;
-        float nickW = AuraRenderer.textWidth(playerNick, 14.0f);
-        float badgeW = nickW + 48.0f;
-        float badgeX = winW - rightPad - badgeW;
-        float badgeY = topPad;
+        if (playerNick == null || playerNick.isEmpty()) playerNick = "Player";
+        String initial = playerNick.substring(0, 1).toUpperCase();
 
-        AuraRenderer.shadow(badgeX, badgeY, badgeW, badgeH, badgeH * 0.5f, 16.0f, 0, Theme.rgba(0, 0, 0, 0.35f));
-        AuraRenderer.roundRect(badgeX, badgeY, badgeW, badgeH, badgeH * 0.5f, Theme.PANEL_GLASS);
-        AuraRenderer.outline(badgeX, badgeY, badgeW, badgeH, badgeH * 0.5f, 1.0f, Theme.PANEL_BORDER);
+        float avatarSize = 44.0f;
+        float avatarX = islandX + 16.0f;
+        float avatarY = islandY + (islandH - avatarSize) * 0.5f;
+        AuraRenderer.circle(avatarX + avatarSize * 0.5f, avatarY + avatarSize * 0.5f, avatarSize * 0.5f,
+                Theme.rgba(255, 255, 255, 0.18f));
+        AuraRenderer.circleStroke(avatarX + avatarSize * 0.5f, avatarY + avatarSize * 0.5f, avatarSize * 0.5f,
+                1.5f, Theme.rgba(255, 255, 255, 0.35f));
+        AuraRenderer.text(initial, avatarX + avatarSize * 0.5f, avatarY + avatarSize * 0.5f + 7.0f, 20.0f,
+                Theme.TEXT_PRIMARY, NanoVG.NVG_ALIGN_CENTER);
 
-        // Avatar circle with first letter of nickname
-        float avSize = badgeH - 8.0f;
-        float avX = badgeX + 4.0f;
-        float avY = badgeY + 4.0f;
-        AuraRenderer.roundRect(avX, avY, avSize, avSize, avSize * 0.5f, Theme.FILL_2);
-        String initial = playerNick.length() > 0 ? playerNick.substring(0, 1).toUpperCase() : "P";
-        AuraRenderer.text(initial, avX + avSize * 0.5f, avY + avSize * 0.5f + 4.5f, 13.0f,
-                Theme.ACCENT, NanoVG.NVG_ALIGN_CENTER);
+        // Idle state: Nickname and subtitle ("Aura Pack")
+        float idleOpacity = Anim.clamp(1.0f - expandProgress * 2.2f, 0.0f, 1.0f);
+        if (idleOpacity > 0.01f) {
+            float metaX = avatarX + avatarSize + 14.0f;
+            AuraRenderer.text(playerNick, metaX, islandY + 32.0f, 17.0f,
+                    Theme.withAlpha(Theme.TEXT_PRIMARY, idleOpacity), NanoVG.NVG_ALIGN_LEFT);
+            AuraRenderer.text("Aura Pack 1.2", metaX, islandY + 52.0f, 13.0f,
+                    Theme.withAlpha(Theme.TEXT_TERTIARY, idleOpacity), NanoVG.NVG_ALIGN_LEFT);
+        }
 
-        AuraRenderer.text(playerNick, avX + avSize + 8.0f, badgeY + badgeH * 0.5f + 4.5f,
-                14.0f, Theme.TEXT_PRIMARY, NanoVG.NVG_ALIGN_LEFT);
+        // Expanded state: Navigation items (Одиночная · Сервер · Друзья · Настройки · Выход)
+        float navOpacity = Anim.clamp((expandProgress - 0.25f) / 0.75f, 0.0f, 1.0f);
+        if (navOpacity > 0.01f) {
+            float navStartX = avatarX + avatarSize + 10.0f;
+            float availableNavW = (islandX + islandW - 170.0f) - navStartX;
+            float itemW = availableNavW / navItems.size();
 
-        // Friends pill next to profile
-        float friendsPillW = 160.0f;
-        float friendsPillX = badgeX - friendsPillW - 12.0f;
-        AuraRenderer.roundRect(friendsPillX, badgeY, friendsPillW, badgeH, badgeH * 0.5f, Theme.PANEL_GLASS);
-        AuraRenderer.outline(friendsPillX, badgeY, friendsPillW, badgeH, badgeH * 0.5f, 1.0f, Theme.PANEL_BORDER);
+            for (int i = 0; i < navItems.size(); i++) {
+                NavItem item = navItems.get(i);
+                item.x = navStartX + i * itemW;
+                item.y = islandY + (islandH - 38.0f) * 0.5f;
+                item.width = itemW - 4.0f;
+                item.height = 38.0f;
 
-        // Live dot
-        float dotX = friendsPillX + 16.0f;
-        float dotY = badgeY + badgeH * 0.5f;
-        AuraRenderer.shadow(dotX - 3.5f, dotY - 3.5f, 7.0f, 7.0f, 3.5f, 8.0f, 0, 0xFF34D399);
-        AuraRenderer.roundRect(dotX - 3.5f, dotY - 3.5f, 7.0f, 7.0f, 3.5f, 0xFF34D399);
+                boolean itemHovered = isMouseOverIsland && realMouseX >= item.x && realMouseX <= item.x + item.width
+                        && realMouseY >= item.y && realMouseY <= item.y + item.height;
 
-        AuraRenderer.text("Друзья онлайн: —", dotX + 10.0f, badgeY + badgeH * 0.5f + 4.5f,
-                13.0f, Theme.TEXT_SECONDARY, NanoVG.NVG_ALIGN_LEFT);
+                item.hover = Anim.lerp(item.hover, itemHovered ? 1.0f : 0.0f, dt * 10.0f);
 
-        // 3. Center Left Brand Block
-        float leftPad = 80.0f;
-        float brandY = winH * 0.28f;
+                if (item.hover > 0.01f) {
+                    AuraRenderer.roundRect(item.x, item.y, item.width, item.height, 99.0f,
+                            Theme.withAlpha(Theme.FILL_2, item.hover * navOpacity));
+                }
 
-        // Wordmark
-        float titleProgress = Anim.easeOutCubic(Math.min(1.0f, openTime / 0.35f));
-        float titleShift = (1.0f - titleProgress) * 20.0f;
-        AuraRenderer.text("Aura", leftPad, brandY + titleShift, 52.0f,
-                Theme.withAlpha(Theme.TEXT_PRIMARY, titleProgress), NanoVG.NVG_ALIGN_LEFT);
-
-        // Tagline
-        AuraRenderer.text("Сервер друзей", leftPad, brandY + 36.0f + titleShift, 16.0f,
-                Theme.withAlpha(Theme.ACCENT, titleProgress), NanoVG.NVG_ALIGN_LEFT);
-
-        // 4. Navigation Menu Items
-        float navStartY = brandY + 70.0f;
-        float itemH = 50.0f;
-        float itemW = 380.0f;
-
-        for (int i = 0; i < navItems.size(); i++) {
-            NavItem item = navItems.get(i);
-            float itemDelay = 0.2f + i * 0.06f;
-            float itemProgress = Anim.easeOutCubic(Math.max(0.0f, Math.min(1.0f, (openTime - itemDelay) / 0.3f)));
-
-            float curY = navStartY + i * (itemH + 12.0f);
-            boolean hovered = realMouseX >= leftPad && realMouseX <= leftPad + itemW &&
-                              realMouseY >= curY && realMouseY <= curY + itemH;
-
-            item.hover = Anim.lerp(item.hover, hovered ? 1.0f : 0.0f, dt * 14.0f);
-
-            float slideX = leftPad + item.hover * 16.0f;
-            float cascadeY = curY + (1.0f - itemProgress) * 16.0f;
-            float alpha = itemProgress;
-
-            // Cyan left accent line when hovered
-            if (item.hover > 0.01f) {
-                float lineH = itemH - 14.0f;
-                float lineTop = cascadeY + 7.0f;
-                AuraRenderer.shadow(slideX - 14.0f, lineTop, 3.0f, lineH, 1.5f, 14.0f * item.hover, 0,
-                        Theme.rgba(100, 210, 255, 0.6f * item.hover));
-                AuraRenderer.roundRect(slideX - 14.0f, lineTop, 3.0f, lineH, 1.5f,
-                        Theme.withAlpha(Theme.ACCENT, item.hover * alpha));
-            }
-
-            // Label
-            int labelColor = hovered ? 0xFFFFFFFF : Theme.rgba(255, 255, 255, 0.85f);
-            AuraRenderer.text(item.label, slideX, cascadeY + 22.0f, 20.0f,
-                    Theme.withAlpha(labelColor, alpha), NanoVG.NVG_ALIGN_LEFT);
-
-            // Badge (e.g. СЕТЬ)
-            if (item.badge != null) {
-                float lw = AuraRenderer.textWidth(item.label, 20.0f);
-                float badgeX2 = slideX + lw + 12.0f;
-                float badgeY2 = cascadeY + 8.0f;
-                float badgeH2 = 18.0f;
-                float badgeW2 = AuraRenderer.textWidth(item.badge, 10.0f) + 14.0f;
-
-                AuraRenderer.roundRect(badgeX2, badgeY2, badgeW2, badgeH2, 9.0f,
-                        Theme.rgba(100, 210, 255, 0.15f * alpha));
-                AuraRenderer.outline(badgeX2, badgeY2, badgeW2, badgeH2, 9.0f, 1.0f,
-                        Theme.rgba(100, 210, 255, 0.35f * alpha));
-                AuraRenderer.text(item.badge, badgeX2 + badgeW2 * 0.5f, badgeY2 + badgeH2 * 0.5f + 3.5f,
-                        10.0f, Theme.withAlpha(Theme.ACCENT, alpha), NanoVG.NVG_ALIGN_CENTER);
-            }
-
-            // Description (appears on hover)
-            if (item.hover > 0.01f) {
-                float descShift = (1.0f - item.hover) * -8.0f;
-                AuraRenderer.text(item.desc, slideX + descShift, cascadeY + 40.0f, 13.0f,
-                        Theme.withAlpha(Theme.TEXT_DIM, item.hover * alpha), NanoVG.NVG_ALIGN_LEFT);
+                int labelColor = item.hover > 0.5f ? Theme.TEXT_PRIMARY : Theme.TEXT_SECONDARY;
+                AuraRenderer.text(item.label, item.x + item.width * 0.5f, item.y + item.height * 0.5f + 6.0f,
+                        15.0f, Theme.withAlpha(labelColor, navOpacity), NanoVG.NVG_ALIGN_CENTER);
             }
         }
 
-        // 5. Bottom Status Bar
-        float bottomY = winH - 40.0f;
+        // Right side: "Играть" pill button
+        playW = 150.0f;
+        playH = 52.0f;
+        playX = islandX + islandW - playW - 12.0f;
+        playY = islandY + (islandH - playH) * 0.5f;
 
-        // Server status pill
-        float pillW = 240.0f;
-        float pillH = 34.0f;
-        float pillX = leftPad;
-        AuraRenderer.shadow(pillX, bottomY - pillH * 0.5f, pillW, pillH, pillH * 0.5f, 12.0f, 0, Theme.rgba(0, 0, 0, 0.3f));
-        AuraRenderer.roundRect(pillX, bottomY - pillH * 0.5f, pillW, pillH, pillH * 0.5f, Theme.PANEL_GLASS);
-        AuraRenderer.outline(pillX, bottomY - pillH * 0.5f, pillW, pillH, pillH * 0.5f, 1.0f, Theme.PANEL_BORDER);
+        boolean isPlayHovered = realMouseX >= playX && realMouseX <= playX + playW
+                && realMouseY >= playY && realMouseY <= playY + playH;
 
-        float sDotX = pillX + 16.0f;
-        float sDotY = bottomY;
-        AuraRenderer.roundRect(sDotX - 3.5f, sDotY - 3.5f, 7.0f, 7.0f, 3.5f, 0xFF34D399);
+        playButtonHover = Anim.lerp(playButtonHover, isPlayHovered ? 1.0f : 0.0f, dt * 10.0f);
 
-        AuraRenderer.text("Сервер: —   |   Пинг: —", sDotX + 10.0f, bottomY + 4.5f,
-                13.0f, Theme.TEXT_SECONDARY, NanoVG.NVG_ALIGN_LEFT);
+        int playBg = playButtonHover > 0.5f ? Theme.ACCENT_HOVER : Theme.ACCENT;
+        AuraRenderer.roundRect(playX, playY, playW, playH, 99.0f, playBg);
+        AuraRenderer.shadow(playX, playY, playW, playH, 99.0f, 16.0f, 0.0f, Theme.rgba(100, 210, 255, 0.35f));
 
-        // Version info on bottom right
-        String modVer = FabricLoader.getInstance().getModContainer("aura-ui")
-                .map(ModContainer::getMetadata)
-                .map(meta -> meta.getVersion().getFriendlyString())
-                .orElse("1.0.0");
-        String verText = "Minecraft 1.20.1 Fabric • v" + modVer;
-        AuraRenderer.text(verText, winW - rightPad, bottomY + 4.5f,
-                13.0f, Theme.TEXT_DIM, NanoVG.NVG_ALIGN_RIGHT);
+        // Triangle icon + "Играть" text (#00283A)
+        float contentCenterX = playX + playW * 0.5f;
+        float contentCenterY = playY + playH * 0.5f;
+
+        AuraRenderer.triangle(
+                contentCenterX - 36.0f, contentCenterY - 7.0f,
+                contentCenterX - 36.0f, contentCenterY + 7.0f,
+                contentCenterX - 24.0f, contentCenterY,
+                Theme.ACCENT_INK
+        );
+
+        AuraRenderer.text("Играть", contentCenterX + 6.0f, contentCenterY + 6.0f, 17.0f,
+                Theme.ACCENT_INK, NanoVG.NVG_ALIGN_CENTER);
 
         AuraRenderer.endFrame();
     }
@@ -315,18 +303,18 @@ public class AuraTitleScreen extends Screen {
         float realMouseX = (float) (client.mouse.getX() * fbWidth / (winWidth > 0 ? winWidth : 1) / scale);
         float realMouseY = (float) (client.mouse.getY() * fbHeight / (winHeight > 0 ? winHeight : 1) / scale);
 
-        float leftPad = 80.0f;
-        float brandY = (fbHeight / scale) * 0.28f;
-        float navStartY = brandY + 70.0f;
-        float itemH = 50.0f;
-        float itemW = 380.0f;
+        // Check Play button click
+        if (realMouseX >= playX && realMouseX <= playX + playW
+                && realMouseY >= playY && realMouseY <= playY + playH) {
+            if (client != null) client.setScreen(new SelectWorldScreen(this));
+            return true;
+        }
 
-        for (int i = 0; i < navItems.size(); i++) {
-            float curY = navStartY + i * (itemH + 12.0f);
-            if (realMouseX >= leftPad && realMouseX <= leftPad + itemW &&
-                realMouseY >= curY && realMouseY <= curY + itemH) {
-                NavItem item = navItems.get(i);
-                if (item.action != null) {
+        // If expanded, check nav items
+        if (expandProgress > 0.3f) {
+            for (NavItem item : navItems) {
+                if (realMouseX >= item.x && realMouseX <= item.x + item.width
+                        && realMouseY >= item.y && realMouseY <= item.y + item.height) {
                     item.action.run();
                     return true;
                 }

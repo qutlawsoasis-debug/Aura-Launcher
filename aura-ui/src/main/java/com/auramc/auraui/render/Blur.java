@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import net.minecraft.client.gl.SimpleFramebuffer;
@@ -49,22 +50,30 @@ public final class Blur {
 
     private static final String FRAGMENT_SHADER = """
         #version 150
-        uniform sampler2D DiffuseSampler;
-        uniform vec2 Delta;
-        uniform float Radius;
+        uniform sampler2D uTexture;
+        uniform vec2 uDelta;
+        uniform float uRadius;
+
         in vec2 TexCoord;
         out vec4 FragColor;
 
         void main() {
             vec4 col = vec4(0.0);
-            float weights[5] = float[](0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
-            col += texture(DiffuseSampler, TexCoord) * weights[0];
+            float total = 0.0;
+            // 9-tap gaussian weights (symmetric around 0)
+            float weights[5] = float[](0.2270270, 0.1945946, 0.1216216, 0.0540540, 0.0162162);
+
+            col += texture(uTexture, TexCoord) * weights[0];
+            total += weights[0];
+
             for (int i = 1; i < 5; i++) {
-                vec2 offset = Delta * (float(i) * Radius);
-                col += texture(DiffuseSampler, TexCoord + offset) * weights[i];
-                col += texture(DiffuseSampler, TexCoord - offset) * weights[i];
+                vec2 offset = uDelta * float(i) * uRadius;
+                col += texture(uTexture, TexCoord + offset) * weights[i];
+                col += texture(uTexture, TexCoord - offset) * weights[i];
+                total += weights[i] * 2.0;
             }
-            FragColor = col;
+
+            FragColor = col / total;
         }
         """;
 
@@ -129,23 +138,22 @@ public final class Blur {
             GL20.glBindAttribLocation(program, 0, "Position");
             GL20.glLinkProgram(program);
             if (GL20.glGetProgrami(program, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
-                AuraUi.LOGGER.error("[aura-ui] Blur link error: " + GL20.glGetProgramInfoLog(program));
+                AuraUi.LOGGER.error("[aura-ui] Blur program link error: " + GL20.glGetProgramInfoLog(program));
                 return;
             }
 
-            uTexture = GL20.glGetUniformLocation(program, "DiffuseSampler");
-            uDelta = GL20.glGetUniformLocation(program, "Delta");
-            uRadius = GL20.glGetUniformLocation(program, "Radius");
+            uTexture = GL20.glGetUniformLocation(program, "uTexture");
+            uDelta = GL20.glGetUniformLocation(program, "uDelta");
+            uRadius = GL20.glGetUniformLocation(program, "uRadius");
 
-            // Fullscreen quad VAO/VBO for OpenGL 3.2+ Core Profile
+            // Setup fullscreen quad / single large triangle for Core Profile GL 3.2+
             quadVao = GL30.glGenVertexArrays();
             quadVbo = GL15.glGenBuffers();
             GL30.glBindVertexArray(quadVao);
             GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, quadVbo);
 
-            // Large fullscreen triangle covering NDC [-1, 1]
-            // (-1, -1), (3, -1), (-1, 3)
-            float[] verts = new float[] {
+            // Large triangle covering NDC [-1, 1]: (-1, -1), (3, -1), (-1, 3)
+            float[] verts = {
                 -1.0f, -1.0f,
                  3.0f, -1.0f,
                 -1.0f,  3.0f
@@ -178,12 +186,23 @@ public final class Blur {
         if (w <= 0 || h <= 0) return;
 
         if (currentMode == Mode.LOW) {
-            // Draw a subtle darkening sheet instead of multi-pass GPU blur
             return;
         }
 
         initShader();
         if (!shaderLoaded || program == 0 || quadVao == 0) return;
+
+        // 1. Save GL state: Viewport, FBO bindings, VAO, Program
+        IntBuffer viewportBuf = BufferUtils.createIntBuffer(16);
+        GL11.glGetIntegerv(GL11.GL_VIEWPORT, viewportBuf);
+        int savedVpX = viewportBuf.get(0);
+        int savedVpY = viewportBuf.get(1);
+        int savedVpW = viewportBuf.get(2);
+        int savedVpH = viewportBuf.get(3);
+
+        int savedReadFbo = GL11.glGetInteger(GL30.GL_READ_FRAMEBUFFER_BINDING);
+        int savedDrawFbo = GL11.glGetInteger(GL30.GL_DRAW_FRAMEBUFFER_BINDING);
+        int savedVao = GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING);
 
         // Downscaled framebuffers for performance
         int bw = Math.max(1, w / 2);
@@ -213,12 +232,14 @@ public final class Blur {
 
         // Pass 1: Horizontal into passB
         passB.beginWrite(true);
+        GL11.glViewport(0, 0, bw, bh);
         GL20.glUniform2f(uDelta, 1.0f / bw, 0.0f);
         RenderSystem.bindTexture(passA.getColorAttachment());
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
 
         // Pass 2: Vertical back into main framebuffer
         main.beginWrite(false);
+        GL11.glViewport(0, 0, w, h);
         GL20.glUniform2f(uDelta, 0.0f, 1.0f / bh);
         RenderSystem.bindTexture(passB.getColorAttachment());
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
@@ -226,7 +247,14 @@ public final class Blur {
         GL30.glBindVertexArray(0);
         GL20.glUseProgram(0);
 
-        // Restore MC RenderSystem state
+        // Restore MC RenderSystem & Framebuffer state
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, savedReadFbo);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, savedDrawFbo);
+        GL30.glBindVertexArray(savedVao);
+        GL11.glViewport(savedVpX, savedVpY, savedVpW, savedVpH);
+
+        main.beginWrite(true);
+
         RenderSystem.activeTexture(GL13.GL_TEXTURE0);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();

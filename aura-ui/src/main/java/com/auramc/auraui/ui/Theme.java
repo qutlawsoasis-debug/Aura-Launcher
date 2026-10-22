@@ -6,7 +6,7 @@ public final class Theme {
     // Fonts
     public static final String FONT_ONEST = "Onest";
 
-    // Palette
+    // Palette (Apple iOS/macOS inspired)
     public static final int ACCENT = 0xFF64D2FF;            // #64D2FF
     public static final int ACCENT_HOVER = 0xFF8EDEFF;      // #8EDEFF
     public static final int ACCENT_ACTIVE = 0xFF50BCE8;     // #50BCE8
@@ -21,18 +21,24 @@ public final class Theme {
     public static final int TEXT_PRIMARY = 0xFFFFFFFF;
     public static final int TEXT_SECONDARY = rgba(255, 255, 255, 0.76f);
     public static final int TEXT_TERTIARY = rgba(255, 255, 255, 0.56f);
-    public static final int TEXT_DIM = rgba(255, 255, 255, 0.45f);
+    public static final int TEXT_DIM = rgba(255, 255, 255, 0.40f);
 
     // Apple Liquid Glass fills
     public static final int FILL_1 = rgba(118, 118, 128, 0.24f);
     public static final int FILL_2 = rgba(118, 118, 128, 0.36f);
     public static final int FILL_3 = rgba(118, 118, 128, 0.50f);
 
-    // Panel & Buttons
+    // Legacy Panel & Controls support
     public static final int PANEL_GLASS = rgba(18, 22, 32, 0.72f);
     public static final int PANEL_GLASS_HOVER = rgba(28, 34, 48, 0.85f);
     public static final int PANEL_BORDER = rgba(255, 255, 255, 0.14f);
     public static final int PANEL_BORDER_HOVER = rgba(100, 210, 255, 0.50f);
+
+    // Glass & Capsules (Island concept)
+    public static final int GLASS_BG = rgba(118, 118, 128, 0.24f);       // rgba(118, 118, 128, .24)
+    public static final int GLASS_BORDER = rgba(255, 255, 255, 0.22f);   // 1px border line
+    public static final int GLASS_SHEEN = rgba(255, 255, 255, 0.40f);    // 1px top highlight
+    public static final int GLASS_SHADOW = rgba(0, 0, 0, 0.35f);
 
     public static final int LINE = rgba(255, 255, 255, 0.22f);
     public static final int HAIR = rgba(255, 255, 255, 0.10f);
@@ -49,7 +55,8 @@ public final class Theme {
     }
 
     public static int withAlpha(int color, float a) {
-        int ia = Math.min(255, Math.max(0, (int) (a * 255f)));
+        int origAlpha = (color >> 24) & 0xFF;
+        int ia = Math.min(255, Math.max(0, (int) (origAlpha * a)));
         return (ia << 24) | (color & 0x00FFFFFF);
     }
 }
