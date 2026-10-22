@@ -1,0 +1,1507 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aura — Главное меню</title>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<style>
+@font-face {
+  font-family: 'Onest';
+  src: url('../v3/public/assets/fonts/Onest.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: block;
+}
+
+:root {
+  --accent: #64D2FF;
+  --accent-rgb: 100, 210, 255;
+  --accent-ink: #00283A;
+
+  --ink: #ffffff;
+  --ink-2: rgba(255, 255, 255, 0.72);
+  --ink-3: rgba(255, 255, 255, 0.48);
+  --ink-4: rgba(255, 255, 255, 0.30);
+
+  --fill: rgba(118, 118, 128, 0.24);
+  --fill-2: rgba(118, 118, 128, 0.36);
+  --fill-3: rgba(118, 118, 128, 0.50);
+  --hair: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.14);
+
+  --glass: rgba(22, 26, 34, 0.58);
+  --glass-2: rgba(30, 35, 45, 0.62);
+  --card: rgba(255, 255, 255, 0.045);
+  --card-hover: rgba(255, 255, 255, 0.075);
+  --sheen: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  --danger: #FF6B6B;
+  --r-xl: 28px;
+  --r-lg: 20px;
+  --r-md: 14px;
+  --r-sm: 10px;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #05070b;
+  color: var(--ink);
+  font-family: 'Onest', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  outline: none;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+svg.lucide {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+  flex: none;
+}
+
+/* ============ ФОНОВЫЕ СЛОИ ============ */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 0.55s var(--ease), transform 0.8s var(--ease);
+  will-change: opacity, transform;
+  z-index: 1;
+}
+
+.bg-layer.active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.bg-layer.inactive {
+  opacity: 0;
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
+.bg-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(110% 70% at 75% 20%, rgba(5, 7, 11, 0.15) 0%, rgba(5, 7, 11, 0.6) 60%, rgba(5, 7, 11, 0.94) 100%),
+    linear-gradient(180deg, rgba(5, 7, 11, 0.72) 0%, rgba(5, 7, 11, 0.22) 32%, rgba(5, 7, 11, 0.65) 68%, rgba(5, 7, 11, 0.96) 100%);
+}
+
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease);
+}
+
+body[data-modal="true"] .veil {
+  opacity: 1;
+  pointer-events: auto;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  background: rgba(4, 8, 14, 0.55);
+}
+
+/* ============ СЛОЙ ХАБА (PS5) ============ */
+#hub {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px 64px 44px;
+  opacity: 0;
+  transform: scale(0.985);
+  transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+  pointer-events: none;
+}
+
+body[data-view="hub"] #hub {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+/* Верхняя панель */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(14, 18, 24, 0.55);
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen);
+}
+
+.tab-btn {
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.2s, background 0.25s var(--ease), box-shadow 0.25s;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+  background: var(--card-hover);
+}
+
+.tab-btn.on {
+  background: #ffffff;
+  color: #080c12;
+  font-weight: 700;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.tab-btn .badge-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+  color: #080c12;
+}
+
+.tab-btn:not(.on) .badge-count {
+  background: var(--fill);
+  color: var(--ink-3);
+}
+
+.top-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(14, 18, 24, 0.55);
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s var(--spring);
+}
+
+.icon-btn:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+  border-color: var(--line);
+  transform: scale(1.05);
+}
+
+.user-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 3px 14px 3px 4px;
+  border-radius: 999px;
+  background: rgba(14, 18, 24, 0.55);
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.user-head {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: url('../v3/public/assets/images/Coock0ld.png') -30px -30px / 240px 240px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.clock-pill {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  padding: 0 8px;
+}
+
+/* Карусель плиток (PS5 Games Row) */
+.tiles-section {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tiles-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tiles-row::-webkit-scrollbar {
+  display: none;
+}
+
+.tile-card {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  border-radius: 20px;
+  background: var(--card);
+  border: 1.5px solid var(--hair);
+  box-shadow: var(--sheen), 0 10px 25px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  flex: none;
+  cursor: pointer;
+  transition: transform 0.35s var(--spring), border-color 0.25s, box-shadow 0.25s, opacity 0.25s;
+  opacity: 0.78;
+}
+
+.tile-card:hover {
+  opacity: 1;
+  transform: translateY(-4px) scale(1.02);
+  border-color: var(--line);
+}
+
+.tile-card.on {
+  width: 148px;
+  height: 148px;
+  opacity: 1;
+  transform: translateY(-2px) scale(1.04);
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.6),
+    0 14px 40px rgba(var(--accent-rgb), 0.35),
+    var(--sheen);
+}
+
+.tile-thumb {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.4s var(--ease);
+}
+
+.tile-card.on .tile-thumb {
+  transform: scale(1.06);
+}
+
+.tile-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 40%, rgba(5, 7, 11, 0.85) 100%);
+}
+
+.tile-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(10, 14, 20, 0.88);
+  border: 1px solid var(--hair);
+  color: var(--ink-2);
+}
+
+.tile-card.on .tile-badge {
+  background: rgba(8, 24, 38, 0.92);
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.25);
+}
+
+.tile-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* Плитка добавления */
+.tile-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1.5px dashed var(--line);
+  color: var(--ink-3);
+}
+
+.tile-add .add-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--fill);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s, transform 0.25s var(--spring);
+}
+
+.tile-add:hover .add-ic {
+  background: var(--accent);
+  color: var(--accent-ink);
+  transform: scale(1.1);
+}
+
+.tile-add span {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Нижняя область (Главный экран выбранного мира / сервера) */
+.stage-area {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.stage-info {
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(14, 18, 24, 0.65);
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  width: fit-content;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.8);
+}
+
+.stage-title {
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+}
+
+.stage-desc {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  max-width: 620px;
+}
+
+.stage-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-play {
+  height: 54px;
+  padding: 0 34px;
+  border-radius: 16px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 16.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 10px 30px rgba(var(--accent-rgb), 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 0.25s var(--spring), box-shadow 0.25s var(--ease), filter 0.2s;
+}
+
+.btn-play:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.06);
+  box-shadow: 0 14px 40px rgba(var(--accent-rgb), 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.btn-play:active {
+  transform: scale(0.985);
+}
+
+.btn-play svg.lucide {
+  width: 20px;
+  height: 20px;
+}
+
+.btn-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: rgba(14, 18, 24, 0.6);
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s var(--spring);
+}
+
+.btn-circle:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+  border-color: var(--line);
+  transform: scale(1.04);
+}
+
+/* Подсказки кнопок (PS5 Navigation Footer) */
+.stage-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.nav-hints {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(14, 18, 24, 0.5);
+  border: 1px solid var(--hair);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.hint-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--fill);
+  border: 1px solid var(--hair);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.pack-version {
+  font-size: 12px;
+  color: var(--ink-4);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* ============ ЭКРАН 1: ЗАСТАВКА-ПРИВЕТСТВИЕ ============ */
+#welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.97);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+}
+
+body[data-view="welcome"] #welcome {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.welcome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 20px;
+  padding: 44px 56px;
+  border-radius: var(--r-xl);
+  background: rgba(18, 22, 30, 0.65);
+  border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+}
+
+.welcome-head {
+  width: 84px;
+  height: 84px;
+  border-radius: 22px;
+  background: url('../v3/public/assets/images/Coock0ld.png') -84px -84px / 672px 672px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 35px rgba(var(--accent-rgb), 0.4);
+}
+
+.welcome-brand {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.welcome-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-top: -8px;
+}
+
+.welcome-sub {
+  font-size: 14px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.welcome-bar {
+  width: 140px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--fill-2);
+  overflow: hidden;
+  position: relative;
+  margin-top: 8px;
+}
+
+.welcome-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+  transform: translateX(-100%);
+  animation: welcomeSlide 1.8s var(--ease) forwards;
+}
+
+@keyframes welcomeSlide {
+  to { transform: translateX(0); }
+}
+
+/* ============ ЭКРАН 3: ОКНО «ДОБАВИТЬ СЕРВЕР» ============ */
+#modal-add-server {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.96);
+  transition: opacity 0.3s var(--ease), transform 0.35s var(--spring);
+}
+
+body[data-modal="true"] #modal-add-server {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.modal-card {
+  width: 520px;
+  padding: 30px;
+  border-radius: var(--r-xl);
+  background: var(--glass-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h3 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--fill);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s, transform 0.2s var(--spring);
+}
+
+.modal-close:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+  transform: rotate(90deg);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.form-input {
+  height: 46px;
+  padding: 0 16px;
+  border-radius: var(--r-md);
+  background: var(--fill);
+  border: 1px solid var(--hair);
+  font-size: 14.5px;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+  background: var(--fill-2);
+  border-color: rgba(var(--accent-rgb), 0.65);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.2);
+}
+
+.form-input::placeholder {
+  color: var(--ink-4);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: var(--fill);
+  padding: 4px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hair);
+}
+
+.seg-btn {
+  height: 36px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  display: grid;
+  place-items: center;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.seg-btn:hover {
+  color: var(--ink);
+}
+
+.seg-btn.on {
+  background: rgba(var(--accent-rgb), 0.18);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.btn-ghost {
+  height: 46px;
+  padding: 0 20px;
+  border-radius: var(--r-md);
+  background: var(--fill);
+  color: var(--ink-2);
+  font-size: 14.5px;
+  font-weight: 600;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-ghost:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+}
+
+.btn-submit {
+  height: 46px;
+  padding: 0 24px;
+  border-radius: var(--r-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14.5px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.35);
+  transition: transform 0.2s var(--spring), box-shadow 0.2s;
+}
+
+.btn-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 25px rgba(var(--accent-rgb), 0.45);
+}
+
+/* ============ ЭКРАН 4: ЭКРАН ЗАГРУЗКИ ============ */
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.97);
+  transition: opacity 0.45s var(--ease), transform 0.45s var(--ease);
+}
+
+body[data-view="loading"] #loading {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+.loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 22px;
+  padding: 48px 64px;
+  border-radius: var(--r-xl);
+  background: rgba(18, 22, 30, 0.7);
+  border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  max-width: 560px;
+}
+
+.loading-mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: radial-gradient(circle at 30% 30%, #b8ecff, var(--accent) 45%, #1b6f92);
+  box-shadow: 0 0 28px rgba(var(--accent-rgb), 0.55);
+  display: grid;
+  place-items: center;
+  color: var(--accent-ink);
+}
+
+.loading-title {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.loading-stage {
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-top: -10px;
+}
+
+.progress-box {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  width: 74%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.8);
+  transition: width 0.3s var(--ease);
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.btn-cancel-load {
+  margin-top: 10px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 11px;
+  background: var(--fill);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.btn-cancel-load:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+}
+</style>
+</head>
+<body data-view="hub" data-tab="worlds" data-modal="false">
+
+<!-- Фоновые слои для плавного кроссфейда -->
+<div class="bg-layer active" id="bgA"></div>
+<div class="bg-layer inactive" id="bgB"></div>
+<div class="bg-scrim"></div>
+
+<!-- ============ ЭКРАН 1: ЗАСТАВКА-ПРИВЕТСТВИЕ ============ -->
+<section id="welcome">
+  <div class="welcome-card">
+    <div class="welcome-head"></div>
+    <div>
+      <div class="welcome-brand">Aura Launcher</div>
+      <h1 class="welcome-title">Добро пожаловать, Coock0ld</h1>
+    </div>
+    <div class="welcome-sub">
+      <span class="dot"></span>
+      <span>Синхронизация профиля и миров...</span>
+    </div>
+    <div class="welcome-bar"></div>
+  </div>
+</section>
+
+<!-- ============ ЭКРАН 2: ХАБ PS5 ============ -->
+<main id="hub">
+  <!-- Верхняя строка -->
+  <header class="top-bar">
+    <div class="nav-tabs" role="tablist">
+      <button class="tab-btn on" id="tabWorlds" data-tab="worlds" role="tab">
+        <span>Одиночная игра</span>
+        <span class="badge-count" id="countWorlds">4</span>
+      </button>
+      <button class="tab-btn" id="tabServers" data-tab="servers" role="tab">
+        <span>Сетевая игра</span>
+        <span class="badge-count" id="countServers">3</span>
+      </button>
+    </div>
+
+    <div class="top-right">
+      <button class="icon-btn" title="Настройки" id="btnSettings"><i data-lucide="sliders-horizontal"></i></button>
+      <div class="user-pill">
+        <div class="user-head"></div>
+        <span>Coock0ld</span>
+        <span class="dot" style="margin-left: 2px;"></span>
+      </div>
+      <div class="clock-pill" id="liveClock">15:10</div>
+    </div>
+  </header>
+
+  <!-- Карусель карточек (плитки) -->
+  <section class="tiles-section">
+    <div class="tiles-row" id="tilesContainer"></div>
+  </section>
+
+  <!-- Нижняя сцена выбранного мира/сервера -->
+  <section class="stage-area">
+    <div class="stage-info">
+      <span class="stage-pill" id="stagePill"><span class="dot"></span><span id="stagePillText">Выживание</span></span>
+      <h2 class="stage-title" id="stageTitle">Новый мир</h2>
+      <p class="stage-desc" id="stageDesc">Описание мира загружается...</p>
+
+      <div class="stage-actions">
+        <button class="btn-play" id="btnPlay">
+          <i data-lucide="play"></i>
+          <span id="btnPlayText">Играть</span>
+        </button>
+        <button class="btn-circle" title="Настройки" id="btnStageOptions">
+          <i data-lucide="more-horizontal"></i>
+        </button>
+        <button class="btn-circle" title="Папка мира" id="btnStageFolder">
+          <i data-lucide="folder-open"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="stage-meta">
+      <div class="nav-hints">
+        <span class="hint-item"><span class="kbd">←</span> <span class="kbd">→</span> Выбор</span>
+        <span class="hint-item"><span class="kbd">Enter</span> Играть</span>
+        <span class="hint-item"><span class="kbd">Tab</span> Режим</span>
+      </div>
+      <div class="pack-version">Aura Pack 3.2 · Fabric 1.20.1</div>
+    </div>
+  </section>
+</main>
+
+<!-- Единственный активный veil для модального окна -->
+<div class="veil" id="modalVeil"></div>
+
+<!-- ============ ЭКРАН 3: ДОБАВИТЬ СЕРВЕР ============ -->
+<div id="modal-add-server">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3>Добавить сервер</h3>
+      <button class="modal-close" id="btnCloseAddServer"><i data-lucide="x"></i></button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="serverNameInput">Имя сервера</label>
+      <input type="text" id="serverNameInput" class="form-input" value="Майнкрафт сервер">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="serverAddressInput">Адрес сервера</label>
+      <input type="text" id="serverAddressInput" class="form-input" placeholder="mc.auramc.ru:25565" value="play.auramc.ru">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Ресурспак сервера</label>
+      <div class="segmented" id="segResourcePacks">
+        <button class="seg-btn on" data-val="prompt">Спрашивать</button>
+        <button class="seg-btn" data-val="enabled">Да</button>
+        <button class="seg-btn" data-val="disabled">Нет</button>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" id="btnCancelAddServer">Отмена</button>
+      <button class="btn-submit" id="btnSubmitAddServer">Добавить сервер</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ЭКРАН 4: ЭКРАН ЗАГРУЗКИ ============ -->
+<section id="loading">
+  <div class="loading-card">
+    <div class="loading-mark"><i data-lucide="box"></i></div>
+    <div>
+      <h2 class="loading-title" id="loadingTitle">Новый мир</h2>
+      <div class="loading-stage" id="loadingStage">Подключение к миру...</div>
+    </div>
+
+    <div class="progress-box">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-meta">
+        <span id="progressLabel">Генерация ландшафта</span>
+        <span id="progressPct">74%</span>
+      </div>
+    </div>
+
+    <button class="btn-cancel-load" id="btnCancelLoading">
+      <span class="kbd">Esc</span>
+      <span>Отмена</span>
+    </button>
+  </div>
+</section>
+
+<script>
+// Данные миров и серверов
+const WORLDS = [
+  {
+    id: 'world-1',
+    name: 'Новый мир',
+    tag: 'Выживание',
+    pill: 'Выживание · Сложность: Нормальная',
+    version: '1.20.1',
+    size: '1.4 ГБ',
+    lastPlayed: 'сегодня, 14:22',
+    desc: 'Ваш основной мир выживания. Построена база в заснеженной тайге, автоматическая ферма железа и портал в Незер. Последнее сохранение: сегодня, 14:22 · 1.4 ГБ',
+    bg: '../v3/public/assets/images/bg_13.jpg',
+    thumb: '../v3/public/assets/images/bg_13.jpg'
+  },
+  {
+    id: 'world-2',
+    name: 'Креатив',
+    tag: 'Творчество',
+    pill: 'Творчество · Мирная сложность',
+    version: '1.20.1',
+    size: '850 МБ',
+    lastPlayed: 'вчера, 19:40',
+    desc: 'Полигон для тестирования редстоун-механик, масштабных замков и испытания новых модов сборки Aura Pack · 850 МБ',
+    bg: '../v3/public/assets/images/bg_5.jpg',
+    thumb: '../v3/public/assets/images/bg_5.jpg'
+  },
+  {
+    id: 'world-3',
+    name: 'Остров',
+    tag: 'Остров',
+    pill: 'Выживание на острове · Сложная',
+    version: '1.20.1',
+    size: '420 МБ',
+    lastPlayed: '19 октября',
+    desc: 'Одинокий скалистый остров посреди бескрайнего океана с ограниченными ресурсами, кавернами и построенным маяком · 420 МБ',
+    bg: '../v3/public/assets/images/bg_11.jpg',
+    thumb: '../v3/public/assets/images/bg_11.jpg'
+  },
+  {
+    id: 'world-4',
+    name: 'Хардкор',
+    tag: 'Хардкор',
+    pill: 'Хардкор · Одна жизнь',
+    version: '1.20.1',
+    size: '310 МБ',
+    lastPlayed: '15 октября',
+    desc: 'Сложность заблокирована на максимуме. Одна ошибка — и мир будет удалён навсегда. Прожито 64 игровых дня · 310 МБ',
+    bg: '../v3/public/assets/images/bg_7.jpg',
+    thumb: '../v3/public/assets/images/bg_7.jpg'
+  }
+];
+
+const SERVERS = [
+  {
+    id: 'server-1',
+    name: 'Aura · Новый мир',
+    tag: 'Приватный',
+    pill: 'Онлайн: 18 / 50 · Пинг: 14 мс · mc.auramc.ru',
+    status: 'Онлайн',
+    players: '18 / 50',
+    ping: '14 мс',
+    ip: 'mc.auramc.ru',
+    desc: 'Официальный ванильный сервер сообщества Aura. Совместное развитие, приватные территории, экономика и встроенный голосовой чат.',
+    bg: '../v3/public/assets/images/bg_1.jpg',
+    thumb: '../v3/public/assets/images/bg_1.jpg'
+  },
+  {
+    id: 'server-2',
+    name: 'Hypixel',
+    tag: 'Мини-игры',
+    pill: 'Онлайн: 38 412 · Пинг: 84 мс · mc.hypixel.net',
+    status: 'Онлайн',
+    players: '38 412',
+    ping: '84 мс',
+    ip: 'mc.hypixel.net',
+    desc: 'Крупнейшая сеть серверов мини-игр: BedWars, SkyWars, SkyBlock, Murder Mystery, аркады и сезонные турниры.',
+    bg: '../v3/public/assets/images/bg_3.jpg',
+    thumb: '../v3/public/assets/images/bg_3.jpg'
+  },
+  {
+    id: 'server-3',
+    name: '2b2t',
+    tag: 'Анархия',
+    pill: 'Очередь: 240 · Пинг: 110 мс · 2b2t.org',
+    status: 'В очереди',
+    players: '450',
+    ping: '110 мс',
+    ip: '2b2t.org',
+    desc: 'Старейший сервер анархии в Minecraft без правил, модерации и вайпов карты с 2010 года.',
+    bg: '../v3/public/assets/images/bg_9.jpg',
+    thumb: '../v3/public/assets/images/bg_9.jpg'
+  }
+];
+
+// Состояние приложения
+const state = {
+  view: 'hub',       // 'welcome' | 'hub' | 'loading'
+  tab: 'worlds',     // 'worlds' | 'servers'
+  selectedIndex: 0,
+  modal: null,       // 'add-server' | null
+  activeBgSlot: 'A',
+  currentBgUrl: ''
+};
+
+// Элементы DOM
+const bgA = document.getElementById('bgA');
+const bgB = document.getElementById('bgB');
+const tabWorlds = document.getElementById('tabWorlds');
+const tabServers = document.getElementById('tabServers');
+const tilesContainer = document.getElementById('tilesContainer');
+const stageTitle = document.getElementById('stageTitle');
+const stagePillText = document.getElementById('stagePillText');
+const stageDesc = document.getElementById('stageDesc');
+const btnPlayText = document.getElementById('btnPlayText');
+const btnPlay = document.getElementById('btnPlay');
+const modalAddServer = document.getElementById('modal-add-server');
+const btnCloseAddServer = document.getElementById('btnCloseAddServer');
+const btnCancelAddServer = document.getElementById('btnCancelAddServer');
+const btnSubmitAddServer = document.getElementById('btnSubmitAddServer');
+const modalVeil = document.getElementById('modalVeil');
+const loadingTitle = document.getElementById('loadingTitle');
+const btnCancelLoading = document.getElementById('btnCancelLoading');
+const liveClock = document.getElementById('liveClock');
+
+// Функция плавного кроссфейда фона
+function setBackground(url) {
+  if (state.currentBgUrl === url) return;
+  state.currentBgUrl = url;
+
+  if (state.activeBgSlot === 'A') {
+    bgB.style.backgroundImage = `url('${url}')`;
+    bgB.classList.remove('inactive');
+    bgB.classList.add('active');
+    bgA.classList.remove('active');
+    bgA.classList.add('inactive');
+    state.activeBgSlot = 'B';
+  } else {
+    bgA.style.backgroundImage = `url('${url}')`;
+    bgA.classList.remove('inactive');
+    bgA.classList.add('active');
+    bgB.classList.remove('active');
+    bgB.classList.add('inactive');
+    state.activeBgSlot = 'A';
+  }
+}
+
+// Рендер плиток
+function renderTiles() {
+  const items = state.tab === 'worlds' ? WORLDS : SERVERS;
+  tilesContainer.innerHTML = '';
+
+  items.forEach((item, index) => {
+    const isSelected = index === state.selectedIndex;
+    const card = document.createElement('div');
+    card.className = `tile-card ${isSelected ? 'on' : ''}`;
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+
+    card.innerHTML = `
+      <div class="tile-thumb" style="background-image: url('${item.thumb}')"></div>
+      <div class="tile-overlay"></div>
+      <div class="tile-badge">${item.tag}</div>
+      <div class="tile-caption">${item.name}</div>
+    `;
+
+    card.addEventListener('click', () => {
+      selectItem(index);
+    });
+
+    tilesContainer.appendChild(card);
+  });
+
+  // Кнопка добавления в конце
+  const addCard = document.createElement('div');
+  addCard.className = 'tile-card tile-add';
+  const addLabel = state.tab === 'worlds' ? 'Создать мир' : 'Добавить';
+  addCard.innerHTML = `
+    <div class="add-ic"><i data-lucide="plus"></i></div>
+    <span>${addLabel}</span>
+  `;
+  addCard.addEventListener('click', () => {
+    if (state.tab === 'servers') {
+      openModal('add-server');
+    } else {
+      startLoading('Создание нового мира...');
+    }
+  });
+  tilesContainer.appendChild(addCard);
+
+  // Обновление Lucide иконок в созданных элементах
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// Выбор элемента
+function selectItem(index) {
+  const items = state.tab === 'worlds' ? WORLDS : SERVERS;
+  if (index < 0) index = 0;
+  if (index >= items.length) index = items.length - 1;
+  state.selectedIndex = index;
+
+  const current = items[index];
+  setBackground(current.bg);
+
+  stageTitle.textContent = current.name;
+  stagePillText.textContent = current.pill;
+  stageDesc.textContent = current.desc;
+  btnPlayText.textContent = state.tab === 'worlds' ? 'Играть' : 'Подключиться';
+
+  // Обновляем классы на карточках
+  const cards = tilesContainer.querySelectorAll('.tile-card:not(.tile-add)');
+  cards.forEach((c, idx) => {
+    if (idx === index) {
+      c.classList.add('on');
+      c.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    } else {
+      c.classList.remove('on');
+    }
+  });
+}
+
+// Переключение вкладки
+function setTab(tab) {
+  state.tab = tab;
+  state.selectedIndex = 0;
+  document.body.setAttribute('data-tab', tab);
+
+  if (tab === 'worlds') {
+    tabWorlds.classList.add('on');
+    tabServers.classList.remove('on');
+  } else {
+    tabServers.classList.add('on');
+    tabWorlds.classList.remove('on');
+  }
+
+  renderTiles();
+  selectItem(0);
+}
+
+// Открытие модального окна
+function openModal(modalId) {
+  state.modal = modalId;
+  document.body.setAttribute('data-modal', 'true');
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+// Закрытие модального окна
+function closeModal() {
+  state.modal = null;
+  document.body.setAttribute('data-modal', 'false');
+}
+
+// Экран загрузки
+function startLoading(customTitle) {
+  const items = state.tab === 'worlds' ? WORLDS : SERVERS;
+  const current = items[state.selectedIndex];
+  loadingTitle.textContent = customTitle || current.name;
+
+  state.view = 'loading';
+  document.body.setAttribute('data-view', 'loading');
+}
+
+function cancelLoading() {
+  state.view = 'hub';
+  document.body.setAttribute('data-view', 'hub');
+}
+
+// Часы
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  liveClock.textContent = `${h}:${m}`;
+}
+
+// Обработчики событий
+tabWorlds.addEventListener('click', () => setTab('worlds'));
+tabServers.addEventListener('click', () => setTab('servers'));
+
+btnPlay.addEventListener('click', () => {
+  startLoading();
+});
+
+btnCloseAddServer.addEventListener('click', closeModal);
+btnCancelAddServer.addEventListener('click', closeModal);
+modalVeil.addEventListener('click', closeModal);
+
+btnSubmitAddServer.addEventListener('click', () => {
+  const name = document.getElementById('serverNameInput').value.trim() || 'Новый сервер';
+  const address = document.getElementById('serverAddressInput').value.trim() || 'localhost';
+  SERVERS.push({
+    id: `server-${Date.now()}`,
+    name: name,
+    tag: 'Пользовательский',
+    pill: `Адрес: ${address} · Пинг: —`,
+    status: 'Не проверен',
+    players: '—',
+    ping: '—',
+    ip: address,
+    desc: `Добавленный сервер ${name} (${address}).`,
+    bg: '../v3/public/assets/images/bg_1.jpg',
+    thumb: '../v3/public/assets/images/bg_1.jpg'
+  });
+  closeModal();
+  setTab('servers');
+  selectItem(SERVERS.length - 1);
+});
+
+btnCancelLoading.addEventListener('click', cancelLoading);
+
+// Сегментированный переключатель ресурс-паков в модалке
+const segButtons = document.querySelectorAll('#segResourcePacks .seg-btn');
+segButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    segButtons.forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+  });
+});
+
+// Управление с клавиатуры
+window.addEventListener('keydown', (e) => {
+  if (state.modal) {
+    if (e.key === 'Escape') {
+      closeModal();
+    }
+    return;
+  }
+
+  if (state.view === 'loading') {
+    if (e.key === 'Escape') {
+      cancelLoading();
+    }
+    return;
+  }
+
+  if (state.view === 'hub') {
+    if (e.key === 'ArrowLeft') {
+      selectItem(state.selectedIndex - 1);
+      e.preventDefault();
+    } else if (e.key === 'ArrowRight') {
+      selectItem(state.selectedIndex + 1);
+      e.preventDefault();
+    } else if (e.key === 'Tab') {
+      setTab(state.tab === 'worlds' ? 'servers' : 'worlds');
+      e.preventDefault();
+    } else if (e.key === 'Enter') {
+      startLoading();
+      e.preventDefault();
+    }
+  }
+});
+
+// Инициализация по query-параметрам
+function init() {
+  const params = new URLSearchParams(window.location.search);
+  const screenParam = params.get('screen');
+
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  // Инициализация фонов
+  bgA.style.backgroundImage = `url('${WORLDS[0].bg}')`;
+  state.currentBgUrl = WORLDS[0].bg;
+
+  if (screenParam === 'welcome') {
+    state.view = 'welcome';
+    document.body.setAttribute('data-view', 'welcome');
+    renderTiles();
+    selectItem(0);
+  } else if (screenParam === 'worlds') {
+    state.view = 'hub';
+    document.body.setAttribute('data-view', 'hub');
+    setTab('worlds');
+  } else if (screenParam === 'servers') {
+    state.view = 'hub';
+    document.body.setAttribute('data-view', 'hub');
+    setTab('servers');
+  } else if (screenParam === 'add-server') {
+    state.view = 'hub';
+    document.body.setAttribute('data-view', 'hub');
+    setTab('servers');
+    openModal('add-server');
+  } else if (screenParam === 'loading') {
+    state.view = 'loading';
+    document.body.setAttribute('data-view', 'loading');
+    loadingTitle.textContent = 'Новый мир';
+    renderTiles();
+    selectItem(0);
+  } else {
+    // Поведение по умолчанию: заставка 2 секунды, затем переход в хаб
+    state.view = 'welcome';
+    document.body.setAttribute('data-view', 'welcome');
+    renderTiles();
+    selectItem(0);
+    setTimeout(() => {
+      if (state.view === 'welcome') {
+        state.view = 'hub';
+        document.body.setAttribute('data-view', 'hub');
+        setTab('worlds');
+      }
+    }, 2000);
+  }
+
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
