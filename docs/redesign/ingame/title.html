@@ -4,14 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aura — Главное меню</title>
-<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link rel="icon" href="data:,">
+<script src="./lucide.min.js"></script>
+<script>
+// Динамическая загрузка шрифта Onest под протокол (без 404 в браузере)
+(function() {
+  const isHttp = location.protocol.startsWith('http');
+  const fontUrl = isHttp ? '../v3/public/assets/fonts/Onest.woff2' : './fonts/Onest.woff2';
+  const st = document.createElement('style');
+  st.textContent = `@font-face { font-family: 'Onest'; src: url('${fontUrl}') format('woff2'); font-weight: 100 900; font-display: block; }`;
+  document.head.appendChild(st);
+})();
+</script>
 <style>
-@font-face {
-  font-family: 'Onest';
-  src: url('../v3/public/assets/fonts/Onest.woff2') format('woff2');
-  font-weight: 100 900;
-  font-display: block;
-}
 
 :root {
   --accent: #64D2FF;
@@ -938,6 +943,38 @@ body[data-view="loading"] #loading {
   background: var(--fill-2);
   color: var(--ink);
 }
+
+/* ПИЛЮЛЯ-ТОСТ */
+.toast-pill {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1000;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--glass-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.25s var(--spring), opacity 0.2s var(--ease);
+}
+.toast-pill.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.toast-pill.err {
+  border-color: rgba(255, 107, 107, 0.6);
+  color: #FFA4A4;
+}
 </style>
 </head>
 <body data-view="hub" data-tab="worlds" data-modal="false">
@@ -1089,9 +1126,74 @@ body[data-view="loading"] #loading {
   </div>
 </section>
 
+<!-- Всплывающий тост для ошибок и статусов -->
+<div class="toast-pill" id="titleToast"></div>
+
 <script>
-// Данные миров и серверов
-const WORLDS = [
+/* ============ РАЗРЕШЕНИЕ ПУТЕЙ К РЕСУРСАМ ============ */
+const isHttp = location.protocol.startsWith('http');
+const asset = p => (isHttp ? '../v3/public/assets/' : './') + p;
+const imgAsset = name => asset('images/' + name);
+
+// Подстановка аватара
+document.querySelectorAll('.user-head').forEach(el => {
+  el.style.backgroundImage = `url('${asset('images/Coock0ld.png')}')`;
+});
+
+const BG_LIST = ['bg_1.jpg','bg_2.jpg','bg_3.jpg','bg_4.jpg','bg_5.jpg','bg_6.jpg','bg_7.jpg','bg_8.jpg','bg_9.jpg','bg_10.jpg','bg_11.jpg','bg_12.jpg','bg_13.jpg','bg_14.jpg','bg_15.jpg'];
+function getFallbackBg(id) {
+  let hash = 0;
+  const str = String(id || '');
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) & 0xffffffff;
+  }
+  const idx = Math.abs(hash) % BG_LIST.length;
+  return imgAsset(BG_LIST[idx]);
+}
+
+/* ============ МОСТ CEF / MINECRAFT ============ */
+const INGAME = new URLSearchParams(location.search).has('ingame');
+
+function sendQuery(obj, onSuccess, onFailure) {
+  if (typeof window.cefQuery !== 'function') {
+    if (onFailure) onFailure(-1, 'no cefQuery');
+    return;
+  }
+  const reqStr = typeof obj === 'string' ? obj : JSON.stringify(obj);
+  try {
+    window.cefQuery({
+      request: reqStr,
+      onSuccess: resp => {
+        let parsed = null;
+        try { parsed = JSON.parse(resp); } catch (e) { parsed = resp; }
+        if (onSuccess) onSuccess(parsed);
+      },
+      onFailure: (code, msg) => {
+        console.warn('cefQuery error:', code, msg);
+        if (onFailure) onFailure(code, msg);
+      }
+    });
+  } catch (err) {
+    console.warn('cefQuery exception:', err);
+    if (onFailure) onFailure(-1, err.message);
+  }
+}
+
+let toastTimer = null;
+function showToast(msg, isError = false) {
+  const el = document.getElementById('titleToast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('err', isError);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+  }, 2000);
+}
+
+// Моковые данные (для автономного просмотра без ?ingame)
+const MOCK_WORLDS = [
   {
     id: 'world-1',
     name: 'Новый мир',
@@ -1101,8 +1203,8 @@ const WORLDS = [
     size: '1.4 ГБ',
     lastPlayed: 'сегодня, 14:22',
     desc: 'Ваш основной мир выживания. Построена база в заснеженной тайге, автоматическая ферма железа и портал в Незер. Последнее сохранение: сегодня, 14:22 · 1.4 ГБ',
-    bg: '../v3/public/assets/images/bg_13.jpg',
-    thumb: '../v3/public/assets/images/bg_13.jpg'
+    bg: imgAsset('bg_13.jpg'),
+    thumb: imgAsset('bg_13.jpg')
   },
   {
     id: 'world-2',
@@ -1113,8 +1215,8 @@ const WORLDS = [
     size: '850 МБ',
     lastPlayed: 'вчера, 19:40',
     desc: 'Полигон для тестирования редстоун-механик, масштабных замков и испытания новых модов сборки Aura Pack · 850 МБ',
-    bg: '../v3/public/assets/images/bg_5.jpg',
-    thumb: '../v3/public/assets/images/bg_5.jpg'
+    bg: imgAsset('bg_5.jpg'),
+    thumb: imgAsset('bg_5.jpg')
   },
   {
     id: 'world-3',
@@ -1125,8 +1227,8 @@ const WORLDS = [
     size: '420 МБ',
     lastPlayed: '19 октября',
     desc: 'Одинокий скалистый остров посреди бескрайнего океана с ограниченными ресурсами, кавернами и построенным маяком · 420 МБ',
-    bg: '../v3/public/assets/images/bg_11.jpg',
-    thumb: '../v3/public/assets/images/bg_11.jpg'
+    bg: imgAsset('bg_11.jpg'),
+    thumb: imgAsset('bg_11.jpg')
   },
   {
     id: 'world-4',
@@ -1137,12 +1239,12 @@ const WORLDS = [
     size: '310 МБ',
     lastPlayed: '15 октября',
     desc: 'Сложность заблокирована на максимуме. Одна ошибка — и мир будет удалён навсегда. Прожито 64 игровых дня · 310 МБ',
-    bg: '../v3/public/assets/images/bg_7.jpg',
-    thumb: '../v3/public/assets/images/bg_7.jpg'
+    bg: imgAsset('bg_7.jpg'),
+    thumb: imgAsset('bg_7.jpg')
   }
 ];
 
-const SERVERS = [
+const MOCK_SERVERS = [
   {
     id: 'server-1',
     name: 'Aura · Новый мир',
@@ -1153,8 +1255,8 @@ const SERVERS = [
     ping: '14 мс',
     ip: 'mc.auramc.ru',
     desc: 'Официальный ванильный сервер сообщества Aura. Совместное развитие, приватные территории, экономика и встроенный голосовой чат.',
-    bg: '../v3/public/assets/images/bg_1.jpg',
-    thumb: '../v3/public/assets/images/bg_1.jpg'
+    bg: imgAsset('bg_1.jpg'),
+    thumb: imgAsset('bg_1.jpg')
   },
   {
     id: 'server-2',
@@ -1166,8 +1268,8 @@ const SERVERS = [
     ping: '84 мс',
     ip: 'mc.hypixel.net',
     desc: 'Крупнейшая сеть серверов мини-игр: BedWars, SkyWars, SkyBlock, Murder Mystery, аркады и сезонные турниры.',
-    bg: '../v3/public/assets/images/bg_3.jpg',
-    thumb: '../v3/public/assets/images/bg_3.jpg'
+    bg: imgAsset('bg_3.jpg'),
+    thumb: imgAsset('bg_3.jpg')
   },
   {
     id: 'server-3',
@@ -1179,10 +1281,13 @@ const SERVERS = [
     ping: '110 мс',
     ip: '2b2t.org',
     desc: 'Старейший сервер анархии в Minecraft без правил, модерации и вайпов карты с 2010 года.',
-    bg: '../v3/public/assets/images/bg_9.jpg',
-    thumb: '../v3/public/assets/images/bg_9.jpg'
+    bg: imgAsset('bg_9.jpg'),
+    thumb: imgAsset('bg_9.jpg')
   }
 ];
+
+let WORLDS = INGAME ? [] : MOCK_WORLDS;
+let SERVERS = INGAME ? [] : MOCK_SERVERS;
 
 // Состояние приложения
 const state = {
@@ -1199,13 +1304,16 @@ const bgA = document.getElementById('bgA');
 const bgB = document.getElementById('bgB');
 const tabWorlds = document.getElementById('tabWorlds');
 const tabServers = document.getElementById('tabServers');
+const countWorlds = document.getElementById('countWorlds');
+const countServers = document.getElementById('countServers');
 const tilesContainer = document.getElementById('tilesContainer');
 const stageTitle = document.getElementById('stageTitle');
 const stagePillText = document.getElementById('stagePillText');
 const stageDesc = document.getElementById('stageDesc');
 const btnPlayText = document.getElementById('btnPlayText');
 const btnPlay = document.getElementById('btnPlay');
-const modalAddServer = document.getElementById('modal-add-server');
+const btnSettings = document.getElementById('btnSettings');
+const btnStageOptions = document.getElementById('btnStageOptions');
 const btnCloseAddServer = document.getElementById('btnCloseAddServer');
 const btnCancelAddServer = document.getElementById('btnCancelAddServer');
 const btnSubmitAddServer = document.getElementById('btnSubmitAddServer');
@@ -1214,9 +1322,145 @@ const loadingTitle = document.getElementById('loadingTitle');
 const btnCancelLoading = document.getElementById('btnCancelLoading');
 const liveClock = document.getElementById('liveClock');
 
+function formatLastPlayed(ms) {
+  if (!ms) return 'никогда';
+  const d = new Date(ms);
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (d.toDateString() === now.toDateString()) return `сегодня, ${time}`;
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return `вчера, ${time}`;
+  const months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function formatSize(mb) {
+  if (!mb && mb !== 0) return '0 МБ';
+  if (mb >= 1024) return (mb / 1024).toFixed(1) + ' ГБ';
+  return Math.round(mb) + ' МБ';
+}
+
+function mapWorldItem(w) {
+  const modeName = {
+    survival: 'Выживание',
+    creative: 'Творчество',
+    hardcore: 'Хардкор',
+    adventure: 'Приключение',
+    spectator: 'Наблюдатель'
+  }[w.mode] || w.mode || 'Выживание';
+
+  const fallback = getFallbackBg(w.id);
+  const thumb = w.icon || fallback;
+  const bg = fallback;
+  const lastStr = formatLastPlayed(w.lastPlayed);
+  const sizeStr = formatSize(w.sizeMb);
+
+  return {
+    id: w.id,
+    name: w.name || w.id,
+    tag: modeName,
+    pill: `${modeName} · ${sizeStr}`,
+    size: sizeStr,
+    lastPlayed: lastStr,
+    desc: `${modeName} · последний вход ${lastStr} · ${sizeStr}`,
+    bg: bg,
+    thumb: thumb
+  };
+}
+
+function mapServerItem(s, idx) {
+  const fallback = getFallbackBg(s.address || s.name || String(idx));
+  return {
+    id: `server-${idx}`,
+    name: s.name || s.address,
+    tag: 'Сервер',
+    pill: `Адрес: ${s.address} · Проверка...`,
+    status: 'Проверка...',
+    players: '—',
+    ping: '—',
+    ip: s.address,
+    desc: `Сервер ${s.name} (${s.address}). Получение статуса...`,
+    bg: fallback,
+    thumb: s.icon || fallback
+  };
+}
+
+function pingServersQueue(serversList) {
+  let idx = 0;
+  function pingNext() {
+    if (idx >= serversList.length) return;
+    const srv = serversList[idx];
+    idx++;
+    sendQuery({ op: 'ping', address: srv.ip }, resp => {
+      if (resp && resp.online) {
+        srv.status = 'Онлайн';
+        srv.ping = `${resp.ping} мс`;
+        srv.players = `${resp.players} / ${resp.max}`;
+        srv.tag = `${resp.ping} мс`;
+        srv.pill = `Онлайн: ${srv.players} · Пинг: ${srv.ping} · ${srv.ip}`;
+        if (resp.motd) srv.desc = resp.motd;
+      } else {
+        srv.status = 'Офлайн';
+        srv.ping = '—';
+        srv.players = '0';
+        srv.tag = 'Офлайн';
+        srv.pill = `Недоступен · ${srv.ip}`;
+        srv.desc = `Сервер ${srv.name} (${srv.ip}) в данный момент недоступен.`;
+      }
+      if (state.tab === 'servers') {
+        renderTiles();
+        selectItem(state.selectedIndex);
+      }
+      pingNext();
+    }, () => {
+      srv.status = 'Офлайн';
+      srv.tag = 'Офлайн';
+      if (state.tab === 'servers') {
+        renderTiles();
+        selectItem(state.selectedIndex);
+      }
+      pingNext();
+    });
+  }
+  pingNext();
+}
+
+function loadWorlds(cb) {
+  if (!INGAME) return;
+  sendQuery({ op: 'worlds' }, resp => {
+    if (resp && Array.isArray(resp.worlds)) {
+      WORLDS = resp.worlds.map(mapWorldItem);
+      if (countWorlds) countWorlds.textContent = WORLDS.length;
+      if (state.tab === 'worlds') {
+        renderTiles();
+        selectItem(0);
+      }
+      if (cb) cb();
+    }
+  });
+}
+
+function loadServers(cb) {
+  if (!INGAME) return;
+  sendQuery({ op: 'servers' }, resp => {
+    if (resp && Array.isArray(resp.servers)) {
+      SERVERS = resp.servers.map(mapServerItem);
+      if (countServers) countServers.textContent = SERVERS.length;
+      if (state.tab === 'servers') {
+        renderTiles();
+        selectItem(0);
+      }
+      pingServersQueue(SERVERS);
+      if (cb) cb();
+    }
+  });
+}
+
 // Функция плавного кроссфейда фона
 function setBackground(url) {
-  if (state.currentBgUrl === url) return;
+  if (!url || state.currentBgUrl === url) return;
   state.currentBgUrl = url;
 
   if (state.activeBgSlot === 'A') {
@@ -1274,12 +1518,15 @@ function renderTiles() {
     if (state.tab === 'servers') {
       openModal('add-server');
     } else {
-      startLoading('Создание нового мира...');
+      if (INGAME) {
+        sendQuery({ op: 'action', name: 'create_world' });
+      } else {
+        startLoading('Создание нового мира...');
+      }
     }
   });
   tilesContainer.appendChild(addCard);
 
-  // Обновление Lucide иконок в созданных элементах
   if (window.lucide) {
     lucide.createIcons();
   }
@@ -1288,19 +1535,24 @@ function renderTiles() {
 // Выбор элемента
 function selectItem(index) {
   const items = state.tab === 'worlds' ? WORLDS : SERVERS;
+  if (!items.length) {
+    stageTitle.textContent = state.tab === 'worlds' ? 'Нет миров' : 'Нет серверов';
+    stagePillText.textContent = 'Пусто';
+    stageDesc.textContent = state.tab === 'worlds' ? 'Создайте свой первый мир Minecraft.' : 'Добавьте сервер для совместной игры.';
+    return;
+  }
   if (index < 0) index = 0;
   if (index >= items.length) index = items.length - 1;
   state.selectedIndex = index;
 
   const current = items[index];
-  setBackground(current.bg);
+  if (current.bg) setBackground(current.bg);
 
   stageTitle.textContent = current.name;
   stagePillText.textContent = current.pill;
   stageDesc.textContent = current.desc;
   btnPlayText.textContent = state.tab === 'worlds' ? 'Играть' : 'Подключиться';
 
-  // Обновляем классы на карточках
   const cards = tilesContainer.querySelectorAll('.tile-card:not(.tile-add)');
   cards.forEach((c, idx) => {
     if (idx === index) {
@@ -1345,11 +1597,36 @@ function closeModal() {
   document.body.setAttribute('data-modal', 'false');
 }
 
+// Запуск мира / подключение
+function triggerPlay() {
+  const items = state.tab === 'worlds' ? WORLDS : SERVERS;
+  if (!items.length) return;
+  const current = items[state.selectedIndex];
+
+  if (INGAME) {
+    if (state.tab === 'worlds') {
+      sendQuery({ op: 'play_world', id: current.id }, resp => {
+        if (resp && resp.ok === false) {
+          showToast(resp.error || 'Ошибка запуска мира', true);
+        }
+      });
+    } else {
+      sendQuery({ op: 'connect', address: current.ip }, resp => {
+        if (resp && resp.ok === false) {
+          showToast(resp.error || 'Ошибка подключения к серверу', true);
+        }
+      });
+    }
+  } else {
+    startLoading();
+  }
+}
+
 // Экран загрузки
 function startLoading(customTitle) {
   const items = state.tab === 'worlds' ? WORLDS : SERVERS;
   const current = items[state.selectedIndex];
-  loadingTitle.textContent = customTitle || current.name;
+  loadingTitle.textContent = customTitle || (current ? current.name : 'Загрузка');
 
   state.view = 'loading';
   document.body.setAttribute('data-view', 'loading');
@@ -1365,15 +1642,29 @@ function updateClock() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
   const m = String(now.getMinutes()).padStart(2, '0');
-  liveClock.textContent = `${h}:${m}`;
+  if (liveClock) liveClock.textContent = `${h}:${m}`;
 }
 
 // Обработчики событий
 tabWorlds.addEventListener('click', () => setTab('worlds'));
 tabServers.addEventListener('click', () => setTab('servers'));
 
-btnPlay.addEventListener('click', () => {
-  startLoading();
+btnPlay.addEventListener('click', triggerPlay);
+
+btnSettings?.addEventListener('click', () => {
+  if (INGAME) {
+    sendQuery({ op: 'action', name: 'options' });
+  } else {
+    showToast('Настройки игры');
+  }
+});
+
+btnStageOptions?.addEventListener('click', () => {
+  if (INGAME) {
+    sendQuery({ op: 'action', name: 'options' });
+  } else {
+    showToast('Настройки игры');
+  }
 });
 
 btnCloseAddServer.addEventListener('click', closeModal);
@@ -1383,22 +1674,35 @@ modalVeil.addEventListener('click', closeModal);
 btnSubmitAddServer.addEventListener('click', () => {
   const name = document.getElementById('serverNameInput').value.trim() || 'Новый сервер';
   const address = document.getElementById('serverAddressInput').value.trim() || 'localhost';
-  SERVERS.push({
-    id: `server-${Date.now()}`,
-    name: name,
-    tag: 'Пользовательский',
-    pill: `Адрес: ${address} · Пинг: —`,
-    status: 'Не проверен',
-    players: '—',
-    ping: '—',
-    ip: address,
-    desc: `Добавленный сервер ${name} (${address}).`,
-    bg: '../v3/public/assets/images/bg_1.jpg',
-    thumb: '../v3/public/assets/images/bg_1.jpg'
-  });
-  closeModal();
-  setTab('servers');
-  selectItem(SERVERS.length - 1);
+  const rpBtn = document.querySelector('#segResourcePacks .seg-btn.on');
+  const rp = rpBtn ? rpBtn.dataset.val : 'prompt';
+
+  if (INGAME) {
+    sendQuery({ op: 'add_server', name: name, address: address, rp: rp }, resp => {
+      closeModal();
+      loadServers(() => {
+        setTab('servers');
+      });
+    });
+  } else {
+    SERVERS.push({
+      id: `server-${Date.now()}`,
+      name: name,
+      tag: 'Пользовательский',
+      pill: `Адрес: ${address} · Пинг: —`,
+      status: 'Не проверен',
+      players: '—',
+      ping: '—',
+      ip: address,
+      desc: `Добавленный сервер ${name} (${address}).`,
+      bg: imgAsset('bg_1.jpg'),
+      thumb: imgAsset('bg_1.jpg')
+    });
+    if (countServers) countServers.textContent = SERVERS.length;
+    closeModal();
+    setTab('servers');
+    selectItem(SERVERS.length - 1);
+  }
 });
 
 btnCancelLoading.addEventListener('click', cancelLoading);
@@ -1439,7 +1743,7 @@ window.addEventListener('keydown', (e) => {
       setTab(state.tab === 'worlds' ? 'servers' : 'worlds');
       e.preventDefault();
     } else if (e.key === 'Enter') {
-      startLoading();
+      triggerPlay();
       e.preventDefault();
     }
   }
@@ -1453,9 +1757,14 @@ function init() {
   updateClock();
   setInterval(updateClock, 30000);
 
-  // Инициализация фонов
-  bgA.style.backgroundImage = `url('${WORLDS[0].bg}')`;
-  state.currentBgUrl = WORLDS[0].bg;
+  const initBg = (WORLDS[0] && WORLDS[0].bg) ? WORLDS[0].bg : imgAsset('bg_13.jpg');
+  bgA.style.backgroundImage = `url('${initBg}')`;
+  state.currentBgUrl = initBg;
+
+  if (INGAME) {
+    loadWorlds();
+    loadServers();
+  }
 
   if (screenParam === 'welcome') {
     state.view = 'welcome';
@@ -1478,11 +1787,10 @@ function init() {
   } else if (screenParam === 'loading') {
     state.view = 'loading';
     document.body.setAttribute('data-view', 'loading');
-    loadingTitle.textContent = 'Новый мир';
+    loadingTitle.textContent = (WORLDS[0] && WORLDS[0].name) ? WORLDS[0].name : 'Новый мир';
     renderTiles();
     selectItem(0);
   } else {
-    // Поведение по умолчанию: заставка 2 секунды, затем переход в хаб
     state.view = 'welcome';
     document.body.setAttribute('data-view', 'welcome');
     renderTiles();

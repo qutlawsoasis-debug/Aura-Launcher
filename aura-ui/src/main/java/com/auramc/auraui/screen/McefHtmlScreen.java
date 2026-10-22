@@ -1,6 +1,8 @@
 package com.auramc.auraui.screen;
 
 import com.auramc.auraui.AuraUi;
+import com.auramc.auraui.web.HtmlBridge;
+import com.auramc.auraui.web.WebAssets;
 import com.cinemamod.mcef.MCEF;
 import com.cinemamod.mcef.MCEFBrowser;
 import com.cinemamod.mcef.MCEFRenderer;
@@ -18,10 +20,12 @@ import net.minecraft.client.render.VertexFormat;
 import net.minecraft.client.render.VertexFormats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
+import org.cef.CefSettings;
 import org.cef.browser.CefBrowser;
 import org.cef.browser.CefFrame;
 import org.cef.browser.CefMessageRouter;
 import org.cef.callback.CefQueryCallback;
+import org.cef.handler.CefDisplayHandlerAdapter;
 import org.cef.handler.CefMessageRouterHandlerAdapter;
 
 /**
@@ -33,14 +37,23 @@ public class McefHtmlScreen extends Screen {
 
     private final String url;
     private MCEFBrowser browser;
-    private CefMessageRouter router;
-    private CefMessageRouterHandlerAdapter queryHandler;
     private PostEffectProcessor blur;
     private int fbW = -1, fbH = -1;
 
+    public McefHtmlScreen() {
+        this(WebAssets.getUrl());
+    }
+
     public McefHtmlScreen(String url) {
         super(Text.literal("Aura"));
-        this.url = url;
+        String prop = System.getProperty("aura.html.url");
+        if (prop != null && !prop.isBlank()) {
+            this.url = prop;
+        } else if (url == null || url.equals(HtmlScreen.DEFAULT_URL)) {
+            this.url = WebAssets.getUrl();
+        } else {
+            this.url = url;
+        }
     }
 
     @Override
@@ -51,37 +64,36 @@ public class McefHtmlScreen extends Screen {
             return;
         }
         if (browser == null) {
+            registerHandlersOnce();
             AuraUi.LOGGER.info("[aura-ui] HTML pause: {}", url);
+            // Роутер cefQuery должен быть на клиенте ДО создания браузера, иначе window.cefQuery на странице не появится
             browser = MCEF.createBrowser(url, true);
             browser.setCursorChangeListener(cursor -> {});
-            router = CefMessageRouter.create();
-            queryHandler = new CefMessageRouterHandlerAdapter() {
-                @Override
-                public boolean onQuery(CefBrowser b, CefFrame frame, long queryId, String request, boolean persistent, CefQueryCallback callback) {
-                    if (client != null) client.execute(() -> handleAction(request));
-                    callback.success("");
-                    return true;
-                }
-            };
-            router.addHandler(queryHandler, true);
-            browser.getClient().addMessageRouter(router);
         }
         resizeAll();
     }
 
-    private void handleAction(String action) {
-        AuraUi.LOGGER.info("[aura-ui] HTML action: {}", action);
-        switch (action) {
-            case "resume" -> client.setScreen(null);
-            case "main_menu" -> {
-                boolean single = client.isInSingleplayer();
-                if (client.world != null) client.world.disconnect();
-                if (single) client.disconnect(new MessageScreen(Text.translatable("menu.savingLevel")));
-                else client.disconnect();
-                client.setScreen(new TitleScreen());
+    private static boolean handlersRegistered;
+
+    private static void registerHandlersOnce() {
+        if (handlersRegistered) return;
+        handlersRegistered = true;
+        CefMessageRouter r = CefMessageRouter.create();
+        r.addHandler(new CefMessageRouterHandlerAdapter() {
+            @Override
+            public boolean onQuery(CefBrowser b, CefFrame frame, long queryId, String request, boolean persistent, CefQueryCallback callback) {
+                HtmlBridge.handle(MinecraftClient.getInstance(), request, callback);
+                return true;
             }
-            default -> AuraUi.LOGGER.info("[aura-ui] HTML action not wired yet: {}", action);
-        }
+        }, true);
+        MCEF.getClient().getHandle().addMessageRouter(r);
+        MCEF.getClient().addDisplayHandler(new CefDisplayHandlerAdapter() {
+            @Override
+            public boolean onConsoleMessage(CefBrowser b, CefSettings.LogSeverity level, String message, String source, int line) {
+                AuraUi.LOGGER.info("[aura-ui CEF] {}:{}: {}", source, line, message);
+                return false;
+            }
+        });
     }
 
     private void resizeAll() {
@@ -143,21 +155,36 @@ public class McefHtmlScreen extends Screen {
         if (Boolean.getBoolean("aura.html.autoshot")) autoshot();
     }
 
-    // Сценарий автопроверки: кадр ESC → открыть настройки → кадр → выход из игры
+    // Сценарий автопроверки: кадр ESC → проверить мост → открыть настройки → кадр → выход из игры
     private long openedAt = 0;
     private int shotStep = 0;
 
     private void autoshot() {
         if (openedAt == 0) openedAt = System.currentTimeMillis();
         long t = System.currentTimeMillis() - openedAt;
-        if (shotStep == 0 && t > 3500) { shot("html_esc"); shotStep++; }
-        else if (shotStep == 1 && t > 7000) { browser.executeJavaScript("setView('settings')", browser.getURL(), 0); shotStep++; }
-        else if (shotStep == 2 && t > 10000) { shot("html_settings"); shotStep++; }
-        else if (shotStep == 3 && t > 10500) {
+        if (shotStep == 0 && t > 3500) {
+            HtmlBridge.handle(client, "{\"op\":\"set\",\"id\":\"render\",\"value\":16}", new CefQueryCallback() {
+                @Override public void success(String r) {}
+                @Override public void failure(int c, String m) {}
+            });
+            HtmlBridge.handle(client, "{\"op\":\"set\",\"id\":\"master\",\"value\":75}", new CefQueryCallback() {
+                @Override public void success(String r) {}
+                @Override public void failure(int c, String m) {}
+            });
+            shot("html_esc");
+            shotStep++;
+        }
+        else if (shotStep == 1 && t > 5000) {
+            browser.executeJavaScript("try { if (window.cefQuery) { window.cefQuery({request: JSON.stringify({op:'set', id:'render', value: 18}), onSuccess: function(r){}, onFailure: function(c,m){}}); window.cefQuery({request: JSON.stringify({op:'set', id:'master', value: 40}), onSuccess: function(r){}, onFailure: function(c,m){}}); } if (typeof sendQuery === 'function') { sendQuery({op:'set', id:'render', value: 18}); sendQuery({op:'set', id:'master', value: 40}); } } catch(e) { console.error('autoshot error:', e); }", browser.getURL(), 0);
+            shotStep++;
+        }
+        else if (shotStep == 2 && t > 7000) { browser.executeJavaScript("setView('settings')", browser.getURL(), 0); shotStep++; }
+        else if (shotStep == 3 && t > 10000) { shot("html_settings"); shotStep++; }
+        else if (shotStep == 4 && t > 10500) {
             browser.executeJavaScript("document.querySelector('.nav-item[data-sec=\"ui\"]').click()", browser.getURL(), 0); shotStep++;
         }
-        else if (shotStep == 4 && t > 13000) { shot("html_settings_ui"); shotStep++; }
-        else if (shotStep == 5 && t > 14000) { client.scheduleStop(); shotStep++; }
+        else if (shotStep == 5 && t > 13000) { shot("html_settings_ui"); shotStep++; }
+        else if (shotStep == 6 && t > 14000) { client.scheduleStop(); shotStep++; }
     }
 
     private void shot(String name) {
@@ -233,10 +260,6 @@ public class McefHtmlScreen extends Screen {
     @Override
     public void removed() {
         if (browser != null) {
-            if (router != null) {
-                router.removeHandler(queryHandler);
-                browser.getClient().removeMessageRouter(router);
-            }
             browser.close();
             browser = null;
         }

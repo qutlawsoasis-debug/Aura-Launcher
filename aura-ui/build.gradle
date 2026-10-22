@@ -39,7 +39,29 @@ dependencies {
     modLocalRuntime files("libs/mcef-fabric-2.1.6-1.20.1.jar")
 }
 
+tasks.register('syncWeb', Copy) {
+    into layout.projectDirectory.dir("src/main/resources/assets/aura-ui/web")
+
+    from("../docs/redesign/ingame") {
+        include "index.html"
+        include "lucide.min.js"
+    }
+
+    from("../docs/redesign/v3/public/assets/fonts") {
+        include "Onest.woff2"
+        into "fonts"
+    }
+
+    from("../docs/redesign/v3/public/assets/images") {
+        include "bg_1.jpg", "bg_2.jpg", "bg_5.jpg", "bg_6.jpg", "bg_7.jpg",
+                "bg_9.jpg", "bg_11.jpg", "bg_12.jpg", "bg_13.jpg", "bg_14.jpg",
+                "bg_15.jpg", "Coock0ld.png"
+        into "images"
+    }
+}
+
 processResources {
+    dependsOn syncWeb
     inputs.property "version", project.version
 
     filesMatching("fabric.mod.json") {

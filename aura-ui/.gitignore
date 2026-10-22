@@ -5,3 +5,4 @@ run/
 *.ipr
 *.iws
 .idea/
+src/main/resources/assets/aura-ui/web/

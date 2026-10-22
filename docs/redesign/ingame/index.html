@@ -4,9 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aura — игровое меню</title>
-<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link rel="icon" href="data:,">
+<script src="./lucide.min.js"></script>
+<script>
+// Динамическая загрузка шрифта Onest под протокол (без 404 в браузере)
+(function() {
+  const isHttp = location.protocol.startsWith('http');
+  const fontUrl = isHttp ? '../v3/public/assets/fonts/Onest.woff2' : './fonts/Onest.woff2';
+  const st = document.createElement('style');
+  st.textContent = `@font-face { font-family: 'Onest'; src: url('${fontUrl}') format('woff2'); font-weight: 100 900; font-display: block; }`;
+  document.head.appendChild(st);
+})();
+</script>
 <style>
-@font-face { font-family: 'Onest'; src: url('../v3/public/assets/fonts/Onest.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
 
 :root {
   --accent: #64D2FF;
@@ -49,7 +59,7 @@ input { font: inherit; color: inherit; }
 svg.lucide { width: 18px; height: 18px; stroke-width: 1.8; flex: none; }
 
 /* ============ МИР ============ */
-.world { position: fixed; inset: 0; background: url('../v3/public/assets/images/bg_13.jpg') center/cover; }
+.world { position: fixed; inset: 0; background-position: center; background-size: cover; }
 .world::after { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0,0,0,.35)); }
 
 /* Единственный живой слой размытия (в игре — шейдер) */
@@ -105,7 +115,7 @@ body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opaci
   box-shadow: var(--sheen), var(--shadow); border-radius: var(--r-xl);
   position: relative;
 }
-.glass::before { /* блик по верхнему краю */
+.glass::before {
   content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: linear-gradient(180deg, rgba(255,255,255,.07), transparent 22%);
 }
@@ -115,7 +125,7 @@ body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opaci
 #esc .wrap { display: grid; grid-template-columns: 400px 340px; gap: 16px; align-items: start; }
 .esc-main { padding: 22px; display: grid; gap: 16px; }
 .me { display: flex; align-items: center; gap: 12px; }
-.head { width: 44px; height: 44px; border-radius: 12px; background: url('../v3/public/assets/images/Coock0ld.png') -44px -44px / 352px 352px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--line); flex: none; }
+.head { width: 44px; height: 44px; border-radius: 12px; background-size: 352px 352px; background-position: -44px -44px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--line); flex: none; }
 .me-name { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .me-sub { font-size: 13px; color: var(--ink-3); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 .me .ping { margin-left: auto; }
@@ -248,39 +258,70 @@ body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opaci
 .d-hero .rings { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; pointer-events: none; }
 .d-hero .rings i { position: absolute; border-radius: 50%; border: 1px solid rgba(var(--accent-rgb),.55); box-shadow: 0 0 18px rgba(var(--accent-rgb),.25), inset 0 0 18px rgba(var(--accent-rgb),.12); transition: width .35s var(--ease), height .35s var(--ease); }
 .d-hero .rings i.far { border-style: dashed; border-color: rgba(255,255,255,.35); box-shadow: none; }
-.cfg-thumb { height: 74px; border-radius: 11px; background-size: cover; background-position: center; position: relative; }
-.cfg-thumb span { position: absolute; left: 8px; bottom: 8px; font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: rgba(0,0,0,.45); color: var(--ink-2); }
-.pcard { border-radius: 16px; padding: 10px; background: var(--card); border: 1px solid var(--hair); text-align: left; display: grid; gap: 10px; transition: transform .3s var(--ease), border-color .2s, background .2s, box-shadow .2s; position: relative; }
-.pcard:hover { transform: translateY(-2px); background: var(--card-hover); border-color: var(--line); }
-.pcard.on { border-color: rgba(var(--accent-rgb),.8); box-shadow: 0 0 0 1px rgba(var(--accent-rgb),.5), 0 10px 30px rgba(var(--accent-rgb),.15); }
-.pcard .thumb { height: 74px; border-radius: 11px; background-size: cover; background-position: center; position: relative; overflow: hidden; }
-.pcard .thumb::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); border-radius: inherit; }
-.pcard b { font-size: 13.5px; font-weight: 600; display: block; }
-.pcard small { font-size: 11.5px; color: var(--ink-3); display: block; margin-top: 2px; }
-.pcard .tick { position: absolute; top: 16px; right: 16px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; transform: scale(0); transition: transform .35s var(--spring); }
-.pcard.on .tick { transform: scale(1); }
-.pcard .tick svg.lucide { width: 14px; height: 14px; stroke-width: 3; }
-.badge { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-weight: 600; background: rgba(var(--accent-rgb),.16); color: var(--accent); margin-left: 6px; vertical-align: 1px; }
 
-.theme-thumb { height: 74px; border-radius: 11px; position: relative; overflow: hidden; background: #0d1219; }
-.theme-thumb i { position: absolute; border-radius: 6px; }
+.pcard {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 8px; border-radius: 14px;
+  background: var(--card); border: 1px solid var(--hair); text-align: left; position: relative;
+  transition: background .2s, border-color .2s, transform .25s var(--ease);
+}
+.pcard:hover { background: var(--card-hover); border-color: var(--line); transform: translateY(-1px); }
+.pcard.on { background: rgba(var(--accent-rgb),.12); border-color: rgba(var(--accent-rgb),.7); box-shadow: 0 0 16px rgba(var(--accent-rgb),.18); }
+.pcard .thumb { width: 100%; height: 72px; border-radius: 9px; background-size: cover; background-position: center; border: 1px solid var(--hair); }
+.pcard .cfg-thumb { width: 100%; height: 72px; border-radius: 9px; background-size: cover; background-position: center; border: 1px solid var(--hair); position: relative; }
+.pcard .cfg-thumb span { position: absolute; left: 6px; top: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; background: rgba(0,0,0,.65); color: #fff; }
+.pcard span b { font-size: 13.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.pcard span small { font-size: 11.5px; color: var(--ink-3); display: block; margin-top: 1px; }
+.pcard .badge { font-size: 10px; font-weight: 700; color: var(--accent); background: rgba(var(--accent-rgb),.18); padding: 1px 6px; border-radius: 5px; }
+.pcard .tick { position: absolute; right: 10px; top: 10px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; opacity: 0; transform: scale(.6); transition: opacity .2s, transform .25s var(--spring); }
+.pcard.on .tick { opacity: 1; transform: none; }
 
-.keys { display: grid; gap: 4px; }
-.key-row { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; }
-.key-row .kbd { height: 26px; min-width: 34px; font-size: 12px; transition: background .2s, color .2s, border-color .2s; }
-.key-row:hover .kbd { border-color: rgba(var(--accent-rgb),.6); color: var(--ink); }
+.theme-thumb { width: 100%; height: 72px; border-radius: 9px; background: #0c1017; border: 1px solid var(--hair); position: relative; overflow: hidden; }
+.theme-thumb i { position: absolute; border-radius: 4px; }
 
-.d-foot { display: flex; align-items: center; gap: 8px; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--ink-3); }
-.d-foot .btn-sm { height: 32px; padding: 0 12px; border-radius: 10px; background: var(--fill); color: var(--ink-2); font-size: 12.5px; font-weight: 500; display: flex; align-items: center; gap: 6px; transition: background .2s, color .2s; }
-.d-foot .btn-sm:hover { background: var(--fill-2); color: var(--ink); }
-.d-foot .btn-sm svg.lucide { width: 14px; height: 14px; }
+.keys { display: grid; gap: 6px; }
+.key-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 12px; background: var(--card); border: 1px solid var(--hair); font-size: 13.5px; }
+.key-row span:first-child { color: var(--ink-2); font-weight: 500; }
+
+.d-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 12px; color: var(--ink-3); }
 .d-foot .spacer { flex: 1; }
+.btn-sm { height: 28px; padding: 0 10px; border-radius: 8px; background: var(--fill); font-size: 12px; font-weight: 500; color: var(--ink-2); display: flex; align-items: center; gap: 6px; transition: background .2s, color .2s; }
+.btn-sm:hover { background: var(--fill-2); color: var(--ink); }
 
-.empty { padding: 30px 10px; text-align: center; color: var(--ink-3); font-size: 13.5px; }
+/* ПИЛЮЛЯ-ТОСТ ДЛЯ ОШИБОК И СТАТУСОВ */
+.toast-pill {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1000;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--glass-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.25s var(--spring), opacity 0.2s var(--ease);
+}
+.toast-pill.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.toast-pill.err {
+  border-color: rgba(255, 107, 107, 0.6);
+  color: #FFA4A4;
+}
 
 /* мини-тулбар режима эффектов (только для макета) */
 .mock-bar { position: fixed; right: 14px; bottom: 14px; z-index: 30; display: flex; gap: 6px; }
-.mock-bar button { height: 30px; padding: 0 12px; border-radius: 9px; background: rgba(14,18,24,.7); border: 1px solid var(--hair); font-size: 12px; color: var(--ink-2); }
+.mock-bar button { height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(14,18,24,.7); border: 1px solid var(--hair); font-size: 12px; color: var(--ink-2); }
 .mock-bar button.on { color: var(--accent-ink); background: var(--accent); }
 
 @media (max-width: 1100px) {
@@ -328,14 +369,14 @@ body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opaci
       <button class="btn-play" data-act="game"><i data-lucide="play"></i>Продолжить</button>
       <div class="tiles">
         <button class="tile" data-act="settings"><span class="ic"><i data-lucide="sliders-horizontal"></i></span><span><b>Настройки</b><small>Графика, звук, управление</small></span></button>
-        <button class="tile"><span class="ic"><i data-lucide="user-plus"></i></span><span><b>Пригласить</b><small>Позвать друга в мир</small></span></button>
-        <button class="tile"><span class="ic"><i data-lucide="trophy"></i></span><span><b>Достижения</b><small>34 из 122</small></span></button>
-        <button class="tile"><span class="ic"><i data-lucide="images"></i></span><span><b>Скриншоты</b><small>12 за сессию</small></span></button>
-        <button class="tile"><span class="ic"><i data-lucide="bar-chart-3"></i></span><span><b>Статистика</b><small>Время, мобы, блоки</small></span></button>
-        <button class="tile"><span class="ic"><i data-lucide="radio-tower"></i></span><span><b>Открыть для сети</b><small>Локальная игра</small></span></button>
+        <button class="tile" data-action="invite"><span class="ic"><i data-lucide="user-plus"></i></span><span><b>Пригласить</b><small>Позвать друга в мир</small></span></button>
+        <button class="tile" data-action="advancements"><span class="ic"><i data-lucide="trophy"></i></span><span><b>Достижения</b><small>34 из 122</small></span></button>
+        <button class="tile" data-action="screenshots_folder"><span class="ic"><i data-lucide="images"></i></span><span><b>Скриншоты</b><small>12 за сессию</small></span></button>
+        <button class="tile" data-action="stats"><span class="ic"><i data-lucide="bar-chart-3"></i></span><span><b>Статистика</b><small>Время, мобы, блоки</small></span></button>
+        <button class="tile" data-action="open_lan"><span class="ic"><i data-lucide="radio-tower"></i></span><span><b>Открыть для сети</b><small>Локальная игра</small></span></button>
       </div>
       <div class="esc-foot">
-        <button class="btn-ghost"><i data-lucide="message-square"></i>Обратная связь</button>
+        <button class="btn-ghost" data-action="feedback"><i data-lucide="message-square"></i>Обратная связь</button>
         <button class="btn-ghost danger" data-act="main_menu"><i data-lucide="log-out"></i>Выйти в меню</button>
       </div>
     </div>
@@ -385,8 +426,22 @@ body[data-view="esc"] #esc > *, body[data-view="settings"] #settings > * { opaci
   <button data-fx="off">off</button>
 </div>
 
+<!-- Всплывающий тост для ошибок и статусов -->
+<div class="toast-pill" id="bridgeToast"></div>
+
 <script>
-const IMG = '../v3/public/assets/images/';
+/* ============ РАЗРЕШЕНИЕ ПУТЕЙ К РЕСУРСАМ ============ */
+const isHttp = location.protocol.startsWith('http');
+const asset = p => (isHttp ? '../v3/public/assets/' : './') + p;
+const IMG = asset('images/');
+
+// Подстановка фонов и аватаров под протокол (file:// или http://)
+const worldEl = document.querySelector('.world');
+if (worldEl) worldEl.style.backgroundImage = `url('${asset('images/bg_13.jpg')}')`;
+document.querySelectorAll('.head').forEach(el => {
+  el.style.backgroundImage = `url('${asset('images/Coock0ld.png')}')`;
+});
+
 const THEMES = [
   { id: 'cyan',   name: 'Бирюза',  rgb: '100,210,255', hex: '#64D2FF', ink: '#00283A' },
   { id: 'mint',   name: 'Мята',    rgb: '102,226,180', hex: '#66E2B4', ink: '#00301F' },
@@ -468,9 +523,32 @@ const S = {
 };
 
 const state = { section: 'graphics', item: 'render', q: '' };
+let gameKeys = null;
+
+// Список настроек, синхронизируемых с игрой
+const GAME_SETTINGS = new Set([
+  'render', 'sim', 'quality', 'fps', 'vsync', 'fov', 'bright',
+  'particles', 'clouds', 'master', 'music', 'blocks', 'mobs', 'players',
+  'sens', 'toggleSprint', 'raw', 'chatOpacity', 'language'
+]);
+
 const $ = s => document.querySelector(s);
 const icon = n => `<i data-lucide="${n}"></i>`;
 const paint = () => window.lucide && lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+
+/* ============ ТОСТ ============ */
+let toastTimer = null;
+function showToast(msg, isError = false) {
+  const el = document.getElementById('bridgeToast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('err', isError);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+  }, 2000);
+}
 
 function fmt(it) {
   if (it.type === 'slider') return it.value + (it.unit || '');
@@ -576,8 +654,16 @@ function renderDetail(anim = true) {
       <span><b>${o.n}</b><small>${o.s}</small></span><span class="tick">${icon('check')}</span></button>`).join('')}
       <button class="pcard" style="place-content:center;justify-items:center;min-height:150px;border-style:dashed;color:var(--ink-3)">${icon('plus')}<small>Сохранить текущие</small></button></div>`;
   } else if (it.type === 'keys') {
-    const keys = [['Вперёд','W'],['Назад','S'],['Влево','A'],['Вправо','D'],['Прыжок','Space'],['Присесть','Shift'],['Бег','Ctrl'],['Инвентарь','E'],['Чат','T'],['Список игроков','Tab'],['Скриншот','F2'],['Голосовой чат','V']];
-    body = `<div class="keys">${keys.map(([n, k]) => `<div class="key-row"><span>${n}</span><span class="kbd">${k}</span></div>`).join('')}</div>`;
+    const defaultKeys = [
+      ['Вперёд','W'],['Назад','S'],['Влево','A'],['Вправо','D'],
+      ['Прыжок','Space'],['Присесть','Shift'],['Бег','Ctrl'],
+      ['Инвентарь','E'],['Чат','T'],['Список игроков','Tab'],
+      ['Скриншот','F2'],['Голосовой чат','V']
+    ];
+    const list = (gameKeys && gameKeys.length)
+      ? gameKeys.map(k => [k.name || k[0], k.key || k[1]])
+      : defaultKeys;
+    body = `<div class="keys">${list.map(([n, k]) => `<div class="key-row"><span>${n}</span><span class="kbd">${k}</span></div>`).join('')}</div>`;
   }
   const el = $('#detail');
   el.innerHTML = `
@@ -593,8 +679,35 @@ function findItem(id) { for (const s of Object.values(S)) { const i = s.items.fi
 
 function renderAll(anim = true) { renderNav(); renderRows(); renderDetail(anim); paint(); }
 
+/* ============ МОСТ CEF / MINECRAFT ============ */
 const INGAME = new URLSearchParams(location.search).has('ingame');
-const toGame = action => { try { window.cefQuery({ request: action, onSuccess() {}, onFailure() {} }); } catch (e) { console.warn('cefQuery', e); } };
+
+function sendQuery(obj, onSuccess, onFailure) {
+  if (typeof window.cefQuery !== 'function') {
+    if (onFailure) onFailure(-1, 'no cefQuery');
+    return;
+  }
+  const reqStr = typeof obj === 'string' ? obj : JSON.stringify(obj);
+  try {
+    window.cefQuery({
+      request: reqStr,
+      onSuccess: resp => {
+        let parsed = null;
+        try { parsed = JSON.parse(resp); } catch (e) { parsed = resp; }
+        if (onSuccess) onSuccess(parsed);
+      },
+      onFailure: (code, msg) => {
+        console.warn('cefQuery error:', code, msg);
+        if (onFailure) onFailure(code, msg);
+      }
+    });
+  } catch (err) {
+    console.warn('cefQuery exception:', err);
+    if (onFailure) onFailure(-1, err.message);
+  }
+}
+
+const toGame = action => { sendQuery({ op: 'action', name: action }); };
 
 function setView(v) {
   if (INGAME && v === 'game') return toGame('resume');
@@ -604,36 +717,146 @@ function setView(v) {
 
 function applyTheme(id) {
   const t = THEMES.find(x => x.id === id);
+  if (!t) return;
   const r = document.documentElement.style;
   r.setProperty('--accent', t.hex); r.setProperty('--accent-rgb', t.rgb); r.setProperty('--accent-ink', t.ink);
 }
 
+function applyGameValues(vals) {
+  for (const [id, val] of Object.entries(vals)) {
+    const it = findItem(id);
+    if (!it) continue;
+    it.value = (it.type === 'slider' && typeof val === 'string') ? Number(val) : val;
+  }
+}
+
+function onSettingChanged(id, newVal, oldVal) {
+  if (!GAME_SETTINGS.has(id)) return;
+  if (!INGAME) return;
+
+  sendQuery({ op: 'set', id: id, value: newVal }, resp => {
+    if (resp && resp.ok === false) {
+      // Откатить значение при ошибке
+      const it = findItem(id);
+      if (it) {
+        it.value = oldVal;
+        renderRows();
+        renderDetail(false);
+        paint();
+      }
+      showToast(resp.error || 'Ошибка применения', true);
+    }
+  }, (code, msg) => {
+    const it = findItem(id);
+    if (it) {
+      it.value = oldVal;
+      renderRows();
+      renderDetail(false);
+      paint();
+    }
+    showToast('Ошибка моста: ' + msg, true);
+  });
+}
+
+function initBridge() {
+  if (!INGAME) return;
+  sendQuery({ op: 'get' }, resp => {
+    if (!resp) return;
+    if (resp.values) {
+      applyGameValues(resp.values);
+    }
+    if (Array.isArray(resp.keys)) {
+      gameKeys = resp.keys;
+    }
+    if (resp.player) {
+      document.querySelectorAll('.me-name, .nav-foot b').forEach(el => el.textContent = resp.player);
+    }
+    if (resp.world) {
+      document.querySelectorAll('.world-name').forEach(el => el.textContent = resp.world);
+      const meSub = document.querySelector('.me-sub');
+      if (meSub) meSub.innerHTML = `<span class="dot"></span>${resp.world}`;
+      const hudTc = document.querySelector('.hud-tc .pill');
+      if (hudTc) hudTc.innerHTML = `<span class="dot"></span>${resp.world}`;
+    }
+    if (typeof resp.fps === 'number') {
+      const pill = document.querySelector('.hud-tl .pill');
+      if (pill) pill.innerHTML = `<span class="dot"></span><b>Aura</b> · ${resp.fps} fps`;
+    }
+    renderAll(false);
+  });
+}
+
 /* ---------- события ---------- */
 document.addEventListener('click', e => {
-  const t = e.target.closest('[data-act],[data-sec],[data-toggle],[data-set],[data-theme],.mock-bar button');
+  const t = e.target.closest('[data-act],[data-action],[data-sec],[data-toggle],[data-set],[data-theme],.mock-bar button');
   if (!t) return;
   if (t.closest('.mock-bar')) {
     document.body.dataset.fx = t.dataset.fx;
     document.querySelectorAll('.mock-bar button').forEach(b => b.classList.toggle('on', b === t));
+    localStorage.setItem('aura_fx', t.dataset.fx);
     return;
   }
   if (t.dataset.act === 'main_menu') return INGAME ? toGame('main_menu') : setView('game');
   if (t.dataset.act) return setView(t.dataset.act);
+
+  if (t.dataset.action) {
+    const actName = t.dataset.action;
+    if (actName === 'feedback') {
+      showToast('Обратная связь');
+      return;
+    }
+    if (INGAME) {
+      sendQuery({ op: 'action', name: actName }, resp => {
+        if (resp && resp.ok === false) {
+          if (resp.error === 'not_ready') {
+            showToast('Скоро');
+          } else {
+            showToast(resp.error || 'Ошибка', true);
+          }
+        }
+      }, (code, msg) => {
+        if (actName === 'invite') showToast('Скоро');
+        else showToast('Ошибка: ' + msg, true);
+      });
+    } else {
+      if (actName === 'invite') showToast('Скоро');
+      else showToast('Действие: ' + actName);
+    }
+    return;
+  }
+
   if (t.dataset.toggle) {
     e.stopPropagation();
-    const it = findItem(t.dataset.toggle); it.value = !it.value;
+    const it = findItem(t.dataset.toggle);
+    const oldVal = it.value;
+    const newVal = !oldVal;
+    it.value = newVal;
     if (it.id === 'anim') document.body.style.setProperty('--ease', it.value ? '' : 'linear');
-    renderRows(); renderDetail(false); paint(); return;
+    renderRows(); renderDetail(false); paint();
+    onSettingChanged(it.id, newVal, oldVal);
+    return;
   }
   if (t.dataset.set) {
     const it = findItem(t.dataset.set);
-    it.value = it.type === 'slider' ? +t.dataset.v : t.dataset.v;
-    if (it.id === 'fx') { document.body.dataset.fx = it.value === 'off' ? 'off' : 'full'; }
-    renderRows(); renderDetail(false); paint(); return;
+    const oldVal = it.value;
+    const newVal = it.type === 'slider' ? +t.dataset.v : t.dataset.v;
+    if (oldVal !== newVal) {
+      it.value = newVal;
+      if (it.id === 'fx') {
+        document.body.dataset.fx = it.value === 'off' ? 'off' : 'full';
+        localStorage.setItem('aura_fx', it.value);
+      }
+      renderRows(); renderDetail(false); paint();
+      onSettingChanged(it.id, newVal, oldVal);
+    }
+    return;
   }
   if (t.dataset.theme) {
-    findItem('theme').value = t.dataset.theme; applyTheme(t.dataset.theme);
-    renderRows(); renderDetail(false); paint(); return;
+    findItem('theme').value = t.dataset.theme;
+    applyTheme(t.dataset.theme);
+    localStorage.setItem('aura_theme', t.dataset.theme);
+    renderRows(); renderDetail(false); paint();
+    return;
   }
   if (t.dataset.item) { state.item = t.dataset.item; state.section = t.dataset.sec; renderRows(); renderDetail(); paint(); return; }
   if (t.dataset.sec) {
@@ -662,10 +885,29 @@ function slideTo(el, x) {
 }
 document.addEventListener('pointerdown', e => {
   const s = e.target.closest('.slider'); if (!s) return;
-  drag = s; s.classList.add('drag'); s.setPointerCapture(e.pointerId); slideTo(s, e.clientX);
+  drag = s; s.classList.add('drag'); s.setPointerCapture(e.pointerId);
+  const id = s.dataset.slider;
+  if (!id.endsWith('-x')) {
+    const it = findItem(id);
+    if (it) s._oldValue = it.value;
+  }
+  slideTo(s, e.clientX);
 });
 document.addEventListener('pointermove', e => { if (drag) slideTo(drag, e.clientX); });
-document.addEventListener('pointerup', () => { if (drag) { drag.classList.remove('drag'); drag = null; } });
+document.addEventListener('pointerup', () => {
+  if (drag) {
+    const s = drag;
+    s.classList.remove('drag');
+    drag = null;
+    const id = s.dataset.slider;
+    if (!id.endsWith('-x')) {
+      const it = findItem(id);
+      if (it && s._oldValue !== undefined && s._oldValue !== it.value) {
+        onSettingChanged(it.id, it.value, s._oldValue);
+      }
+    }
+  }
+});
 
 /* поиск */
 $('#q').addEventListener('input', e => {
@@ -685,10 +927,27 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key.toLowerCase() === 'f' && v === 'settings') { e.preventDefault(); $('#q').focus(); }
 });
 
+// Загрузка локальных настроек (тема и эффекты) из localStorage
+const savedTheme = localStorage.getItem('aura_theme');
+if (savedTheme && THEMES.some(t => t.id === savedTheme)) {
+  findItem('theme').value = savedTheme;
+  applyTheme(savedTheme);
+}
+const savedFx = localStorage.getItem('aura_fx');
+if (savedFx) {
+  document.body.dataset.fx = savedFx;
+  const fxItem = findItem('fx');
+  if (fxItem) fxItem.value = savedFx;
+}
+
 renderAll(false);
 paint();
+
 const qs = new URLSearchParams(location.search);
-if (INGAME) document.body.classList.add('ingame');
+if (INGAME) {
+  document.body.classList.add('ingame');
+  initBridge();
+}
 if (qs.get('sec') && S[qs.get('sec')]) { state.section = qs.get('sec'); state.item = qs.get('item') || S[state.section].items[0].id; }
 if (qs.get('theme')) { findItem('theme').value = qs.get('theme'); applyTheme(qs.get('theme')); }
 if (qs.get('view')) setView(qs.get('view'));
