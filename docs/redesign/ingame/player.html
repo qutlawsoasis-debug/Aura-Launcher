@@ -1391,13 +1391,54 @@ function onYtError(event) {
     }
   }
 
-  // Все кандидаты исчерпаны или другая ошибка
+  // Все YouTube-кандидаты заблокированы лейблом (101/150) -> спасительный переход на SoundCloud!
+  if (isEmbedBlocked && state.currentTrack && !state.currentTrack._scFallbackTried) {
+    state.currentTrack._scFallbackTried = true;
+    console.log('[AuraMusic] YouTube blocked. Switching to SoundCloud fallback for:', state.currentTrack.title);
+    fallbackToSoundCloud(state.currentTrack);
+    return;
+  }
+
   if (isEmbedBlocked) {
     console.warn('[AuraMusic] All candidates blocked for track');
   } else {
     showToast('Ошибка воспроизведения видео');
   }
   setTimeout(() => playNext(), 600);
+
+async function fallbackToSoundCloud(track) {
+  try {
+    const q = `${track.artist} ${track.title}`.replace(/s*-s*Topic$/i, '').trim();
+    const res = await fetch(`https://lobby-api.vercel.app/api/music/soundcloud?q=${encodeURIComponent(q)}&limit=3`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.items && data.items.length > 0) {
+        const sc = data.items[0];
+        console.log('[AuraMusic] Playing SoundCloud fallback:', sc.permalinkUrl);
+        state.isYouTube = false;
+        state.isSoundCloud = true;
+        if (ytPlayer && ytReady && typeof ytPlayer.stopVideo === 'function') {
+          try { ytPlayer.stopVideo(); } catch(e) {}
+        }
+        const coverWrap = document.getElementById('coverWrap');
+        if (coverWrap) coverWrap.classList.remove('yt-active');
+        const ytBox = document.getElementById('ytPlayerBox');
+        if (ytBox) ytBox.style.display = 'none';
+        const nowArt = document.getElementById('nowArt');
+        if (nowArt) nowArt.style.display = 'block';
+
+        track.soundCloudUrl = sc.permalinkUrl;
+        track.source = 'soundcloud';
+        playSoundCloud(sc.permalinkUrl);
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('[AuraMusic] SoundCloud fallback failed:', e);
+  }
+  setTimeout(() => playNext(), 600);
+}
+
 }
 
 function playYtVideo(videoId) {
