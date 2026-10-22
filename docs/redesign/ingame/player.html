@@ -1,0 +1,1860 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aura — Музыкальный плеер</title>
+<link rel="icon" href="data:,">
+<script src="./lucide.min.js"></script>
+<script>
+(function() {
+  const isHttp = location.protocol.startsWith('http');
+  const fontUrl = isHttp ? '../v3/public/assets/fonts/Onest.woff2' : './fonts/Onest.woff2';
+  const st = document.createElement('style');
+  st.textContent = `@font-face { font-family: 'Onest'; src: url('${fontUrl}') format('woff2'); font-weight: 100 900; font-display: block; }`;
+  document.head.appendChild(st);
+})();
+</script>
+<style>
+:root {
+  --accent: #64D2FF;
+  --accent-rgb: 100, 210, 255;
+  --accent-ink: #00283A;
+
+  --ink: #ffffff;
+  --ink-2: rgba(255, 255, 255, 0.76);
+  --ink-3: rgba(255, 255, 255, 0.48);
+  --ink-4: rgba(255, 255, 255, 0.28);
+
+  --fill: rgba(118, 118, 128, 0.24);
+  --fill-2: rgba(118, 118, 128, 0.38);
+  --hair: rgba(255, 255, 255, 0.08);
+  --line: rgba(255, 255, 255, 0.14);
+
+  --glass: rgba(14, 18, 26, 0.72);
+  --glass-elevated: rgba(22, 28, 38, 0.85);
+  --card: rgba(255, 255, 255, 0.045);
+  --card-hover: rgba(255, 255, 255, 0.08);
+
+  --sheen: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 4px 12px rgba(0, 0, 0, 0.35);
+
+  --danger: #FF6B6B;
+  --success: #34D399;
+  --audius: #CC44FF;
+  --itunes: #FA2D48;
+  --deezer: #FEAA2D;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+
+body {
+  background: #06090e;
+  color: var(--ink);
+  font-family: 'Onest', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; outline: none; }
+input { font: inherit; color: inherit; outline: none; border: 0; }
+svg.lucide { width: 18px; height: 18px; stroke-width: 1.8; flex: none; }
+
+/* ============ ДИНАМИЧЕСКИЙ ФОН APPLE MUSIC ============ */
+.bg-ambient {
+  position: fixed;
+  inset: -60px;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bg-blur-img {
+  position: absolute;
+  inset: 0;
+  width: calc(100% + 120px);
+  height: calc(100% + 120px);
+  object-fit: cover;
+  filter: blur(80px) saturate(160%) brightness(0.75);
+  transform: scale(1.15);
+  transition: opacity 0.8s var(--ease);
+  will-change: transform, filter;
+  animation: pulseAmbient 16s ease-in-out infinite alternate;
+}
+@keyframes pulseAmbient {
+  0% { transform: scale(1.15) rotate(0deg); filter: blur(80px) saturate(160%) brightness(0.72); }
+  50% { transform: scale(1.22) rotate(1deg); filter: blur(95px) saturate(180%) brightness(0.80); }
+  100% { transform: scale(1.18) rotate(-1deg); filter: blur(85px) saturate(165%) brightness(0.75); }
+}
+.bg-ambient::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 45% 45%, rgba(6, 9, 14, 0.12) 0%, rgba(6, 9, 14, 0.38) 65%, rgba(6, 9, 14, 0.65) 100%),
+              linear-gradient(180deg, rgba(6, 9, 14, 0.10) 0%, rgba(6, 9, 14, 0.45) 100%);
+}
+
+/* ============ ОСНОВНОЙ КОНТЕЙНЕР ============ */
+#app {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============ ВЕРХНИЙ БАР НАВИГАЦИИ ============ */
+.nav-bar {
+  height: 64px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--hair);
+  background: rgba(10, 14, 20, 0.45);
+  box-shadow: var(--sheen);
+  flex: none;
+  z-index: 20;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), #1E40AF);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45);
+}
+.brand-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+}
+.nav-tab {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+.nav-tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+.nav-tab.on {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  box-shadow: 0 2px 12px rgba(var(--accent-rgb), 0.35);
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--fill);
+  border: 1px solid var(--hair);
+  color: var(--ink-2);
+  transition: background 0.15s, color 0.15s, transform 0.2s var(--spring);
+}
+.icon-btn:hover {
+  background: var(--fill-2);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+
+/* ============ ЭКРАНЫ ПРИЛОЖЕНИЯ ============ */
+.screen-layer {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: none;
+  opacity: 0;
+  transform: scale(0.985);
+  transition: opacity 0.35s var(--ease), transform 0.4s var(--ease);
+}
+.screen-layer.active {
+  display: flex;
+  opacity: 1;
+  transform: none;
+}
+
+/* ============ ЭКРАН 1: СЕЙЧАС ИГРАЕТ (APPLE MUSIC) ============ */
+#screen-now {
+  padding: 40px 64px 36px;
+  gap: 60px;
+}
+.player-col-left {
+  width: 440px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+}
+.album-art-wrap {
+  width: 380px;
+  height: 380px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px var(--line);
+  position: relative;
+  background: #111620;
+  flex: none;
+  align-self: center;
+  transition: transform 0.3s var(--ease);
+}
+.album-art-wrap:hover {
+  transform: scale(1.02);
+}
+.album-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.track-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.track-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-artist {
+  font-size: 17px;
+  color: var(--ink-2);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.source-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.source-badge.audius { background: rgba(204, 68, 255, 0.18); color: #E084FF; border: 1px solid rgba(204, 68, 255, 0.4); }
+.source-badge.itunes { background: rgba(250, 45, 72, 0.18); color: #FF667D; border: 1px solid rgba(250, 45, 72, 0.4); }
+.source-badge.deezer { background: rgba(254, 170, 45, 0.18); color: #FFBF5E; border: 1px solid rgba(254, 170, 45, 0.4); }
+
+/* Слайдер таймлайна */
+.timeline-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.time-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  cursor: pointer;
+  overflow: visible;
+  transition: height 0.15s;
+}
+.time-bar:hover {
+  height: 8px;
+}
+.time-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.5);
+}
+.time-knob {
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.time-bar:hover .time-knob {
+  opacity: 1;
+}
+.time-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Кнопки управления */
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+.ctrl-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  transition: transform 0.2s var(--spring), color 0.15s, background 0.15s;
+}
+.ctrl-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.08);
+}
+.ctrl-btn.play-main {
+  width: 60px;
+  height: 60px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 6px 20px rgba(var(--accent-rgb), 0.45);
+}
+.ctrl-btn.play-main:hover {
+  transform: scale(1.06);
+  filter: brightness(1.08);
+}
+.ctrl-btn.play-main svg.lucide {
+  width: 26px;
+  height: 26px;
+}
+
+/* Громкость */
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+}
+.vol-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  position: relative;
+  cursor: pointer;
+}
+.vol-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 80%;
+  border-radius: 999px;
+  background: var(--ink-2);
+}
+
+/* Правая колонка: Синхронный текст Apple Music */
+.lyrics-col {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.lyrics-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 120px 24px 200px 0;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0,0,0,1) 12%, rgba(0,0,0,1) 85%, transparent 100%);
+}
+.lyrics-scroll::-webkit-scrollbar { display: none; }
+
+.lyric-line {
+  padding: 16px 0;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  color: rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+  transform-origin: left center;
+  transition: color 0.35s var(--ease), transform 0.35s var(--spring), opacity 0.35s var(--ease);
+}
+.lyric-line:hover {
+  color: rgba(255, 255, 255, 0.65);
+}
+.lyric-line.active {
+  color: #ffffff !important;
+  font-size: 38px !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+  transform: scale(1.05);
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7), 0 0 45px rgba(255, 255, 255, 0.6);
+}
+.lyric-line.past {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.lyrics-empty {
+  margin-top: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-3);
+  font-size: 16px;
+}
+.lyrics-empty svg.lucide {
+  width: 36px;
+  height: 36px;
+  opacity: 0.6;
+}
+
+/* ============ ЭКРАН 2: ПОИСК ТРЕКОВ ============ */
+#screen-search {
+  flex-direction: column;
+  padding: 32px 64px 40px;
+  gap: 24px;
+}
+.search-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+.search-input-box {
+  height: 56px;
+  border-radius: 18px;
+  background: var(--glass-elevated);
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen), var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.search-input-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 24px rgba(var(--accent-rgb), 0.25), var(--sheen);
+}
+.search-input-box input {
+  flex: 1;
+  background: none;
+  font-size: 17px;
+  font-weight: 500;
+  color: #fff;
+}
+.search-input-box input::placeholder {
+  color: var(--ink-3);
+}
+
+.chips-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chip {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--fill);
+  border: 1px solid var(--hair);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.chip:hover {
+  background: var(--fill-2);
+  color: #fff;
+}
+.chip.on {
+  background: rgba(var(--accent-rgb), 0.18);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(var(--accent-rgb), 0.3);
+}
+
+.search-results-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  padding-right: 4px;
+}
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  transition: background 0.15s, border-color 0.15s, transform 0.2s var(--spring);
+  cursor: pointer;
+}
+.result-item:hover {
+  background: var(--card-hover);
+  border-color: var(--line);
+  transform: translateY(-1px);
+}
+.result-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #111;
+  flex: none;
+}
+.result-info {
+  flex: 1;
+  min-width: 0;
+}
+.result-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-artist {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.result-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.result-dur {
+  font-size: 13px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  margin-left: 8px;
+}
+.badge-type {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-2);
+}
+.badge-type.full {
+  background: rgba(52, 211, 153, 0.18);
+  color: #34D399;
+}
+
+/* ============ ЭКРАН 3: ОЧЕРЕДЬ ============ */
+#screen-queue {
+  flex-direction: column;
+  padding: 32px 64px 40px;
+  gap: 20px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+.queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.queue-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.queue-actions {
+  display: flex;
+  gap: 8px;
+}
+.queue-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--hair);
+  cursor: grab;
+  transition: background 0.15s;
+}
+.queue-item:active {
+  cursor: grabbing;
+}
+.queue-item.playing {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+.queue-drag-ic {
+  color: var(--ink-4);
+  flex: none;
+}
+
+/* ============ ЭКРАН 4: МИНИ-ПЛЕЕР ДЛЯ HUD (?mini=1) ============ */
+body.mini-mode {
+  background: transparent !important;
+}
+body.mini-mode .bg-ambient,
+body.mini-mode .nav-bar,
+body.mini-mode #screen-search,
+body.mini-mode #screen-queue,
+body.mini-mode #screen-now {
+  display: none !important;
+}
+.mini-player-card {
+  display: none;
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  width: 360px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--glass-elevated);
+  border: 1px solid var(--hair);
+  box-shadow: var(--sheen), 0 16px 40px rgba(0, 0, 0, 0.6);
+  padding: 10px 14px;
+  align-items: center;
+  gap: 12px;
+  z-index: 100;
+  overflow: hidden;
+}
+body.mini-mode .mini-player-card {
+  display: flex;
+}
+.mini-art {
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+.mini-info {
+  flex: 1;
+  min-width: 0;
+}
+.mini-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-artist {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mini-progress-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.mini-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.6);
+}
+
+/* ============ ТОСТ ============ */
+.toast-pill {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1000;
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--glass-elevated);
+  border: 1px solid var(--line);
+  box-shadow: var(--sheen), var(--shadow);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.25s var(--spring), opacity 0.2s var(--ease);
+}
+.toast-pill.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+.toast-pill.err {
+  border-color: rgba(255, 107, 107, 0.6);
+  color: #FFA4A4;
+}
+
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--hair);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+</style>
+</head>
+<body>
+
+<!-- АМБИЕНТНЫЙ ФОН ДЛЯ APPLE MUSIC ЭФФЕКТА -->
+<div class="bg-ambient">
+  <img class="bg-blur-img" id="bgBlurImg" src="" alt="">
+</div>
+
+<!-- АУДИО ЭЛЕМЕНТ ДЛЯ ВОСПРОИЗВЕДЕНИЯ -->
+<audio id="audioPlayer" preload="auto"></audio>
+
+<div id="app">
+  <!-- ВЕРХНЯЯ НАВИГАЦИЯ -->
+  <header class="nav-bar">
+    <div class="brand">
+      <div class="brand-mark"><i data-lucide="music-2"></i></div>
+      <div>
+        <div class="brand-title">Aura Music</div>
+        <div class="brand-sub">Музыка в игре</div>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="nav-tab on" id="tabNow" data-screen="now">
+        <i data-lucide="disc-3"></i> Сейчас играет
+      </button>
+      <button class="nav-tab" id="tabSearch" data-screen="search">
+        <i data-lucide="search"></i> Поиск <span class="kbd">/</span>
+      </button>
+      <button class="nav-tab" id="tabQueue" data-screen="queue">
+        <i data-lucide="list-music"></i> Очередь (<span id="queueCount">0</span>)
+      </button>
+    </div>
+
+    <div class="nav-right">
+      <button class="icon-btn" title="Мини-плеер HUD" id="btnToggleMini"><i data-lucide="pip"></i></button>
+    </div>
+  </header>
+
+  <!-- ЭКРАН 1: СЕЙЧАС ИГРАЕТ -->
+  <main class="screen-layer active" id="screen-now">
+    <div class="player-col-left">
+      <div class="album-art-wrap">
+        <img class="album-art" id="nowArt" src="" alt="Обложка">
+      </div>
+
+      <div class="track-meta">
+        <div class="track-title" id="nowTitle">Выберите трек</div>
+        <div class="track-artist">
+          <span id="nowArtist">Исполнитель</span>
+          <span class="source-badge audius" id="nowBadge">Audius · Полный</span>
+        </div>
+      </div>
+
+      <div class="timeline-wrap">
+        <div class="time-bar" id="timeBar">
+          <div class="time-fill" id="timeFill">
+            <div class="time-knob"></div>
+          </div>
+        </div>
+        <div class="time-labels">
+          <span id="lblTimeCur">0:00</span>
+          <span id="lblTimeDur">0:00</span>
+        </div>
+      </div>
+
+      <div class="controls-row">
+        <button class="ctrl-btn" title="Случайный порядок" id="btnShuffle"><i data-lucide="shuffle"></i></button>
+        <button class="ctrl-btn" title="Предыдущий трек" id="btnPrev"><i data-lucide="skip-back"></i></button>
+        <button class="ctrl-btn play-main" title="Воспроизведение (Пробел)" id="btnPlayMain"><i data-lucide="play" id="icPlay"></i></button>
+        <button class="ctrl-btn" title="Следующий трек" id="btnNext"><i data-lucide="skip-forward"></i></button>
+        <button class="ctrl-btn" title="Повтор" id="btnRepeat"><i data-lucide="repeat"></i></button>
+      </div>
+
+      <div class="volume-row">
+        <i data-lucide="volume-2" style="width:16px; height:16px; color:var(--ink-3);"></i>
+        <div class="vol-bar" id="volBar">
+          <div class="vol-fill" id="volFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Правая колонка: Синхронный текст Apple Music -->
+    <div class="lyrics-col">
+      <div class="lyrics-scroll" id="lyricsScroll">
+        <div class="lyrics-empty" id="lyricsEmpty">
+          <i data-lucide="file-text"></i>
+          <span>Текст песни не найден или загружается...</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 2: ПОИСК ТРЕКОВ -->
+  <main class="screen-layer" id="screen-search">
+    <div class="search-header">
+      <div class="search-input-box">
+        <i data-lucide="search" style="color:var(--ink-3);"></i>
+        <input type="text" id="searchInput" placeholder="Поиск песни или артиста (например: Imagine Dragons Believer, lofi)..." autocomplete="off">
+        <button id="btnClearSearch" style="display:none; color:var(--ink-3);"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="chips-row" id="chipsSource">
+        <button class="chip on" data-src="all"><i data-lucide="layers"></i>Все</button>
+        <button class="chip" data-src="audius"><span style="color:#E084FF;">●</span> Audius (полные)</button>
+        <button class="chip" data-src="itunes"><span style="color:#FF667D;">●</span> iTunes (30 с)</button>
+        <button class="chip" data-src="deezer"><span style="color:#FFBF5E;">●</span> Deezer (30 с)</button>
+        <button class="chip" data-src="jamendo" style="opacity:0.5;" title="Требуется client_id (пропущен)"><span style="color:#34D399;">●</span> Jamendo</button>
+      </div>
+    </div>
+
+    <div class="search-results-list" id="searchResults">
+      <div style="text-align:center; padding:60px 0; color:var(--ink-3);">
+        <i data-lucide="search" style="width:36px; height:36px; opacity:0.4; margin-bottom:12px;"></i>
+        <div>Введите запрос для поиска по Audius, iTunes и Deezer</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ЭКРАН 3: ОЧЕРЕДЬ -->
+  <main class="screen-layer" id="screen-queue">
+    <div class="queue-header">
+      <div class="queue-title">Очередь воспроизведения</div>
+      <div class="queue-actions">
+        <button class="chip" id="btnClearQueue"><i data-lucide="trash-2"></i>Очистить</button>
+        <button class="chip on" id="btnAddMore"><i data-lucide="plus"></i>Найти ещё</button>
+      </div>
+    </div>
+
+    <div class="queue-list" id="queueList"></div>
+  </main>
+</div>
+
+<!-- МИНИ-ПЛЕЕР ДЛЯ HUD (?mini=1) -->
+<div class="mini-player-card" id="miniPlayerCard">
+  <img class="mini-art" id="miniArt" src="" alt="Мини-обложка">
+  <div class="mini-info">
+    <div class="mini-title" id="miniTitle">Название трека</div>
+    <div class="mini-artist" id="miniArtist">Исполнитель</div>
+  </div>
+  <button class="ctrl-btn" id="btnMiniPlay" style="width:38px; height:38px;"><i data-lucide="play" id="icMiniPlay"></i></button>
+  <button class="ctrl-btn" id="btnMiniNext" style="width:38px; height:38px;"><i data-lucide="skip-forward"></i></button>
+  <div class="mini-progress-bar">
+    <div class="mini-progress-fill" id="miniProgressFill"></div>
+  </div>
+</div>
+
+<!-- ВСПЛЫВАЮЩИЙ ТОСТ -->
+<div class="toast-pill" id="playerToast"></div>
+
+<script>
+/* ============ ИНИЦИАЛИЗАЦИЯ ИКОНОК ============ */
+if (window.lucide) {
+  lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+}
+
+/* ============ CEF СОБЫТИЯ ============ */
+function sendCefLyric(text, sec) {
+  if (typeof window.cefQuery === 'function') {
+    try {
+      window.cefQuery({
+        request: JSON.stringify({ op: 'lyric', text: text, t: sec }),
+        onSuccess: () => {},
+        onFailure: () => {}
+      });
+    } catch (e) {
+      console.debug('[CEF] lyric:', text, sec);
+    }
+  } else {
+    console.debug('[LYRIC CEFQ]', text, `(${sec}s)`);
+  }
+}
+
+/* ============ ПУТИ К АССЕТАМ ============ */
+const isHttp = location.protocol.startsWith('http');
+const asset = p => (isHttp ? '../v3/public/assets/' : './') + p;
+const imgAsset = name => asset('images/' + name);
+
+/* ============ СОСТОЯНИЕ ПЛЕЕРА ============ */
+const state = {
+  currentTrack: null,
+  isPlaying: false,
+  currentTime: 0,
+  duration: 0,
+  volume: 0.8,
+  isShuffle: false,
+  isRepeat: false,
+  queue: [],
+  queueIndex: -1,
+  lyrics: [],       // [{ time: 12.3, text: "..." }]
+  activeLyricIdx: -1,
+  selectedSource: 'all',
+  currentScreen: 'now'
+};
+
+const audio = document.getElementById('audioPlayer');
+audio.volume = state.volume;
+
+/* ============ ТОСТ ============ */
+let toastTimer = null;
+function showToast(msg, isErr = false) {
+  const el = document.getElementById('playerToast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('err', isErr);
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+/* ============ ФОРМАТИРОВАНИЕ ВРЕМЕНИ ============ */
+function fmtTime(sec) {
+  if (!sec || isNaN(sec) || sec < 0) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/* ============ НАВИГАЦИЯ ПО ЭКРАНАМ ============ */
+function setScreen(name) {
+  state.currentScreen = name;
+  document.querySelectorAll('.screen-layer').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('on'));
+
+  const targetScreen = document.getElementById(`screen-${name}`);
+  if (targetScreen) targetScreen.classList.add('active');
+
+  const tabBtn = document.querySelector(`.nav-tab[data-screen="${name}"]`);
+  if (tabBtn) tabBtn.classList.add('on');
+
+  if (name === 'search') {
+    setTimeout(() => document.getElementById('searchInput')?.focus(), 100);
+  } else if (name === 'queue') {
+    renderQueue();
+  }
+}
+
+document.querySelectorAll('.nav-tab').forEach(btn => {
+  btn.addEventListener('click', () => setScreen(btn.dataset.screen));
+});
+
+/* ============ ПАРСИНГ LRC СИНХРОННОГО ТЕКСТА ============ */
+function parseLrc(lrcText) {
+  if (!lrcText) return [];
+  const lines = lrcText.split('\n');
+  const result = [];
+  const timeRegex = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/g;
+
+  lines.forEach(line => {
+    let match;
+    const times = [];
+    while ((match = timeRegex.exec(line)) !== null) {
+      const min = parseInt(match[1], 10);
+      const sec = parseInt(match[2], 10);
+      const ms = parseFloat('0.' + match[3]);
+      times.push(min * 60 + sec + ms);
+    }
+    const cleanText = line.replace(/\[\d{2}:\d{2}\.\d{2,3}\]/g, '').trim();
+    if (cleanText) {
+      times.forEach(t => {
+        result.push({ time: t, text: cleanText });
+      });
+    }
+  });
+
+  result.sort((a, b) => a.time - b.time);
+  return result;
+}
+
+/* ============ ЗАГРУЗКА ТЕКСТА С LRCLIB ============ */
+async function fetchLyrics(track) {
+  state.lyrics = [];
+  state.activeLyricIdx = -1;
+  const scrollEl = document.getElementById('lyricsScroll');
+  scrollEl.innerHTML = `
+    <div class="lyrics-empty">
+      <i data-lucide="loader" style="animation:spin 1s linear infinite;"></i>
+      <span>Поиск текста песни в базе LRCLIB...</span>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const q = encodeURIComponent(`${track.artist} ${track.title}`.replace(/[\(\)\[\]\-]/g, ' ').trim());
+    const resp = await fetch(`https://lrclib.net/api/search?q=${q}`);
+    if (resp.ok) {
+      const list = await resp.json();
+      if (list && list.length) {
+        const best = list.find(item => item.syncedLyrics) || list[0];
+        if (best.syncedLyrics) {
+          state.lyrics = parseLrc(best.syncedLyrics);
+        } else if (best.plainLyrics) {
+          // Обычный текст без таймингов
+          state.lyrics = best.plainLyrics.split('\n')
+            .map(l => l.trim())
+            .filter(Boolean)
+            .map((text, i) => ({ time: i * 4, text: text }));
+        }
+      }
+    }
+  } catch (err) {
+    console.debug('Lyrics fetch failed:', err);
+  }
+
+  renderLyrics();
+}
+
+function renderLyrics() {
+  const scrollEl = document.getElementById('lyricsScroll');
+  if (!state.lyrics.length) {
+    scrollEl.innerHTML = `
+      <div class="lyrics-empty">
+        <i data-lucide="file-text"></i>
+        <span>Текст песни не найден</span>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  scrollEl.innerHTML = state.lyrics.map((l, i) => `
+    <div class="lyric-line ${i === state.activeLyricIdx ? 'active' : (i < state.activeLyricIdx ? 'past' : '')}" data-idx="${i}" data-time="${l.time}">
+      ${l.text}
+    </div>
+  `).join('');
+
+  scrollEl.querySelectorAll('.lyric-line').forEach(el => {
+    el.addEventListener('click', () => {
+      const t = parseFloat(el.dataset.time);
+      if (!isNaN(t)) {
+        audio.currentTime = t;
+        updateLyricsPosition(t);
+        if (!state.isPlaying) togglePlay();
+      }
+    });
+  });
+
+  if (state.activeLyricIdx >= 0 && scrollEl.children[state.activeLyricIdx]) {
+    scrollEl.children[state.activeLyricIdx].scrollIntoView({ block: 'center', inline: 'nearest' });
+  }
+}
+
+function updateLyricsPosition(time) {
+  if (!state.lyrics.length) return;
+  let currentIdx = -1;
+  for (let i = 0; i < state.lyrics.length; i++) {
+    if (time >= state.lyrics[i].time) {
+      currentIdx = i;
+    } else {
+      break;
+    }
+  }
+
+  state.activeLyricIdx = currentIdx;
+  const lines = document.querySelectorAll('.lyric-line');
+  lines.forEach((el, i) => {
+    el.classList.toggle('active', i === currentIdx);
+    el.classList.toggle('past', i < currentIdx);
+  });
+
+  if (currentIdx >= 0) {
+    const activeEl = lines[currentIdx];
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    sendCefLyric(state.lyrics[currentIdx].text, time);
+  }
+}
+
+/* ============ ВОСПРОИЗВЕДЕНИЕ ТРЕКА ============ */
+function playTrack(track) {
+  state.currentTrack = track;
+  audio.src = track.streamUrl;
+  audio.play().catch(e => console.warn('Audio play error:', e));
+  state.isPlaying = true;
+  updatePlayButton(true);
+
+  // Обновление обложек и инфо
+  document.getElementById('nowTitle').textContent = track.title;
+  document.getElementById('nowArtist').textContent = track.artist;
+  document.getElementById('nowArt').src = track.art;
+  document.getElementById('bgBlurImg').src = track.art;
+
+  // Мини-плеер
+  document.getElementById('miniTitle').textContent = track.title;
+  document.getElementById('miniArtist').textContent = track.artist;
+  document.getElementById('miniArt').src = track.art;
+
+  // Бейдж источника
+  const badge = document.getElementById('nowBadge');
+  badge.className = `source-badge ${track.source}`;
+  badge.textContent = `${track.sourceName} · ${track.isFull ? 'Полный трек' : 'Превью 30 с'}`;
+
+  // Текст
+  fetchLyrics(track);
+
+  // Переход на экран «Сейчас играет»
+  if (state.currentScreen !== 'now') {
+    setScreen('now');
+  }
+}
+
+function togglePlay() {
+  if (!state.currentTrack) return;
+  if (state.isPlaying) {
+    audio.pause();
+    state.isPlaying = false;
+    updatePlayButton(false);
+  } else {
+    audio.play().catch(() => {});
+    state.isPlaying = true;
+    updatePlayButton(true);
+  }
+}
+
+function updatePlayButton(playing) {
+  const ic = document.getElementById('icPlay');
+  const icMini = document.getElementById('icMiniPlay');
+  if (ic) ic.setAttribute('data-lucide', playing ? 'pause' : 'play');
+  if (icMini) icMini.setAttribute('data-lucide', playing ? 'pause' : 'play');
+  if (window.lucide) lucide.createIcons();
+}
+
+/* ============ АУДИО СОБЫТИЯ И ТАЙМЛАЙН ============ */
+audio.addEventListener('timeupdate', () => {
+  state.currentTime = audio.currentTime;
+  state.duration = audio.duration || state.currentTrack?.duration || 0;
+
+  const pct = state.duration > 0 ? (state.currentTime / state.duration) * 100 : 0;
+  document.getElementById('timeFill').style.width = `${pct}%`;
+  document.getElementById('miniProgressFill').style.width = `${pct}%`;
+
+  document.getElementById('lblTimeCur').textContent = fmtTime(state.currentTime);
+  document.getElementById('lblTimeDur').textContent = fmtTime(state.duration);
+
+  updateLyricsPosition(state.currentTime);
+});
+
+audio.addEventListener('ended', () => {
+  if (state.isRepeat) {
+    audio.currentTime = 0;
+    audio.play();
+  } else {
+    playNext();
+  }
+});
+
+// Перемотка кликом по таймлайну
+document.getElementById('timeBar')?.addEventListener('click', (e) => {
+  const bar = e.currentTarget;
+  const rect = bar.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  const targetTime = pct * (audio.duration || state.currentTrack?.duration || 0);
+  audio.currentTime = targetTime;
+  updateLyricsPosition(targetTime);
+  const pct100 = `${pct * 100}%`;
+  document.getElementById('timeFill').style.width = pct100;
+  document.getElementById('miniProgressFill').style.width = pct100;
+  document.getElementById('lblTimeCur').textContent = fmtTime(targetTime);
+});
+
+audio.addEventListener('seeked', () => {
+  updateLyricsPosition(audio.currentTime);
+});
+audio.addEventListener('pause', () => {
+  updateLyricsPosition(audio.currentTime);
+});
+
+// Громкость кликом
+document.getElementById('volBar')?.addEventListener('click', (e) => {
+  const bar = e.currentTarget;
+  const rect = bar.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  audio.volume = pct;
+  state.volume = pct;
+  document.getElementById('volFill').style.width = `${pct * 100}%`;
+});
+
+// Кнопки плеера
+document.getElementById('btnPlayMain')?.addEventListener('click', togglePlay);
+document.getElementById('btnMiniPlay')?.addEventListener('click', togglePlay);
+
+document.getElementById('btnPrev')?.addEventListener('click', () => {
+  if (audio.currentTime > 3) {
+    audio.currentTime = 0;
+  } else {
+    playPrev();
+  }
+});
+
+document.getElementById('btnNext')?.addEventListener('click', playNext);
+document.getElementById('btnMiniNext')?.addEventListener('click', playNext);
+
+document.getElementById('btnShuffle')?.addEventListener('click', function() {
+  state.isShuffle = !state.isShuffle;
+  this.classList.toggle('on', state.isShuffle);
+  showToast(state.isShuffle ? 'Случайный порядок включен' : 'Случайный порядок выключен');
+});
+
+document.getElementById('btnRepeat')?.addEventListener('click', function() {
+  state.isRepeat = !state.isRepeat;
+  this.classList.toggle('on', state.isRepeat);
+  showToast(state.isRepeat ? 'Повтор включен' : 'Повтор выключен');
+});
+
+/* ============ ОЧЕРЕДЬ ============ */
+function addToQueue(track) {
+  state.queue.push(track);
+  updateQueueCount();
+  showToast(`Добавлено в очередь: ${track.title}`);
+}
+
+function updateQueueCount() {
+  document.getElementById('queueCount').textContent = state.queue.length;
+}
+
+function renderQueue() {
+  const listEl = document.getElementById('queueList');
+  if (!state.queue.length) {
+    listEl.innerHTML = '<div style="text-align:center; padding:60px 0; color:var(--ink-3);">Очередь пуста</div>';
+    return;
+  }
+
+  listEl.innerHTML = state.queue.map((t, idx) => `
+    <div class="queue-item ${t === state.currentTrack ? 'playing' : ''}" data-idx="${idx}">
+      <i data-lucide="grip-vertical" class="queue-drag-ic"></i>
+      <img src="${t.art}" class="result-thumb" style="width:40px; height:40px;" alt="">
+      <div class="result-info">
+        <div class="result-name">${t.title}</div>
+        <div class="result-artist">${t.artist}</div>
+      </div>
+      <span class="source-badge ${t.source}">${t.sourceName}</span>
+      <span class="result-dur">${fmtTime(t.duration)}</span>
+      <button class="icon-btn btn-del-queue" style="width:28px; height:28px;"><i data-lucide="trash"></i></button>
+    </div>
+  `).join('');
+
+  if (window.lucide) lucide.createIcons();
+
+  listEl.querySelectorAll('.queue-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-del-queue')) {
+        const idx = parseInt(el.dataset.idx, 10);
+        state.queue.splice(idx, 1);
+        updateQueueCount();
+        renderQueue();
+        return;
+      }
+      const idx = parseInt(el.dataset.idx, 10);
+      state.queueIndex = idx;
+      playTrack(state.queue[idx]);
+    });
+  });
+}
+
+function playNext() {
+  if (!state.queue.length) return;
+  if (state.isShuffle) {
+    state.queueIndex = Math.floor(Math.random() * state.queue.length);
+  } else {
+    state.queueIndex = (state.queueIndex + 1) % state.queue.length;
+  }
+  playTrack(state.queue[state.queueIndex]);
+}
+
+function playPrev() {
+  if (!state.queue.length) return;
+  state.queueIndex = (state.queueIndex - 1 + state.queue.length) % state.queue.length;
+  playTrack(state.queue[state.queueIndex]);
+}
+
+document.getElementById('btnClearQueue')?.addEventListener('click', () => {
+  state.queue = [];
+  updateQueueCount();
+  renderQueue();
+  showToast('Очередь очищена');
+});
+
+document.getElementById('btnAddMore')?.addEventListener('click', () => {
+  setScreen('search');
+});
+
+/* ============ РЕАЛЬНЫЕ МУЗЫКАЛЬНЫЕ API ============ */
+
+// 1. iTunes JSONP
+function searchItunes(query) {
+  return new Promise(resolve => {
+    const cbName = `_itunes_cb_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve([]);
+    }, 4000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(resp) {
+      cleanup();
+      if (!resp || !resp.results) return resolve([]);
+      const tracks = resp.results.map(r => ({
+        id: `itunes-${r.trackId}`,
+        title: r.trackName,
+        artist: r.artistName,
+        album: r.collectionName,
+        art: r.artworkUrl100?.replace('100x100bb', '400x400bb') || r.artworkUrl60 || '',
+        streamUrl: r.previewUrl,
+        duration: 30,
+        source: 'itunes',
+        sourceName: 'iTunes',
+        isFull: false
+      })).filter(t => t.streamUrl);
+      resolve(tracks);
+    };
+
+    script.src = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=15&callback=${cbName}`;
+    script.onerror = () => { cleanup(); resolve([]); };
+    document.head.appendChild(script);
+  });
+}
+
+// 2. Deezer JSONP
+function searchDeezer(query) {
+  return new Promise(resolve => {
+    const cbName = `_deezer_cb_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const script = document.createElement('script');
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve([]);
+    }, 4000);
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(resp) {
+      cleanup();
+      if (!resp || !resp.data) return resolve([]);
+      const tracks = resp.data.map(r => ({
+        id: `deezer-${r.id}`,
+        title: r.title,
+        artist: r.artist?.name || 'Неизвестный артист',
+        album: r.album?.title || '',
+        art: r.album?.cover_medium || r.album?.cover || '',
+        streamUrl: r.preview,
+        duration: 30,
+        source: 'deezer',
+        sourceName: 'Deezer',
+        isFull: false
+      })).filter(t => t.streamUrl);
+      resolve(tracks);
+    };
+
+    script.src = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=15&output=jsonp&callback=${cbName}`;
+    script.onerror = () => { cleanup(); resolve([]); };
+    document.head.appendChild(script);
+  });
+}
+
+// 3. Audius Fetch
+let audiusHost = 'https://api.audius.co';
+async function initAudiusHost() {
+  try {
+    const res = await fetch('https://api.audius.co');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.data && json.data.length) audiusHost = json.data[0];
+    }
+  } catch (e) {}
+}
+initAudiusHost();
+
+async function searchAudius(query) {
+  try {
+    const res = await fetch(`${audiusHost}/v1/tracks/search?query=${encodeURIComponent(query)}&app_name=aura`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    if (!json.data) return [];
+    return json.data.map(r => ({
+      id: `audius-${r.id}`,
+      title: r.title,
+      artist: r.user?.name || 'Audius Creator',
+      album: r.genre || 'Audius',
+      art: r.artwork?.['480x480'] || r.artwork?.['150x150'] || '',
+      streamUrl: `${audiusHost}/v1/tracks/${r.id}/stream?app_name=aura`,
+      duration: r.duration || 180,
+      source: 'audius',
+      sourceName: 'Audius',
+      isFull: true
+    }));
+  } catch (e) {
+    console.warn('Audius search error:', e);
+    return [];
+  }
+}
+
+// Объединение результатов и склеивание дубликатов
+function mergeAndDeduplicate(results) {
+  const map = new Map();
+  results.forEach(t => {
+    const key = `${t.artist.toLowerCase()} - ${t.title.toLowerCase()}`.replace(/[^a-z0-9а-я]/g, '');
+    if (!map.has(key)) {
+      map.set(key, t);
+    } else {
+      const existing = map.get(key);
+      // Предпочитать полный трек перед превью
+      if (!existing.isFull && t.isFull) {
+        map.set(key, t);
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
+function renderSearchResults(tracks) {
+  const container = document.getElementById('searchResults');
+  if (!tracks.length) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:60px 0; color:var(--ink-3);">
+        <i data-lucide="music" style="width:36px; height:36px; opacity:0.4; margin-bottom:12px;"></i>
+        <div>Ничего не найдено</div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = tracks.map((t, idx) => `
+    <div class="result-item" data-idx="${idx}">
+      <img src="${t.art || imgAsset('bg_13.jpg')}" class="result-thumb" alt="">
+      <div class="result-info">
+        <div class="result-name">${t.title}</div>
+        <div class="result-artist">${t.artist}</div>
+      </div>
+      <div class="result-badges">
+        <span class="source-badge ${t.source}">${t.sourceName}</span>
+        <span class="badge-type ${t.isFull ? 'full' : ''}">${t.isFull ? 'Полный трек' : 'Превью 30 с'}</span>
+      </div>
+      <span class="result-dur">${fmtTime(t.duration)}</span>
+    </div>
+  `).join('');
+
+  if (window.lucide) lucide.createIcons();
+
+  container.querySelectorAll('.result-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const chosen = tracks[idx];
+      addToQueue(chosen);
+      state.queueIndex = state.queue.length - 1;
+      playTrack(chosen);
+    });
+  });
+}
+
+/* ============ РАНЖИРОВАНИЕ РЕЗУЛЬТАТОВ ПОИСКА ============ */
+function scoreTrack(track, query) {
+  const q = (query || '').toLowerCase().trim();
+  const artist = (track.artist || '').toLowerCase().trim();
+  const title = (track.title || '').toLowerCase().trim();
+  const combined = `${artist} ${title}`;
+
+  let score = 0;
+
+  // Точные совпадения слов запроса
+  const qWords = q.split(/\s+/).filter(w => w.length > 1);
+  const allWordsMatch = qWords.length > 0 && qWords.every(w => combined.includes(w));
+  if (allWordsMatch) score += 6000;
+
+  // Очищенные строки от знаков препинания
+  const cleanTitle = title.replace(/[^a-z0-9а-я]/g, ' ').replace(/\s+/g, ' ').trim();
+  const cleanArtist = artist.replace(/[^a-z0-9а-я]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Если название песни совпадает с частью запроса
+  if (q.includes(cleanTitle) && cleanTitle.length >= 3) {
+    score += 5000;
+  }
+  // Если артист совпадает с частью запроса
+  if (q.includes(cleanArtist) && cleanArtist.length >= 3) {
+    score += 5000;
+  }
+  // Точное совпадение: название точно равно одному из слов запроса
+  if (qWords.includes(cleanTitle)) {
+    score += 3000;
+  }
+
+  // Штрафы за производные версии (каверы, ремиксы, гитарные версии и т.д.)
+  const penaltyWords = [
+    'remix', 'cover', 'fingerstyle', 'karaoke', 'tribute', 'instrumental',
+    'acoustic', 'live', 'slowed', 'reverb', 'sped up', 'edit', 'parody',
+    'piano version', 'synthesizer', 'guitar', 'mix', 'mashup', 'version'
+  ];
+  for (const pw of penaltyWords) {
+    if (title.includes(pw)) score -= 4000;
+    if (artist.includes(pw)) score -= 4000;
+  }
+
+  // При равенстве: полный трек выше превью
+  if (track.isFull) {
+    score += 200;
+  }
+
+  return score;
+}
+
+function rankTracks(tracks, query) {
+  return [...tracks].sort((a, b) => scoreTrack(b, query) - scoreTrack(a, query));
+}
+
+/* ============ ВЫПОЛНЕНИЕ ПОИСКА С ДЕБАУНСОМ ============ */
+let searchDebounceTimer = null;
+async function performSearch(query) {
+  const container = document.getElementById('searchResults');
+  if (!query || query.length < 2) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:60px 0; color:var(--ink-3);">
+        <i data-lucide="search" style="width:36px; height:36px; opacity:0.4; margin-bottom:12px;"></i>
+        <div>Введите запрос для поиска по открытым источникам</div>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="text-align:center; padding:60px 0; color:var(--ink-3);">
+      <i data-lucide="loader" style="width:36px; height:36px; animation:spin 1s linear infinite; margin-bottom:12px;"></i>
+      <div>Ищем по Audius, iTunes и Deezer...</div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  const promises = [];
+  const src = state.selectedSource;
+  if (src === 'all' || src === 'audius') promises.push(searchAudius(query));
+  if (src === 'all' || src === 'itunes') promises.push(searchItunes(query));
+  if (src === 'all' || src === 'deezer') promises.push(searchDeezer(query));
+
+  const allLists = await Promise.all(promises);
+  let flat = allLists.flat();
+
+  if (src === 'all') {
+    flat = mergeAndDeduplicate(flat);
+  }
+
+  flat = rankTracks(flat, query);
+
+  renderSearchResults(flat);
+}
+
+const searchInput = document.getElementById('searchInput');
+searchInput?.addEventListener('input', (e) => {
+  const val = e.target.value.trim();
+  document.getElementById('btnClearSearch').style.display = val ? 'block' : 'none';
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => performSearch(val), 300);
+});
+
+document.getElementById('btnClearSearch')?.addEventListener('click', () => {
+  searchInput.value = '';
+  document.getElementById('btnClearSearch').style.display = 'none';
+  performSearch('');
+});
+
+// Фильтр источников
+document.querySelectorAll('#chipsSource .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#chipsSource .chip').forEach(c => c.classList.remove('on'));
+    chip.classList.add('on');
+    state.selectedSource = chip.dataset.src;
+    if (searchInput.value.trim()) {
+      performSearch(searchInput.value.trim());
+    }
+  });
+});
+
+/* ============ ГОРЯЧИЕ КЛАВИШИ ============ */
+window.addEventListener('keydown', (e) => {
+  // Не перехватывать ввод в строке поиска
+  if (e.target.tagName === 'INPUT') {
+    if (e.key === 'Escape') {
+      searchInput.blur();
+      setScreen('now');
+    }
+    return;
+  }
+
+  if (e.key === '/') {
+    e.preventDefault();
+    setScreen('search');
+  } else if (e.code === 'Space') {
+    e.preventDefault();
+    togglePlay();
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    audio.currentTime = Math.max(0, audio.currentTime - 5);
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    audio.currentTime = Math.min(audio.duration || 9999, audio.currentTime + 5);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    if (state.currentScreen !== 'now') setScreen('now');
+  }
+});
+
+/* ============ РЕЖИМ МИНИ-ПЛЕЕРА (?mini=1) ============ */
+const urlParams = new URLSearchParams(window.location.search);
+const isMini = urlParams.get('mini') === '1' || urlParams.get('mini') === 'true';
+const isDemo = urlParams.get('demo') === '1' || urlParams.get('demo') === 'true';
+const initialScreen = urlParams.get('screen') || (isMini ? 'mini' : 'now');
+
+if (isMini) {
+  document.body.classList.add('mini-mode');
+}
+
+document.getElementById('btnToggleMini')?.addEventListener('click', () => {
+  document.body.classList.toggle('mini-mode');
+});
+
+/* ============ ДЕМО ТРЕК ДЛЯ КАДРОВ И ПЕРВОГО СТАРТА ============ */
+const ITUNES_BELIEVER_ART = 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/11/7a/b8/117ab805-6811-8929-18b9-0fad7baf0c25/17UMGIM98210.rgb.jpg/600x600bb.jpg';
+const ITUNES_BONES_ART = 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/33/87/c8/3387c827-adaa-681d-bd10-ce7d8e888b9c/22UMGIM21054.rgb.jpg/600x600bb.jpg';
+const ITUNES_LOFI_ART = 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/71/15/c5/7115c542-cf70-35f6-e2e9-d2131ff538a2/5055803554880.png/600x600bb.jpg';
+const ITUNES_CHILL_ART = 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/4e/69/8b/4e698ba6-a4b4-7683-b85e-faf04b317c72/5055803577049.png/600x600bb.jpg';
+
+const DEMO_BELIEVER = {
+  id: 'demo-believer',
+  title: 'Believer',
+  artist: 'Imagine Dragons',
+  album: 'Evolve',
+  art: ITUNES_BELIEVER_ART,
+  streamUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/37/2c/66/372c66d7-fc06-9e12-c242-70b86a073bb3/mzaf_650638531190566378.plus.aac.p.m4a',
+  duration: 204,
+  source: 'itunes',
+  sourceName: 'iTunes',
+  isFull: false
+};
+
+const DEMO_BONES = {
+  id: 'demo-bones',
+  title: 'Bones',
+  artist: 'Imagine Dragons',
+  album: 'Mercury - Acts 1 & 2',
+  art: ITUNES_BONES_ART,
+  streamUrl: '',
+  duration: 165,
+  source: 'deezer',
+  sourceName: 'Deezer',
+  isFull: false
+};
+
+const DEMO_LOFI = {
+  id: 'demo-lofi',
+  title: 'Stars In The Sky',
+  artist: 'Lofi Beats Co.',
+  album: 'Chillhop Vibes',
+  art: ITUNES_LOFI_ART,
+  streamUrl: '',
+  duration: 154,
+  source: 'audius',
+  sourceName: 'Audius',
+  isFull: true
+};
+
+const DEMO_SYNTH = {
+  id: 'demo-synth',
+  title: 'Neon Nights (Synthwave Mix)',
+  artist: 'Audius Collective',
+  album: 'Cyber Retro',
+  art: ITUNES_CHILL_ART,
+  streamUrl: '',
+  duration: 218,
+  source: 'audius',
+  sourceName: 'Audius',
+  isFull: true
+};
+
+// Загрузка трека по умолчанию
+state.queue = [DEMO_BELIEVER, DEMO_BONES, DEMO_LOFI, DEMO_SYNTH];
+state.queueIndex = 0;
+updateQueueCount();
+
+if (isDemo || !isMini) {
+  // Инициализация отображения Believer
+  state.currentTrack = DEMO_BELIEVER;
+  document.getElementById('nowTitle').textContent = DEMO_BELIEVER.title;
+  document.getElementById('nowArtist').textContent = DEMO_BELIEVER.artist;
+  document.getElementById('nowArt').src = DEMO_BELIEVER.art;
+  document.getElementById('bgBlurImg').src = DEMO_BELIEVER.art;
+
+  document.getElementById('miniTitle').textContent = DEMO_BELIEVER.title;
+  document.getElementById('miniArtist').textContent = DEMO_BELIEVER.artist;
+  document.getElementById('miniArt').src = DEMO_BELIEVER.art;
+
+  // Демо таймлайн
+  document.getElementById('timeFill').style.width = '6%';
+  document.getElementById('miniProgressFill').style.width = '6%';
+  document.getElementById('lblTimeCur').textContent = '0:10';
+  document.getElementById('lblTimeDur').textContent = '3:24';
+
+  // Синхронный текст Believer
+  state.lyrics = [
+    { time: 0, text: "First things first" },
+    { time: 3.2, text: "I'ma say all the words inside my head" },
+    { time: 7.1, text: "I'm fired up and tired of the way that things have been, oh-ooh" },
+    { time: 14.5, text: "The way that things have been, oh-ooh" },
+    { time: 18.2, text: "Second things second" },
+    { time: 21.0, text: "Don't you tell me what you think that I could be" },
+    { time: 25.1, text: "I'm the one at the sail, I'm the master of my sea, oh-ooh" },
+    { time: 32.4, text: "The master of my sea, oh-ooh" },
+    { time: 36.0, text: "I was broken from a young age" },
+    { time: 39.5, text: "Taking my sulking to the masses" },
+    { time: 43.2, text: "Writing my poems for the few" },
+    { time: 47.0, text: "That look at me, took to me, shook to me, feeling me" },
+    { time: 51.2, text: "Singing from heartache from the pain" },
+    { time: 55.4, text: "Taking my message from the veins" },
+    { time: 59.8, text: "Speaking my lesson from the brain" },
+    { time: 64.0, text: "Seeing the beauty through the..." },
+    { time: 68.0, text: "Pain! You made me a, you made me a believer, believer" },
+    { time: 76.5, text: "Pain! You break me down, you build me up, believer, believer" }
+  ];
+  state.activeLyricIdx = 2; // Активная строка прямо в центре экрана
+  renderLyrics();
+}
+
+if (initialScreen === 'search') {
+  setScreen('search');
+  document.getElementById('searchInput').value = 'Imagine Dragons Believer';
+  if (isDemo) {
+    renderSearchResults([
+      DEMO_BELIEVER,
+      DEMO_BONES,
+      {
+        id: 'audius-believer-remix',
+        title: 'Believer (Lofi Chill Remix)',
+        artist: 'Imagine Dragons ft. Lofi Chill',
+        album: 'Chill Sessions',
+        art: ITUNES_CHILL_ART,
+        streamUrl: '',
+        duration: 195,
+        source: 'audius',
+        sourceName: 'Audius',
+        isFull: true
+      },
+      DEMO_LOFI
+    ]);
+  } else {
+    performSearch('Imagine Dragons Believer');
+  }
+} else if (initialScreen === 'queue') {
+  setScreen('queue');
+} else if (initialScreen === 'mini') {
+  document.body.classList.add('mini-mode');
+} else {
+  setScreen('now');
+}
+</script>
+</body>
+</html>
