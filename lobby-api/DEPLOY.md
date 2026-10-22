@@ -35,7 +35,32 @@ vercel --prod
 
 ---
 
-## 3. Подключение в лаунчере
+## 3. Настройка YouTube Data API v3 для музыкального плеера
+
+Для работы серверного резолва треков (`/api/music/resolve`) и поиска (`/api/music/search`, `/api/music/list`) требуется ключ `YOUTUBE_API_KEY`.
+
+### Создание ключа в Google Cloud Console:
+1. Откройте [Google Cloud Console](https://console.cloud.google.com/).
+2. Создайте новый проект (или выберите существующий).
+3. Перейдите в раздел **APIs & Services → Library** (Библиотека API).
+4. Найдите **YouTube Data API v3** и нажмите **Enable** (Включить).
+5. Перейдите в раздел **APIs & Services → Credentials** (Учётные данные).
+6. Нажмите **+ Create Credentials → API key**.
+7. Нажмите **Edit API key** (Редактировать ключ) для безопасности:
+   - В блоке **API restrictions** выберите **Restrict key**.
+   - Отметьте только **YouTube Data API v3**.
+   - Сохраните изменения.
+
+### Добавление ключа в Vercel:
+- **Через веб-панель**: в настройках проекта Vercel: **Settings → Environment Variables** добавьте переменную с именем `YOUTUBE_API_KEY` и значением созданного ключа (для всех сред: Production, Preview, Development).
+- **Через CLI**:
+```bash
+vercel env add YOUTUBE_API_KEY production
+```
+
+---
+
+## 4. Подключение в лаунчере
 
 После успешного деплоя Vercel выдаст публичный URL (например, `https://aura-lobby-api.vercel.app`).
 
