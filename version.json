@@ -1,7 +1,7 @@
 {
-  "internalVersion": "1.2.147",
-  "userFacingVersion": "beta 1.0.139",
+  "internalVersion": "1.2.148",
+  "userFacingVersion": "beta 1.0.140",
   "changelog": [
-    "Выбор версии Minecraft (1.21.1 / 1.20.1) при создании облачного мира в WebUI. Раздельные серверы под каждую версию."
+    "Пресеты графики: прорисовка 6/8/8/10, Distant Horizons + LOD 128/256/512, «Слабый ПК» = Complementary LOW, «Высокий» = Noble, пак Punchy под 1.21.1, убран Transparent-GUI"
   ]
 }
