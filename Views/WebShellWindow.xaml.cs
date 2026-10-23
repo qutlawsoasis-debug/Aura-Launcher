@@ -60,6 +60,10 @@ public partial class WebShellWindow : Window
         IDiscordRpcService? discordRpcService = null)
     {
         InitializeComponent();
+        if (TryFindResource("BgBase") is System.Windows.Media.SolidColorBrush bgBrush)
+        {
+            WebViewControl.DefaultBackgroundColor = System.Drawing.Color.FromArgb(bgBrush.Color.A, bgBrush.Color.R, bgBrush.Color.G, bgBrush.Color.B);
+        }
         _gameSessionService = gameSessionService;
         _configService = configService;
         _presetService = presetService;

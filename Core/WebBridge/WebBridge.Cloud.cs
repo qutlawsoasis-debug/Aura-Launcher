@@ -61,12 +61,31 @@ public partial class WebBridge
         string? nick = ValidNickOrError(msg);
         if (nick == null) return;
 
-        var resp = await _cloudLobbyService!.GetWorldsAsync(nick);
+        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(8));
+        CloudWorldsResponse? resp;
+        try
+        {
+            resp = await _cloudLobbyService!.GetWorldsAsync(nick, cts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger($"[WEBBRIDGE] cloud.list failed: {ex.Message}");
+            SendError(msg.Id, msg.Name, "Сервер не отвечает");
+            return;
+        }
+
+        if (resp == null)
+        {
+            _logger("[WEBBRIDGE] cloud.list: GetWorldsAsync returned null (server unreachable)");
+            SendError(msg.Id, msg.Name, "Сервер не отвечает");
+            return;
+        }
+
         SendResponse(msg.Id, msg.Name, new
         {
-            maxActive = resp?.MaxActive ?? 0,
-            activeCount = resp?.ActiveCount ?? 0,
-            worlds = (resp?.Worlds ?? new()).Select(MapCloudWorld)
+            maxActive = resp.MaxActive,
+            activeCount = resp.ActiveCount,
+            worlds = (resp.Worlds ?? new()).Select(MapCloudWorld)
         });
     }
 

@@ -58,10 +58,47 @@
       return 'Спит';
     }
 
+    let hasLoadedOnce = false;
+
+    function renderSkeleton() {
+      list.innerHTML = `
+        <div class="cw skeleton">
+          <div class="cw-row">
+            <div class="cw-icon"></div>
+            <div class="cw-main">
+              <div class="sk-text"></div>
+              <div class="sk-sub"></div>
+            </div>
+            <div class="sk-btn"></div>
+          </div>
+        </div>
+        <div class="cw skeleton">
+          <div class="cw-row">
+            <div class="cw-icon"></div>
+            <div class="cw-main">
+              <div class="sk-text" style="width:110px"></div>
+              <div class="sk-sub" style="width:60px"></div>
+            </div>
+            <div class="sk-btn"></div>
+          </div>
+        </div>
+        <div class="cloud-loading"><span class="small dim">Загружаю миры…</span></div>`;
+    }
+
+    function renderError(message) {
+      list.innerHTML = `
+        <div class="cloud-error-box">
+          <div class="cloud-error-msg">${esc(message || 'Сервер не отвечает')}</div>
+          <button type="button" class="btn sm primary" id="btnCloudRetry">Повторить</button>
+        </div>`;
+      const retryBtn = document.getElementById('btnCloudRetry');
+      if (retryBtn) retryBtn.addEventListener('click', () => refresh(true));
+    }
+
     function render() {
       list.innerHTML = '';
       if (!worlds.length) {
-        list.innerHTML = '<div class="cloud-empty small dim">Миров пока нет — создайте первый или загрузите свой.</div>';
+        list.innerHTML = '<div class="cloud-empty small dim">У вас пока нет миров — создайте первый или загрузите свой.</div>';
         return;
       }
       worlds.forEach((w, i) => {
@@ -113,12 +150,17 @@
     }
 
     async function refresh(withFriends) {
+      if (!hasLoadedOnce || withFriends) {
+        renderSkeleton();
+      }
       try {
         if (withFriends) {
           const f = await send('friends.get').catch(() => null);
           friends = ((f && f.friends) || []).map(x => x.nick).filter(Boolean);
         }
-        const res = await send('cloud.list');
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Сервер не отвечает')), 8000));
+        const res = await Promise.race([send('cloud.list'), timeoutPromise]);
+        hasLoadedOnce = true;
         worlds = (res && res.worlds) || [];
         if (slots) slots.textContent = res && res.maxActive ? `Запущено ${res.activeCount} из ${res.maxActive}` : '';
         // Мир проснулся — подключаем, если игрок ждал
@@ -127,7 +169,8 @@
         render();
         ready.forEach(connect);
       } catch (err) {
-        list.innerHTML = `<div class="cloud-empty small dim">${esc(errText(err))}</div>`;
+        hasLoadedOnce = false;
+        renderError(errText(err));
       }
       schedule();
     }
