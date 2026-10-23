@@ -10,7 +10,7 @@ import handleMusicResolve from '../api/music/resolve.js';
 import handleMusicBlocked from '../api/music/blocked.js';
 import handleMusicSearch from '../api/music/search.js';
 import handleMusicList from '../api/music/list.js';
-import handleMusicSoundCloud from '../api/music/soundcloud.js';
+import handleEmbedPlayer from '../api/embed/player.js';
 import { generateLandingHtml } from './landing.js';
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -59,6 +59,9 @@ export const server = http.createServer(async (req, res) => {
     const pathname = parsedUrl.pathname || '';
     console.log(`[LOBBY-API] ${req.method} ${pathname}`);
     try {
+        if (pathname === '/embed/player.html' || pathname === '/api/embed/player') {
+            return handleEmbedPlayer(req, res);
+        }
         const store = getStore();
         // Task 34: Landing pages for /j/:code, /f/:code, and /api/landing rewrite
         if (req.method === 'GET' && (pathname.startsWith('/j/') || pathname.startsWith('/f/') || pathname === '/api/landing')) {
@@ -120,9 +123,6 @@ export const server = http.createServer(async (req, res) => {
         }
         if (pathname === '/api/music/search') {
             return await handleMusicSearch(req, res);
-        }
-        if (pathname === '/api/music/soundcloud') {
-            return await handleMusicSoundCloud(req, res);
         }
         if (pathname === '/api/music/list') {
             return await handleMusicList(req, res);

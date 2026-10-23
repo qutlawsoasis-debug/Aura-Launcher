@@ -1,4 +1,14 @@
 {
+  "headers": [
+    {
+      "source": "/embed/player.html",
+      "headers": [
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=300" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/api/lobby/join", "destination": "/api/join" },
     { "source": "/api/lobby/leave", "destination": "/api/leave" },
@@ -8,6 +18,7 @@
     { "source": "/api/lobby/close", "destination": "/api/close" },
     { "source": "/api/lobby/manifest", "destination": "/api/manifest" },
     { "source": "/api/lobby/kick", "destination": "/api/kick" },
+    { "source": "/embed/player.html", "destination": "/api/embed/player" },
     { "source": "/j/:code", "destination": "/api/landing?type=join&code=:code" },
     { "source": "/f/:code", "destination": "/api/landing?type=friend&code=:code" }
   ]
