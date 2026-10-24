@@ -175,7 +175,7 @@
         b.type = 'button';
         b.className = 'shot';
         b.style.setProperty('--i', Math.min(i, 12));
-        b.innerHTML = `<img loading="lazy" src="${esc(s.url)}" alt=""><span>${esc(s.date)}</span>`;
+        b.innerHTML = `<img loading="lazy" src="${esc(s.thumb || s.url)}" alt=""><span>${esc(s.date)}</span>`;
         b.addEventListener('click', () => openViewer(s));
         shotsGrid.appendChild(b);
       });

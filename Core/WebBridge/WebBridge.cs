@@ -30,6 +30,7 @@ public partial class WebBridge : IDisposable
     private readonly ICloudLobbyService? _cloudLobbyService;
     private readonly IAchievementService? _achievementService;
     private readonly IDiscordRpcService? _discordRpcService;
+    private readonly IPrewarmGameService? _prewarmService;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -53,6 +54,7 @@ public partial class WebBridge : IDisposable
         ICloudLobbyService? cloudLobbyService = null,
         IAchievementService? achievementService = null,
         IDiscordRpcService? discordRpcService = null,
+        IPrewarmGameService? prewarmService = null,
         Action<string>? logger = null)
     {
         _window = window;
@@ -65,6 +67,7 @@ public partial class WebBridge : IDisposable
         _skinService = skinService;
         _friendService = friendService;
         _reportService = reportService;
+        _prewarmService = prewarmService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
@@ -112,6 +115,9 @@ public partial class WebBridge : IDisposable
     {
         _coreWebView2 = coreWebView2;
         _coreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+        // Хосты скриншотов регистрируем сразу, до первых запросов превью из галереи
+        RegisterShotsHosts(ScreenshotsDir());
 
         // Отправка начального статуса окна
         SendWindowState();
@@ -591,6 +597,7 @@ public partial class WebBridge : IDisposable
             nickname = cfg.Nickname,
             ramMb = cfg.RamMb,
             hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
+            fastStartEnabled = cfg.FastStartEnabled,
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
             selectedVersion = normVer,
@@ -657,6 +664,29 @@ public partial class WebBridge : IDisposable
                 bool hideVal = valProp.GetBoolean();
                 await _configService.UpdateConfigAsync(c => c.HideLauncherWhilePlaying = hideVal);
                 _logger($"[WEBBRIDGE] config.set hideLauncherWhilePlaying -> {hideVal}");
+                break;
+            }
+
+            case "fastStartEnabled":
+            {
+                if (valProp.ValueKind != JsonValueKind.True && valProp.ValueKind != JsonValueKind.False)
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set fastStartEnabled rejected: not a bool");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                bool fastVal = valProp.GetBoolean();
+                await _configService.UpdateConfigAsync(c => c.FastStartEnabled = fastVal);
+                _logger($"[WEBBRIDGE] config.set fastStartEnabled -> {fastVal}");
+                if (!fastVal)
+                {
+                    _prewarmService?.StopPrewarm();
+                }
+                else
+                {
+                    _ = _prewarmService?.StartPrewarmAsync();
+                }
                 break;
             }
 
@@ -763,6 +793,11 @@ public partial class WebBridge : IDisposable
 
         string instanceDir = GetInstanceDir();
         var result = _presetService.ApplyPreset(instanceDir, presetKey, persistConfig: true);
+
+        if (result.Success && _prewarmService?.PrewarmedProcess != null)
+        {
+            _ = _prewarmService.RestartPrewarmAsync();
+        }
 
         _logger($"[WEBBRIDGE] preset.apply result: success={result.Success}, ram={result.FinalRamMb}, shader={result.ChosenShader}");
         SendResponse(msg.Id, msg.Name, result);
@@ -1347,6 +1382,7 @@ public partial class WebBridge : IDisposable
         }
         _gameLaunchCts?.Cancel();
         _gameLaunchCts?.Dispose();
+        _prewarmService?.StopPrewarm();
     }
 
     private void OnFriendsListUpdated(IReadOnlyList<FriendPresenceItem> friends)
@@ -1513,6 +1549,10 @@ public partial class WebBridge : IDisposable
         }
 
         await _configService.UpdateConfigAsync(c => c.SelectedVersion = ver);
+        if (_prewarmService?.PrewarmedProcess != null)
+        {
+            _ = _prewarmService.RestartPrewarmAsync();
+        }
         var cfg = _configService.CurrentConfig;
         string normVer = GameVersionProfiles.NormalizeVersion(cfg.SelectedVersion);
         _logger($"[WEBBRIDGE] game.setVersion -> {normVer}");
@@ -1522,6 +1562,7 @@ public partial class WebBridge : IDisposable
             nickname = cfg.Nickname,
             ramMb = cfg.RamMb,
             hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
+            fastStartEnabled = cfg.FastStartEnabled,
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
             selectedVersion = normVer,

@@ -18,6 +18,70 @@ namespace AuraLauncher.Core.WebBridge;
 public partial class WebBridge
 {
     private const string ShotsHost = "shots.aura.local";
+    private const string ShotsThumbsHost = "shots-thumbs.aura.local";
+    private const int ShotsThumbSize = 320;
+
+    private string ThumbsDir(string screenshotsDir)
+    {
+        string dir = Path.Combine(screenshotsDir, ".thumbs");
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private void RegisterShotsHosts(string screenshotsDir)
+    {
+        var core = _coreWebView2;
+        if (core == null) return;
+        string thumbs = ThumbsDir(screenshotsDir);
+        RunOnUi(() =>
+        {
+            core.SetVirtualHostNameToFolderMapping(ShotsHost, screenshotsDir, CoreWebView2HostResourceAccessKind.Allow);
+            core.SetVirtualHostNameToFolderMapping(ShotsThumbsHost, thumbs, CoreWebView2HostResourceAccessKind.Allow);
+        });
+    }
+
+    // Миниатюра 320px jpg в кэше .thumbs; имя включает время файла — при изменении png кэш инвалидируется
+    private string EnsureShotThumb(string pngPath, string thumbsDir)
+    {
+        var fi = new FileInfo(pngPath);
+        string baseName = Path.GetFileNameWithoutExtension(fi.Name);
+        string thumbName = $"{baseName}_{fi.LastWriteTimeUtc.Ticks}.jpg";
+        string thumbPath = Path.Combine(thumbsDir, thumbName);
+        if (File.Exists(thumbPath)) return thumbName;
+
+        var bmp = new BitmapImage();
+        bmp.BeginInit();
+        bmp.UriSource = new Uri(pngPath, UriKind.Absolute);
+        bmp.DecodePixelWidth = ShotsThumbSize;
+        bmp.CacheOption = BitmapCacheOption.OnLoad;
+        bmp.EndInit();
+        bmp.Freeze();
+
+        string tmpPath = thumbPath + ".tmp";
+        var encoder = new JpegBitmapEncoder { QualityLevel = 75 };
+        encoder.Frames.Add(BitmapFrame.Create(bmp));
+        using (var stream = File.Create(tmpPath))
+        {
+            encoder.Save(stream);
+        }
+        File.Move(tmpPath, thumbPath, true);
+        return thumbName;
+    }
+
+    private void PruneOldThumbs(string thumbsDir, System.Collections.Generic.HashSet<string> keepNames)
+    {
+        try
+        {
+            foreach (string file in Directory.GetFiles(thumbsDir, "*.jpg"))
+            {
+                if (!keepNames.Contains(Path.GetFileName(file)))
+                {
+                    try { File.Delete(file); } catch { }
+                }
+            }
+        }
+        catch { }
+    }
 
     private async Task<WorldSaveItem?> FindSaveAsync(BridgeMessage msg)
     {
@@ -195,17 +259,35 @@ public partial class WebBridge
         }
 
         string dir = ScreenshotsDir();
-        // Картинки отдаём напрямую: папка скриншотов подключается к WebView2 отдельным хостом
-        RunOnUi(() => _coreWebView2?.SetVirtualHostNameToFolderMapping(ShotsHost, dir, CoreWebView2HostResourceAccessKind.Allow));
+        // Полные png и миниатюры отдаются с виртуальных хостов WebView2;
+        // маппинг регистрируем и здесь, и при Attach, чтобы он не зависел от порядка вызовов
+        RegisterShotsHosts(dir);
 
         var shots = await _workshopService.GetScreenshotsAsync(GetInstanceDir());
         ReportAchievement("screenshots_count", shots.Count);
+
+        string thumbs = ThumbsDir(dir);
+        var thumbsByName = await Task.Run(() =>
+        {
+            var map = new System.Collections.Generic.Dictionary<string, string>();
+            foreach (var s in shots)
+            {
+                try { map[s.FileName] = EnsureShotThumb(s.FullPath, thumbs); }
+                catch (Exception ex) { _logger($"[WEBBRIDGE] shot thumb failed {s.FileName}: {ex.Message}"); }
+            }
+            return map;
+        });
+        PruneOldThumbs(thumbs, new System.Collections.Generic.HashSet<string>(thumbsByName.Values));
+
         SendResponse(msg.Id, msg.Name, new
         {
             shots = shots.OrderByDescending(s => s.CreatedDate).Select(s => new
             {
                 file = s.FileName,
                 url = $"https://{ShotsHost}/{Uri.EscapeDataString(s.FileName)}",
+                thumb = thumbsByName.TryGetValue(s.FileName, out string? t)
+                    ? $"https://{ShotsThumbsHost}/{Uri.EscapeDataString(t)}"
+                    : $"https://{ShotsHost}/{Uri.EscapeDataString(s.FileName)}",
                 date = s.DateFormatted,
                 size = s.SizeFormatted
             })

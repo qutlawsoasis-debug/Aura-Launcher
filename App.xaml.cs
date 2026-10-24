@@ -171,6 +171,7 @@ public partial class App : Application
         ConfigureServices(services, useFakeTunnel);
         Services = services.BuildServiceProvider();
         _ = Services.GetRequiredService<IConfigService>();
+        try { Services.GetRequiredService<WindowsMediaSessionService>().Start(); } catch { }
 
         // Логирование версии лаунчера при старте
         try
@@ -277,7 +278,8 @@ public partial class App : Application
                 Services.GetRequiredService<ILauncherUpdateService>(),
                 Services.GetRequiredService<ICloudLobbyService>(),
                 Services.GetRequiredService<IAchievementService>(),
-                Services.GetRequiredService<IDiscordRpcService>())
+                Services.GetRequiredService<IDiscordRpcService>(),
+                Services.GetRequiredService<IPrewarmGameService>())
             {
                 IsUpdatedRestart = isUpdatedRestart,
                 StartupProtocolUri = protocolArg
@@ -327,6 +329,14 @@ public partial class App : Application
         StartPipeServer(pipeName, activeWindow);
 
         MainWindow = activeWindow;
+        if (string.Equals(Environment.GetEnvironmentVariable("AURA_OFFSCREEN"), "1", StringComparison.Ordinal)
+            || Array.Exists(args, a => a.Equals("--offscreen", StringComparison.OrdinalIgnoreCase)))
+        {
+            activeWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+            activeWindow.Left = -32000;
+            activeWindow.Top = -32000;
+            activeWindow.ShowActivated = false;
+        }
         activeWindow.Opacity = 0.0;
         activeWindow.Show();
         ShutdownMode = ShutdownMode.OnMainWindowClose;
@@ -644,7 +654,16 @@ public partial class App : Application
         services.AddSingleton<ILauncherUpdateService, LauncherUpdateService>();
         services.AddSingleton<IPackUpdateService, PackUpdateService>();
         services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
-        services.AddSingleton<IGameSessionService, GameSessionService>();
+        services.AddSingleton<IPrewarmGameService, PrewarmGameService>();
+        services.AddSingleton<IGameSessionService>(sp => new GameSessionService(
+            sp.GetRequiredService<IGameLaunchService>(),
+            sp.GetRequiredService<IPackUpdateService>(),
+            sp.GetRequiredService<IServerListSyncService>(),
+            sp.GetRequiredService<ISkinService>(),
+            sp.GetRequiredService<IConfigService>(),
+            sp.GetService<IDiscordRpcService>(),
+            sp.GetService<IFriendService>(),
+            sp.GetRequiredService<IPrewarmGameService>()));
         services.AddSingleton<ISkinService, SkinService>();
         services.AddSingleton<IServerListSyncService, ServerListSyncService>();
         services.AddSingleton<IModManifestService, ModManifestService>();
@@ -685,6 +704,7 @@ public partial class App : Application
         services.AddSingleton<IScreenshotWatcherService, ScreenshotWatcherService>();
         services.AddSingleton<IReleaseNotesService, ReleaseNotesService>();
         services.AddSingleton<IGraphicsPresetService, GraphicsPresetService>();
+        services.AddSingleton<WindowsMediaSessionService>();
 
         // Регистрация ViewModels
         services.AddSingleton<OverviewViewModel>();
@@ -935,6 +955,13 @@ public partial class App : Application
             var anthemService = Services?.GetService<IAnthemService>();
             anthemService?.Stop();
             anthemService?.Dispose();
+        }
+        catch { }
+
+        try
+        {
+            var prewarmService = Services?.GetService<IPrewarmGameService>();
+            prewarmService?.StopPrewarm();
         }
         catch { }
 

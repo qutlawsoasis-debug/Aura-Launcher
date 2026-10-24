@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -149,6 +149,7 @@ public class WebBridgeTests
         Assert.False(root.GetProperty("hideLauncherWhilePlaying").GetBoolean());
         Assert.Equal("High", root.GetProperty("graphicsPreset").GetString());
         Assert.Equal("low", root.GetProperty("visualEffectsMode").GetString());
+        Assert.True(root.TryGetProperty("fastStartEnabled", out _));
     }
 
     [Fact]
@@ -178,6 +179,12 @@ public class WebBridgeTests
         Assert.NotNull(lastResponse);
         Assert.Null(lastResponse.Error);
         Assert.Equal("off", configService.CurrentConfig.VisualEffectsMode);
+
+        // fastStartEnabled
+        await bridge.ProcessRawMessageAsync("""{"id":"req_set_fast","type":"command","name":"config.set","payload":{"key":"fastStartEnabled","value":true}}""");
+        Assert.NotNull(lastResponse);
+        Assert.Null(lastResponse.Error);
+        Assert.True(configService.CurrentConfig.FastStartEnabled);
     }
 
     [Theory]

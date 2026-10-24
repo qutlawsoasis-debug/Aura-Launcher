@@ -17,6 +17,7 @@ public class GameSessionService : IGameSessionService
     private readonly IConfigService _configService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IFriendService? _friendService;
+    private readonly IPrewarmGameService? _prewarmService;
 
     private readonly object _stateLock = new();
     private GameSessionState _state = GameSessionState.Idle;
@@ -57,7 +58,8 @@ public class GameSessionService : IGameSessionService
         ISkinService skinService,
         IConfigService configService,
         IDiscordRpcService? discordRpcService = null,
-        IFriendService? friendService = null)
+        IFriendService? friendService = null,
+        IPrewarmGameService? prewarmService = null)
     {
         _launchService = launchService;
         _packUpdateService = packUpdateService;
@@ -66,6 +68,7 @@ public class GameSessionService : IGameSessionService
         _configService = configService;
         _discordRpcService = discordRpcService;
         _friendService = friendService;
+        _prewarmService = prewarmService;
     }
 
     public async Task<Process> LaunchAsync(
@@ -209,6 +212,64 @@ public class GameSessionService : IGameSessionService
                 });
             });
 
+            if (_prewarmService != null && _prewarmService.IsPrewarmedReady)
+            {
+                progress?.Report(new LaunchProgress
+                {
+                    Stage = "Мгновенный запуск...",
+                    Percentage = 90,
+                    DetailText = "Подключение к предзапущенной игре..."
+                });
+
+                var fastProcess = await _prewarmService.ActivateAsync(
+                    quickPlayMultiplayer: options?.QuickPlayMultiplayer,
+                    quickPlaySingleplayer: options?.QuickPlaySingleplayer);
+
+                if (fastProcess != null && !fastProcess.HasExited)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[FAST-START] Мгновенный запуск активирован! PID={fastProcess.Id}");
+                    _currentProcess = fastProcess;
+                    _gameSessionStartTime = DateTime.UtcNow;
+                    _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
+                    State = GameSessionState.Running;
+
+                    var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
+                    var gameLogPath = System.IO.Path.Combine(targetGameDir, "logs", "launcher-game.log");
+
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await fastProcess.WaitForExitAsync();
+                        }
+                        catch { }
+
+                        int exitCode = 0;
+                        try { exitCode = fastProcess.ExitCode; } catch { }
+                        HandleGameExited(exitCode, gameLogPath);
+                    });
+
+                    try
+                    {
+                        if (_friendService != null)
+                        {
+                            _friendService.IsGameRunning = true;
+                            _ = _friendService.SyncNowAsync();
+                        }
+                        GameStarted?.Invoke(this, fastProcess);
+                    }
+                    catch { }
+
+                    progress?.Report(new LaunchProgress
+                    {
+                        Stage = "В игре",
+                        Percentage = 100,
+                        DetailText = "В игре"
+                    });
+                    return fastProcess;
+                }
+            }
+
             _gameSessionStartTime = DateTime.UtcNow;
             _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
 
@@ -220,37 +281,7 @@ public class GameSessionService : IGameSessionService
                 },
                 onGameExited: (exitCode, logPath) =>
                 {
-                    _currentProcess = null;
-                    State = exitCode == 0 ? GameSessionState.Idle : GameSessionState.Failed;
-
-                    if (_gameSessionStartTime.HasValue)
-                    {
-                        var elapsed = DateTime.UtcNow - _gameSessionStartTime.Value;
-                        long addSec = (long)elapsed.TotalSeconds;
-                        if (addSec > 5)
-                        {
-                            _ = _configService.UpdateConfigAsync(c =>
-                            {
-                                c.TotalPlayTimeSeconds += addSec;
-                                c.TotalGameLaunches += 1;
-                                c.LastPlayedUtc = DateTime.UtcNow;
-                            });
-                        }
-                        _gameSessionStartTime = null;
-                    }
-
-                    try
-                    {
-                        if (_friendService != null)
-                        {
-                            _friendService.IsGameRunning = false;
-                            _ = _friendService.SyncNowAsync();
-                        }
-                        _discordRpcService?.SetInLauncher();
-                    }
-                    catch { }
-
-                    GameExited?.Invoke(this, new GameExitedEventArgs(exitCode, logPath));
+                    HandleGameExited(exitCode, logPath);
                 },
                 installProgress: installProgress,
                 cancellationToken: ct);
@@ -290,6 +321,41 @@ public class GameSessionService : IGameSessionService
                 _configService.CurrentConfig.QuickPlaySingleplayer = null;
             }
         }
+    }
+
+    private void HandleGameExited(int exitCode, string logPath)
+    {
+        _currentProcess = null;
+        State = exitCode == 0 ? GameSessionState.Idle : GameSessionState.Failed;
+
+        if (_gameSessionStartTime.HasValue)
+        {
+            var elapsed = DateTime.UtcNow - _gameSessionStartTime.Value;
+            long addSec = (long)elapsed.TotalSeconds;
+            if (addSec > 5)
+            {
+                _ = _configService.UpdateConfigAsync(c =>
+                {
+                    c.TotalPlayTimeSeconds += addSec;
+                    c.TotalGameLaunches += 1;
+                    c.LastPlayedUtc = DateTime.UtcNow;
+                });
+            }
+            _gameSessionStartTime = null;
+        }
+
+        try
+        {
+            if (_friendService != null)
+            {
+                _friendService.IsGameRunning = false;
+                _ = _friendService.SyncNowAsync();
+            }
+            _discordRpcService?.SetInLauncher();
+        }
+        catch { }
+
+        GameExited?.Invoke(this, new GameExitedEventArgs(exitCode, logPath));
     }
 
     public async Task<bool> StopAsync(int timeoutMs = 5000)

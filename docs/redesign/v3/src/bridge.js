@@ -567,7 +567,7 @@
   ];
 
   const mockShots = [1, 5, 9, 12, 3, 14].map((n, i) => ({
-    file: `2026-10-2${i}_18.0${i}.png`, url: `assets/images/bg_${n}.jpg`, date: `2${i}.10.2026 18:0${i}`, size: '2.4 МБ'
+    file: `2026-10-2${i}_18.0${i}.png`, url: `assets/images/bg_${n}.jpg`, thumb: `assets/images/bg_${n}.jpg`, date: `2${i}.10.2026 18:0${i}`, size: '2.4 МБ'
   }));
 
   function handleMockWorlds(name, p) {

@@ -1403,7 +1403,7 @@ public class FabricGameLaunchService : IGameLaunchService
             {
                 UserType = "legacy"
             },
-            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs)
+            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir)
         };
 
         LogGameLaunchEvent(targetInstanceDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
@@ -1658,13 +1658,28 @@ public class FabricGameLaunchService : IGameLaunchService
         }
     }
 
-    private static MArgument[] BuildJvmArguments(string? jvmArgs)
+    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir)
     {
         var list = new List<MArgument>
         {
             new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main "),
-            new MArgument("-XX:+UnlockExperimentalVMOptions")
+            new MArgument("-XX:+UnlockExperimentalVMOptions"),
+            new MArgument("-Dmodernfix.mixin.perf.dynamic_resources=true")
         };
+
+        try
+        {
+            string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
+            if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
+            {
+                list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
+            }
+            else
+            {
+                list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
+            }
+        }
+        catch { }
 
         if (!string.IsNullOrWhiteSpace(jvmArgs))
         {
@@ -1681,10 +1696,11 @@ public class FabricGameLaunchService : IGameLaunchService
         else
         {
             list.Add(new MArgument("-XX:+UseG1GC"));
-            list.Add(new MArgument("-XX:G1NewSizePercent=20"));
-            list.Add(new MArgument("-XX:G1ReservePercent=20"));
+            list.Add(new MArgument("-XX:+ParallelRefProcEnabled"));
+            list.Add(new MArgument("-XX:G1ReservePercent=15"));
+            list.Add(new MArgument("-XX:G1HeapRegionSize=32M"));
             list.Add(new MArgument("-XX:MaxGCPauseMillis=50"));
-            list.Add(new MArgument("-XX:G1HeapRegionSize=16M"));
+            list.Add(new MArgument("-XX:+AlwaysPreTouch"));
         }
 
         return list.ToArray();

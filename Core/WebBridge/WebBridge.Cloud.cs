@@ -157,6 +157,15 @@ public partial class WebBridge
 
         string address = $"{_cloudLobbyService!.ServerHost}:{world.Port.Value}";
         _logger($"[WEBBRIDGE] cloud.connect {world.Id} -> {address}");
+
+        if (!string.IsNullOrWhiteSpace(world.GameVersion) &&
+            !string.Equals(_configService.CurrentConfig.SelectedVersion, world.DisplayVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger($"[WEBBRIDGE] cloud.connect switching version {_configService.CurrentConfig.SelectedVersion} -> {world.DisplayVersion}");
+            _configService.CurrentConfig.SelectedVersion = world.DisplayVersion;
+            await _configService.SaveConfigAsync(_configService.CurrentConfig);
+        }
+
         SendResponse(msg.Id, msg.Name, new { accepted = true, address });
         StartGameLaunch(new LaunchOptions { QuickPlayMultiplayer = address });
     }

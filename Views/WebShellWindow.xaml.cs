@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
 using AuraLauncher.Core.WebBridge;
+using AuraLauncher.Services.Implementations;
 using AuraLauncher.Services.Interfaces;
 using Microsoft.Web.WebView2.Core;
 
@@ -25,6 +26,7 @@ public partial class WebShellWindow : Window
     private readonly ICloudLobbyService? _cloudLobbyService;
     private readonly IAchievementService? _achievementService;
     private readonly IDiscordRpcService? _discordRpcService;
+    private readonly IPrewarmGameService? _prewarmGameService;
     private WebBridge? _bridge;
 
     /// <summary>Лаунчер только что перезапущен после обновления — экран загрузки покажет «Что нового».</summary>
@@ -57,7 +59,8 @@ public partial class WebShellWindow : Window
         ILauncherUpdateService? launcherUpdateService = null,
         ICloudLobbyService? cloudLobbyService = null,
         IAchievementService? achievementService = null,
-        IDiscordRpcService? discordRpcService = null)
+        IDiscordRpcService? discordRpcService = null,
+        IPrewarmGameService? prewarmGameService = null)
     {
         InitializeComponent();
         if (TryFindResource("BgBase") is System.Windows.Media.SolidColorBrush bgBrush)
@@ -78,6 +81,7 @@ public partial class WebShellWindow : Window
         _cloudLobbyService = cloudLobbyService;
         _achievementService = achievementService;
         _discordRpcService = discordRpcService;
+        _prewarmGameService = prewarmGameService;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -98,7 +102,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService, _cloudLobbyService, _achievementService, _discordRpcService)
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService, _cloudLobbyService, _achievementService, _discordRpcService, _prewarmGameService)
             {
                 IsUpdatedRestart = IsUpdatedRestart
             };
@@ -106,6 +110,24 @@ public partial class WebShellWindow : Window
             if (!string.IsNullOrWhiteSpace(StartupProtocolUri)) _bridge.HandleProtocolUri(StartupProtocolUri);
 
             _friendService?.Start();
+
+            // Фоновый предзапуск игры при старте лаунчера, если включен Быстрый старт
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (_prewarmGameService != null && _configService.CurrentConfig.FastStartEnabled)
+                    {
+                        await _prewarmGameService.StartPrewarmAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[PREWARM: STARTUP ERROR] {ex.Message}");
+                }
+            });
+
+            RegisterVirtualHosts();
 
             string targetUrl = await ResolveTargetUrlAsync();
             WebViewControl.CoreWebView2.Navigate(targetUrl);
@@ -181,8 +203,47 @@ public partial class WebShellWindow : Window
         return Task.FromResult("about:blank");
     }
 
+    private void RegisterVirtualHosts()
+    {
+        string? uiFolder = ResolveUiFolder();
+        if (uiFolder != null)
+        {
+            WebViewControl.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "aura.local",
+                uiFolder,
+                CoreWebView2HostResourceAccessKind.Allow);
+        }
+
+        var cfg = _configService.CurrentConfig;
+        string instanceDir = _launchService != null
+            ? _launchService.ResolveInstanceDirectory(cfg.GameDir, cfg.SelectedVersion)
+            : (string.IsNullOrWhiteSpace(cfg.GameDir)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura")
+                : cfg.GameDir);
+
+        string screenshotsDir = Path.Combine(instanceDir, "screenshots");
+        try
+        {
+            Directory.CreateDirectory(screenshotsDir);
+            string thumbsDir = Path.Combine(screenshotsDir, ".thumbs");
+            Directory.CreateDirectory(thumbsDir);
+
+            WebViewControl.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "shots.aura.local",
+                screenshotsDir,
+                CoreWebView2HostResourceAccessKind.Allow);
+
+            WebViewControl.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                "shots-thumbs.aura.local",
+                thumbsDir,
+                CoreWebView2HostResourceAccessKind.Allow);
+        }
+        catch { }
+    }
+
     private void WebShellWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        _prewarmGameService?.StopPrewarm();
         _bridge?.Dispose();
     }
 }
