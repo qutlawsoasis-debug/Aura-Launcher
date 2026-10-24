@@ -1,8 +1,10 @@
 {
-  "internalVersion": "1.2.150",
-  "userFacingVersion": "beta 1.0.142",
-  "changelog": [
-    "Миры на сервере: скелетоны загрузки, обработка таймаута и ошибок с кнопкой Повторить",
-    "Устранение белой вспышки фона при старте WebView2"
-  ]
+    "internalVersion":  "1.2.151",
+    "userFacingVersion":  "beta 1.0.143",
+    "changelog":  [
+                      "Превью скриншотов в Мастерской",
+                      "Быстрый старт (Quick Play, MCEF, AppCDS)",
+                      "Поддержка системной медиасессии Windows (Aura Music)",
+                      "Offscreen-режим для фонового тестирования"
+                  ]
 }
