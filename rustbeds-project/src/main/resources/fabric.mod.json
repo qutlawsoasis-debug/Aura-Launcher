@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "rustbeds",
+  "version": "${version}",
+  "name": "Rust Beds",
+  "description": "Allows players to assign beds to friends like in Rust with GUI.",
+  "authors": [
+    "Aura"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.auramc.rustbeds.RustBedsMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": "${minecraftVersion}",
+    "java": ">=${javaVersion}",
+    "fabric-api": "*"
+  }
+}
