@@ -46,6 +46,7 @@ public interface IGameSessionService
     GameSessionState State { get; }
     bool IsGameRunning { get; }
     Process? CurrentProcess { get; }
+    string? RunningGameVersion { get; }
 
     event EventHandler<GameSessionState>? StateChanged;
     event EventHandler<string>? LogReceived;

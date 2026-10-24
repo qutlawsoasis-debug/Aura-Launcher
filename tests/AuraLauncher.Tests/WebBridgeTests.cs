@@ -85,6 +85,7 @@ public class WebBridgeTests
         public GameSessionState State { get; set; } = GameSessionState.Idle;
         public bool IsGameRunning => State == GameSessionState.Running;
         public System.Diagnostics.Process? CurrentProcess => null;
+        public string? RunningGameVersion => null;
 
         public event EventHandler<GameSessionState>? StateChanged;
         public event EventHandler<string>? LogReceived;

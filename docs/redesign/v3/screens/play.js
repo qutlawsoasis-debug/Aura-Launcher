@@ -85,7 +85,8 @@
         window.setIslandMode('running', false);
       }
       if (payload.notify && typeof window.showToast === 'function') {
-        window.showToast('Minecraft запущен (Fabric 1.20.1)', 'success');
+        const ver = payload.version ? ` (Fabric ${payload.version})` : '';
+        window.showToast(`Minecraft запущен${ver}`, 'success');
       }
     } else if (newState === 'idle') {
       updateAllPlayButtons();
@@ -117,7 +118,7 @@
       const state = (status.state || (status.isRunning ? 'running' : 'idle')).toLowerCase();
 
       if (state === 'running' || status.isRunning) {
-        setGameState('running', { notify: true });
+        setGameState('running', { notify: true, version: status.version });
       } else if (state === 'preparing' || state === 'launching' || status.isLaunching) {
         setGameState('launching');
       } else if (state === 'failed') {

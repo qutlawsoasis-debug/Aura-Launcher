@@ -129,6 +129,7 @@ public partial class WebBridge : IDisposable
         {
             state = MapState(_gameSessionService.State),
             isRunning = _gameSessionService.IsGameRunning,
+            version = _gameSessionService.RunningGameVersion,
             processId = _gameSessionService.CurrentProcess?.Id,
             exitCode = (int?)null
         });
@@ -151,6 +152,7 @@ public partial class WebBridge : IDisposable
         {
             state = MapState(state),
             isRunning = state == GameSessionState.Running,
+            version = _gameSessionService.RunningGameVersion,
             processId = _gameSessionService.CurrentProcess?.Id,
             exitCode = (int?)null
         });
@@ -165,6 +167,7 @@ public partial class WebBridge : IDisposable
         {
             state = e.ExitCode == 0 ? "idle" : "failed",
             isRunning = false,
+            version = (string?)null,
             processId = (int?)null,
             exitCode = e.ExitCode
         });
@@ -533,6 +536,7 @@ public partial class WebBridge : IDisposable
                 {
                     state = "failed",
                     isRunning = false,
+                    version = (string?)null,
                     processId = (int?)null,
                     exitCode = -1,
                     error = ex.Message

@@ -24,6 +24,7 @@ public class GameSessionService : IGameSessionService
     private Process? _currentProcess;
     private CancellationTokenSource? _activeCts;
     private DateTime? _gameSessionStartTime;
+    private string? _runningGameVersion;
 
     public GameSessionState State
     {
@@ -45,6 +46,18 @@ public class GameSessionService : IGameSessionService
     public bool IsGameRunning => State == GameSessionState.Running && _currentProcess != null && !_currentProcess.HasExited;
 
     public Process? CurrentProcess => _currentProcess;
+
+    public string? RunningGameVersion
+    {
+        get
+        {
+            lock (_stateLock) return _runningGameVersion;
+        }
+        private set
+        {
+            lock (_stateLock) _runningGameVersion = value;
+        }
+    }
 
     public event EventHandler<GameSessionState>? StateChanged;
     public event EventHandler<string>? LogReceived;
@@ -92,7 +105,9 @@ public class GameSessionService : IGameSessionService
 
         try
         {
-            var config = _configService.CurrentConfig;
+            var config = _configService.CurrentConfig.Clone();
+            var sessionVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
+            config.SelectedVersion = sessionVersion;
 
             // 0. Валидация никнейма
             var nickVal = NicknameValidator.Validate(config.Nickname);
@@ -230,7 +245,8 @@ public class GameSessionService : IGameSessionService
                     FabricGameLaunchService.LogLauncherEvent($"[FAST-START] Мгновенный запуск активирован! PID={fastProcess.Id}");
                     _currentProcess = fastProcess;
                     _gameSessionStartTime = DateTime.UtcNow;
-                    _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
+                    RunningGameVersion = sessionVersion;
+                    _discordRpcService?.SetPlayingGame($"Aura Pack ({sessionVersion})", _gameSessionStartTime, sessionVersion);
                     State = GameSessionState.Running;
 
                     var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
@@ -271,7 +287,8 @@ public class GameSessionService : IGameSessionService
             }
 
             _gameSessionStartTime = DateTime.UtcNow;
-            _discordRpcService?.SetPlayingGame($"Aura Pack ({config.SelectedVersion})", _gameSessionStartTime);
+            RunningGameVersion = sessionVersion;
+            _discordRpcService?.SetPlayingGame($"Aura Pack ({sessionVersion})", _gameSessionStartTime, sessionVersion);
 
             var process = await _launchService.LaunchGameAsync(
                 config,
@@ -296,7 +313,7 @@ public class GameSessionService : IGameSessionService
                     _friendService.IsGameRunning = true;
                     _ = _friendService.SyncNowAsync();
                 }
-                _discordRpcService?.SetPlayingGame(startTime: DateTime.UtcNow);
+                _discordRpcService?.SetPlayingGame(startTime: DateTime.UtcNow, gameVersion: sessionVersion);
                 GameStarted?.Invoke(this, process);
             }
             catch { }
@@ -305,11 +322,13 @@ public class GameSessionService : IGameSessionService
         }
         catch (OperationCanceledException)
         {
+            RunningGameVersion = null;
             State = GameSessionState.Idle;
             throw;
         }
         catch (Exception)
         {
+            RunningGameVersion = null;
             State = GameSessionState.Failed;
             throw;
         }
@@ -326,6 +345,7 @@ public class GameSessionService : IGameSessionService
     private void HandleGameExited(int exitCode, string logPath)
     {
         _currentProcess = null;
+        RunningGameVersion = null;
         State = exitCode == 0 ? GameSessionState.Idle : GameSessionState.Failed;
 
         if (_gameSessionStartTime.HasValue)

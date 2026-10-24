@@ -58,4 +58,9 @@ public class LauncherConfig
     public bool ShareWorldsWithFriends { get; set; } = true;
     public System.Collections.Generic.List<string> HiddenWorldFolderNames { get; set; } = new();
     public System.Collections.Generic.List<string>? SharedWorldFolderNames { get; set; }
+
+    public LauncherConfig Clone()
+    {
+        return (LauncherConfig)this.MemberwiseClone();
+    }
 }

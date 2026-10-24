@@ -26,7 +26,7 @@ public partial class WebBridge
         {
             if (_gameSessionService.IsGameRunning)
             {
-                _discordRpcService.SetPlayingGame();
+                _discordRpcService.SetPlayingGame(gameVersion: _gameSessionService.RunningGameVersion);
             }
             else if (_lobbySession != null && _lobbySession.Role != LobbySessionRole.None && _lobbySession.Players.Count > 0)
             {

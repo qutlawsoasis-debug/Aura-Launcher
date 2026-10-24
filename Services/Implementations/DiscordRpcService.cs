@@ -62,11 +62,13 @@ public class DiscordRpcService : IDiscordRpcService
     private string? _lobbyHostName;
     private string? _lobbyCode;
     private string? _playingWorldName;
+    private string? _playingGameVersion;
 
     public void SetInLauncher()
     {
         _currentActivity = "launcher";
         _gameStartTime = null;
+        _playingGameVersion = null;
         ApplyCurrentPresence();
     }
 
@@ -77,14 +79,19 @@ public class DiscordRpcService : IDiscordRpcService
         _lobbyHostName = hostName;
         _lobbyCode = lobbyCode;
         _gameStartTime = null;
+        _playingGameVersion = null;
         ApplyCurrentPresence();
     }
 
-    public void SetPlayingGame(string? worldName = null, DateTime? startTime = null)
+    public void SetPlayingGame(string? worldName = null, DateTime? startTime = null, string? gameVersion = null)
     {
         _currentActivity = "playing";
         _playingWorldName = worldName;
         _gameStartTime = startTime ?? _gameStartTime ?? DateTime.UtcNow;
+        if (!string.IsNullOrWhiteSpace(gameVersion))
+        {
+            _playingGameVersion = gameVersion;
+        }
         ApplyCurrentPresence();
     }
 
@@ -126,11 +133,18 @@ public class DiscordRpcService : IDiscordRpcService
                     }
                     catch { }
 
+                    string defaultDetails = !string.IsNullOrWhiteSpace(_playingGameVersion)
+                        ? $"В мире Minecraft ({_playingGameVersion})"
+                        : "В мире Minecraft";
+                    string smallText = !string.IsNullOrWhiteSpace(_playingGameVersion)
+                        ? $"Minecraft {_playingGameVersion}"
+                        : "Minecraft";
+
                     presence = new RichPresence
                     {
                         Details = !string.IsNullOrWhiteSpace(_playingWorldName)
                             ? $"В мире: {_playingWorldName}"
-                            : "В мире Minecraft (Fabric 1.20.1)",
+                            : defaultDetails,
                         State = gameState,
                         Timestamps = new Timestamps { Start = _gameStartTime ?? DateTime.UtcNow },
                         Assets = new Assets
@@ -138,7 +152,7 @@ public class DiscordRpcService : IDiscordRpcService
                             LargeImageKey = "aura_logo",
                             LargeImageText = "Aura Launcher",
                             SmallImageKey = "minecraft",
-                            SmallImageText = "Minecraft 1.20.1"
+                            SmallImageText = smallText
                         },
                         Buttons = buttons
                     };

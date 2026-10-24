@@ -193,4 +193,123 @@ public class MultiVersionAndInstanceIsolationTests : IDisposable
         var result = await service.CheckAndApplyAsync();
         Assert.NotEqual("Сборка для другой версии Minecraft", result.Message);
     }
+
+    private class MockDiscordRpcService : IDiscordRpcService
+    {
+        public string? LastWorldName { get; private set; }
+        public DateTime? LastStartTime { get; private set; }
+        public string? LastGameVersion { get; private set; }
+        public bool InLauncher { get; private set; }
+
+        public void Initialize() { }
+        public void SetInLauncher() => InLauncher = true;
+        public void SetInLobby(int playerCount, string? hostName = null, string? lobbyCode = null) { }
+        public void SetPlayingGame(string? worldName = null, DateTime? startTime = null, string? gameVersion = null)
+        {
+            LastWorldName = worldName;
+            LastStartTime = startTime;
+            LastGameVersion = gameVersion;
+            InLauncher = false;
+        }
+        public void UpdateSettings() { }
+        public void Dispose() { }
+    }
+
+    private class MockGameLaunchService : IGameLaunchService
+    {
+        public LauncherConfig? CapturedConfig { get; private set; }
+        public bool IsGameRunning => false;
+        public System.Diagnostics.Process? CurrentGameProcess => null;
+        public event EventHandler<int>? GameExited;
+
+        public string ResolveMinecraftDirectory(string? customPath = null) => customPath ?? "C:\\aura";
+        public string ResolveInstanceDirectory(string? customPath = null, string? version = null) =>
+            Path.Combine(customPath ?? "C:\\aura", "instances", version ?? "1.20.1");
+        public string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17) => "javaw.exe";
+        public bool CheckEnvironmentInstalled(string gameDir, string? version = null) => true;
+        public System.Diagnostics.Process? FindRunningGameProcess(string gameDir) => null;
+        public Task<bool> StopGameProcessAsync(int timeoutMs = 6000) => Task.FromResult(true);
+
+        public Task EnsureInstalledAsync(
+            string gameDir,
+            IProgress<InstallProgressReport>? progress = null,
+            Action<string>? onLogReceived = null,
+            CancellationToken cancellationToken = default,
+            string? version = null) => Task.CompletedTask;
+
+        public Task<System.Diagnostics.Process> LaunchGameAsync(
+            LauncherConfig config,
+            Action<string>? onLogReceived = null,
+            Action<int, string>? onGameExited = null,
+            IProgress<InstallProgressReport>? installProgress = null,
+            CancellationToken cancellationToken = default)
+        {
+            CapturedConfig = config;
+            return Task.FromResult<System.Diagnostics.Process>(null!);
+        }
+    }
+
+    private class MockPackUpdateService : IPackUpdateService
+    {
+        public Task<PackUpdateResult> CheckAndApplyAsync(IProgress<DownloadProgressReport>? progress = null, CancellationToken ct = default, bool forceFullCheck = false)
+        {
+            return Task.FromResult(new PackUpdateResult(PackUpdateStatus.UpToDate, "Сборка актуальна"));
+        }
+    }
+
+    private class MockServerListSyncService : IServerListSyncService
+    {
+        public Task SyncServersAsync(string gameDir, IReadOnlyList<ManifestServerEntry>? manifestServers, string? customStateFilePath = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task UpsertActiveLobbyServerAsync(string gameDir, string tunnelAddress, string? hostName = null, string? lobbyCode = null, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task RemoveActiveLobbyServerAsync(string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private class MockSkinService : ISkinService
+    {
+        public SkinValidationResult ValidateSkinFile(string? filePath) => new(true);
+        public System.Windows.Media.ImageSource LoadSkinImage(string? skinPath) => null!;
+        public System.Windows.Media.ImageSource ExtractHeadAvatar(string? skinPath) => null!;
+        public System.Windows.Media.ImageSource ExtractFrontSkinPreview(string? skinPath) => null!;
+        public System.Windows.Media.ImageSource ExtractBackSkinPreview(string? skinPath) => null!;
+        public Task SyncSkinToGameAsync(string? skinPath, string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<SkinUploadResult> UploadSkinToLobbyApiAsync(string? skinPath, string nickname, string model, string? ownerToken, string? baseUrl = null, CancellationToken cancellationToken = default) => Task.FromResult(new SkinUploadResult(true));
+        public Task<System.Windows.Media.ImageSource> GetAvatarForPlayerAsync(string nickname, CancellationToken cancellationToken = default) => Task.FromResult<System.Windows.Media.ImageSource>(null!);
+        public Task<(System.Windows.Media.ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default) => Task.FromResult<(System.Windows.Media.ImageSource, bool)>((null!, false));
+        public void EnsureCustomSkinLoaderConfig(string gameDir) { }
+        public void ClearCustomSkinLoaderCache(string gameDir) { }
+    }
+
+    [Fact]
+    public async Task GameSessionService_SnapshotsVersion_ImmuneToLaterConfigMutation()
+    {
+        var config = new LauncherConfig
+        {
+            GameDir = _testRoot,
+            Nickname = "TestUser",
+            SelectedVersion = "1.21.1"
+        };
+        var configService = new InMemoryConfigService(config);
+        var launchService = new MockGameLaunchService();
+        var discordRpc = new MockDiscordRpcService();
+        var sessionService = new GameSessionService(
+            launchService,
+            new MockPackUpdateService(),
+            new MockServerListSyncService(),
+            new MockSkinService(),
+            configService,
+            discordRpc);
+
+        // Mutating config right before or during launch
+        var launchTask = sessionService.LaunchAsync();
+        // User changes version in UI while launch is in flight:
+        config.SelectedVersion = "1.20.1";
+
+        await launchTask;
+
+        Assert.Equal("1.21.1", sessionService.RunningGameVersion);
+        Assert.Equal("1.21.1", discordRpc.LastGameVersion);
+        Assert.NotNull(launchService.CapturedConfig);
+        Assert.Equal("1.21.1", launchService.CapturedConfig.SelectedVersion);
+    }
 }
