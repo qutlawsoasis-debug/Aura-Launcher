@@ -28,8 +28,6 @@ public class LauncherConfig
     public string SkinModel { get; set; } = "default";
     public int AnthemVolume { get; set; } = 100;
     public bool AnthemMuted { get; set; } = false;
-    public string? AnthemCustomPath { get; set; }
-    public bool MusicOnStartup { get; set; } = true;
     public bool HideLauncherWhilePlaying { get; set; } = true;
     public string? UserId { get; set; }
     public string? UserTokenEncrypted { get; set; }
@@ -41,7 +39,7 @@ public class LauncherConfig
     public long TotalPlayTimeSeconds { get; set; } = 0;
     public int TotalGameLaunches { get; set; } = 0;
     public DateTime? LastPlayedUtc { get; set; }
-    public string CurrentMusicTrack { get; set; } = "Aura Theme";
+    public string CurrentMusicTrack { get; set; } = "";
     public string StartMode { get; set; } = "Maximized";
     public bool AutoRotateBackgrounds { get; set; } = true;
     public string GraphicsPreset { get; set; } = "Medium";

@@ -34,16 +34,7 @@ window.AURA_DEMO_DATA = (function () {
       defaultGamePath: '%APPDATA%\\.aura'
     },
 
-    // 3. Музыкальный трек (по v2)
-    audio: {
-      title: 'Aura',
-      artist: 'zxcursed',
-      duration: '2:38',
-      src: 'assets/audio/anthem.mp3',
-      cover: 'assets/audio/artist.jpg'
-    },
-
-    // 4. Сетевое лобби (Playit P2P)
+    // 3. Сетевое лобби (Playit P2P)
     lobby: {
       code: 'AURA-7731-PLAY',     // Формат реального лобби AURA-XXXX-XXXX
       region: 'EU Anycast',
@@ -51,7 +42,7 @@ window.AURA_DEMO_DATA = (function () {
       maxSlots: 8
     },
 
-    // 5. Демонстрационный список друзей (соответствует IFriendService)
+    // 4. Демонстрационный список друзей (соответствует IFriendService)
     // DEMO: mock data for prototype rendering
     friends: [
       {
@@ -101,7 +92,7 @@ window.AURA_DEMO_DATA = (function () {
       }
     ],
 
-    // 6. Входящие запросы в друзья
+    // 5. Входящие запросы в друзья
     // DEMO: mock friend requests
     incomingRequests: [
       {
@@ -120,7 +111,7 @@ window.AURA_DEMO_DATA = (function () {
       }
     ],
 
-    // 7. Реальные обновления лаунчера (вместо выдуманных рейдов)
+    // 6. Реальные обновления лаунчера (вместо выдуманных рейдов)
     updates: [
       {
         id: 'upd-1',

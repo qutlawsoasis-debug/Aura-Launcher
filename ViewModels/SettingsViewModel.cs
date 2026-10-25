@@ -394,20 +394,6 @@ public class SettingsViewModel : ObservableObject
         }
     }
 
-    public bool MusicOnStartup
-    {
-        get => _configService.CurrentConfig.MusicOnStartup;
-        set
-        {
-            if (_configService.CurrentConfig.MusicOnStartup != value)
-            {
-                _configService.CurrentConfig.MusicOnStartup = value;
-                OnPropertyChanged();
-                _ = SaveImmediatelyAsync();
-            }
-        }
-    }
-
     public bool AutoConnectOnInviteAccept
     {
         get => _configService.CurrentConfig.AutoConnectOnInviteAccept;

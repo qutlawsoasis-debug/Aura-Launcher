@@ -711,8 +711,8 @@ public class MainViewModel : ObservableObject
     public string MaximizeRestoreToolTip => IsWindowMaximized ? "Оконный режим" : "Во весь экран";
 
     public IAnthemService? AnthemService { get; }
-    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "zxcursed · Aura";
-    public string CurrentTrackDisplayName => (AnthemService?.CurrentTrackTitle ?? "ZXCURSED — AURA").ToUpperInvariant().Replace("·", "—");
+    public string CurrentTrackTitle => AnthemService?.CurrentTrackTitle ?? "";
+    public string CurrentTrackDisplayName => (AnthemService?.CurrentTrackTitle ?? "").ToUpperInvariant().Replace("·", "—");
     public bool IsMusicWidgetVisible => AnthemService != null && AnthemService.IsAvailable && !string.IsNullOrWhiteSpace(CurrentTrackTitle);
     public double PlaybackProgress => AnthemService?.PlaybackProgress ?? 0.0;
 
@@ -725,7 +725,7 @@ public class MainViewModel : ObservableObject
             var title = CurrentTrackTitle;
             if (title.Contains("·")) return title.Split('·')[0].Trim();
             if (title.Contains("-")) return title.Split('-')[0].Trim();
-            return "zxcursed";
+            return "";
         }
     }
 
@@ -741,7 +741,7 @@ public class MainViewModel : ObservableObject
     }
 
     public TimeSpan CurrentPosition => AnthemService?.CurrentPosition ?? TimeSpan.Zero;
-    public TimeSpan TotalDuration => AnthemService?.TotalDuration ?? TimeSpan.FromSeconds(76);
+    public TimeSpan TotalDuration => AnthemService?.TotalDuration ?? TimeSpan.Zero;
     public string CurrentPositionFormatted
     {
         get
@@ -755,7 +755,7 @@ public class MainViewModel : ObservableObject
         get
         {
             var dur = TotalDuration;
-            if (dur == TimeSpan.Zero) dur = TimeSpan.FromSeconds(76);
+            if (dur == TimeSpan.Zero) return "0:00";
             return $"{dur.Minutes}:{dur.Seconds:D2}";
         }
     }

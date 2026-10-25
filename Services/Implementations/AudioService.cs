@@ -88,7 +88,6 @@ public sealed class AudioService : IAudioService
         _isMuted = _configService.CurrentConfig.AnthemMuted;
 
         _player = new MediaPlayer();
-        _player.Volume = 0.0;
         _player.MediaOpened += OnPlayerMediaOpened;
         _player.MediaEnded += OnPlayerMediaEnded;
         _player.MediaFailed += OnPlayerMediaFailed;
@@ -114,9 +113,11 @@ public sealed class AudioService : IAudioService
 
         LoadPlaylist();
 
+        // Автозапуск музыки удалён: трек лишь выбирается в плеере,
+        // воспроизведение начинается только по явному действию пользователя.
+
         if (_playlist.Count > 0)
         {
-            // Restore last active track if saved in config
             string savedTitle = _configService.CurrentConfig.CurrentMusicTrack;
             if (!string.IsNullOrWhiteSpace(savedTitle))
             {
@@ -124,22 +125,7 @@ public sealed class AudioService : IAudioService
                 if (idx >= 0) _currentTrackIndex = idx;
             }
 
-            bool isTestMode = Program.StartupArgs.Any(a => a.StartsWith("--selftest", StringComparison.OrdinalIgnoreCase)
-                                                        || a.StartsWith("--fake-update", StringComparison.OrdinalIgnoreCase));
-            bool isUpdateRestart = Program.StartupArgs.Any(a => a.Equals("--update-restart", StringComparison.OrdinalIgnoreCase));
-
-            bool shouldPlay = _configService.CurrentConfig.MusicOnStartup && !_isMuted && _volumePercent > 0 && !isTestMode && !isUpdateRestart;
-            PrepareTrack(_currentTrackIndex, autoOpen: shouldPlay);
-
-            if (shouldPlay)
-            {
-                Play();
-            }
-            else
-            {
-                _player.Volume = 0.0;
-                _player.Stop();
-            }
+            PrepareTrack(_currentTrackIndex, autoOpen: false);
         }
     }
 
@@ -155,13 +141,6 @@ public sealed class AudioService : IAudioService
             if (!Directory.Exists(musicDir))
             {
                 Directory.CreateDirectory(musicDir);
-            }
-
-            // If empty, seed default track and cover from launcher assets
-            var existingFiles = Directory.GetFiles(musicDir);
-            if (existingFiles.Length == 0)
-            {
-                SeedDefaultTrack(musicDir);
             }
 
             var audioFiles = Directory.GetFiles(musicDir)
@@ -180,43 +159,7 @@ public sealed class AudioService : IAudioService
             FabricGameLaunchService.LogLauncherEvent($"[AUDIO-SERVICE: ERROR] Failed to load playlist: {ex.Message}");
         }
 
-        if (_playlist.Count == 0)
-        {
-            // Check bundled fallback if folder is still empty
-            string fallbackMp3 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Audio", "anthem.mp3");
-            if (File.Exists(fallbackMp3))
-            {
-                string? fallbackCover = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Audio", "artist.jpg");
-                _playlist.Add(new AudioTrack("Aura", "zxcursed", fallbackMp3, File.Exists(fallbackCover) ? fallbackCover : null));
-            }
-        }
-
         TrackChanged?.Invoke(this, CurrentTrack);
-    }
-
-    private void SeedDefaultTrack(string targetDir)
-    {
-        try
-        {
-            string sourceMp3 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Audio", "anthem.mp3");
-            string sourceCover = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Audio", "artist.jpg");
-
-            string destMp3 = Path.Combine(targetDir, "zxcursed - Aura.mp3");
-            string destCover = Path.Combine(targetDir, "zxcursed - Aura.jpg");
-
-            if (File.Exists(sourceMp3) && !File.Exists(destMp3))
-            {
-                File.Copy(sourceMp3, destMp3, overwrite: true);
-            }
-            if (File.Exists(sourceCover) && !File.Exists(destCover))
-            {
-                File.Copy(sourceCover, destCover, overwrite: true);
-            }
-        }
-        catch (Exception ex)
-        {
-            FabricGameLaunchService.LogLauncherEvent($"[AUDIO-SERVICE] SeedDefaultTrack failed: {ex.Message}");
-        }
     }
 
     private AudioTrack ParseTrack(string filePath, string dir)

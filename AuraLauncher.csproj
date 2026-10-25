@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Resources\aura-icon.ico</ApplicationIcon>
-    <Version>1.2.152</Version>
+    <Version>1.2.153</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;spikes\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -27,8 +27,6 @@
     <Resource Include="Resources\Fonts\Manrope-*.ttf" />
     <Resource Include="Resources\Fonts\Oswald.ttf" />
     <Resource Include="Resources\Fonts\Onest.ttf" />
-    <Resource Include="Resources\Audio\anthem.mp3" />
-    <Resource Include="Resources\Audio\artist.jpg" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,15 +42,6 @@
     <None Update="version.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <Content Include="Resources\Audio\anthem.mp3">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-    </Content>
-    <Content Include="Resources\Audio\artist.jpg">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </Content>
     <Content Include="Data\achievements.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
