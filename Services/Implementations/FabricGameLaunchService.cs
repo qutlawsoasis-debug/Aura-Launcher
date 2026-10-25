@@ -1522,7 +1522,41 @@ public class FabricGameLaunchService : IGameLaunchService
         Directory.CreateDirectory(logsDir);
         var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
 
-        var gameLogWriter = new StreamWriter(new FileStream(gameLogPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+        // Ротация вместо стирания: вывод Java прошлой попытки — улика сбоя и не должна
+        // уничтожаться следующим запуском. Имя архива уникально (stamp + ticks): повторный
+        // запуск в ту же секунду не должен приводить к пропуску ротации, а Move без
+        // overwrite-режима не перезапишет уже существующий архив.
+        try
+        {
+            if (File.Exists(gameLogPath))
+            {
+                string stamp = File.GetLastWriteTime(gameLogPath).ToString("yyyyMMdd-HHmmss");
+                string archivePath = Path.Combine(logsDir, $"launcher-game-{stamp}-{DateTime.UtcNow.Ticks:x8}.log");
+                File.Move(gameLogPath, archivePath);
+
+                // Чистим только собственные архивы ротации (launcher-game-*.log), держим последние 5
+                var archives = new DirectoryInfo(logsDir)
+                    .GetFiles("launcher-game-*.log")
+                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                    .ToList();
+                foreach (var extra in archives.Skip(5))
+                {
+                    try { extra.Delete(); } catch { }
+                }
+            }
+        }
+        catch { }
+
+        // Ротация не удалась (файл занят сторонним процессом) — не открываем launcher-game.log
+        // на запись: FileMode.Create стёр бы единственный непрочитанный лог прошлой попытки.
+        // Текущая сессия в этом случае пишется под уникальным именем.
+        string sessionLogPath = gameLogPath;
+        if (File.Exists(gameLogPath))
+        {
+            sessionLogPath = Path.Combine(logsDir, $"launcher-game-{DateTime.Now:yyyyMMdd-HHmmss}-{DateTime.UtcNow.Ticks:x8}.log");
+        }
+
+        var gameLogWriter = new StreamWriter(new FileStream(sessionLogPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
         {
             AutoFlush = true
         };
@@ -1555,9 +1589,18 @@ public class FabricGameLaunchService : IGameLaunchService
             EnsureDefaultResourcePacksEnabled(targetInstanceDir);
         }
 
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
+        try
+        {
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+        catch (Exception ex)
+        {
+            gameLogWriter.Dispose();
+            LogLauncherEvent($"[LAUNCH: START-ERROR] Не удалось запустить процесс Java: {ex.Message}");
+            throw new InvalidOperationException($"Не удалось запустить процесс Java: {ex.Message}", ex);
+        }
 
         _gameProcess = process;
 
@@ -1570,15 +1613,19 @@ public class FabricGameLaunchService : IGameLaunchService
             try
             {
                 await process.WaitForExitAsync();
+                // Синхронный WaitForExit после асинхронного догружает остатки stdout/stderr
+                // (последние строки перед выходом JVM) до того, как лог будет прочитан анализатором
+                process.WaitForExit();
+                int exitCode = process.ExitCode;
+                gameLogWriter.WriteLine($"[LAUNCHER] Процесс игры завершён: код {exitCode}, {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 await gameLogWriter.FlushAsync();
                 gameLogWriter.Dispose();
 
-                int exitCode = process.ExitCode;
                 _gameProcess = null;
 
                 LogLauncherEvent($"[EXIT] Игра (PID {process.Id}) завершилась с кодом выхода {exitCode}");
                 GameExited?.Invoke(this, exitCode);
-                onGameExited?.Invoke(exitCode, gameLogPath);
+                onGameExited?.Invoke(exitCode, sessionLogPath);
             }
             catch (Exception ex)
             {

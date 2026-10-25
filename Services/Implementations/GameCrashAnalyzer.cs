@@ -46,12 +46,12 @@ public static class GameCrashAnalyzer
         "level.dat"
     ];
 
-    public static GameCrashAnalysisResult AnalyzeCrash(string gameDir, int exitCode)
+    public static GameCrashAnalysisResult AnalyzeCrash(string gameDir, int exitCode, string? launcherGameLogPath = null)
     {
         var snippetBuilder = new StringBuilder();
         snippetBuilder.AppendLine($"ExitCode: {exitCode}");
 
-        string combinedLog = CollectRecentLogs(gameDir, snippetBuilder);
+        string combinedLog = CollectRecentLogs(gameDir, snippetBuilder, launcherGameLogPath);
 
         if (ContainsAny(combinedLog, ["OutOfMemoryError", "Out of Memory Error", "There is insufficient memory for the Java Runtime Environment"]))
         {
@@ -99,7 +99,7 @@ public static class GameCrashAnalyzer
             snippetBuilder.ToString());
     }
 
-    private static string CollectRecentLogs(string gameDir, StringBuilder summaryBuilder)
+    private static string CollectRecentLogs(string gameDir, StringBuilder summaryBuilder, string? launcherGameLogPath = null)
     {
         if (string.IsNullOrWhiteSpace(gameDir) || !Directory.Exists(gameDir))
         {
@@ -165,7 +165,9 @@ public static class GameCrashAnalyzer
 
         try
         {
-            var gameLogPath = Path.Combine(gameDir, "logs", "launcher-game.log");
+            var gameLogPath = !string.IsNullOrWhiteSpace(launcherGameLogPath)
+                ? launcherGameLogPath
+                : Path.Combine(gameDir, "logs", "launcher-game.log");
             if (File.Exists(gameLogPath))
             {
                 string gameLogTail = ReadTailText(gameLogPath, 120);

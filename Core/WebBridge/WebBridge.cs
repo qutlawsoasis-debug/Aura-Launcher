@@ -169,7 +169,8 @@ public partial class WebBridge : IDisposable
             isRunning = false,
             version = (string?)null,
             processId = (int?)null,
-            exitCode = e.ExitCode
+            exitCode = e.ExitCode,
+            error = e.FailureReason
         });
     }
 
