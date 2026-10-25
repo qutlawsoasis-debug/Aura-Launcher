@@ -326,10 +326,28 @@ public class GameSessionService : IGameSessionService
             State = GameSessionState.Idle;
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             RunningGameVersion = null;
             State = GameSessionState.Failed;
+
+            // Сбой этапа подготовки/скачивания тоже сохраняем до следующего сбоя
+            try
+            {
+                var cfgNow = _configService.CurrentConfig;
+                string prepLogsDir = System.IO.Path.Combine(
+                    _launchService.ResolveInstanceDirectory(cfgNow.GameDir, cfgNow.SelectedVersion), "logs");
+                LaunchFailureStore.Save(prepLogsDir, new
+                {
+                    savedAtUtc = DateTime.UtcNow,
+                    version = GameVersionProfiles.NormalizeVersion(cfgNow.SelectedVersion),
+                    stage = "prepare",
+                    exitCode = (int?)null,
+                    reason = ex.Message
+                });
+            }
+            catch { }
+
             throw;
         }
         finally
@@ -345,12 +363,68 @@ public class GameSessionService : IGameSessionService
     private void HandleGameExited(int exitCode, string logPath)
     {
         _currentProcess = null;
+        string? versionAtExit = RunningGameVersion;
+        DateTime? startedAt = _gameSessionStartTime;
         RunningGameVersion = null;
         State = exitCode == 0 ? GameSessionState.Idle : GameSessionState.Failed;
 
-        if (_gameSessionStartTime.HasValue)
+        string? failureReason = null;
+        if (exitCode != 0)
         {
-            var elapsed = DateTime.UtcNow - _gameSessionStartTime.Value;
+            var uptime = startedAt.HasValue ? DateTime.UtcNow - startedAt.Value : TimeSpan.Zero;
+
+            try
+            {
+                // Каталог инстанса выводим из фактического пути лога этой сессии
+                string? gameDir = null;
+                if (!string.IsNullOrWhiteSpace(logPath))
+                {
+                    string? logsDirOfSession = System.IO.Path.GetDirectoryName(logPath);
+                    if (!string.IsNullOrEmpty(logsDirOfSession))
+                    {
+                        gameDir = System.IO.Directory.GetParent(logsDirOfSession)?.FullName;
+                    }
+                }
+                gameDir ??= _launchService.ResolveInstanceDirectory(_configService.CurrentConfig.GameDir);
+
+                // Этап сбоя: ранний выход JVM (игра не успела начаться) или краш в работе
+                bool earlyExit = uptime.TotalSeconds <= 30;
+                var analysis = GameCrashAnalyzer.AnalyzeCrash(gameDir, exitCode, logPath);
+                string fallbackTitle = $"Игра завершилась с ошибкой (код {exitCode})";
+                bool matchedSpecific = !string.Equals(analysis.Title, fallbackTitle, StringComparison.Ordinal);
+                string? logName = string.IsNullOrWhiteSpace(logPath) ? null : System.IO.Path.GetFileName(logPath);
+                long uptimeSeconds = (long)Math.Max(uptime.TotalSeconds, 0);
+
+                failureReason = earlyExit
+                    ? matchedSpecific
+                        ? $"Игра не запустилась: {analysis.Title}. Процесс Java завершился через {uptimeSeconds} с после старта (код {exitCode}). {analysis.UserAdvice}"
+                        : $"Игра не запустилась: процесс Java завершился через {uptimeSeconds} с после старта (код {exitCode}). Полный вывод Java сохранён в logs/{logName ?? "launcher-game.log"}. Перезапустите игру; при повторном сбое приложите этот файл к отчёту."
+                    : $"{analysis.Title}. Код {exitCode}, время работы {(long)uptime.TotalMinutes} мин. {analysis.UserAdvice}";
+
+                // Причина сбоя сохраняется до следующего сбоя: успешный запуск этот файл не трогает
+                string? logsDirForStore = string.IsNullOrWhiteSpace(logPath)
+                    ? System.IO.Path.Combine(_launchService.ResolveInstanceDirectory(_configService.CurrentConfig.GameDir), "logs")
+                    : System.IO.Path.GetDirectoryName(logPath);
+                LaunchFailureStore.Save(logsDirForStore, new
+                {
+                    savedAtUtc = DateTime.UtcNow,
+                    version = versionAtExit,
+                    stage = earlyExit ? "java-early-exit" : "game-crash",
+                    exitCode,
+                    uptimeSeconds,
+                    reason = failureReason,
+                    logFile = logName
+                });
+            }
+            catch
+            {
+                failureReason = $"Игра завершилась с ошибкой (код {exitCode})";
+            }
+        }
+
+        if (startedAt.HasValue)
+        {
+            var elapsed = DateTime.UtcNow - startedAt.Value;
             long addSec = (long)elapsed.TotalSeconds;
             if (addSec > 5)
             {
@@ -375,7 +449,7 @@ public class GameSessionService : IGameSessionService
         }
         catch { }
 
-        GameExited?.Invoke(this, new GameExitedEventArgs(exitCode, logPath));
+        GameExited?.Invoke(this, new GameExitedEventArgs(exitCode, logPath, failureReason));
     }
 
     public async Task<bool> StopAsync(int timeoutMs = 5000)

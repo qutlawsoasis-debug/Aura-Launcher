@@ -4,10 +4,20 @@
   "package": "net.auramc.defaults.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "AccessibilityOnboardingScreenMixin",
+    "ConfirmScreenMixin",
     "CreateWorldScreenMixin",
     "CyclingButtonWidgetMixin",
+    "IntegratedServerLoaderMixin",
+    "MinecraftClientMixin",
+    "MultiplayerWarningScreenMixin",
     "OpenToLanScreenMixin",
+    "Realms32BitWarningCheckerMixin",
+    "RealmsMainScreenMixin",
+    "RealmsNotificationsScreenMixin",
+    "SplashOverlayMixin",
     "TabManagerMixin",
+    "TitleScreenMixin",
     "WorldCreatorMixin"
   ],
   "injectors": {

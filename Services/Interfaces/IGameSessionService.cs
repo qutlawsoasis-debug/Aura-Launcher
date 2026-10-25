@@ -34,10 +34,14 @@ public class GameExitedEventArgs : EventArgs
     public int ExitCode { get; }
     public string? LogPath { get; }
 
-    public GameExitedEventArgs(int exitCode, string? logPath = null)
+    /// <summary>Готовое объяснение сбоя для интерфейса (null при штатном завершении, код 0).</summary>
+    public string? FailureReason { get; }
+
+    public GameExitedEventArgs(int exitCode, string? logPath = null, string? failureReason = null)
     {
         ExitCode = exitCode;
         LogPath = logPath;
+        FailureReason = failureReason;
     }
 }
 
