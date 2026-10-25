@@ -27,4 +27,4 @@ jobs:
       run: dotnet build AuraLauncher.csproj -c Release --no-restore
 
     - name: 🧪 Run Unit Tests
-      run: dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --no-build -c Release --filter "Category!=Integration" --verbosity normal
+      run: dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj -c Release --filter "Category!=Integration" --verbosity normal
