@@ -1,5 +1,8 @@
 // CSS imports in exact tag order
 import '../tokens.css';
+import '../themes/frost.css';
+import '../themes/liquid.css';
+import '../themes/themes.css';
 import '../assets/css/core.css';
 import '../screens/play.css';
 import '../screens/map.css';
@@ -14,6 +17,7 @@ import '../screens/achievements.css';
 
 // JS modules in exact tag order
 import './perf-hud.js';
+import './themes.js';
 import './bridge.js';
 import './profile.js';
 import './skins.js';

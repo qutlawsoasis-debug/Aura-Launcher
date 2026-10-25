@@ -180,6 +180,7 @@
         hideLauncherWhilePlaying: true,
         graphicsPreset: 'Medium',
         visualEffectsMode: 'full',
+        theme: 'frost',
         selectedVersion: '1.20.1',
         gameDir: 'C:\\Users\\Player\\AppData\\Roaming\\.aura'
       };
@@ -193,7 +194,7 @@
     }
 
     if (name === 'config.set') {
-      const allowed = ['ramMb', 'hideLauncherWhilePlaying', 'visualEffectsMode', 'autoUpdate', 'discordRpc'];
+      const allowed = ['ramMb', 'hideLauncherWhilePlaying', 'visualEffectsMode', 'autoUpdate', 'discordRpc', 'theme'];
       if (!payload || !allowed.includes(payload.key)) {
         return Promise.reject(new Error('invalid_key'));
       }
@@ -213,12 +214,19 @@
           return Promise.reject(new Error('invalid_value'));
         }
       }
+      if (payload.key === 'theme') {
+        const val = typeof payload.value === 'string' ? payload.value.trim().toLowerCase() : '';
+        if (!/^[a-z0-9_-]{3,32}$/.test(val)) {
+          return Promise.reject(new Error('invalid_value'));
+        }
+      }
       let cfg = {
         nickname: 'Player',
         ramMb: 6144,
         hideLauncherWhilePlaying: true,
         graphicsPreset: 'Medium',
-        visualEffectsMode: 'full'
+        visualEffectsMode: 'full',
+        theme: 'frost'
       };
       try {
         const stored = localStorage.getItem('aura_mock_config');
@@ -429,6 +437,7 @@
         hideLauncherWhilePlaying: true,
         graphicsPreset: 'Medium',
         visualEffectsMode: 'full',
+        theme: 'frost',
         selectedVersion: '1.20.1',
         gameDir: 'C:\\Users\\Player\\AppData\\Roaming\\.aura'
       };

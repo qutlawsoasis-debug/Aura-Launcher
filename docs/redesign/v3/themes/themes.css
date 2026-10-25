@@ -1,0 +1,226 @@
+/**
+ * Aura Launcher — Common Themes Styles & Settings UI Integration
+ * Connects theme tokens to component styles and defines accessible theme cards.
+ */
+
+@import './frost.css';
+@import './liquid.css';
+
+/* ================= 1. ДЕЛЕГИРОВАНИЕ ТОКЕНОВ МАТЕРИАЛА ================= */
+:root {
+  --glass: var(--theme-glass-bg, rgba(40, 42, 50, 0.40));
+  --glass-solid: var(--theme-glass-solid, rgba(38, 40, 48, 0.96));
+  --glass-sheen: var(--theme-glass-sheen, linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 40%, rgba(255, 255, 255, 0.02)));
+  --glass-panel: var(--glass);
+  --glass-panel-border: var(--theme-glass-border, 1px solid var(--line));
+  --glass-panel-shadow: var(--theme-glass-shadow, inset 0 1px 0 rgba(255, 255, 255, 0.40), 0 30px 80px rgba(0, 0, 0, 0.35));
+  --glass-blur: var(--theme-glass-blur, 44px);
+  --theme-glass-saturate: 190%;
+
+  --glass-raised: var(--theme-glass-raised, var(--fill));
+  --glass-raised-hover: var(--theme-glass-raised-hover, var(--fill-2));
+  --glass-raised-active: var(--theme-glass-raised-active, var(--fill-3));
+  --glass-raised-border: var(--theme-glass-raised-border, 1px solid var(--hair));
+}
+
+/* ================= 2. ПЕРЕХОД ТЕМЫ (МАКСИМУМ 250МС, ЛОКАЛЬНЫЙ) ================= */
+.island {
+  transition: width var(--dur-morph) var(--spring),
+              height var(--dur-morph) var(--spring),
+              border-radius var(--dur-morph) var(--spring),
+              bottom var(--dur-morph) var(--spring),
+              background 250ms var(--ease-out),
+              box-shadow 250ms var(--ease-out),
+              border-color 250ms var(--ease-out),
+              opacity var(--dur-3) var(--ease-out),
+              backdrop-filter 250ms var(--ease-out),
+              -webkit-backdrop-filter 250ms var(--ease-out);
+}
+
+html[data-effects="off"] .island,
+@media (prefers-reduced-motion: reduce) {
+  .island {
+    transition: none !important;
+  }
+}
+
+/* Управление фоновой подложкой в раскрытом острове */
+html[data-effects="full"] .island.open::before {
+  opacity: var(--theme-island-before-opacity, 1);
+}
+
+/* ================= 3. КАРТОЧКИ ВЫБОРА ТЕМЫ В НАСТРОЙКАХ ================= */
+.theme-section {
+  margin-top: 6px;
+  margin-bottom: 12px;
+}
+
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--fill);
+  border: 1px solid var(--hair);
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  user-select: none;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms var(--ease-out);
+}
+
+.theme-card:hover {
+  background: var(--fill-2);
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+.theme-card:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.theme-card.selected {
+  background: rgba(100, 210, 255, 0.10);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(100, 210, 255, 0.22);
+}
+
+/* Статическое CSS мини-превью (не зависит от текущей активной темы!) */
+.theme-preview {
+  position: relative;
+  width: 100%;
+  height: 68px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #09131d 0%, #152433 50%, #071018 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+}
+
+/* Элементы ландшафта в превью */
+.theme-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 75% 25%, rgba(100, 210, 255, 0.25), transparent 55%),
+              linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.60) 100%);
+  pointer-events: none;
+}
+
+.theme-preview .mini-capsule {
+  position: relative;
+  width: 110px;
+  height: 28px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.theme-preview .mini-capsule .mini-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.theme-preview .mini-capsule .mini-bar {
+  width: 44px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.theme-preview .mini-capsule .mini-btn {
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--accent);
+}
+
+/* Превью: Матовое стекло */
+.theme-preview.preview-frost .mini-capsule {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.05)), rgba(40, 44, 56, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.40), 0 4px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Превью: Жидкое стекло */
+.theme-preview.preview-liquid .mini-capsule {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.04) 60%, rgba(255, 255, 255, 0.10) 100%), rgba(16, 22, 32, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow: inset 0 1.5px 0.5px rgba(255, 255, 255, 0.70),
+              inset 0 -1px 1px rgba(255, 255, 255, 0.20),
+              0 6px 16px rgba(0, 0, 0, 0.40);
+  backdrop-filter: blur(4px) saturate(160%);
+  -webkit-backdrop-filter: blur(4px) saturate(160%);
+}
+
+.theme-card-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.theme-card-title {
+  font-size: var(--font-size-secondary, 15px);
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--text-primary, #FFFFFF);
+  margin-bottom: 2px;
+}
+
+.theme-card-desc {
+  font-size: var(--font-size-caption, 13px);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.56));
+  line-height: 1.25;
+}
+
+.theme-radio-indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 8px;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.theme-card.selected .theme-radio-indicator {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.theme-radio-indicator::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00283A;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.theme-card.selected .theme-radio-indicator::after {
+  opacity: 1;
+  transform: scale(1);
+}

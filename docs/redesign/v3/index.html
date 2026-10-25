@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
   <title>Aura — Остров</title>
+  <script>
+    (function () {
+      var t = 'frost';
+      var r = /^[a-z0-9_-]{3,32}$/;
+      try {
+        var p = new URLSearchParams(window.location.search).get('theme');
+        if (p && r.test(p)) { t = p; }
+        else if (window.__AURA_BOOTSTRAP_THEME__ && r.test(window.__AURA_BOOTSTRAP_THEME__)) { t = window.__AURA_BOOTSTRAP_THEME__; }
+        else {
+          var s = localStorage.getItem('aura_theme');
+          if (s && r.test(s)) { t = s; }
+        }
+      } catch (e) {}
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+  </script>
   
 </head>
 <body>
@@ -499,7 +515,46 @@
 </div>
 <div class="small dim" style="margin:10px 2px 0" id="settingsPresetHint">16 чанков · шейдеры Sildurs · PBR-текстуры</div>
 
-<div class="group-title">Лаунчер</div>
+<div class="group-title">Внешний вид</div>
+<div class="row" style="flex-direction:column;align-items:stretch;gap:8px">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <span>Тема оформления<span class="hint" id="themeActiveHint">Матовое стекло</span></span>
+  </div>
+  <div class="theme-cards" role="radiogroup" aria-label="Тема оформления" id="themeRadioGroup">
+    <div class="theme-card selected" role="radio" tabindex="0" aria-checked="true" data-theme-id="frost" id="themeCard_frost">
+      <div class="theme-preview preview-frost">
+        <div class="mini-capsule">
+          <span class="mini-dot"></span>
+          <span class="mini-bar"></span>
+          <span class="mini-btn"></span>
+        </div>
+      </div>
+      <div class="theme-card-body">
+        <div>
+          <div class="theme-card-title">Матовое стекло</div>
+          <div class="theme-card-desc">Глубокое размытие 44px и мягкие тени</div>
+        </div>
+        <div class="theme-radio-indicator"></div>
+      </div>
+    </div>
+    <div class="theme-card" role="radio" tabindex="-1" aria-checked="false" data-theme-id="liquid" id="themeCard_liquid">
+      <div class="theme-preview preview-liquid">
+        <div class="mini-capsule">
+          <span class="mini-dot"></span>
+          <span class="mini-bar"></span>
+          <span class="mini-btn"></span>
+        </div>
+      </div>
+      <div class="theme-card-body">
+        <div>
+          <div class="theme-card-title">Жидкое стекло</div>
+          <div class="theme-card-desc">Прозрачный преломляющий материал с акцентным ободком</div>
+        </div>
+        <div class="theme-radio-indicator"></div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="row">
   <span>Эффекты</span>
   <div class="seg" style="width:230px" data-seg="effects" id="effectsSegmented">
@@ -509,6 +564,8 @@
     <button type="button" data-fx="off">Выкл</button>
   </div>
 </div>
+
+<div class="group-title">Лаунчер</div>
 <div class="row">
   <span>Скрывать лаунчер в игре<span class="hint">Освобождает видеопамять</span></span>
   <span class="toggle on" id="toggleHideOnLaunch"></span>
@@ -558,6 +615,22 @@
 
   
   <!-- Сторонние библиотеки (skinview3d UMD) -->
+    <!-- Liquid Glass Displacement Map Filter -->
+  <svg id="auraSvgFilters" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden;pointer-events:none;">
+    <defs>
+      <filter id="auraLiquidFilter" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="noise" />
+        <feColorMatrix type="matrix" values="
+          0.2 0   0   0 0.4
+          0   0.2 0   0 0.4
+          0   0   0.2 0 0.4
+          0   0   0   1 0" in="noise" result="neutralNoise" />
+        <feDisplacementMap in="SourceGraphic" in2="neutralNoise" scale="12" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+        <feBlend in="SourceGraphic" in2="displaced" mode="normal" />
+      </filter>
+    </defs>
+  </svg>
+
   <script src="/vendor/skinview3d.bundle.js"></script>
 
   <script type="module" src="/src/main.js"></script>
