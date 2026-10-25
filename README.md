@@ -205,8 +205,16 @@ dotnet test tests/AuraLauncher.Tests/AuraLauncher.Tests.csproj --filter "Categor
 .\scripts\check-design.ps1
 
 # 4. Создайте релизный дистрибутив и установщик Velopack
-.\scripts\build-release.ps1
+#    -OutDir обязателен (каталог выбираете сами; C:\AuraRelease скрипт не использует).
+#    Без -Execute скрипт работает в режиме plan-only: проверяет параметры
+#    и печатает команды, ничего не собирая и не меняя.
+.\scripts\build-release.ps1 -OutDir "$env:TEMP\AuraDev\build\release" -Execute
 ```
+
+> **Безопасность упаковки:** по умолчанию скрипт ничего не выполняет (plan-only);
+> для реальной сборки нужен явный `-Execute`. Запись версий в `version.json` /
+> `AuraLauncher.csproj` — только с флагом `-UpdateVersionFiles`. Старые релизы
+> скрипт **не удаляет** — очистка каталога вывода выполняется вручную.
 
 ---
 

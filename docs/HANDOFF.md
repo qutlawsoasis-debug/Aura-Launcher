@@ -41,22 +41,32 @@
 
 ### Релиз лаунчера (`Aura-Launcher`)
 1. Обновить версию в `AuraLauncher.csproj` (`<Version>1.2.XX</Version>`) и `version.json` (`internalVersion`: `1.2.XX`, `userFacingVersion`: `beta 1.0.YY`, где `YY = XX - 8`).
-2. Закоммитить и запушить в `main`.
+   Альтернатива — не править файлы вручную, а передать флаг `-UpdateVersionFiles -Execute` скрипту сборки (шаг 3): он запишет рассчитанную версию сам.
+2. По явному поручению на релиз подготовить отдельную ветку и PR в `main`. Прямой push в `main` запрещён; перед слиянием требуется независимый approving review. Защиту ветки не отключать.
 3. Собрать пакет через Velopack:
    ```powershell
-   .\scripts\build-release.ps1
+   # План (по умолчанию): только проверка параметров и печать команд, ничего не меняется
+   .\scripts\build-release.ps1 -OutDir "<каталог релиза>"
+
+   # Реальная упаковка (версия в файлы пишет только с -UpdateVersionFiles)
+   .\scripts\build-release.ps1 -OutDir "<каталог релиза>" -Version 1.2.XX -UpdateVersionFiles -Execute
    ```
-   Артефакты появятся в `C:\AuraRelease\1.2.XX\`. В `C:\AuraRelease` хранить не более **5 последних версий**.
-4. Опубликовать релиз на GitHub через `gh`:
+   Поведение скрипта:
+   - `-OutDir` **обязателен** — каталог вывода задаётся явно; каталога по умолчанию нет, `C:\AuraRelease` скрипт не использует и не чистит.
+   - Без `-Execute` — режим **plan-only**: сборка и упаковка не запускаются, `version.json` / `AuraLauncher.csproj` / git не затрагиваются.
+   - Для дельта-обновлений добавьте `-PreviousPackagesDir "<каталог с прежними AuraLauncher-*.nupkg, RELEASES, releases.win.json>"` — файлы копируются в `-OutDir`, ничего не удаляется.
+   - **Автоочистки старых релизов нет**: скрипт никогда не удаляет чужие версии; очистку каталога вывода выполняйте вручную.
+   - Артефакты появятся в указанном `-OutDir`.
+4. Опубликовать релиз на GitHub через `gh` (пути — из вашего `-OutDir`):
    ```powershell
    gh release create v1.2.XX `
-     "C:\AuraRelease\1.2.XX\AuraLauncher-win-Setup.exe" `
-     "C:\AuraRelease\1.2.XX\AuraLauncher-win-Portable.zip" `
-     "C:\AuraRelease\1.2.XX\AuraLauncher-1.2.XX-full.nupkg" `
-     "C:\AuraRelease\1.2.XX\AuraLauncher-1.2.XX-delta.nupkg" `
-     "C:\AuraRelease\1.2.XX\RELEASES" `
-     "C:\AuraRelease\1.2.XX\releases.win.json" `
-     "C:\AuraRelease\1.2.XX\assets.win.json" `
+     "<OutDir>\AuraLauncher-win-Setup.exe" `
+     "<OutDir>\AuraLauncher-win-Portable.zip" `
+     "<OutDir>\AuraLauncher-1.2.XX-full.nupkg" `
+     "<OutDir>\AuraLauncher-1.2.XX-delta.nupkg" `
+     "<OutDir>\RELEASES" `
+     "<OutDir>\releases.win.json" `
+     "<OutDir>\assets.win.json" `
      --title "beta 1.0.YY (v1.2.XX)" --notes "beta 1.0.YY"
    ```
 

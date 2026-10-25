@@ -1,39 +1,20 @@
-Add-Type -AssemblyName System.Drawing
-$src = [System.Drawing.Bitmap]::FromFile((Resolve-Path "app_icon.png"))
-$w = $src.Width
-$h = $src.Height
+# scripts/generate-splash.ps1
+# Generates brand-aligned splash.png for Velopack installer based on DESIGN.md.
+# Renders via a Chromium-based browser (Chrome or Edge, or CHROME_PATH override);
+# temporary files stay in the system temp dir, never in the repository.
+$ErrorActionPreference = "Stop"
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$jsScript = Join-Path $scriptDir "generate-splash.js"
 
-# Make background color outside transparent by checking alpha and dark border
-$bmp = New-Object System.Drawing.Bitmap $w, $h, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-for ($y = 0; $y -lt $h; $y++) {
-    for ($x = 0; $x -lt $w; $x++) {
-        $c = $src.GetPixel($x, $y)
-        # If very close to dark background #010302 or (R < 10 and G < 10 and B < 10)
-        if ($c.R -lt 12 -and $c.G -lt 14 -and $c.B -lt 12) {
-            $bmp.SetPixel($x, $y, [System.Drawing.Color]::FromArgb(0, 0, 0, 0))
-        } else {
-            $bmp.SetPixel($x, $y, $c)
-        }
-    }
+if (-not (Test-Path $jsScript)) {
+    throw "generate-splash.js not found: $jsScript"
 }
-$src.Dispose()
 
-$targetSplash = New-Object System.Drawing.Bitmap 480, 320
-$g = [System.Drawing.Graphics]::FromImage($targetSplash)
-$bg = [System.Drawing.ColorTranslator]::FromHtml('#0B141A')
-$g.Clear($bg)
-$g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    throw "node.exe not found in PATH; it is required to run generate-splash.js"
+}
 
-$destW = 96
-$destH = 96
-$destX = [int]((480 - $destW) / 2)
-$destY = [int]((320 - $destH) / 2)
-$g.DrawImage($bmp, $destX, $destY, $destW, $destH)
-
-$g.Dispose()
-$bmp.Dispose()
-
-$splashPath = Join-Path (Get-Location).Path "splash.png"
-$targetSplash.Save($splashPath, [System.Drawing.Imaging.ImageFormat]::Png)
-$targetSplash.Dispose()
-Write-Host "splash.png generated cleanly"
+& node $jsScript
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to generate splash.png (exit code $LASTEXITCODE)"
+}

@@ -43,7 +43,7 @@ public class AnthemServiceTests
         public bool IsAvailable { get; set; } = true;
         public bool Initialized { get; set; } = false;
         public bool Stopped { get; set; } = false;
-        public string CurrentTrackTitle { get; set; } = "zxcursed · Aura";
+        public string CurrentTrackTitle { get; set; } = "Demo Artist · Demo Track";
         public double PlaybackProgress { get; set; } = 0.0;
         public TimeSpan CurrentPosition { get; set; } = TimeSpan.Zero;
         public TimeSpan TotalDuration { get; set; } = TimeSpan.FromSeconds(76);
@@ -81,32 +81,33 @@ public class AnthemServiceTests
     }
 
     [Fact]
-    public void AnthemFile_Exists_And_SizeUnder5MB()
+    public void AnthemAssets_Removed_From_Packaging()
     {
         string? projectDir = FindProjectDirectory();
         Assert.NotNull(projectDir);
 
-        string anthemPath = Path.Combine(projectDir, "Resources", "Audio", "anthem.mp3");
-        Assert.True(File.Exists(anthemPath), $"Anthem file must exist at {anthemPath}");
+        // Демо-гимн полностью исключён из WPF/Content упаковки и веб-ассетов
+        string csprojPath = Path.Combine(projectDir, "AuraLauncher.csproj");
+        Assert.True(File.Exists(csprojPath), $"Project file must exist at {csprojPath}");
+        string csproj = File.ReadAllText(csprojPath);
+        Assert.DoesNotContain("anthem.mp3", csproj, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("artist.jpg", csproj, StringComparison.OrdinalIgnoreCase);
 
-        var fileInfo = new FileInfo(anthemPath);
-        Assert.True(fileInfo.Length > 0, "Anthem file must not be empty");
-        Assert.True(fileInfo.Length <= 5 * 1024 * 1024, $"Anthem file must be under 5MB (was {fileInfo.Length} bytes)");
+        Assert.False(File.Exists(Path.Combine(projectDir, "Resources", "Audio", "anthem.mp3")),
+            "Демо-гимн не должен находиться в Resources/Audio");
+        Assert.False(File.Exists(Path.Combine(projectDir, "Resources", "Audio", "artist.jpg")),
+            "Обложка демо-гимна не должна находиться в Resources/Audio");
+
+        string webAnthem = Path.Combine(projectDir, "docs", "redesign", "v3", "public", "assets", "audio", "anthem.mp3");
+        Assert.False(File.Exists(webAnthem), "Демо-гимн не должен находиться в веб-ассетах");
     }
 
     [Fact]
-    public void ThirdPartyNotices_Contains_AnthemLicenseAndSource()
+    public void LauncherConfig_MusicStartupSettings_AreRemoved()
     {
-        string? projectDir = FindProjectDirectory();
-        Assert.NotNull(projectDir);
-
-        string noticesPath = Path.Combine(projectDir, "THIRD-PARTY-NOTICES.txt");
-        Assert.True(File.Exists(noticesPath));
-
-        string content = File.ReadAllText(noticesPath);
-        Assert.Contains("Ukrainian National Anthem", content);
-        Assert.Contains("Public Domain", content);
-        Assert.Contains("commons.wikimedia.org", content);
+        // Автозапуск музыки удалён полностью: настроек, способных его включить, в конфиге быть не должно
+        Assert.Null(typeof(LauncherConfig).GetProperty("MusicOnStartup"));
+        Assert.Null(typeof(LauncherConfig).GetProperty("AnthemCustomPath"));
     }
 
     private class MockLauncherUpdateService : ILauncherUpdateService
@@ -155,9 +156,9 @@ public class AnthemServiceTests
 
         Assert.Equal(80, mainVM.AnthemVolume);
         Assert.False(mainVM.IsAnthemMuted);
-        Assert.Equal("zxcursed · Aura", mainVM.CurrentTrackTitle);
-        Assert.Equal("zxcursed", mainVM.CurrentTrackArtist);
-        Assert.Equal("Aura", mainVM.CurrentTrackSong);
+        Assert.Equal("Demo Artist · Demo Track", mainVM.CurrentTrackTitle);
+        Assert.Equal("Demo Artist", mainVM.CurrentTrackArtist);
+        Assert.Equal("Demo Track", mainVM.CurrentTrackSong);
 
         // Toggle mute
         mainVM.ToggleMuteCommand.Execute(null);

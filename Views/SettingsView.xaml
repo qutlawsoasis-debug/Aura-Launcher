@@ -535,33 +535,7 @@
                               VerticalAlignment="Center" />
                 </Grid>
 
-                <!-- 2.2 "Музыка при запуске" -->
-                <Grid Height="56" Margin="0,2,0,2">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <TextBlock Text="Музыка при запуске"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="14"
-                                   FontWeight="Medium"
-                                   Foreground="{StaticResource InkBrush}" />
-                        <TextBlock Text="Играет один раз при открытии лаунчера"
-                                   FontFamily="{StaticResource MainFont}"
-                                   FontSize="12"
-                                   Foreground="{StaticResource MuteBrush}"
-                                   Margin="0,2,0,0" />
-                    </StackPanel>
-
-                    <CheckBox Grid.Column="1"
-                              IsChecked="{Binding MusicOnStartup, Mode=TwoWay}"
-                              Style="{StaticResource AuraCheckBox}"
-                              VerticalAlignment="Center" />
-                </Grid>
-
-                <!-- 2.3 "Подключаться автоматически после принятия приглашения" -->
+                <!-- 2.2 "Подключаться автоматически после принятия приглашения" -->
                 <Grid Height="56" Margin="0,2,0,2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -584,7 +558,7 @@
                               VerticalAlignment="Center" />
                 </Grid>
 
-                <!-- 2.4 "Уведомления Windows" -->
+                <!-- 2.3 "Уведомления Windows" -->
                 <Grid Height="56" Margin="0,2,0,2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -605,7 +579,7 @@
                               VerticalAlignment="Center" />
                 </Grid>
 
-                <!-- 2.5 "Показывать статус в Discord" -->
+                <!-- 2.4 "Показывать статус в Discord" -->
                 <Grid Height="56" Margin="0,2,0,2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -626,7 +600,7 @@
                               VerticalAlignment="Center" />
                 </Grid>
 
-                <!-- 2.6 "Режим запуска" -->
+                <!-- 2.5 "Режим запуска" -->
                 <Grid Height="56" Margin="0,2,0,2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -659,7 +633,7 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 2.7 "Автосмена фона" -->
+                <!-- 2.6 "Автосмена фона" -->
                 <Grid Height="56" Margin="0,2,0,2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

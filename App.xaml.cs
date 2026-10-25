@@ -423,14 +423,13 @@ public partial class App : Application
         }
         catch { }
 
-        // Инициализация сервиса гимна (воспроизведение при первом старте, если не mute)
+        // Остановка ручного плеера при закрытии окна
         try
         {
-            var anthemService = Services.GetRequiredService<IAnthemService>();
-            anthemService.Initialize();
+            var anthemService = Services.GetService<IAnthemService>();
             activeWindow.Closed += (s, args) =>
             {
-                try { anthemService.Stop(); } catch { }
+                try { anthemService?.Stop(); } catch { }
             };
         }
         catch { }
