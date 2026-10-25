@@ -1,10 +1,7 @@
 {
-  "internalVersion": "1.2.154",
-  "userFacingVersion": "beta 1.0.146",
+  "internalVersion": "1.2.155",
+  "userFacingVersion": "beta 1.0.147",
   "changelog": [
-    "Minecraft 1.20.1 и 1.21.1: полное подавление визуального экрана загрузки Mojang с сохранением жизненного цикла ресурсов",
-    "Minecraft 1.20.1 и 1.21.1: пропуск экранов welcome/accessibility onboarding, multiplayer warning и подтверждения экспериментальных настроек",
-    "Minecraft 1.20.1 и 1.21.1: удаление элементов интерфейса Realms и фоновых сетевых проверок",
-    "Лаунчер: точная диагностика этапа сбоя запуска Java, ротация логов без коллизий и сохранение улик в last-launch-failure.json"
+    "Лаунчер: векторные SVG-иконки достижений вместо emoji в уведомлениях и витрине согласно DESIGN.md"
   ]
 }

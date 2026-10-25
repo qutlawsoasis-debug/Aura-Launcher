@@ -76,14 +76,14 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-size: 22px;
+  color: var(--ink-2);
   background: var(--fill-2);
-  filter: grayscale(1);
   opacity: 0.55;
 }
+.ach-icon svg { width: 24px; height: 24px; display: block; }
 .ach.on .ach-icon {
-  filter: none;
   opacity: 1;
+  color: #fff;
   background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.35), transparent 60%), linear-gradient(135deg, #64D2FF, #7B6CFF);
   box-shadow: 0 6px 20px rgba(100, 210, 255, 0.35);
 }
@@ -134,7 +134,7 @@
 .ach-pop.out { animation: ach-out 400ms var(--ease-out) forwards; }
 @keyframes ach-in { from { opacity: 0; transform: translateX(60px) scale(0.9); } to { opacity: 1; transform: none; } }
 @keyframes ach-out { to { opacity: 0; transform: translateX(40px) scale(0.95); } }
-.ach-pop .ach-icon { filter: none; opacity: 1; background: linear-gradient(135deg, #64D2FF, #7B6CFF); animation: ach-pulse 1.6s ease-in-out 2; }
+.ach-pop .ach-icon { opacity: 1; color: #fff; background: linear-gradient(135deg, #64D2FF, #7B6CFF); animation: ach-pulse 1.6s ease-in-out 2; }
 @keyframes ach-pulse { 50% { transform: scale(1.12) rotate(-6deg); box-shadow: 0 0 26px rgba(100, 210, 255, 0.8); } }
 .ach-pop .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--accent); text-transform: uppercase; }
 .ach-pop .t { font-size: 16px; font-weight: 600; margin-top: 2px; }
