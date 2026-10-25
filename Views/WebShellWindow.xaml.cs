@@ -33,7 +33,19 @@ public partial class WebShellWindow : Window
     public bool IsUpdatedRestart { get; init; }
 
     // Флаг в адресе виден странице до первой отрисовки: заставка сразу продолжает «после обновления»
-    private string StartupQuery => IsUpdatedRestart ? "?updated=1" : string.Empty;
+    // Параметры адреса до первой отрисовки: заставка и тема оформления передаются в bootstrap
+    private string StartupQuery
+    {
+        get
+        {
+            var queryParams = new System.Collections.Generic.List<string>();
+            if (IsUpdatedRestart) queryParams.Add("updated=1");
+            string rawTheme = _configService.CurrentConfig.Theme?.Trim().ToLowerInvariant() ?? "frost";
+            string theme = System.Text.RegularExpressions.Regex.IsMatch(rawTheme, "^[a-z0-9_-]{3,32}$") ? rawTheme : "frost";
+            queryParams.Add($"theme={Uri.EscapeDataString(theme)}");
+            return queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
+        }
+    }
 
     /// <summary>Ссылка aura://, с которой запустили лаунчер (обрабатывается, когда мост готов).</summary>
     public string? StartupProtocolUri { get; set; }
@@ -96,6 +108,11 @@ public partial class WebShellWindow : Window
             await WebViewControl.EnsureCoreWebView2Async(env);
 
             WebViewControl.CoreWebView2.Settings.IsNonClientRegionSupportEnabled = true;
+
+            string rawTheme = _configService.CurrentConfig.Theme?.Trim().ToLowerInvariant() ?? "frost";
+            string initialTheme = System.Text.RegularExpressions.Regex.IsMatch(rawTheme, "^[a-z0-9_-]{3,32}$") ? rawTheme : "frost";
+            await WebViewControl.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                $"window.__AURA_BOOTSTRAP_THEME__ = '{initialTheme}'; try {{ document.documentElement.setAttribute('data-theme', '{initialTheme}'); }} catch(e){{}}");
 #if DEBUG
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = true;
 #else

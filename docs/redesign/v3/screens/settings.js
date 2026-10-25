@@ -22,6 +22,7 @@
     hideLauncherWhilePlaying: true,
     graphicsPreset: 'Medium',
     visualEffectsMode: 'full',
+    theme: 'frost',
     selectedVersion: '1.20.1',
     gameDir: ''
   };
@@ -42,6 +43,8 @@
     const presetHint = document.getElementById('settingsPresetHint');
     const presetSeg = document.getElementById('presetSegmented');
     const effectsSeg = document.getElementById('effectsSegmented');
+    const themeGroup = document.getElementById('themeRadioGroup');
+    const themeActiveHint = document.getElementById('themeActiveHint');
     const toggleHide = document.getElementById('toggleHideOnLaunch');
 
     let rollFn = null;
@@ -220,6 +223,85 @@
       });
     }
 
+    // 2b. Theme Selection (Radio Cards)
+    const syncThemeUI = (themeId) => {
+      const currentTheme = themeId || (window.AuraThemes ? window.AuraThemes.getCurrentThemeId() : 'frost');
+      if (themeGroup) {
+        const cards = themeGroup.querySelectorAll('.theme-card');
+        cards.forEach(card => {
+          const isSelected = card.dataset.themeId === currentTheme;
+          card.classList.toggle('selected', isSelected);
+          card.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+          card.setAttribute('tabindex', isSelected ? '0' : '-1');
+        });
+      }
+      if (themeActiveHint) {
+        const info = window.AuraThemes && window.AuraThemes.THEMES.find(t => t.id === currentTheme);
+        themeActiveHint.textContent = info ? info.name : (currentTheme === 'liquid' ? 'Жидкое стекло' : 'Матовое стекло');
+      }
+    };
+
+    const selectTheme = (themeId, syncBridge = true) => {
+      if (!themeId) return;
+      const targetId = window.AuraThemes && window.AuraThemes.isValidThemeId(themeId) ? themeId : 'frost';
+      activeConfig.theme = targetId;
+
+      if (window.AuraThemes && typeof window.AuraThemes.applyTheme === 'function') {
+        window.AuraThemes.applyTheme(targetId, { save: true, sendToHost: syncBridge });
+      } else {
+        document.documentElement.setAttribute('data-theme', targetId);
+        try { localStorage.setItem('aura_theme', targetId); } catch (_) {}
+        if (syncBridge) {
+          sendBridge('config.set', { key: 'theme', value: targetId }).catch(() => {});
+        }
+      }
+
+      syncThemeUI(targetId);
+    };
+
+    if (themeGroup) {
+      themeGroup.querySelectorAll('.theme-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectTheme(card.dataset.themeId, true);
+          card.focus();
+        });
+      });
+
+      themeGroup.addEventListener('keydown', (e) => {
+        const cards = Array.from(themeGroup.querySelectorAll('.theme-card'));
+        const currentIndex = cards.findIndex(c => c === document.activeElement || c.classList.contains('selected'));
+        let nextIndex = -1;
+
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          nextIndex = (currentIndex + 1) % cards.length;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          nextIndex = (currentIndex - 1 + cards.length) % cards.length;
+        } else if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          if (document.activeElement && document.activeElement.classList.contains('theme-card')) {
+            selectTheme(document.activeElement.dataset.themeId, true);
+          }
+          return;
+        }
+
+        if (nextIndex >= 0 && cards[nextIndex]) {
+          const nextCard = cards[nextIndex];
+          selectTheme(nextCard.dataset.themeId, true);
+          nextCard.focus();
+        }
+      });
+    }
+
+    window.addEventListener('aura:themechange', (e) => {
+      if (e.detail && e.detail.theme) {
+        activeConfig.theme = e.detail.theme;
+        syncThemeUI(e.detail.theme);
+      }
+    });
+
     // 3. Effects Mode Segment
     const syncEffectsSegment = () => {
       const currentMode = document.documentElement.dataset.effects || activeConfig.visualEffectsMode || 'full';
@@ -357,6 +439,15 @@
         }
         syncEffectsSegment();
 
+        // Theme
+        const urlTheme = urlParams.get('theme');
+        if (urlTheme && (window.AuraThemes ? window.AuraThemes.isValidThemeId(urlTheme) : /^[a-z0-9_-]{3,32}$/.test(urlTheme))) {
+          activeConfig.theme = urlTheme;
+        } else if (activeConfig.theme) {
+          selectTheme(activeConfig.theme, false);
+        }
+        syncThemeUI(activeConfig.theme);
+
         // Hide toggle
         if (toggleHide && typeof activeConfig.hideLauncherWhilePlaying === 'boolean') {
           toggleHide.classList.toggle('on', activeConfig.hideLauncherWhilePlaying);
@@ -372,6 +463,7 @@
       .catch(() => {});
 
     syncEffectsSegment();
+    syncThemeUI(activeConfig.theme);
 
     function updateVersionHint(ver) {
       const hint = document.getElementById('gameVersionHint');

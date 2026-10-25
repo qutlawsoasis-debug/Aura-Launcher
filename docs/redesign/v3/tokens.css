@@ -58,19 +58,19 @@
   --hair: rgba(255, 255, 255, 0.10);
 
   /* ================= 3. СТЕКЛО ОСТРОВА (Apple Liquid Glass) ================= */
-  --glass: rgba(40, 42, 50, 0.40);
-  --glass-solid: rgba(38, 40, 48, 0.96);
-  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 40%, rgba(255, 255, 255, 0.02));
+  --glass: var(--theme-glass-bg, rgba(40, 42, 50, 0.40));
+  --glass-solid: var(--theme-glass-solid, rgba(38, 40, 48, 0.96));
+  --glass-sheen: var(--theme-glass-sheen, linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 40%, rgba(255, 255, 255, 0.02)));
   --glass-panel: var(--glass);
-  --glass-panel-border: 1px solid var(--line);
-  --glass-panel-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.2), 0 30px 80px rgba(0, 0, 0, 0.35);
-  --glass-blur: 44px;
-  --glass-saturate: 190%;
+  --glass-panel-border: var(--theme-glass-border, 1px solid var(--line));
+  --glass-panel-shadow: var(--theme-glass-shadow, inset 0 1px 0 rgba(255, 255, 255, 0.40), inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.20), 0 30px 80px rgba(0, 0, 0, 0.35));
+  --glass-blur: var(--theme-glass-blur, 44px);
+  --glass-saturate: var(--theme-glass-saturate, 190%);
 
-  --glass-raised: var(--fill);
-  --glass-raised-hover: var(--fill-2);
-  --glass-raised-active: var(--fill-3);
-  --glass-raised-border: 1px solid var(--hair);
+  --glass-raised: var(--theme-glass-raised, var(--fill));
+  --glass-raised-hover: var(--theme-glass-raised-hover, var(--fill-2));
+  --glass-raised-active: var(--theme-glass-raised-active, var(--fill-3));
+  --glass-raised-border: var(--theme-glass-raised-border, 1px solid var(--hair));
 
   /* ================= 4. ТАЙМИНГИ И СИСТЕМА ДВИЖЕНИЯ ================= */
   --dur-1: 120ms;
@@ -102,8 +102,8 @@
 
 html[data-effects="full"] .island {
   background: var(--glass-sheen), var(--glass);
-  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(1.05);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(1.05);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--theme-glass-brightness, 1.05));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--theme-glass-brightness, 1.05));
 }
 
 /* В раскрытом разделе вместо живого размытия — заранее размытая копия мира (bg_1-blur.jpg,
@@ -132,7 +132,7 @@ html[data-effects="full"] .island {
 }
 
 html[data-effects="full"] .island.open::before {
-  opacity: 1;
+  opacity: var(--theme-island-before-opacity, 1);
 }
 
 /* Живое размытие снимается только когда копия уже проявилась (задержка = длительности проявления),

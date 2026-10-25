@@ -1,0 +1,43 @@
+/**
+ * Aura Launcher Theme: Frost («Матовое стекло»)
+ * Classic deep blur (44px), ambient soft shadows, frosted milky fill.
+ * Exact 1:1 match to baseline v3 design tokens.
+ */
+
+:root,
+html[data-theme="frost"] {
+  --theme-id: "frost";
+  --theme-name: "Матовое стекло";
+
+  /* Island material tokens */
+  --theme-glass-bg: rgba(40, 42, 50, 0.40);
+  --theme-glass-solid: rgba(38, 40, 48, 0.96);
+  --theme-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04) 40%, rgba(255, 255, 255, 0.02));
+  --theme-glass-border: 1px solid var(--line);
+  --theme-glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.40),
+                        inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+                        inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+                        0 1px 2px rgba(0, 0, 0, 0.20),
+                        0 30px 80px rgba(0, 0, 0, 0.35);
+
+  --theme-glass-blur: 44px;
+  --theme-glass-saturate: 190%;
+  --theme-glass-brightness: 1.05;
+
+  /* Raised surfaces / buttons */
+  --theme-glass-raised: var(--fill);
+  --theme-glass-raised-hover: var(--fill-2);
+  --theme-glass-raised-active: var(--fill-3);
+  --theme-glass-raised-border: 1px solid var(--hair);
+
+  /* Open island backdrop */
+  --theme-island-before-opacity: 1;
+}
+
+/* Light background adaptivity */
+[data-tone="light"],
+html[data-theme="frost"][data-tone="light"] {
+  --theme-glass-bg: rgba(14, 18, 26, 0.55);
+  --theme-glass-solid: rgba(14, 18, 26, 0.98);
+  --theme-glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 40%, rgba(0, 0, 0, 0.10));
+}

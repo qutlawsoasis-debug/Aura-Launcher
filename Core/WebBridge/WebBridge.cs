@@ -605,6 +605,7 @@ public partial class WebBridge : IDisposable
             fastStartEnabled = cfg.FastStartEnabled,
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
+            theme = string.IsNullOrWhiteSpace(cfg.Theme) ? "frost" : cfg.Theme,
             selectedVersion = normVer,
             gameDir = cfg.GameDir,
             autoUpdate = cfg.AutoUpdateEnabled,
@@ -714,6 +715,28 @@ public partial class WebBridge : IDisposable
 
                 await _configService.UpdateConfigAsync(c => c.VisualEffectsMode = fxVal);
                 _logger($"[WEBBRIDGE] config.set visualEffectsMode -> {fxVal}");
+                break;
+            }
+
+            case "theme":
+            {
+                if (valProp.ValueKind != JsonValueKind.String)
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set theme rejected: not a string");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                string themeVal = valProp.GetString()?.Trim().ToLowerInvariant() ?? string.Empty;
+                if (string.IsNullOrEmpty(themeVal) || !System.Text.RegularExpressions.Regex.IsMatch(themeVal, "^[a-z0-9_-]{3,32}$"))
+                {
+                    _logger($"[WEBBRIDGE: WARN] config.set theme rejected: invalid identifier '{themeVal}'");
+                    SendError(msg.Id, msg.Name, "invalid_value");
+                    return;
+                }
+
+                await _configService.UpdateConfigAsync(c => c.Theme = themeVal);
+                _logger($"[WEBBRIDGE] config.set theme -> {themeVal}");
                 break;
             }
 
@@ -1570,6 +1593,7 @@ public partial class WebBridge : IDisposable
             fastStartEnabled = cfg.FastStartEnabled,
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
+            theme = string.IsNullOrWhiteSpace(cfg.Theme) ? "frost" : cfg.Theme,
             selectedVersion = normVer,
             gameDir = cfg.GameDir,
             autoUpdate = cfg.AutoUpdateEnabled,

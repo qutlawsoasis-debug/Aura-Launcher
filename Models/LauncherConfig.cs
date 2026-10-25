@@ -44,6 +44,8 @@ public class LauncherConfig
     public bool AutoRotateBackgrounds { get; set; } = true;
     public string GraphicsPreset { get; set; } = "Medium";
     public string VisualEffectsMode { get; set; } = "full";
+    /// <summary>Тема оформления интерфейса: "frost" (по умолчанию) | "liquid".</summary>
+    public string Theme { get; set; } = "frost";
     /// <summary>Плащ Aura: "cyan" | "silver" | "none" (виден всем через lobby-api / CustomSkinLoader).</summary>
     public string CapeId { get; set; } = "none";
     /// <summary>Быстрый старт: фоновый предзапуск игры (по умолчанию выключен).</summary>
