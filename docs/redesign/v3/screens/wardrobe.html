@@ -14,6 +14,11 @@
         <div class="cape-thumb cape-thumb-silver"></div>
         <span class="cape-title">Серебряный</span>
       </button>
+      <label class="cape" id="capeUploadLabel" title="Загрузить свой плащ (.png)" style="cursor:pointer">
+        <div class="cape-thumb cape-thumb-custom" id="customCapeThumb">+</div>
+        <span class="cape-title" id="customCapeTitle">Свой</span>
+        <input type="file" id="capeFileInput" accept="image/png" style="display:none">
+      </label>
       <button type="button" class="cape" data-cape="none" title="Без плаща">
         <div class="cape-thumb cape-thumb-none">✕</div>
         <span class="cape-title">Без плаща</span>
@@ -52,7 +57,15 @@
 
     <div class="row">
       <span>Ник</span>
-      <input class="field" id="inputPlayerNickname" value="Coock0ld" style="width:170px;height:40px">
+      <input class="field" id="inputPlayerNickname" value="Player" style="width:170px;height:40px">
+    </div>
+
+    <div class="wardrobe-history-section" style="margin-top:10px">
+      <div class="small dim" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <span>История гардероба</span>
+        <span class="hint" id="historyCounter">0 файлов</span>
+      </div>
+      <div class="wardrobe-history-list" id="wardrobeHistoryList"></div>
     </div>
   </div>
 </div>

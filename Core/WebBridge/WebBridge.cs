@@ -265,6 +265,22 @@ public partial class WebBridge : IDisposable
                     await HandleSkinSetModelAsync(msg);
                     break;
 
+                case "cape.upload":
+                    await HandleCapeUploadAsync(msg);
+                    break;
+
+                case "wardrobe.getHistory":
+                    HandleWardrobeGetHistory(msg);
+                    break;
+
+                case "wardrobe.apply":
+                    await HandleWardrobeApplyAsync(msg);
+                    break;
+
+                case "wardrobe.delete":
+                    await HandleWardrobeDeleteAsync(msg);
+                    break;
+
                 case "friends.get":
                     HandleFriendsGet(msg);
                     break;
@@ -1098,15 +1114,15 @@ public partial class WebBridge : IDisposable
         }
     }
 
-    private static string CopySkinToPersistentStorage(string sourcePath)
+    private string CopySkinToPersistentStorage(string sourcePath)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
                 return sourcePath;
 
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var skinsDir = Path.Combine(appData, ".aura", "skins");
+            var baseDir = _skinService?.GetProfileDataDir() ?? _configService?.ProfileDataDir ?? Environment.GetEnvironmentVariable("AURA_PROFILE_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+            var skinsDir = Path.Combine(baseDir, "skins");
             Directory.CreateDirectory(skinsDir);
 
             var fileName = Path.GetFileName(sourcePath);
@@ -1130,6 +1146,7 @@ public partial class WebBridge : IDisposable
     {
         var cfg = _configService.CurrentConfig;
         string? dataUrl = null;
+        string? capeDataUrl = null;
 
         if (!string.IsNullOrWhiteSpace(cfg.SkinPath) && File.Exists(cfg.SkinPath))
         {
@@ -1144,18 +1161,34 @@ public partial class WebBridge : IDisposable
             }
         }
 
+        if (cfg.CapeId == "custom" && !string.IsNullOrWhiteSpace(cfg.CapePath) && File.Exists(cfg.CapePath))
+        {
+            try
+            {
+                byte[] capeBytes = File.ReadAllBytes(cfg.CapePath);
+                capeDataUrl = $"data:image/png;base64,{Convert.ToBase64String(capeBytes)}";
+            }
+            catch (Exception ex)
+            {
+                _logger($"[WEBBRIDGE: WARN] skin.get failed to read CapePath: {ex.Message}");
+            }
+        }
+
         string fileName = !string.IsNullOrWhiteSpace(cfg.SkinOriginalName)
             ? cfg.SkinOriginalName
             : (!string.IsNullOrWhiteSpace(cfg.SkinPath) ? Path.GetFileName(cfg.SkinPath) : "steve.png");
 
-        _logger($"[WEBBRIDGE] skin.get: nick={cfg.Nickname}, model={cfg.SkinModel}, file={fileName}, hasSkin={dataUrl != null}");
+        _logger($"[WEBBRIDGE] skin.get: nick={cfg.Nickname}, model={cfg.SkinModel}, file={fileName}, hasSkin={dataUrl != null}, cape={cfg.CapeId}");
         SendResponse(msg.Id, msg.Name, new
         {
             nickname = cfg.Nickname,
             model = cfg.SkinModel,
             fileName = fileName,
             dataUrl = dataUrl,
-            cape = string.IsNullOrWhiteSpace(cfg.CapeId) ? "none" : cfg.CapeId
+            cape = string.IsNullOrWhiteSpace(cfg.CapeId) ? "none" : cfg.CapeId,
+            capePath = cfg.CapePath,
+            capeOriginalName = cfg.CapeOriginalName,
+            capeDataUrl = capeDataUrl
         });
     }
 
@@ -1221,92 +1254,88 @@ public partial class WebBridge : IDisposable
             return;
         }
 
-        string tempFile = Path.Combine(Path.GetTempPath(), $"aura_skin_upload_{Guid.NewGuid():N}.png");
+        var validation = _skinService.ValidateSkinBytes(rawBytes);
+        if (!validation.IsValid)
+        {
+            string errMsg = validation.ErrorMessage ?? "Неподдерживаемый файл скина.";
+            _logger($"[WEBBRIDGE: WARN] skin.upload validation failed: {errMsg}");
+            SendError(msg.Id, msg.Name, errMsg);
+            return;
+        }
+
+        string safeFileName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+            safeFileName = $"skin_{Guid.NewGuid():N}.png";
+
+        // Сохранение в managed storage профиля с SHA-256 дедупликацией
+        var (persistentPath, hash) = await _skinService.SaveToManagedStorageAsync(rawBytes, "skin", safeFileName);
+
+        var cfg = _configService.CurrentConfig;
+        cfg.SkinPath = persistentPath;
+        cfg.SkinOriginalName = safeFileName;
+
+        // Обновляем историю гардероба
+        cfg.WardrobeHistory ??= new List<WardrobeItem>();
+        string itemId = $"skin_{hash}";
+        cfg.WardrobeHistory.RemoveAll(x => string.Equals(x.Hash, hash, StringComparison.OrdinalIgnoreCase) && x.Type == "skin");
+
+        var historyItem = new WardrobeItem
+        {
+            Id = itemId,
+            Type = "skin",
+            Name = safeFileName,
+            Hash = hash,
+            Model = cfg.SkinModel,
+            RelativePath = Path.Combine("skins", $"{hash}.png").Replace('\\', '/'),
+            CreatedUtc = DateTime.UtcNow
+        };
+        cfg.WardrobeHistory.Insert(0, historyItem);
+
+        await _configService.SaveConfigAsync(cfg);
+
+        await _skinService.SyncSkinToGameAsync(persistentPath, cfg.Nickname, cfg.GameDir);
+
+        string? uploadError = null;
         try
         {
-            await File.WriteAllBytesAsync(tempFile, rawBytes);
+            var uploadRes = await _skinService.UploadSkinToLobbyApiAsync(
+                cfg.SkinPath,
+                cfg.Nickname,
+                cfg.SkinModel,
+                cfg.SkinOwnerToken,
+                cfg.LobbyApiBaseUrl);
 
-            var validation = _skinService.ValidateSkinFile(tempFile);
-            if (!validation.IsValid)
+            if (uploadRes.Success)
             {
-                string errMsg = validation.ErrorMessage ?? "Неподдерживаемый файл скина.";
-                _logger($"[WEBBRIDGE: WARN] skin.upload validation failed: {errMsg}");
-                SendError(msg.Id, msg.Name, errMsg);
-                return;
-            }
-
-            string safeFileName = Path.GetFileName(fileName);
-            if (string.IsNullOrWhiteSpace(safeFileName))
-                safeFileName = $"skin_{Guid.NewGuid():N}.png";
-
-            string persistentPath = CopySkinToPersistentStorage(tempFile);
-            if (Path.GetDirectoryName(persistentPath) is string pDir && Directory.Exists(pDir))
-            {
-                string namedPath = Path.Combine(pDir, safeFileName);
-                try
+                if (!string.IsNullOrWhiteSpace(uploadRes.OwnerToken))
                 {
-                    File.Copy(persistentPath, namedPath, overwrite: true);
-                    if (!string.Equals(persistentPath, namedPath, StringComparison.OrdinalIgnoreCase))
-                    {
-                        File.Delete(persistentPath);
-                    }
-                    persistentPath = namedPath;
+                    cfg.SkinOwnerToken = uploadRes.OwnerToken;
+                    await _configService.SaveConfigAsync(cfg);
                 }
-                catch { }
+                _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
+                _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
             }
-
-            var cfg = _configService.CurrentConfig;
-            cfg.SkinPath = persistentPath;
-            cfg.SkinOriginalName = safeFileName;
-            await _configService.SaveConfigAsync(cfg);
-
-            await _skinService.SyncSkinToGameAsync(persistentPath, cfg.Nickname, cfg.GameDir);
-
-            string? uploadError = null;
-            try
+            else
             {
-                var uploadRes = await _skinService.UploadSkinToLobbyApiAsync(
-                    cfg.SkinPath,
-                    cfg.Nickname,
-                    cfg.SkinModel,
-                    cfg.SkinOwnerToken,
-                    cfg.LobbyApiBaseUrl);
-
-                if (uploadRes.Success)
-                {
-                    if (!string.IsNullOrWhiteSpace(uploadRes.OwnerToken))
-                    {
-                        cfg.SkinOwnerToken = uploadRes.OwnerToken;
-                        await _configService.SaveConfigAsync(cfg);
-                    }
-                    _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
-                    _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
-                }
-                else
-                {
-                    uploadError = uploadRes.ErrorMessage ?? "Ошибка загрузки скина в lobby-api";
-                    _logger($"[WEBBRIDGE: WARN] skin.upload lobby-api error: {uploadError}");
-                }
+                uploadError = uploadRes.ErrorMessage ?? "Ошибка загрузки скина в lobby-api";
+                _logger($"[WEBBRIDGE: WARN] skin.upload lobby-api error: {uploadError}");
             }
-            catch (Exception ex)
-            {
-                uploadError = ex.Message;
-                _logger($"[WEBBRIDGE: WARN] skin.upload lobby-api exception: {ex.Message}");
-            }
-
-            ReportAchievement("custom_skin");
-        _logger($"[WEBBRIDGE] skin.upload finished: ok=true, fileName={safeFileName}, uploadError={uploadError}");
-            SendResponse(msg.Id, msg.Name, new
-            {
-                ok = true,
-                fileName = safeFileName,
-                uploadError = uploadError
-            });
         }
-        finally
+        catch (Exception ex)
         {
-            try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+            uploadError = ex.Message;
+            _logger($"[WEBBRIDGE: WARN] skin.upload lobby-api exception: {ex.Message}");
         }
+
+        ReportAchievement("custom_skin");
+        _logger($"[WEBBRIDGE] skin.upload finished: ok=true, fileName={safeFileName}, uploadError={uploadError}");
+        SendResponse(msg.Id, msg.Name, new
+        {
+            ok = true,
+            id = itemId,
+            fileName = safeFileName,
+            uploadError = uploadError
+        });
     }
 
     private async Task HandleSkinSetModelAsync(BridgeMessage msg)

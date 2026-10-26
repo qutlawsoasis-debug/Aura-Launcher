@@ -96,7 +96,9 @@ public partial class WardrobeView : UserControl
     {
         if (e.PropertyName == nameof(WardrobeViewModel.SkinPath) ||
             e.PropertyName == nameof(WardrobeViewModel.IsSlimModel) ||
-            e.PropertyName == nameof(WardrobeViewModel.SkinDisplayName))
+            e.PropertyName == nameof(WardrobeViewModel.SkinDisplayName) ||
+            e.PropertyName == nameof(WardrobeViewModel.CapeId) ||
+            e.PropertyName == nameof(WardrobeViewModel.CapePath))
         {
             Dispatcher.Invoke(Refresh3DModel);
         }
@@ -139,7 +141,14 @@ public partial class WardrobeView : UserControl
                 skinBmp = SkinService.LoadDefaultSteveBitmap();
             }
 
-            var modelGroup = SkinModel3DBuilder.BuildPlayerModel(skinBmp, isSlim);
+            BitmapSource? capeBmp = null;
+            if (skinService != null && vm != null && !string.IsNullOrWhiteSpace(vm.CapeId) && vm.CapeId != "none")
+            {
+                string capeRef = vm.CapeId == "custom" ? vm.CapePath : vm.CapeId;
+                capeBmp = skinService.LoadCapeImage(capeRef) as BitmapSource;
+            }
+
+            var modelGroup = SkinModel3DBuilder.BuildPlayerModel(skinBmp, isSlim, capeBmp);
             AlivePlayer3D.SetSourceModel(SkinDragArea, modelGroup);
         }
         catch (Exception ex)

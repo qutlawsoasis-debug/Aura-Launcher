@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Aura Launcher v3 — Wardrobe Section Controller (skinview3d 3D Viewer)
  * 3D-модель скина: плавное смешивание анимаций, вращение с инерцией, плащи без подгрузки на лету,
  * рендер только пока раздел открыт.
@@ -201,10 +201,29 @@
     let currentCape = 'none';
     let savedCape = null; // плащ из конфига; применяется, когда картинки плащей загрузятся
 
-    function applyCape(type) {
+    let customCapeUrl = null;
+
+    function applyCape(type, customUrl) {
+      if (customUrl) customCapeUrl = customUrl;
       currentCape = type || 'none';
-      document.querySelectorAll('#capeSelector .cape').forEach(b => b.classList.toggle('on', b.dataset.cape === currentCape));
-      if (currentCape === 'none') viewer.resetCape();
+      document.querySelectorAll('#capeSelector .cape').forEach(b => {
+        const isMatch = b.dataset.cape === currentCape || (currentCape === 'custom' && b.id === 'capeUploadLabel');
+        b.classList.toggle('on', isMatch);
+      });
+      const customThumb = document.getElementById('customCapeThumb');
+      if (currentCape === 'custom' && customCapeUrl) {
+        if (customThumb) {
+          customThumb.textContent = '';
+          customThumb.style.backgroundImage = `url('${customCapeUrl}')`;
+        }
+        if (viewer) viewer.loadCape(customCapeUrl);
+      } else if (currentCape === 'none') {
+        if (customThumb) {
+          customThumb.textContent = '+';
+          customThumb.style.backgroundImage = 'none';
+        }
+        if (viewer) viewer.resetCape();
+      }
       else if (capeImages[currentCape]) viewer.loadCape(capeImages[currentCape]);
       viewer.render();
     }
@@ -233,14 +252,20 @@
         syncModelButtons(model);
         updateSkinUI(res && res.dataUrl, fn, model);
         savedCape = (res && res.cape) || 'none';
-        if (Object.keys(capeImages).length) applyCape(savedCape);
+        if (savedCape === 'custom' && res && res.capeDataUrl) {
+          applyCape('custom', res.capeDataUrl);
+        } else if (Object.keys(capeImages).length) {
+          applyCape(savedCape);
+        }
         return viewer.loadSkin(skinUrl);
       })
       .then(() => viewer.render())
       .catch(() => {
         viewer.loadSkin(DEFAULT_SKIN).then(() => viewer.render()).catch(() => {});
       });
-    preloadCapes().then(() => applyCape(savedCape || 'none'));
+    preloadCapes().then(() => {
+      if (savedCape !== 'custom') applyCape(savedCape || 'none');
+    });
 
     if (window.ResizeObserver) {
       new ResizeObserver(() => {
@@ -313,7 +338,8 @@
         sendBridge('skin.setCape', { cape: capeType })
           .then(() => {
             if (typeof window.showToast === 'function') {
-              window.showToast(capeType === 'none' ? 'Плащ снят' : 'Плащ надет — его видят все в игре', 'success');
+              window.showToast(capeType === 'none' ? 'Плащ снят' : 'Плащ Aura надет', 'success');
+              if (typeof loadWardrobeHistory === 'function') loadWardrobeHistory();
             }
           })
           .catch(err => {
@@ -343,7 +369,14 @@
             if (skinNameLabel) skinNameLabel.textContent = file.name;
             if (skinFacePreview) skinFacePreview.style.backgroundImage = `url('${dataUrl}'), url('${dataUrl}')`;
             if (effects() === 'off') viewer.render();
-            if (typeof window.showToast === 'function') window.showToast('Скин загружен', 'success');
+            sendBridge('skin.upload', { fileName: file.name, base64Data: dataUrl })
+              .then(() => {
+                if (typeof window.showToast === 'function') window.showToast('Скин сохранён', 'success');
+                if (typeof loadWardrobeHistory === 'function') loadWardrobeHistory();
+              })
+              .catch(err => {
+                if (typeof window.showToast === 'function') window.showToast('Ошибка сохранения скина: ' + (err.message || err), 'error');
+              });
           }).catch(() => {
             canvas.style.opacity = '1';
             if (typeof window.showToast === 'function') window.showToast('Не удалось загрузить скин', 'error');
@@ -353,7 +386,121 @@
       });
     }
 
-    const nickInput = document.getElementById('inputPlayerNickname');
+    const capeFileInput = document.getElementById('capeFileInput');
+    if (capeFileInput) {
+      capeFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target.result;
+          sendBridge('cape.upload', { fileName: file.name, base64Data: dataUrl })
+            .then(() => {
+              applyCape('custom', dataUrl);
+              showCapeSide();
+              if (typeof window.showToast === 'function') {
+                window.showToast('Плащ применён (виден вам в игре)', 'success');
+              }
+              loadWardrobeHistory();
+            })
+            .catch(err => {
+              if (typeof window.showToast === 'function') {
+                window.showToast('Ошибка загрузки плаща: ' + (err.message || err), 'error');
+              }
+            });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function loadWardrobeHistory() {
+      const container = document.getElementById('wardrobeHistoryList');
+      const counter = document.getElementById('historyCounter');
+      if (!container) return;
+
+      sendBridge('wardrobe.getHistory')
+        .then(res => {
+          if (!res) return;
+          const skins = res.skins || [];
+          const capes = res.capes || [];
+          const total = skins.length + capes.length;
+          if (counter) counter.textContent = total + ' ' + (total === 1 ? 'файл' : (total < 5 ? 'файла' : 'файлов'));
+
+          container.innerHTML = '';
+          if (total === 0) {
+            container.innerHTML = '<div class="hint" style="padding:6px 0;font-size:12px">История пуста. Загрузите скин или плащ.</div>';
+            return;
+          }
+
+          const allItems = [...skins, ...capes];
+          allItems.sort((a, b) => new Date(b.createdUtc || 0) - new Date(a.createdUtc || 0));
+
+          allItems.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'wardrobe-history-item' + (item.isCurrent ? ' is-current' : '');
+
+            const badge = document.createElement('span');
+            badge.className = 'wardrobe-history-badge';
+            badge.textContent = item.type === 'cape' ? 'Плащ' : 'Скин';
+
+            const name = document.createElement('span');
+            name.className = 'wardrobe-history-name';
+            name.textContent = item.name || item.id;
+            name.title = item.name || item.id;
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.gap = '4px';
+
+            const applyBtn = document.createElement('button');
+            applyBtn.type = 'button';
+            applyBtn.className = 'btn xs';
+            applyBtn.textContent = item.isCurrent ? 'Надет' : 'Надеть';
+            applyBtn.disabled = !!item.isCurrent;
+            applyBtn.addEventListener('click', () => {
+              sendBridge('wardrobe.apply', { id: item.id })
+                .then(() => {
+                  if (item.type === 'cape') {
+                    applyCape('custom', item.dataUrl);
+                    showCapeSide();
+                    if (typeof window.showToast === 'function') window.showToast('Плащ «' + item.name + '» применён', 'success');
+                  } else {
+                    if (viewer) viewer.loadSkin(item.dataUrl);
+                    updateSkinUI(item.dataUrl, item.name, item.model);
+                    if (typeof window.showToast === 'function') window.showToast('Скин «' + item.name + '» применён', 'success');
+                  }
+                  loadWardrobeHistory();
+                })
+                .catch(err => {
+                  if (typeof window.showToast === 'function') window.showToast('Ошибка: ' + (err.message || err), 'error');
+                });
+            });
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'btn xs ghost';
+            delBtn.textContent = '✕';
+            delBtn.title = 'Удалить из истории';
+            delBtn.addEventListener('click', () => {
+              sendBridge('wardrobe.delete', { id: item.id })
+                .then(() => {
+                  loadWardrobeHistory();
+                });
+            });
+
+            row.appendChild(badge);
+            row.appendChild(name);
+            actions.appendChild(applyBtn);
+            actions.appendChild(delBtn);
+            row.appendChild(actions);
+            container.appendChild(row);
+          });
+        })
+        .catch(() => {});
+    }
+
+    loadWardrobeHistory();
     if (nickInput) {
       nickInput.addEventListener('change', () => {
         if (typeof window.showToast === 'function') window.showToast(`Ник изменён на ${nickInput.value}`, 'info');

@@ -114,4 +114,186 @@ public class SkinServiceTests
             try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
     }
+
+    [Fact]
+    [System.STAThread]
+    public void ValidateCapeFile_Valid64x32Cape_ReturnsSuccess()
+    {
+        var skinService = new SkinService();
+        var tempFile = Path.Combine(Path.GetTempPath(), $"aura_test_cape_{Guid.NewGuid():N}.png");
+        try
+        {
+            // Создаем тестовый PNG 64x32
+            var bmp = BitmapSource.Create(64, 32, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 32 * 4], 64 * 4);
+            using (var fs = File.Create(tempFile))
+            {
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bmp));
+                enc.Save(fs);
+            }
+
+            var res = skinService.ValidateCapeFile(tempFile);
+            Assert.True(res.IsValid);
+            Assert.Equal(64, res.Width);
+            Assert.Equal(32, res.Height);
+        }
+        finally
+        {
+            try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    [System.STAThread]
+    public void ValidateCapeFile_InvalidDimensions_ReturnsError()
+    {
+        var skinService = new SkinService();
+        var tempFile = Path.Combine(Path.GetTempPath(), $"aura_test_cape_invalid_{Guid.NewGuid():N}.png");
+        try
+        {
+            // Создаем тестовый PNG 100x100 (недопустимый)
+            var bmp = BitmapSource.Create(100, 100, 96, 96, PixelFormats.Bgra32, null, new byte[100 * 100 * 4], 100 * 4);
+            using (var fs = File.Create(tempFile))
+            {
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bmp));
+                enc.Save(fs);
+            }
+
+            var res = skinService.ValidateCapeFile(tempFile);
+            Assert.False(res.IsValid);
+            Assert.Contains("Неподдерживаемый размер", res.ErrorMessage);
+        }
+        finally
+        {
+            try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+        }
+    }
+
+    [Fact]
+    [System.STAThread]
+    public async Task SaveToManagedStorageAsync_SameContent_ProducesSamePathAndHash()
+    {
+        var customTempDir = Path.Combine(Path.GetTempPath(), "AuraProfileTest_" + Guid.NewGuid().ToString("N"));
+        var skinService = new SkinService(null, customTempDir);
+
+        var bmp = BitmapSource.Create(64, 32, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 32 * 4], 64 * 4);
+        byte[] testBytes;
+        using (var ms = new MemoryStream())
+        {
+            var enc = new PngBitmapEncoder();
+            enc.Frames.Add(BitmapFrame.Create(bmp));
+            enc.Save(ms);
+            testBytes = ms.ToArray();
+        }
+
+        var (path1, hash1) = await skinService.SaveToManagedStorageAsync(testBytes, "cape", "test_cape.png");
+        var (path2, hash2) = await skinService.SaveToManagedStorageAsync(testBytes, "cape", "another_name.png");
+
+        Assert.Equal(hash1, hash2);
+        Assert.Equal(path1, path2);
+        Assert.True(File.Exists(path1));
+        Assert.StartsWith(Path.GetFullPath(customTempDir), Path.GetFullPath(path1));
+
+        try { Directory.Delete(customTempDir, recursive: true); } catch { }
+    }
+
+    [Fact]
+    public async Task SyncCapeToGameAsync_SyncsAndRemovesLocalSkinFile()
+    {
+        var skinService = new SkinService();
+        var tempGameDir = Path.Combine(Path.GetTempPath(), "AuraGameTest_" + Guid.NewGuid().ToString("N"));
+        var tempCapeFile = Path.Combine(Path.GetTempPath(), $"aura_cape_{Guid.NewGuid():N}.png");
+        try
+        {
+            await File.WriteAllBytesAsync(tempCapeFile, new byte[] { 1, 2, 3 });
+
+            await skinService.SyncCapeToGameAsync(tempCapeFile, "TestNick", tempGameDir);
+
+            var expectedTarget = Path.Combine(tempGameDir, "CustomSkinLoader", "LocalSkin", "capes", "TestNick.png");
+            Assert.True(File.Exists(expectedTarget));
+
+            // Проверяем удаление при сбросе плаща
+            await skinService.SyncCapeToGameAsync(null, "TestNick", tempGameDir);
+            Assert.False(File.Exists(expectedTarget));
+        }
+        finally
+        {
+            try { Directory.Delete(tempGameDir, recursive: true); } catch { }
+            try { if (File.Exists(tempCapeFile)) File.Delete(tempCapeFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task SyncCapeToGameAsync_MultiInstanceSync_SyncsBothInstances()
+    {
+        var skinService = new SkinService();
+        var rootGameDir = Path.Combine(Path.GetTempPath(), "AuraMultiInstTest_" + Guid.NewGuid().ToString("N"));
+        var inst1201 = Path.Combine(rootGameDir, "instances", "1.20.1");
+        var inst1211 = Path.Combine(rootGameDir, "instances", "1.21.1");
+        Directory.CreateDirectory(inst1201);
+        Directory.CreateDirectory(inst1211);
+
+        var tempCapeFile = Path.Combine(Path.GetTempPath(), $"aura_cape_{Guid.NewGuid():N}.png");
+        try
+        {
+            await File.WriteAllBytesAsync(tempCapeFile, new byte[] { 0xAA, 0xBB });
+
+            await skinService.SyncCapeToGameAsync(tempCapeFile, "PlayerOne", rootGameDir);
+
+            var file1201 = Path.Combine(inst1201, "CustomSkinLoader", "LocalSkin", "capes", "PlayerOne.png");
+            var file1211 = Path.Combine(inst1211, "CustomSkinLoader", "LocalSkin", "capes", "PlayerOne.png");
+            Assert.True(File.Exists(file1201));
+            Assert.True(File.Exists(file1211));
+        }
+        finally
+        {
+            try { Directory.Delete(rootGameDir, recursive: true); } catch { }
+            try { if (File.Exists(tempCapeFile)) File.Delete(tempCapeFile); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task SyncCapeToGameAsync_InvalidNickname_ThrowsArgumentException()
+    {
+        var skinService = new SkinService();
+        var tempGameDir = Path.Combine(Path.GetTempPath(), "AuraGameTest_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                skinService.SyncCapeToGameAsync(null, "../evil_nick", tempGameDir));
+
+            await Assert.ThrowsAsync<ArgumentException>(() =>
+                skinService.SyncCapeToGameAsync(null, "bad/slash", tempGameDir));
+        }
+        finally
+        {
+            try { Directory.Delete(tempGameDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void TryResolveWardrobeItemPath_MaliciousRelativePath_IsRejected()
+    {
+        var customTempDir = Path.Combine(Path.GetTempPath(), "AuraProfileSecTest_" + Guid.NewGuid().ToString("N"));
+        var skinService = new SkinService(null, customTempDir);
+
+        try
+        {
+            var item = new AuraLauncher.Models.WardrobeItem
+            {
+                Id = "cape_invalid",
+                Type = "cape",
+                RelativePath = @"..\..\..\Windows\System32\drivers\etc\hosts"
+            };
+
+            bool resolved = skinService.TryResolveWardrobeItemPath(item, out string fullPath);
+            Assert.False(resolved);
+            Assert.Empty(fullPath);
+        }
+        finally
+        {
+            try { Directory.Delete(customTempDir, recursive: true); } catch { }
+        }
+    }
 }

@@ -40,8 +40,8 @@
 
 .capes {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
 }
 
 .cape {
@@ -107,6 +107,58 @@
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--line);
   color: var(--ink-3);
+}
+
+.cape-thumb-custom {
+  background: var(--fill-2);
+  box-shadow: inset 0 0 0 1.5px var(--line);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 16px;
+  background-size: 192px 96px;
+  background-repeat: no-repeat;
+  background-position: -3px -3px;
+}
+
+.wardrobe-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 110px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.wardrobe-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: var(--fill);
+  border-radius: var(--radius-s, 6px);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  font-size: 12px;
+}
+
+.wardrobe-history-item.is-current {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.wardrobe-history-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+
+.wardrobe-history-name {
+  color: var(--ink-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 6px;
 }
 
 .cape-title {

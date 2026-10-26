@@ -46,8 +46,14 @@ public class LauncherConfig
     public string VisualEffectsMode { get; set; } = "full";
     /// <summary>Тема оформления интерфейса: "frost" (по умолчанию) | "liquid".</summary>
     public string Theme { get; set; } = "frost";
-    /// <summary>Плащ Aura: "cyan" | "silver" | "none" (виден всем через lobby-api / CustomSkinLoader).</summary>
+    /// <summary>Плащ Aura: "cyan" | "silver" | "custom" | "none".</summary>
     public string CapeId { get; set; } = "none";
+    /// <summary>Путь к кастомному плащу в managed storage профиля лаунчера.</summary>
+    public string CapePath { get; set; } = "";
+    /// <summary>Оригинальное имя файла кастомного плаща.</summary>
+    public string CapeOriginalName { get; set; } = "";
+    /// <summary>История ранее импортированных скинов и плащей пользователя.</summary>
+    public System.Collections.Generic.List<WardrobeItem> WardrobeHistory { get; set; } = new();
     /// <summary>Быстрый старт: фоновый предзапуск игры (по умолчанию выключен).</summary>
     public bool FastStartEnabled { get; set; } = false;
     /// <summary>Проверять и ставить обновления лаунчера (при запуске и в фоне).</summary>

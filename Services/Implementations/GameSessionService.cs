@@ -199,6 +199,7 @@ public class GameSessionService : IGameSessionService
                 }
 
                 await _skinService.SyncSkinToGameAsync(config.SkinPath, config.Nickname, targetGameDir, ct);
+                await _skinService.SyncCapeToGameAsync(config.CapePath, config.Nickname, targetGameDir, ct);
             }
             catch (Exception ex)
             {

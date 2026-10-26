@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using System.Windows.Media;
 using Microsoft.Win32;
 using AuraLauncher.Core;
+using AuraLauncher.Models;
+using AuraLauncher.Services.Implementations;
 using AuraLauncher.Services.Interfaces;
 
 namespace AuraLauncher.ViewModels;
@@ -36,15 +38,15 @@ public class WardrobeViewModel : ObservableObject
 
     public string Nickname => _configService.CurrentConfig.Nickname;
 
-    public static string CopySkinToPersistentStorage(string sourcePath)
+    public string CopySkinToPersistentStorage(string sourcePath)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
                 return sourcePath;
 
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var skinsDir = Path.Combine(appData, ".aura", "skins");
+            var baseDir = _skinService?.GetProfileDataDir() ?? _configService?.ProfileDataDir ?? Environment.GetEnvironmentVariable("AURA_PROFILE_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+            var skinsDir = Path.Combine(baseDir, "skins");
             Directory.CreateDirectory(skinsDir);
 
             var fileName = Path.GetFileName(sourcePath);
@@ -228,6 +230,57 @@ public class WardrobeViewModel : ObservableObject
 
     public RelayCommand SelectSkinCommand { get; }
     public RelayCommand ResetSkinCommand { get; }
+    public RelayCommand SelectCapeCommand { get; }
+    public RelayCommand SelectCyanCapeCommand { get; }
+    public RelayCommand SelectSilverCapeCommand { get; }
+    public RelayCommand RemoveCapeCommand { get; }
+    public RelayCommand ApplyHistoryItemCommand { get; }
+    public RelayCommand DeleteHistoryItemCommand { get; }
+
+    public System.Collections.ObjectModel.ObservableCollection<WardrobeItem> HistoryItems { get; } = new();
+
+    public string CapeId
+    {
+        get => _configService.CurrentConfig.CapeId;
+        set
+        {
+            if (_configService.CurrentConfig.CapeId != value)
+            {
+                _configService.CurrentConfig.CapeId = value ?? "none";
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(CapeDisplayName));
+                OnPropertyChanged(nameof(IsCapeCyan));
+                OnPropertyChanged(nameof(IsCapeSilver));
+                OnPropertyChanged(nameof(IsCapeCustom));
+                OnPropertyChanged(nameof(IsCapeNone));
+                _ = _configService.SaveConfigAsync(_configService.CurrentConfig);
+            }
+        }
+    }
+
+    public string CapePath => _configService.CurrentConfig.CapePath;
+
+    public string CapeDisplayName
+    {
+        get
+        {
+            var id = _configService.CurrentConfig.CapeId;
+            if (id == "cyan") return "Плащ Aura";
+            if (id == "silver") return "Серебряный плащ";
+            if (id == "custom")
+            {
+                return !string.IsNullOrWhiteSpace(_configService.CurrentConfig.CapeOriginalName)
+                    ? _configService.CurrentConfig.CapeOriginalName
+                    : "Свой плащ";
+            }
+            return "Без плаща";
+        }
+    }
+
+    public bool IsCapeCyan => CapeId == "cyan";
+    public bool IsCapeSilver => CapeId == "silver";
+    public bool IsCapeCustom => CapeId == "custom";
+    public bool IsCapeNone => string.IsNullOrWhiteSpace(CapeId) || CapeId == "none";
 
     public WardrobeViewModel(ISkinService skinService, IConfigService configService, IFriendService? friendService = null)
     {
@@ -242,7 +295,15 @@ public class WardrobeViewModel : ObservableObject
         CopyProfileIdCommand = new RelayCommand(_ => CopyProfileId());
         SaveNicknameCommand = new RelayCommand(async _ => await ApplyNicknameChangeAsync());
 
+        SelectCapeCommand = new RelayCommand(_ => SelectCapeFile());
+        SelectCyanCapeCommand = new RelayCommand(async _ => await SelectBuiltInCapeAsync("cyan"));
+        SelectSilverCapeCommand = new RelayCommand(async _ => await SelectBuiltInCapeAsync("silver"));
+        RemoveCapeCommand = new RelayCommand(async _ => await RemoveCapeAsync());
+        ApplyHistoryItemCommand = new RelayCommand(async item => { if (item is WardrobeItem wi) await ApplyHistoryItemAsync(wi); });
+        DeleteHistoryItemCommand = new RelayCommand(async item => { if (item is WardrobeItem wi) await DeleteHistoryItemAsync(wi); });
+
         UpdateSkinPreviews();
+        RefreshHistory();
 
         _configService.ConfigChanged += (s, cfg) =>
         {
@@ -255,7 +316,15 @@ public class WardrobeViewModel : ObservableObject
             OnPropertyChanged(nameof(ProfileId));
             OnPropertyChanged(nameof(SkinPath));
             OnPropertyChanged(nameof(IsSlimModel));
+            OnPropertyChanged(nameof(CapeId));
+            OnPropertyChanged(nameof(CapePath));
+            OnPropertyChanged(nameof(CapeDisplayName));
+            OnPropertyChanged(nameof(IsCapeCyan));
+            OnPropertyChanged(nameof(IsCapeSilver));
+            OnPropertyChanged(nameof(IsCapeCustom));
+            OnPropertyChanged(nameof(IsCapeNone));
             UpdateSkinPreviews();
+            RefreshHistory();
         };
     }
 
@@ -327,7 +396,7 @@ public class WardrobeViewModel : ObservableObject
         catch { }
     }
 
-    public void SelectSkinFile()
+    public async void SelectSkinFile()
     {
         var ofd = new OpenFileDialog
         {
@@ -347,11 +416,45 @@ public class WardrobeViewModel : ObservableObject
             }
 
             IsStatusError = false;
-            SkinPath = ofd.FileName;
-            SkinOriginalName = Path.GetFileName(ofd.FileName);
+            string originalName = Path.GetFileName(ofd.FileName);
+
+            // Сохраняем в managed storage профиля с SHA-256 дедупликацией
+            string managedPath;
+            string hash;
+            try
+            {
+                (managedPath, hash) = await _skinService.SaveToManagedStorageAsync(ofd.FileName, "skin", originalName);
+            }
+            catch (Exception ex)
+            {
+                IsStatusError = true;
+                StatusMessage = $"Ошибка сохранения скина: {ex.Message}";
+                return;
+            }
+
+            SkinPath = managedPath;
+            SkinOriginalName = originalName;
             FormatDescription = validation.Height == 32
                 ? "Классический скин Minecraft (64×32)"
                 : "Современный скин Minecraft (64×64)";
+
+            // Обновляем историю гардероба
+            var cfg = _configService.CurrentConfig;
+            cfg.WardrobeHistory ??= new System.Collections.Generic.List<WardrobeItem>();
+            string itemId = $"skin_{hash}";
+            cfg.WardrobeHistory.RemoveAll(x => string.Equals(x.Hash, hash, StringComparison.OrdinalIgnoreCase) && x.Type == "skin");
+            cfg.WardrobeHistory.Insert(0, new WardrobeItem
+            {
+                Id = itemId,
+                Type = "skin",
+                Name = originalName,
+                Hash = hash,
+                Model = cfg.SkinModel,
+                RelativePath = Path.Combine("skins", $"{hash}.png").Replace('\\', '/'),
+                CreatedUtc = DateTime.UtcNow
+            });
+            await _configService.SaveConfigAsync(cfg);
+            RefreshHistory();
 
             // Синхронизируем с игрой через единый путь config.GameDir
             var mcDir = _configService.CurrentConfig.GameDir;
@@ -359,6 +462,266 @@ public class WardrobeViewModel : ObservableObject
 
             // Загружаем в lobby-api
             _ = UploadCurrentSkinAsync();
+        }
+    }
+
+    public async void SelectCapeFile()
+    {
+        var ofd = new OpenFileDialog
+        {
+            Title = "Выберите плащ Minecraft (.png)",
+            Filter = "Плащи Minecraft (*.png)|*.png|Все файлы (*.*)|*.*",
+            Multiselect = false
+        };
+
+        if (ofd.ShowDialog() == true)
+        {
+            var validation = _skinService.ValidateCapeFile(ofd.FileName);
+            if (!validation.IsValid)
+            {
+                IsStatusError = true;
+                StatusMessage = validation.ErrorMessage ?? "Неподдерживаемый файл плаща.";
+                return;
+            }
+
+            IsStatusError = false;
+            string originalName = Path.GetFileName(ofd.FileName);
+
+            string managedPath;
+            string hash;
+            try
+            {
+                (managedPath, hash) = await _skinService.SaveToManagedStorageAsync(ofd.FileName, "cape", originalName);
+            }
+            catch (Exception ex)
+            {
+                IsStatusError = true;
+                StatusMessage = $"Ошибка сохранения плаща: {ex.Message}";
+                return;
+            }
+
+            var cfg = _configService.CurrentConfig;
+            cfg.CapeId = "custom";
+            cfg.CapePath = managedPath;
+            cfg.CapeOriginalName = originalName;
+
+            cfg.WardrobeHistory ??= new System.Collections.Generic.List<WardrobeItem>();
+            string itemId = $"cape_{hash}";
+            cfg.WardrobeHistory.RemoveAll(x => string.Equals(x.Hash, hash, StringComparison.OrdinalIgnoreCase) && x.Type == "cape");
+            cfg.WardrobeHistory.Insert(0, new WardrobeItem
+            {
+                Id = itemId,
+                Type = "cape",
+                Name = originalName,
+                Hash = hash,
+                RelativePath = Path.Combine("capes", $"{hash}.png").Replace('\\', '/'),
+                CreatedUtc = DateTime.UtcNow
+            });
+            await _configService.SaveConfigAsync(cfg);
+
+            OnPropertyChanged(nameof(CapeId));
+            OnPropertyChanged(nameof(CapePath));
+            OnPropertyChanged(nameof(CapeDisplayName));
+            OnPropertyChanged(nameof(IsCapeCustom));
+            OnPropertyChanged(nameof(IsCapeNone));
+            OnPropertyChanged(nameof(IsCapeCyan));
+            OnPropertyChanged(nameof(IsCapeSilver));
+            RefreshHistory();
+
+            await _skinService.SyncCapeToGameAsync(managedPath, Nickname, cfg.GameDir);
+            _ = SetLobbyApiCapeAsync("none");
+
+            IsStatusError = false;
+            StatusMessage = "Плащ применён (виден вам в игре).";
+            ScheduleStatusMessageClear();
+        }
+    }
+
+    public async Task SelectBuiltInCapeAsync(string cape)
+    {
+        if (cape != "cyan" && cape != "silver") return;
+
+        var cfg = _configService.CurrentConfig;
+        cfg.CapeId = cape;
+        cfg.CapePath = "";
+        cfg.CapeOriginalName = "";
+        await _configService.SaveConfigAsync(cfg);
+
+        OnPropertyChanged(nameof(CapeId));
+        OnPropertyChanged(nameof(CapePath));
+        OnPropertyChanged(nameof(CapeDisplayName));
+        OnPropertyChanged(nameof(IsCapeCyan));
+        OnPropertyChanged(nameof(IsCapeSilver));
+        OnPropertyChanged(nameof(IsCapeCustom));
+        OnPropertyChanged(nameof(IsCapeNone));
+
+        await _skinService.SyncCapeToGameAsync(null, Nickname, cfg.GameDir);
+        await SetLobbyApiCapeAsync(cape);
+
+        IsStatusError = false;
+        StatusMessage = cape == "cyan" ? "Плащ Aura надет." : "Серебряный плащ надет.";
+        ScheduleStatusMessageClear();
+    }
+
+    public async Task RemoveCapeAsync()
+    {
+        var cfg = _configService.CurrentConfig;
+        cfg.CapeId = "none";
+        cfg.CapePath = "";
+        cfg.CapeOriginalName = "";
+        await _configService.SaveConfigAsync(cfg);
+
+        OnPropertyChanged(nameof(CapeId));
+        OnPropertyChanged(nameof(CapePath));
+        OnPropertyChanged(nameof(CapeDisplayName));
+        OnPropertyChanged(nameof(IsCapeCyan));
+        OnPropertyChanged(nameof(IsCapeSilver));
+        OnPropertyChanged(nameof(IsCapeCustom));
+        OnPropertyChanged(nameof(IsCapeNone));
+
+        await _skinService.SyncCapeToGameAsync(null, Nickname, cfg.GameDir);
+        await SetLobbyApiCapeAsync("none");
+
+        IsStatusError = false;
+        StatusMessage = "Плащ снят.";
+        ScheduleStatusMessageClear();
+    }
+
+    public async Task ApplyHistoryItemAsync(WardrobeItem item)
+    {
+        if (item == null) return;
+
+        if (_skinService == null || !_skinService.TryResolveWardrobeItemPath(item, out string fullPath))
+        {
+            IsStatusError = true;
+            StatusMessage = "Файл не найден в хранилище профиля.";
+            RefreshHistory();
+            return;
+        }
+
+        if (item.Type == "cape")
+        {
+            var cfg = _configService.CurrentConfig;
+            cfg.CapeId = "custom";
+            cfg.CapePath = fullPath;
+            cfg.CapeOriginalName = item.Name;
+            await _configService.SaveConfigAsync(cfg);
+
+            OnPropertyChanged(nameof(CapeId));
+            OnPropertyChanged(nameof(CapePath));
+            OnPropertyChanged(nameof(CapeDisplayName));
+            OnPropertyChanged(nameof(IsCapeCustom));
+            OnPropertyChanged(nameof(IsCapeNone));
+            OnPropertyChanged(nameof(IsCapeCyan));
+            OnPropertyChanged(nameof(IsCapeSilver));
+
+            await _skinService.SyncCapeToGameAsync(fullPath, Nickname, cfg.GameDir);
+            _ = SetLobbyApiCapeAsync("none");
+
+            IsStatusError = false;
+            StatusMessage = $"Плащ «{item.Name}» применён.";
+            ScheduleStatusMessageClear();
+        }
+        else
+        {
+            SkinPath = fullPath;
+            SkinOriginalName = item.Name;
+            if (!string.IsNullOrWhiteSpace(item.Model))
+            {
+                IsSlimModel = item.Model == "slim";
+            }
+            var mcDir = _configService.CurrentConfig.GameDir;
+            await _skinService.SyncSkinToGameAsync(SkinPath, Nickname, mcDir);
+            _ = UploadCurrentSkinAsync();
+        }
+    }
+
+    public async Task DeleteHistoryItemAsync(WardrobeItem item)
+    {
+        if (item == null) return;
+
+        var cfg = _configService.CurrentConfig;
+        cfg.WardrobeHistory?.RemoveAll(x => string.Equals(x.Id, item.Id, StringComparison.OrdinalIgnoreCase));
+
+        string fullPath = "";
+        bool hasFile = _skinService != null && _skinService.TryResolveWardrobeItemPath(item, out fullPath);
+
+        if (item.Type == "cape")
+        {
+            if (cfg.CapeId == "custom" && (string.Equals(cfg.CapePath, fullPath, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(cfg.CapePath)))
+            {
+                await RemoveCapeAsync();
+            }
+        }
+        else
+        {
+            if (string.Equals(cfg.SkinPath, fullPath, StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(cfg.SkinPath))
+            {
+                await ResetSkinToDefaultAsync();
+            }
+        }
+
+        await _configService.SaveConfigAsync(cfg);
+
+        // Удаление файла с диска ТОЛЬКО если нет других записей с тем же хешем
+        if (hasFile && !string.IsNullOrWhiteSpace(fullPath) && File.Exists(fullPath))
+        {
+            bool referencedByOther = cfg.WardrobeHistory != null && cfg.WardrobeHistory.Any(x => string.Equals(x.Hash, item.Hash, StringComparison.OrdinalIgnoreCase));
+            if (!referencedByOther)
+            {
+                try
+                {
+                    string profileDir = _skinService!.GetProfileDataDir();
+                    string safeBase = Path.GetFullPath(Path.Combine(profileDir, item.Type == "cape" ? "capes" : "skins"));
+                    if (fullPath.StartsWith(safeBase + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Delete(fullPath);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        RefreshHistory();
+    }
+
+    public void RefreshHistory()
+    {
+        HistoryItems.Clear();
+        var raw = _configService.CurrentConfig.WardrobeHistory;
+        if (raw == null) return;
+
+        foreach (var item in raw)
+        {
+            if (item == null || string.IsNullOrWhiteSpace(item.Id)) continue;
+
+            if (_skinService != null && _skinService.TryResolveWardrobeItemPath(item, out _))
+            {
+                HistoryItems.Add(item);
+            }
+        }
+    }
+
+    private static readonly System.Net.Http.HttpClient CapeHttpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
+
+    private async Task SetLobbyApiCapeAsync(string cape)
+    {
+        try
+        {
+            var cfg = _configService.CurrentConfig;
+            string nick = cfg.Nickname?.Trim() ?? string.Empty;
+            if (!NicknameValidator.Validate(nick).IsValid) return;
+
+            string baseUrl = string.IsNullOrWhiteSpace(cfg.LobbyApiBaseUrl) ? "https://lobby-api.vercel.app" : cfg.LobbyApiBaseUrl.TrimEnd('/');
+            string json = System.Text.Json.JsonSerializer.Serialize(new { nickname = nick, ownerToken = cfg.SkinOwnerToken, cape });
+            using var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+            using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, $"{baseUrl}/api/skin") { Content = content };
+            SkinService.AddUserAuthHeaders(req);
+            using var resp = await CapeHttpClient.SendAsync(req);
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[WARDROBE: WARN] SetLobbyApiCapeAsync: {ex.Message}");
         }
     }
 

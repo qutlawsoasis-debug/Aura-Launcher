@@ -16,6 +16,13 @@ public interface IConfigService
     LauncherConfig CurrentConfig { get; }
 
     /// <summary>
+    /// Каталог профиля данных (по умолчанию %AppData%\.aura или значение AURA_PROFILE_DIR).
+    /// </summary>
+    string ProfileDataDir => !string.IsNullOrWhiteSpace(CurrentConfig?.GameDir)
+        ? CurrentConfig.GameDir
+        : System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+
+    /// <summary>
     /// Событие изменения конфигурации (смена ника, RAM, путей и т.д.).
     /// </summary>
     event EventHandler<LauncherConfig>? ConfigChanged;

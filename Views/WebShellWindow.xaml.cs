@@ -43,6 +43,9 @@ public partial class WebShellWindow : Window
             string rawTheme = _configService.CurrentConfig.Theme?.Trim().ToLowerInvariant() ?? "frost";
             string theme = System.Text.RegularExpressions.Regex.IsMatch(rawTheme, "^[a-z0-9_-]{3,32}$") ? rawTheme : "frost";
             queryParams.Add($"theme={Uri.EscapeDataString(theme)}");
+            string rawEffects = _configService.CurrentConfig.VisualEffectsMode?.Trim().ToLowerInvariant() ?? "full";
+            string effects = (rawEffects is "full" or "low" or "off") ? rawEffects : "full";
+            queryParams.Add($"effects={Uri.EscapeDataString(effects)}");
             return queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : string.Empty;
         }
     }

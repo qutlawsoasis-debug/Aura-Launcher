@@ -277,3 +277,142 @@ html[data-effects="off"] .boot-news li,
 }
 .boot.restarting::after { opacity: 1; }
 .boot.restarting .boot-float { transform: scale(0.97); transition: transform 900ms var(--ease-out); }
+
+/* ================== ТЕМАТИЧЕСКИЕ МАТЕРИАЛЫ ДЛЯ ЭКРАНОВ СТАРТА И «ЧТО НОВОГО» ================== */
+
+/* Frost: сохраняем матовое стекло с глубоким размытием */
+html[data-theme="frost"][data-effects="full"] .boot-capsule,
+:root:not([data-theme="liquid"])[data-effects="full"] .boot-capsule {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+html[data-theme="frost"][data-effects="full"] .boot-news,
+:root:not([data-theme="liquid"])[data-effects="full"] .boot-news,
+html[data-theme="frost"][data-effects="full"] .changelog-panel,
+:root:not([data-theme="liquid"])[data-effects="full"] .changelog-panel {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+/* Liquid: ультра-чистое прозрачное преломляющее стекло */
+html[data-theme="liquid"] .boot-capsule {
+  background: var(--theme-glass-sheen), var(--theme-glass-bg);
+  border: var(--theme-glass-border);
+  box-shadow: var(--theme-glass-shadow), 0 0 60px rgba(100, 210, 255, 0.18);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"] .boot-capsule :is(b, span, .boot-status) {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"][data-effects="full"] .boot-capsule {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+}
+
+html[data-theme="liquid"][data-effects="low"] .boot-capsule {
+  background: var(--theme-glass-sheen), rgba(24, 28, 38, 0.35);
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+html[data-theme="liquid"][data-effects="off"] .boot-capsule {
+  background: var(--theme-glass-solid);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="liquid"].no-svg-filter[data-effects="full"] .boot-capsule {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+}
+
+/* Liquid: «Что нового» в экране загрузки */
+html[data-theme="liquid"] .boot-news {
+  background: var(--theme-glass-sheen), rgba(255, 255, 255, 0.05);
+  border: var(--theme-glass-border);
+  box-shadow: var(--theme-glass-shadow);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"] .boot-news :is(.boot-news-title, .boot-news-head, li, b, span) {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"] .boot-news li {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 8px 12px 8px 30px;
+}
+
+html[data-theme="liquid"][data-effects="full"] .boot-news {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+}
+
+html[data-theme="liquid"][data-effects="low"] .boot-news {
+  background: var(--theme-glass-sheen), rgba(24, 28, 38, 0.35);
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+html[data-theme="liquid"][data-effects="off"] .boot-news {
+  background: var(--theme-glass-solid);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="liquid"].no-svg-filter[data-effects="full"] .boot-news {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+}
+
+/* Liquid: «Что нового» из настроек (.changelog-panel) */
+html[data-theme="liquid"] .changelog-panel {
+  background: var(--theme-glass-sheen), rgba(255, 255, 255, 0.05);
+  border: var(--theme-glass-border);
+  box-shadow: var(--theme-glass-shadow);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"] .changelog-panel :is(h2, .small, li) {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"] .changelog-list li {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 8px 12px 8px 30px;
+}
+
+html[data-theme="liquid"][data-effects="full"] .changelog-panel {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+}
+
+html[data-theme="liquid"][data-effects="low"] .changelog-panel {
+  background: var(--theme-glass-sheen), rgba(24, 28, 38, 0.35);
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+html[data-theme="liquid"][data-effects="off"] .changelog-panel {
+  background: var(--theme-glass-solid);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="liquid"].no-svg-filter[data-effects="full"] .changelog-panel {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+}
