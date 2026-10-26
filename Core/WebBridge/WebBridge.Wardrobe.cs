@@ -57,9 +57,9 @@ public partial class WebBridge
             return;
         }
 
-        if (rawBytes.Length > 1024 * 1024)
+        if (rawBytes.Length > 2 * 1024 * 1024)
         {
-            _logger($"[WEBBRIDGE: WARN] cape.upload rejected: payload exceeds 1MB ({rawBytes.Length} bytes)");
+            _logger($"[WEBBRIDGE: WARN] cape.upload rejected: payload exceeds 2MB ({rawBytes.Length} bytes)");
             SendError(msg.Id, msg.Name, "file_too_large");
             return;
         }

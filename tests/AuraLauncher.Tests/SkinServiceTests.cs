@@ -170,6 +170,81 @@ public class SkinServiceTests
         }
     }
 
+    [Theory]
+    [InlineData(64, 32)]
+    [InlineData(128, 64)]
+    [InlineData(256, 128)]
+    [InlineData(512, 256)]
+    [InlineData(1024, 512)]
+    [InlineData(22, 17)]
+    [InlineData(64, 64)]
+    [System.STAThread]
+    public void ValidateCapeBytes_SupportedDimensions_ReturnsSuccess(int width, int height)
+    {
+        var skinService = new SkinService();
+        var bmp = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, new byte[width * height * 4], width * 4);
+        using var ms = new MemoryStream();
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(bmp));
+        enc.Save(ms);
+        byte[] bytes = ms.ToArray();
+
+        var res = skinService.ValidateCapeBytes(bytes);
+        Assert.True(res.IsValid);
+        Assert.Equal(width, res.Width);
+        Assert.Equal(height, res.Height);
+    }
+
+    [Theory]
+    [InlineData(1025, 512)]
+    [InlineData(1024, 513)]
+    [InlineData(2048, 1024)]
+    [InlineData(100, 100)]
+    [InlineData(500, 250)]
+    [System.STAThread]
+    public void ValidateCapeBytes_UnsupportedDimensions_ReturnsError(int width, int height)
+    {
+        var skinService = new SkinService();
+        var bmp = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, new byte[width * height * 4], width * 4);
+        using var ms = new MemoryStream();
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(bmp));
+        enc.Save(ms);
+        byte[] bytes = ms.ToArray();
+
+        var res = skinService.ValidateCapeBytes(bytes);
+        Assert.False(res.IsValid);
+        Assert.Contains("Неподдерживаемый размер", res.ErrorMessage);
+    }
+
+    [Fact]
+    [System.STAThread]
+    public void ValidateCapeFile_Synthetic1024x512HDCape_ValidatesSuccessfully()
+    {
+        var skinService = new SkinService();
+        var tempFile = Path.Combine(Path.GetTempPath(), $"aura_test_cape_hd1024_{Guid.NewGuid():N}.png");
+        try
+        {
+            var bmp = BitmapSource.Create(1024, 512, 96, 96, PixelFormats.Bgra32, null, new byte[1024 * 512 * 4], 1024 * 4);
+            using (var fs = File.Create(tempFile))
+            {
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bmp));
+                enc.Save(fs);
+            }
+
+            var res = skinService.ValidateCapeFile(tempFile);
+            Assert.True(res.IsValid);
+            Assert.Equal(1024, res.Width);
+            Assert.Equal(512, res.Height);
+            Assert.Null(res.ErrorMessage);
+        }
+        finally
+        {
+            try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { }
+        }
+    }
+
     [Fact]
     [System.STAThread]
     public async Task SaveToManagedStorageAsync_SameContent_ProducesSamePathAndHash()

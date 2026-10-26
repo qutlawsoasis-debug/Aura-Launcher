@@ -1175,9 +1175,48 @@ public class SkinService : ISkinService
             return new SkinValidationResult(false, "Массив байтов плаща пуст.");
         }
 
-        if (bytes.Length > 1024 * 1024)
+        if (bytes.Length > 2 * 1024 * 1024)
         {
-            return new SkinValidationResult(false, "Файл плаща превышает допустимый размер (1 МБ).");
+            return new SkinValidationResult(false, "Файл плаща превышает допустимый размер (2 МБ).");
+        }
+
+        if (bytes.Length < 24)
+        {
+            return new SkinValidationResult(false, "Файл не является допустимым изображением PNG (слишком мал).");
+        }
+
+        // 1. Проверка сигнатуры PNG до дорогостоящего декодирования
+        if (bytes[0] != 0x89 || bytes[1] != 0x50 || bytes[2] != 0x4E || bytes[3] != 0x47 ||
+            bytes[4] != 0x0D || bytes[5] != 0x0A || bytes[6] != 0x1A || bytes[7] != 0x0A)
+        {
+            return new SkinValidationResult(false, "Файл не является допустимым изображением PNG.");
+        }
+
+        // 2. Чтение IHDR и валидация лимитов (размеры, пиксели, соотношение) ДО создания BitmapDecoder
+        int width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+        int height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+
+        if (width <= 0 || height <= 0)
+        {
+            return new SkinValidationResult(false, "Поврежденные размеры изображения в заголовке PNG.");
+        }
+
+        if (width > 1024 || height > 512 || (long)width * height > 1024 * 512)
+        {
+            return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Превышен максимальный лимит 1024×512.", width, height);
+        }
+
+        // Допустимые размеры плащей в Minecraft и CustomSkinLoader:
+        // - Стандартные 2:1 кратные 64x32 до 1024x512: 64x32 (1x), 128x64 (2x), 256x128 (4x), 512x256 (8x), 1024x512 (16x)
+        // - Классический обрезанный: 22x17
+        // - Квадратный плащ: 64x64
+        bool isStandard2To1 = (width == height * 2) && (width == 64 || width == 128 || width == 256 || width == 512 || width == 1024);
+        bool isClassic = (width == 22 && height == 17);
+        bool isSquare = (width == 64 && height == 64);
+
+        if (!isStandard2To1 && !isClassic && !isSquare)
+        {
+            return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Требуются размеры формата 2:1 (64×32, 128×64, 256×128, 512×256, 1024×512) либо 22×17, 64×64.", width, height);
         }
 
         try
@@ -1190,20 +1229,12 @@ public class SkinService : ISkinService
             }
 
             var frame = decoder.Frames[0];
-            int width = frame.PixelWidth;
-            int height = frame.PixelHeight;
-
-            // Допустимые размеры плащей в Minecraft и CustomSkinLoader:
-            // 64x32 (стандартный), 22x17 (классический), 64x64, 128x64 (HD)
-            if ((width == 64 && height == 32) ||
-                (width == 22 && height == 17) ||
-                (width == 64 && height == 64) ||
-                (width == 128 && height == 64))
+            if (frame.PixelWidth != width || frame.PixelHeight != height)
             {
-                return new SkinValidationResult(true, null, width, height);
+                return new SkinValidationResult(false, "Несоответствие фактических размеров кадра заголовку PNG.", frame.PixelWidth, frame.PixelHeight);
             }
 
-            return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Требуется 64×32 (или 22×17, 64×64, 128×64).", width, height);
+            return new SkinValidationResult(true, null, width, height);
         }
         catch (Exception ex)
         {
@@ -1231,13 +1262,54 @@ public class SkinService : ISkinService
                 return new SkinValidationResult(false, "Файл плаща поврежден (0 байт).");
             }
 
-            if (fileInfo.Length > 1024 * 1024)
+            if (fileInfo.Length > 2 * 1024 * 1024)
             {
-                return new SkinValidationResult(false, "Файл плаща превышает допустимый размер (1 МБ).");
+                return new SkinValidationResult(false, "Файл плаща превышает допустимый размер (2 МБ).");
             }
 
-            int width = 0;
-            int height = 0;
+            if (fileInfo.Length < 24)
+            {
+                return new SkinValidationResult(false, "Файл не является допустимым изображением PNG (слишком мал).");
+            }
+
+            // Читаем заголовок PNG (24 байта) ДО полной загрузки и декодирования
+            byte[] header = new byte[24];
+            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                int read = fs.Read(header, 0, 24);
+                if (read < 24)
+                {
+                    return new SkinValidationResult(false, "Файл поврежден (не удалось прочитать заголовок PNG).");
+                }
+            }
+
+            if (header[0] != 0x89 || header[1] != 0x50 || header[2] != 0x4E || header[3] != 0x47 ||
+                header[4] != 0x0D || header[5] != 0x0A || header[6] != 0x1A || header[7] != 0x0A)
+            {
+                return new SkinValidationResult(false, "Файл не является допустимым изображением PNG.");
+            }
+
+            int width = (header[16] << 24) | (header[17] << 16) | (header[18] << 8) | header[19];
+            int height = (header[20] << 24) | (header[21] << 16) | (header[22] << 8) | header[23];
+
+            if (width <= 0 || height <= 0)
+            {
+                return new SkinValidationResult(false, "Поврежденные размеры изображения в заголовке PNG.");
+            }
+
+            if (width > 1024 || height > 512 || (long)width * height > 1024 * 512)
+            {
+                return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Превышен максимальный лимит 1024×512.", width, height);
+            }
+
+            bool isStandard2To1 = (width == height * 2) && (width == 64 || width == 128 || width == 256 || width == 512 || width == 1024);
+            bool isClassic = (width == 22 && height == 17);
+            bool isSquare = (width == 64 && height == 64);
+
+            if (!isStandard2To1 && !isClassic && !isSquare)
+            {
+                return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Требуются размеры формата 2:1 (64×32, 128×64, 256×128, 512×256, 1024×512) либо 22×17, 64×64.", width, height);
+            }
 
             using (var stream = File.OpenRead(filePath))
             {
@@ -1248,21 +1320,13 @@ public class SkinService : ISkinService
                 }
 
                 var frame = decoder.Frames[0];
-                width = frame.PixelWidth;
-                height = frame.PixelHeight;
+                if (frame.PixelWidth != width || frame.PixelHeight != height)
+                {
+                    return new SkinValidationResult(false, "Несоответствие фактических размеров кадра заголовку PNG.", frame.PixelWidth, frame.PixelHeight);
+                }
             }
 
-            // Допустимые размеры плащей в Minecraft и CustomSkinLoader:
-            // 64x32 (стандартный), 22x17 (классический), 64x64, 128x64 (HD)
-            if ((width == 64 && height == 32) ||
-                (width == 22 && height == 17) ||
-                (width == 64 && height == 64) ||
-                (width == 128 && height == 64))
-            {
-                return new SkinValidationResult(true, null, width, height);
-            }
-
-            return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Требуется 64×32 (или 22×17, 64×64, 128×64).", width, height);
+            return new SkinValidationResult(true, null, width, height);
         }
         catch (Exception ex)
         {

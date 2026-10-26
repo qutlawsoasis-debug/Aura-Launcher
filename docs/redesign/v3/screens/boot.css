@@ -180,17 +180,25 @@ html.booting .brand { opacity: 0; }
   max-height: calc(100vh - 230px);
   width: min(460px, 100%);
   padding: 22px 24px 20px;
+  opacity: 1;
+  transform: none;
   transition: opacity 320ms var(--ease-out), transform 320ms var(--ease-out);
   border-radius: 26px;
   pointer-events: auto;
   background: var(--glass-sheen), rgba(30, 32, 40, 0.7);
   border: var(--glass-panel-border);
   box-shadow: var(--glass-panel-shadow);
-  animation: boot-in 800ms var(--spring) both;
+  animation: boot-in 800ms var(--spring);
 }
 .boot-news[hidden] { display: none; }
-/* «Поехали»: карточка гаснет, но держит место — капсула не прыгает перед полётом */
-.boot-news.gone { opacity: 0; transform: translateY(-10px) scale(0.98); pointer-events: none; }
+/* «Поехали»: карточка гаснет, согласованный выход с island transition */
+.boot-news.gone {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.98);
+  pointer-events: none;
+  animation: none;
+  transition: opacity 320ms var(--ease-out), transform 320ms var(--ease-out);
+}
 .boot-news-head { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 14px; }
 .boot-news-badge {
   padding: 4px 10px;
@@ -245,10 +253,18 @@ html.booting .brand { opacity: 0; }
 .boot.leaving .boot-version,
 .boot.leaving .boot-news {
   opacity: 0;
-  transition: opacity 700ms var(--ease-out);
+  transform: translateY(-16px) scale(0.98);
+  transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
 }
 
 /* Упрощение */
+@media (prefers-reduced-motion: reduce) {
+  .boot-news,
+  .boot-news.gone {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 html[data-effects="low"] .boot-aurora .a2,
 html[data-effects="low"] .boot-aurora .a3 { display: none; }
 html[data-effects="off"] .boot *,
