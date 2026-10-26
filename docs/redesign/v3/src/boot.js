@@ -7,6 +7,19 @@
 (function () {
   'use strict';
 
+  // Применение сохранённой темы и режима эффектов до первого кадра
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    const th = sp.get('theme') || localStorage.getItem('aura_theme');
+    if (th && /^[a-z0-9_-]{3,32}$/.test(th)) {
+      document.documentElement.setAttribute('data-theme', th);
+    }
+    const fx = sp.get('effects') || localStorage.getItem('aura_effects');
+    if (fx && (fx === 'full' || fx === 'low' || fx === 'off')) {
+      document.documentElement.setAttribute('data-effects', fx);
+    }
+  } catch (_) {}
+
   const MIN_SHOW_MS = 1500;
 
   function initBoot() {
@@ -39,7 +52,8 @@
     }
 
     const startedAt = performance.now();
-    const effectsOff = () => root.dataset.effects === 'off';
+    const effectsOff = () => root.dataset.effects === 'off' ||
+      Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     let finished = false;
     let waitNews = null;
 
@@ -166,10 +180,77 @@
         newsList.appendChild(li);
       });
       news.hidden = false;
-      waitNews = new Promise(resolve => newsGo.addEventListener('click', () => {
-        news.classList.add('gone');
-        setTimeout(resolve, 200);
-      }, { once: true }));
+      news.classList.remove('gone');
+      if (newsGo) {
+        newsGo.disabled = false;
+        newsGo.removeAttribute('aria-disabled');
+      }
+
+      waitNews = new Promise(resolve => {
+        let isExiting = false;
+
+        const onGo = () => {
+          if (isExiting) return;
+          isExiting = true;
+
+          // Double-click safety & control/focus protection
+          if (newsGo) {
+            newsGo.disabled = true;
+            newsGo.setAttribute('aria-disabled', 'true');
+          }
+          news.style.pointerEvents = 'none';
+          if (document.activeElement === newsGo || news.contains(document.activeElement)) {
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+              document.activeElement.blur();
+            }
+          }
+
+          // Immediate exit for reduced motion
+          if (effectsOff()) {
+            news.classList.add('gone');
+            news.hidden = true;
+            resolve();
+            return;
+          }
+
+          // Harmonized exit motion: transform/opacity matching island transition, no bounce
+          news.style.animation = 'none';
+          void news.offsetHeight;
+          news.classList.add('gone');
+
+          let completed = false;
+          let fallbackTimer = null;
+
+          const finishExit = () => {
+            if (completed) return;
+            completed = true;
+            if (fallbackTimer) {
+              clearTimeout(fallbackTimer);
+              fallbackTimer = null;
+            }
+            news.removeEventListener('transitionend', onTransitionEnd);
+            // DOM display/hidden only after completion
+            news.hidden = true;
+            resolve();
+          };
+
+          const onTransitionEnd = (e) => {
+            if (e.target === news && (e.propertyName === 'opacity' || e.propertyName === 'transform')) {
+              finishExit();
+            }
+          };
+
+          news.addEventListener('transitionend', onTransitionEnd);
+          // Bounded cleanup fallback (320ms transition + 60ms grace window)
+          fallbackTimer = setTimeout(finishExit, 380);
+        };
+
+        if (newsGo) {
+          newsGo.addEventListener('click', onGo);
+        } else {
+          resolve();
+        }
+      });
     }
 
     retryBtn.addEventListener('click', () => { actions.hidden = true; window.AuraBridge.send('startup.retry').catch(() => {}); });
@@ -195,8 +276,8 @@
   window.AuraChangelog = function (info) {
     const items = (info && info.changelog) || [];
     const sheet = document.createElement('div');
-    sheet.className = 'ach-sheet';
-    sheet.innerHTML = `<div class="ach-panel" style="width:min(560px,100%)">
+    sheet.className = 'ach-sheet changelog-sheet';
+    sheet.innerHTML = `<div class="ach-panel changelog-panel" style="width:min(560px,100%)">
       <div class="ach-head">
         <div style="flex:1"><h2 style="margin:0">Что нового</h2><div class="small dim"></div></div>
         <button type="button" class="close" aria-label="Закрыть">✕</button>
@@ -211,11 +292,66 @@
       li.textContent = String(line).replace(/^\[[^\]]+\]\s*/, '');
       list.appendChild(li);
     });
-    const close = () => {
-      sheet.classList.remove('show');
-      setTimeout(() => sheet.remove(), 320);
-      document.removeEventListener('keydown', onKey, true);
+
+    const isReduced = () => {
+      try {
+        return document.documentElement.dataset.effects === 'off' ||
+          Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      } catch (_) {
+        return false;
+      }
     };
+
+    let closing = false;
+    let fallbackTimer = null;
+
+    const cleanupAndRemove = () => {
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+      sheet.removeEventListener('transitionend', onTransitionEnd);
+      document.removeEventListener('keydown', onKey, true);
+      if (sheet.parentNode) {
+        sheet.remove();
+      }
+    };
+
+    const onTransitionEnd = (e) => {
+      if (e.target === sheet && e.propertyName === 'opacity') {
+        cleanupAndRemove();
+      }
+    };
+
+    const close = () => {
+      if (closing) return;
+      closing = true;
+
+      // Safe control / focus release
+      const closeBtn = sheet.querySelector('.close');
+      if (closeBtn) {
+        closeBtn.disabled = true;
+        closeBtn.setAttribute('aria-disabled', 'true');
+      }
+      if (sheet.contains(document.activeElement)) {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+          document.activeElement.blur();
+        }
+      }
+      document.removeEventListener('keydown', onKey, true);
+
+      // Reduced motion: immediate unmount
+      if (isReduced()) {
+        cleanupAndRemove();
+        return;
+      }
+
+      // Smooth transform / opacity transition out
+      sheet.classList.remove('show');
+      sheet.addEventListener('transitionend', onTransitionEnd);
+      fallbackTimer = setTimeout(cleanupAndRemove, 380);
+    };
+
     const onKey = e => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
     sheet.querySelector('.close').addEventListener('click', close);
     sheet.addEventListener('click', e => { if (e.target === sheet) close(); });

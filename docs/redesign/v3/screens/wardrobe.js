@@ -218,16 +218,19 @@
           b.classList.toggle('on', isMatch);
         });
         const customThumb = document.getElementById('customCapeThumb');
+        const customIcon = customThumb ? customThumb.querySelector('.cape-action-icon') : null;
         if (currentCape === 'custom' && customCapeUrl) {
           if (customThumb) {
-            customThumb.textContent = '';
+            if (customIcon) customIcon.style.display = 'none';
             customThumb.style.backgroundImage = `url('${customCapeUrl}')`;
+            customThumb.classList.add('has-texture');
           }
           if (viewer) viewer.loadCape(customCapeUrl);
         } else if (currentCape === 'none') {
-          if (customThumb) {
-            customThumb.textContent = '+';
+          if (customThumb && !customCapeUrl) {
+            if (customIcon) customIcon.style.display = '';
             customThumb.style.backgroundImage = 'none';
+            customThumb.classList.remove('has-texture');
           }
           if (viewer) viewer.resetCape();
         } else if (capeImages[currentCape]) {
@@ -427,6 +430,27 @@
         console.warn('[wardrobe] #capeFileInput not found in DOM');
       }
 
+      function formatHistoryName(item) {
+        const raw = (item.name || item.id || '').trim();
+        const base = raw.replace(/\.png$/i, '');
+        // Check if raw name is a pure hex hash
+        const isHexHash = /^[a-f0-9]{12,64}$/i.test(base);
+        const typeLabel = item.type === 'cape' ? 'Плащ' : 'Скин';
+        if (isHexHash) {
+          const shortHash = base.slice(0, 6);
+          return {
+            title: `${typeLabel} #${shortHash}`,
+            badge: typeLabel,
+            tooltip: raw
+          };
+        }
+        return {
+          title: base,
+          badge: typeLabel,
+          tooltip: raw
+        };
+      }
+
       function loadWardrobeHistory() {
         const container = document.getElementById('wardrobeHistoryList');
         const counter = document.getElementById('historyCounter');
@@ -445,7 +469,7 @@
 
             container.innerHTML = '';
             if (total === 0) {
-              container.innerHTML = '<div class="hint" style="padding:6px 0;font-size:12px">История пуста. Загрузите скин или плащ.</div>';
+              container.innerHTML = '<div class="wardrobe-history-empty">История пуста. Загрузите скин или плащ.</div>';
               return;
             }
 
@@ -453,62 +477,87 @@
             allItems.sort((a, b) => new Date(b.createdUtc || 0) - new Date(a.createdUtc || 0));
 
             allItems.forEach(item => {
+              const nameInfo = formatHistoryName(item);
+
               const row = document.createElement('div');
               row.className = 'wardrobe-history-item' + (item.isCurrent ? ' is-current' : '');
 
-              const badge = document.createElement('span');
-              badge.className = 'wardrobe-history-badge';
-              badge.textContent = item.type === 'cape' ? 'Плащ' : 'Скин';
+              // Real miniature thumbnail using item.dataUrl
+              const thumb = document.createElement('div');
+              thumb.className = 'wardrobe-history-thumb ' + (item.type === 'cape' ? 'is-cape' : 'is-skin');
+              if (item.dataUrl) {
+                if (item.type === 'cape') {
+                  thumb.style.backgroundImage = `url("${item.dataUrl}")`;
+                } else {
+                  thumb.style.backgroundImage = `url("${item.dataUrl}"), url("${item.dataUrl}")`;
+                }
+              }
+
+              const info = document.createElement('div');
+              info.className = 'wardrobe-history-info';
 
               const name = document.createElement('span');
               name.className = 'wardrobe-history-name';
-              name.textContent = item.name || item.id;
-              name.title = item.name || item.id;
+              name.textContent = nameInfo.title;
+              name.title = nameInfo.tooltip;
+
+              const badge = document.createElement('span');
+              badge.className = 'wardrobe-history-badge';
+              badge.textContent = nameInfo.badge;
+
+              info.appendChild(name);
+              info.appendChild(badge);
 
               const actions = document.createElement('div');
-              actions.style.display = 'flex';
-              actions.style.gap = '4px';
+              actions.className = 'wardrobe-history-actions';
 
-              const applyBtn = document.createElement('button');
-              applyBtn.type = 'button';
-              applyBtn.className = 'btn xs';
-              applyBtn.textContent = item.isCurrent ? 'Надет' : 'Надеть';
-              applyBtn.disabled = !!item.isCurrent;
-              applyBtn.addEventListener('click', () => {
-                sendBridge('wardrobe.apply', { id: item.id })
-                  .then(() => {
-                    if (item.type === 'cape') {
-                      applyCape('custom', item.dataUrl);
-                      showCapeSide();
-                      if (typeof window.showToast === 'function') window.showToast('Плащ «' + item.name + '» применён', 'success');
-                    } else {
-                      if (viewer) viewer.loadSkin(item.dataUrl);
-                      updateSkinUI(item.dataUrl, item.name, item.model);
-                      if (typeof window.showToast === 'function') window.showToast('Скин «' + item.name + '» применён', 'success');
-                    }
-                    loadWardrobeHistory();
-                  })
-                  .catch(err => {
-                    if (typeof window.showToast === 'function') window.showToast('Ошибка: ' + (err.message || err), 'error');
-                  });
-              });
+              if (item.isCurrent) {
+                const statusPill = document.createElement('span');
+                statusPill.className = 'wardrobe-history-status';
+                statusPill.textContent = 'Надет';
+                actions.appendChild(statusPill);
+              } else {
+                const applyBtn = document.createElement('button');
+                applyBtn.type = 'button';
+                applyBtn.className = 'btn xs';
+                applyBtn.textContent = 'Надеть';
+                applyBtn.addEventListener('click', () => {
+                  sendBridge('wardrobe.apply', { id: item.id })
+                    .then(() => {
+                      if (item.type === 'cape') {
+                        applyCape('custom', item.dataUrl);
+                        showCapeSide();
+                        if (typeof window.showToast === 'function') window.showToast('Плащ «' + nameInfo.title + '» применён', 'success');
+                      } else {
+                        if (viewer) viewer.loadSkin(item.dataUrl);
+                        updateSkinUI(item.dataUrl, item.name, item.model);
+                        if (typeof window.showToast === 'function') window.showToast('Скин «' + nameInfo.title + '» применён', 'success');
+                      }
+                      loadWardrobeHistory();
+                    })
+                    .catch(err => {
+                      if (typeof window.showToast === 'function') window.showToast('Ошибка: ' + (err.message || err), 'error');
+                    });
+                });
+                actions.appendChild(applyBtn);
+              }
 
               const delBtn = document.createElement('button');
               delBtn.type = 'button';
-              delBtn.className = 'btn xs ghost';
+              delBtn.className = 'wardrobe-history-del';
               delBtn.textContent = '✕';
               delBtn.title = 'Удалить из истории';
+              delBtn.setAttribute('aria-label', `Удалить ${nameInfo.title} из истории`);
               delBtn.addEventListener('click', () => {
                 sendBridge('wardrobe.delete', { id: item.id })
                   .then(() => {
                     loadWardrobeHistory();
                   });
               });
-
-              row.appendChild(badge);
-              row.appendChild(name);
-              actions.appendChild(applyBtn);
               actions.appendChild(delBtn);
+
+              row.appendChild(thumb);
+              row.appendChild(info);
               row.appendChild(actions);
               container.appendChild(row);
             });

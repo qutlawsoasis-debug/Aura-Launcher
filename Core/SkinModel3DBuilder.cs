@@ -324,7 +324,10 @@ public static class SkinModel3DBuilder
         {
             try
             {
-                var capeUpscaled = UpscaleNearestNeighbor(capeBmp, 8);
+                int capeW = capeBmp.PixelWidth;
+                int capeH = capeBmp.PixelHeight;
+                int upscaleFactor = Math.Max(1, 512 / Math.Max(1, capeW));
+                var capeUpscaled = upscaleFactor > 1 ? UpscaleNearestNeighbor(capeBmp, upscaleFactor) : capeBmp;
                 var capeBrush = new ImageBrush(capeUpscaled)
                 {
                     ViewportUnits = BrushMappingMode.Absolute,
@@ -335,10 +338,13 @@ public static class SkinModel3DBuilder
                 var capeMaterial = new DiffuseMaterial(capeBrush);
                 if (capeMaterial.CanFreeze) capeMaterial.Freeze();
 
+                int scaleX = (capeW == 22 && capeH == 17) ? 1 : Math.Max(1, capeW / 64);
+                int scaleY = (capeW == 22 && capeH == 17) ? 1 : Math.Max(1, capeH / 32);
+
                 var capeModel = CreateCuboidModel(
                     -5, 5, -8, 8, -3.2, -2.2,
-                    0, 0, 10, 16, 1,
-                    capeMaterial, capeBmp.PixelWidth, capeBmp.PixelHeight, limbPart: PlayerLimbPart.None);
+                    0, 0, 10 * scaleX, 16 * scaleY, 1 * scaleX,
+                    capeMaterial, capeW, capeH, limbPart: PlayerLimbPart.None);
 
                 if (capeModel != null)
                 {

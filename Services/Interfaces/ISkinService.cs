@@ -80,7 +80,7 @@ public interface ISkinService
     void ClearCustomSkinLoaderCache(string gameDir);
 
     /// <summary>
-    /// Валидация файла плаща (проверка существования, целостности и размеров 64x32, 22x17, 64x64 или 128x64).
+    /// Валидация файла плаща (проверка существования, целостности и допустимых размеров 2:1 от 64x32 до 1024x512, 22x17 или 64x64).
     /// </summary>
     SkinValidationResult ValidateCapeFile(string? filePath) => new SkinValidationResult(false, "Not implemented");
 

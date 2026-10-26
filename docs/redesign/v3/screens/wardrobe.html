@@ -14,13 +14,22 @@
         <div class="cape-thumb cape-thumb-silver"></div>
         <span class="cape-title">Серебряный</span>
       </button>
-      <label class="cape" id="capeUploadLabel" title="Загрузить свой плащ (.png)" style="cursor:pointer">
-        <div class="cape-thumb cape-thumb-custom" id="customCapeThumb">+</div>
+      <label class="cape cape-import" id="capeUploadLabel" title="Загрузить свой плащ (.png)" style="cursor:pointer">
+        <div class="cape-thumb cape-thumb-custom" id="customCapeThumb">
+          <svg class="cape-action-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 2.5v7M5 6.5L8 9.5l3-3M3 12.5h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <span class="cape-title" id="customCapeTitle">Свой</span>
         <input type="file" id="capeFileInput" accept="image/png" style="display:none">
       </label>
-      <button type="button" class="cape" data-cape="none" title="Без плаща">
-        <div class="cape-thumb cape-thumb-none">✕</div>
+      <button type="button" class="cape cape-none" data-cape="none" title="Без плаща">
+        <div class="cape-thumb cape-thumb-none">
+          <svg class="cape-action-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2 2"/>
+            <path d="M3.5 10.5L10.5 3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+        </div>
         <span class="cape-title">Без плаща</span>
       </button>
     </div>
@@ -65,8 +74,8 @@
       <button type="button" class="btn sm" id="btnAchOpen">Открыть</button>
     </div>
 
-    <div class="wardrobe-history-section" style="margin-top:10px">
-      <div class="small dim" style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+    <div class="wardrobe-history-section">
+      <div class="wardrobe-history-head">
         <span>История гардероба</span>
         <span class="hint" id="historyCounter">0 файлов</span>
       </div>
