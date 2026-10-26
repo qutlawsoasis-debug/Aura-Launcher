@@ -57,7 +57,12 @@
 
     <div class="row">
       <span>Ник</span>
-      <input class="field" id="inputPlayerNickname" value="Player" style="width:170px;height:40px">
+      <input class="field" id="inputPlayerNickname" value="" placeholder="Ваш ник" maxlength="16" autocomplete="off" spellcheck="false" style="width:170px;height:40px">
+    </div>
+
+    <div class="row">
+      <span>Достижения<span class="hint" id="achHint">—</span></span>
+      <button type="button" class="btn sm" id="btnAchOpen">Открыть</button>
     </div>
 
     <div class="wardrobe-history-section" style="margin-top:10px">

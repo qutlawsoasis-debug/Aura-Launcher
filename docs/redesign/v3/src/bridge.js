@@ -328,6 +328,10 @@
       return Promise.resolve({ success: true, path: 'mock/mods' });
     }
 
+    if (name === 'fs.openGameFolder') {
+      return Promise.resolve({ success: true, path: 'mock/.aura' });
+    }
+
     if (!scope.__mockSkinData) {
       scope.__mockSkinData = {
         nickname: 'Player',

@@ -15,10 +15,11 @@ import '../screens/update.css';
 import '../screens/boot.css';
 import '../screens/achievements.css';
 
-// JS modules in exact tag order
+// JS modules in exact tag order: core infrastructure & shared init first
 import './perf-hud.js';
 import './themes.js';
 import './bridge.js';
+import './shared-init.js';
 import './profile.js';
 import './skins.js';
 import './update.js';
@@ -26,13 +27,13 @@ import './boot.js';
 import './protocol.js';
 import '../assets/js/demo-data.js';
 import '../assets/js/core.js';
+import '../screens/settings.js';
 import '../screens/play.js';
 import '../screens/map.js';
 import '../screens/lobby.js';
 import '../screens/cloud.js';
 import '../screens/friends.js';
-import '../screens/wardrobe.js';
 import '../screens/workshop.js';
 import '../screens/worlds.js';
 import '../screens/achievements.js';
-import '../screens/settings.js';
+import '../screens/wardrobe.js';

@@ -25,7 +25,7 @@
   </div>
   <div class="theme-cards" role="radiogroup" aria-label="Тема оформления" id="themeRadioGroup">
     <div class="theme-card selected" role="radio" tabindex="0" aria-checked="true" data-theme-id="frost" id="themeCard_frost">
-      <div class="theme-preview preview-frost">
+      <div class="theme-preview preview-frost" aria-hidden="true">
         <div class="mini-capsule">
           <span class="mini-dot"></span>
           <span class="mini-bar"></span>
@@ -41,7 +41,7 @@
       </div>
     </div>
     <div class="theme-card" role="radio" tabindex="-1" aria-checked="false" data-theme-id="liquid" id="themeCard_liquid">
-      <div class="theme-preview preview-liquid">
+      <div class="theme-preview preview-liquid" aria-hidden="true">
         <div class="mini-capsule">
           <span class="mini-dot"></span>
           <span class="mini-bar"></span>
@@ -74,12 +74,16 @@
   <span class="toggle on" id="toggleHideOnLaunch"></span>
 </div>
 <div class="row">
-  <span>Автообновление<span class="hint">Фоновое обновление через Velopack</span></span>
+  <span>Автообновление<span class="hint">Проверять новую версию при запуске и в фоне</span></span>
   <span class="toggle on" id="toggleAutoUpdate"></span>
 </div>
 <div class="row">
-  <span>Останавливать туннель при выходе</span>
-  <span class="toggle on" id="toggleStopTunnelOnExit"></span>
+  <span>Статус в Discord<span class="hint">«В лаунчере», «В лобби», «В игре»</span></span>
+  <span class="toggle on" id="toggleDiscordRpc"></span>
+</div>
+<div class="row">
+  <span>Что нового<span class="hint" id="changelogHint">Список изменений версии</span></span>
+  <button type="button" class="btn sm" id="btnChangelog">Открыть</button>
 </div>
 
 <div class="group-title">Игра</div>
