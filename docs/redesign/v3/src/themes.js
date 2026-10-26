@@ -143,6 +143,7 @@ export function initThemeBootstrap() {
   applyTheme(resolved, { save: true, sendToHost: false });
   verifySvgFilterSupport();
   initSpecularTracker();
+  initLiquidDisplacement();
 }
 
 /* ================= 4. SPECULAR CURSOR TRACKING (LIQUID FULL EFFECTS) ================= */
@@ -201,6 +202,150 @@ function initSpecularTracker() {
   }
 }
 
+/* ================= 5. LIQUID EDGE DISPLACEMENT MAP GENERATOR ================= */
+let lastEdgeMapKey = '';
+let liquidResizeObserver = null;
+
+export function updateLiquidDisplacementMap(width, height, borderRadius) {
+  if (typeof document === 'undefined') return;
+  const feImage = document.getElementById('auraLiquidEdgeMap');
+  if (!feImage) return;
+
+  const w = Math.max(64, Math.round(width || 400));
+  const h = Math.max(32, Math.round(height || 76));
+  const r = Math.max(0, Math.min(Math.min(w, h) / 2, Math.round(borderRadius ?? 38)));
+  const rim = 16;
+  const key = `${w}x${h}r${r}`;
+  if (key === lastEdgeMapKey) return;
+  lastEdgeMapKey = key;
+
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const imgData = ctx.createImageData(w, h);
+    const buf32 = new Uint32Array(imgData.data.buffer);
+    buf32.fill(0xFF808080); // Little-endian 32-bit: Alpha=255, Blue=128, Green=128, Red=128
+
+    const setPixel = (x, y, nx, ny, dist) => {
+      if (x < 0 || x >= w || y < 0 || y >= h) return;
+      const factor = Math.max(0, 1 - dist / rim);
+      const R = Math.round(128 + nx * 127 * factor);
+      const G = Math.round(128 + ny * 127 * factor);
+      buf32[y * w + x] = 0xFF000000 | (128 << 16) | (G << 8) | R;
+    };
+
+    // Straight edges:
+    // Top: inward is downward (+y, ny = 1, nx = 0)
+    // Bottom: inward is upward (-y, ny = -1, nx = 0)
+    for (let x = r; x < w - r; x++) {
+      for (let d = 0; d < rim; d++) {
+        setPixel(x, d, 0, 1, d);
+        setPixel(x, h - 1 - d, 0, -1, d);
+      }
+    }
+
+    // Left: inward is rightward (+x, nx = 1, ny = 0)
+    // Right: inward is leftward (-x, nx = -1, ny = 0)
+    for (let y = r; y < h - r; y++) {
+      for (let d = 0; d < rim; d++) {
+        setPixel(d, y, 1, 0, d);
+        setPixel(w - 1 - d, y, -1, 0, d);
+      }
+    }
+
+    // 4 rounded corners:
+    const corners = [
+      { cx: r, cy: r },
+      { cx: w - 1 - r, cy: r },
+      { cx: r, cy: h - 1 - r },
+      { cx: w - 1 - r, cy: h - 1 - r }
+    ];
+
+    for (const c of corners) {
+      const minX = Math.max(0, c.cx - r);
+      const maxX = Math.min(w - 1, c.cx + r);
+      const minY = Math.max(0, c.cy - r);
+      const maxY = Math.min(h - 1, c.cy + r);
+      const isLeft = c.cx < w / 2;
+      const isTop = c.cy < h / 2;
+
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          const vx = x - c.cx;
+          const vy = y - c.cy;
+          if ((isLeft ? vx <= 0 : vx >= 0) && (isTop ? vy <= 0 : vy >= 0)) {
+            const distCenter = Math.hypot(vx, vy);
+            const distBorder = r - distCenter;
+            if (distBorder >= 0 && distBorder < rim && distCenter > 0) {
+              const nx = -vx / distCenter;
+              const ny = -vy / distCenter;
+              setPixel(x, y, nx, ny, distBorder);
+            }
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    const dataUrl = canvas.toDataURL('image/png');
+    feImage.setAttribute('href', dataUrl);
+    feImage.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', dataUrl);
+  } catch (err) {
+    console.warn('[THEMES] updateLiquidDisplacementMap error:', err);
+  }
+}
+
+export function initLiquidDisplacement() {
+  if (typeof document === 'undefined') return;
+
+  const refreshMap = () => {
+    if (document.documentElement.getAttribute('data-theme') !== 'liquid') return;
+    const island = document.getElementById('island');
+    if (!island) return;
+    const rect = island.getBoundingClientRect();
+    const style = window.getComputedStyle(island);
+    const br = parseFloat(style.borderRadius) || (island.classList.contains('open') ? 34 : 38);
+    updateLiquidDisplacementMap(rect.width, rect.height, br);
+  };
+
+  const setup = () => {
+    const island = document.getElementById('island');
+    if (!island) return;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      if (liquidResizeObserver) liquidResizeObserver.disconnect();
+      liquidResizeObserver = new ResizeObserver(() => {
+        refreshMap();
+      });
+      liquidResizeObserver.observe(island);
+    }
+
+    island.addEventListener('transitionend', (e) => {
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        refreshMap();
+      }
+    });
+
+    window.addEventListener('aura:themechange', (e) => {
+      if (e.detail && e.detail.theme === 'liquid') {
+        refreshMap();
+      }
+    });
+
+    refreshMap();
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setup, { once: true });
+  } else {
+    setup();
+  }
+}
+
 // Automatically bootstrap theme immediately upon evaluation
 if (typeof document !== 'undefined') {
   initThemeBootstrap();
@@ -216,6 +361,8 @@ if (typeof window !== 'undefined') {
     getAvailableThemes,
     applyTheme,
     initThemeBootstrap,
-    verifySvgFilterSupport
+    verifySvgFilterSupport,
+    updateLiquidDisplacementMap,
+    initLiquidDisplacement
   };
 }

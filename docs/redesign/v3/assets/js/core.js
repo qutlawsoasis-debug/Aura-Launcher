@@ -79,12 +79,20 @@
     const body = sec && sec.querySelector('.sec-body');
     const foot = sec && sec.querySelector('.sec-foot');
     if (!sec || !head || !body || !foot) return 0;
-    const prev = [body.style.flex, body.style.height];
-    body.style.flex = 'none';
-    body.style.height = 'auto';
-    const bodyH = body.scrollHeight;
-    body.style.flex = prev[0];
-    body.style.height = prev[1];
+    // .sec-body — сам скролл-контейнер (overflow-y:auto): прежний замер через
+    // flex:none + height:auto мгновенно клампил scrollTop в 0, и любая прокрутка
+    // раздела сбрасывалась при каждом fitIsland (фоновые обновления, resize).
+    // Замер через padding-bottom: scrollHeight только растёт, клампа нет,
+    // значение эквивалентно прежнему (scrollHeight - PROBE).
+    const SCROLL_PROBE = 1048576;
+    const prevPaddingBottom = body.style.paddingBottom;
+    // Проба пишется inline поверх каскада, поэтому базой берём фактический computed
+    // padding-bottom (например, 10px из stylesheet), а не inline-значение — иначе
+    // замер теряет исходный паддинг контейнера.
+    const computedPadBottom = parseFloat(getComputedStyle(body).paddingBottom) || 0;
+    body.style.paddingBottom = computedPadBottom + SCROLL_PROBE + 'px';
+    const bodyH = body.scrollHeight - SCROLL_PROBE;
+    body.style.paddingBottom = prevPaddingBottom;
     const cs = getComputedStyle(sec);
     const headCs = getComputedStyle(head);
     return Math.ceil(parseFloat(cs.paddingTop) + head.offsetHeight + parseFloat(headCs.marginBottom) + bodyH + foot.offsetHeight + 4);
