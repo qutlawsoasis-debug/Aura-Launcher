@@ -228,6 +228,7 @@ public partial class WebBridge
             if (_skinService != null)
             {
                 await _skinService.SyncCapeToGameAsync(fullPath, cfg.Nickname, cfg.GameDir);
+                _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
             }
 
             _ = SetLobbyApiCapeAsync("none");
@@ -239,13 +240,19 @@ public partial class WebBridge
         {
             cfg.SkinPath = fullPath;
             cfg.SkinOriginalName = item.Name;
-            cfg.SkinModel = item.Model ?? "default";
+            string model = item.Model;
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                model = SkinService.DetectIsSlim(fullPath) ? "slim" : "default";
+            }
+            cfg.SkinModel = model;
             await _configService.SaveConfigAsync(cfg);
 
             string? uploadError = null;
             if (_skinService != null)
             {
                 await _skinService.SyncSkinToGameAsync(fullPath, cfg.Nickname, cfg.GameDir);
+                _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
                 try
                 {
                     var res = await _skinService.UploadSkinToLobbyApiAsync(

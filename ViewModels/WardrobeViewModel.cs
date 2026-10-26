@@ -373,7 +373,17 @@ public class WardrobeViewModel : ObservableObject
         await _configService.SaveConfigAsync(_configService.CurrentConfig);
 
         var cfg = _configService.CurrentConfig;
+        if (!string.IsNullOrWhiteSpace(oldNick) && !string.Equals(oldNick, clean, StringComparison.OrdinalIgnoreCase))
+        {
+            _skinService.CleanupPlayerGameFiles(oldNick, cfg.GameDir);
+        }
+
         await _skinService.SyncSkinToGameAsync(cfg.SkinPath, clean, cfg.GameDir);
+        string? capeToSync = (string.Equals(cfg.CapeId, "custom", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(cfg.CapePath) && File.Exists(cfg.CapePath))
+            ? cfg.CapePath
+            : null;
+        await _skinService.SyncCapeToGameAsync(capeToSync, clean, cfg.GameDir);
+        _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
         _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
 
         OnPropertyChanged(nameof(Nickname));
@@ -432,6 +442,9 @@ public class WardrobeViewModel : ObservableObject
                 return;
             }
 
+            bool isSlim = SkinService.DetectIsSlim(managedPath);
+            string detectedModel = isSlim ? "slim" : "default";
+
             SkinPath = managedPath;
             SkinOriginalName = originalName;
             FormatDescription = validation.Height == 32
@@ -440,6 +453,7 @@ public class WardrobeViewModel : ObservableObject
 
             // Обновляем историю гардероба
             var cfg = _configService.CurrentConfig;
+            cfg.SkinModel = detectedModel;
             cfg.WardrobeHistory ??= new System.Collections.Generic.List<WardrobeItem>();
             string itemId = $"skin_{hash}";
             cfg.WardrobeHistory.RemoveAll(x => string.Equals(x.Hash, hash, StringComparison.OrdinalIgnoreCase) && x.Type == "skin");
@@ -449,16 +463,18 @@ public class WardrobeViewModel : ObservableObject
                 Type = "skin",
                 Name = originalName,
                 Hash = hash,
-                Model = cfg.SkinModel,
+                Model = detectedModel,
                 RelativePath = Path.Combine("skins", $"{hash}.png").Replace('\\', '/'),
                 CreatedUtc = DateTime.UtcNow
             });
             await _configService.SaveConfigAsync(cfg);
+            OnPropertyChanged(nameof(IsSlimModel));
             RefreshHistory();
 
             // Синхронизируем с игрой через единый путь config.GameDir
             var mcDir = _configService.CurrentConfig.GameDir;
             _ = _skinService.SyncSkinToGameAsync(SkinPath, Nickname, mcDir);
+            _skinService.EnsureCustomSkinLoaderConfig(mcDir);
 
             // Загружаем в lobby-api
             _ = UploadCurrentSkinAsync();
@@ -529,6 +545,7 @@ public class WardrobeViewModel : ObservableObject
             RefreshHistory();
 
             await _skinService.SyncCapeToGameAsync(managedPath, Nickname, cfg.GameDir);
+            _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
             _ = SetLobbyApiCapeAsync("none");
 
             IsStatusError = false;
@@ -556,6 +573,7 @@ public class WardrobeViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCapeNone));
 
         await _skinService.SyncCapeToGameAsync(null, Nickname, cfg.GameDir);
+        _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
         await SetLobbyApiCapeAsync(cape);
 
         IsStatusError = false;
@@ -580,6 +598,7 @@ public class WardrobeViewModel : ObservableObject
         OnPropertyChanged(nameof(IsCapeNone));
 
         await _skinService.SyncCapeToGameAsync(null, Nickname, cfg.GameDir);
+        _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
         await SetLobbyApiCapeAsync("none");
 
         IsStatusError = false;
@@ -616,6 +635,7 @@ public class WardrobeViewModel : ObservableObject
             OnPropertyChanged(nameof(IsCapeSilver));
 
             await _skinService.SyncCapeToGameAsync(fullPath, Nickname, cfg.GameDir);
+            _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
             _ = SetLobbyApiCapeAsync("none");
 
             IsStatusError = false;
@@ -626,12 +646,15 @@ public class WardrobeViewModel : ObservableObject
         {
             SkinPath = fullPath;
             SkinOriginalName = item.Name;
-            if (!string.IsNullOrWhiteSpace(item.Model))
+            string model = item.Model;
+            if (string.IsNullOrWhiteSpace(model))
             {
-                IsSlimModel = item.Model == "slim";
+                model = SkinService.DetectIsSlim(fullPath) ? "slim" : "default";
             }
+            IsSlimModel = model == "slim";
             var mcDir = _configService.CurrentConfig.GameDir;
             await _skinService.SyncSkinToGameAsync(SkinPath, Nickname, mcDir);
+            _skinService.EnsureCustomSkinLoaderConfig(mcDir);
             _ = UploadCurrentSkinAsync();
         }
     }

@@ -74,7 +74,7 @@ public class SkinServiceTests
     }
 
     [Fact]
-    public void EnsureCustomSkinLoaderConfig_WritesAuraLobbyAtTopAndBypassesCache()
+    public void EnsureCustomSkinLoaderConfig_ConfiguresLocalSkinFirstAndDisablesTransparency()
     {
         var skinService = new SkinService();
         var tempDir = Path.Combine(Path.GetTempPath(), "AuraSkinTest_" + Guid.NewGuid().ToString("N"));
@@ -93,6 +93,11 @@ public class SkinServiceTests
             Assert.True(node["forceDisableCache"]?.GetValue<bool>());
             Assert.Equal(0, node["cacheExpiry"]?.GetValue<int>());
             Assert.True(node["enableCacheAutoClean"]?.GetValue<bool>());
+            Assert.True(node["forceLoadAllTextures"]?.GetValue<bool>());
+            Assert.False(node["enableTransparentSkin"]?.GetValue<bool>());
+            Assert.True(node["enableCape"]?.GetValue<bool>());
+            Assert.Equal("15.0.1", node["version"]?.GetValue<string>());
+            Assert.Equal(40, node["buildNumber"]?.GetValue<int>());
 
             var loadlist = node["loadlist"] as JsonArray;
             Assert.NotNull(loadlist);
@@ -100,19 +105,86 @@ public class SkinServiceTests
 
             var first = loadlist[0] as JsonObject;
             Assert.NotNull(first);
-            Assert.Equal("AuraLobby", first["name"]?.GetValue<string>());
-            Assert.Equal("CustomSkinAPI", first["type"]?.GetValue<string>());
-            Assert.Equal("https://lobby-api.vercel.app/csl/", first["root"]?.GetValue<string>());
+            Assert.Equal("LocalSkin", first["name"]?.GetValue<string>());
+            Assert.Equal("Legacy", first["type"]?.GetValue<string>());
+            Assert.Equal("auto", first["model"]?.GetValue<string>());
+            Assert.Equal("LocalSkin/skins/{USERNAME}.png", first["skin"]?.GetValue<string>());
+            Assert.Equal("LocalSkin/capes/{USERNAME}.png", first["cape"]?.GetValue<string>());
 
             var second = loadlist[1] as JsonObject;
             Assert.NotNull(second);
-            Assert.Equal("LocalSkin", second["name"]?.GetValue<string>());
-            Assert.Equal("Legacy", second["type"]?.GetValue<string>());
+            Assert.Equal("AuraLobby", second["name"]?.GetValue<string>());
+            Assert.Equal("CustomSkinAPI", second["type"]?.GetValue<string>());
+            Assert.Equal("https://lobby-api.vercel.app/csl/", second["root"]?.GetValue<string>());
         }
         finally
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
+    }
+
+    [Fact]
+    public void EnsureCustomSkinLoaderConfig_MultiInstance_WritesToAllInstances()
+    {
+        var skinService = new SkinService();
+        var tempDir = Path.Combine(Path.GetTempPath(), "AuraSkinMultiTest_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var inst1201 = Path.Combine(tempDir, "instances", "1.20.1");
+            var inst1211 = Path.Combine(tempDir, "instances", "1.21.1");
+            Directory.CreateDirectory(inst1201);
+            Directory.CreateDirectory(inst1211);
+
+            skinService.EnsureCustomSkinLoaderConfig(tempDir);
+
+            var rootCsl = Path.Combine(tempDir, "CustomSkinLoader", "CustomSkinLoader.json");
+            var inst1201Csl = Path.Combine(inst1201, "CustomSkinLoader", "CustomSkinLoader.json");
+            var inst1211Csl = Path.Combine(inst1211, "CustomSkinLoader", "CustomSkinLoader.json");
+
+            Assert.True(File.Exists(rootCsl), "Root CSL config missing");
+            Assert.True(File.Exists(inst1201Csl), "1.20.1 instance CSL config missing");
+            Assert.True(File.Exists(inst1211Csl), "1.21.1 instance CSL config missing");
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    [System.STAThread]
+    public void DetectIsSlim_DetectsAlexSkinCorrectly()
+    {
+        // 64x64 Alex skin has alpha == 0 on col 55 rows 20..31
+        byte[] alexPixels = new byte[64 * 64 * 4];
+        for (int i = 0; i < alexPixels.Length; i += 4)
+        {
+            alexPixels[i] = 100;     // B
+            alexPixels[i + 1] = 100; // G
+            alexPixels[i + 2] = 100; // R
+            alexPixels[i + 3] = 255; // A
+        }
+        // Set col 55, y=20..31 alpha to 0 (Alex slim signature)
+        for (int y = 20; y < 32; y++)
+        {
+            alexPixels[(y * 64 + 55) * 4 + 3] = 0;
+        }
+
+        var alexBmp = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, alexPixels, 64 * 4);
+        Assert.True(SkinService.DetectIsSlim(alexBmp));
+
+        // 64x64 Steve skin has alpha > 0 on col 55 rows 20..31
+        byte[] stevePixels = new byte[64 * 64 * 4];
+        for (int i = 0; i < stevePixels.Length; i += 4)
+        {
+            stevePixels[i + 3] = 255;
+        }
+        var steveBmp = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, stevePixels, 64 * 4);
+        Assert.False(SkinService.DetectIsSlim(steveBmp));
+
+        // 64x32 classic skin is always Steve (false)
+        var classicBmp = BitmapSource.Create(64, 32, 96, 96, PixelFormats.Bgra32, null, new byte[64 * 32 * 4], 64 * 4);
+        Assert.False(SkinService.DetectIsSlim(classicBmp));
     }
 
     [Fact]
@@ -369,6 +441,85 @@ public class SkinServiceTests
         finally
         {
             try { Directory.Delete(customTempDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task CleanupPlayerGameFiles_RemovesSkinAndCapeAcrossInstances()
+    {
+        var skinService = new SkinService();
+        var rootGameDir = Path.Combine(Path.GetTempPath(), "AuraCleanupTest_" + Guid.NewGuid().ToString("N"));
+        var inst1201 = Path.Combine(rootGameDir, "instances", "1.20.1");
+        var inst1211 = Path.Combine(rootGameDir, "instances", "1.21.1");
+        Directory.CreateDirectory(inst1201);
+        Directory.CreateDirectory(inst1211);
+
+        try
+        {
+            var skin1 = Path.Combine(inst1201, "CustomSkinLoader", "LocalSkin", "skins", "OldNick.png");
+            var cape1 = Path.Combine(inst1201, "CustomSkinLoader", "LocalSkin", "capes", "OldNick.png");
+            var skin2 = Path.Combine(inst1211, "CustomSkinLoader", "LocalSkin", "skins", "OldNick.png");
+            var cape2 = Path.Combine(inst1211, "CustomSkinLoader", "LocalSkin", "capes", "OldNick.png");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(skin1)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(cape1)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(skin2)!);
+            Directory.CreateDirectory(Path.GetDirectoryName(cape2)!);
+
+            await File.WriteAllBytesAsync(skin1, new byte[] { 1, 2, 3 });
+            await File.WriteAllBytesAsync(cape1, new byte[] { 4, 5, 6 });
+            await File.WriteAllBytesAsync(skin2, new byte[] { 1, 2, 3 });
+            await File.WriteAllBytesAsync(cape2, new byte[] { 4, 5, 6 });
+
+            skinService.CleanupPlayerGameFiles("OldNick", rootGameDir);
+
+            Assert.False(File.Exists(skin1));
+            Assert.False(File.Exists(cape1));
+            Assert.False(File.Exists(skin2));
+            Assert.False(File.Exists(cape2));
+        }
+        finally
+        {
+            try { Directory.Delete(rootGameDir, recursive: true); } catch { }
+        }
+    }
+
+    [Fact]
+    [System.STAThread]
+    public async Task DetectIsSlim_FromFileAndBytes_DetectsCorrectly()
+    {
+        // 64x64 Alex skin with alpha 0 on col 55, y=20..31
+        byte[] alexPixels = new byte[64 * 64 * 4];
+        for (int i = 0; i < alexPixels.Length; i += 4)
+        {
+            alexPixels[i] = 120;
+            alexPixels[i + 1] = 120;
+            alexPixels[i + 2] = 120;
+            alexPixels[i + 3] = 255;
+        }
+        for (int y = 20; y < 32; y++)
+        {
+            alexPixels[(y * 64 + 55) * 4 + 3] = 0;
+        }
+
+        var alexBmp = BitmapSource.Create(64, 64, 96, 96, PixelFormats.Bgra32, null, alexPixels, 64 * 4);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(alexBmp));
+        using var ms = new MemoryStream();
+        enc.Save(ms);
+        byte[] alexPngBytes = ms.ToArray();
+
+        var tempSkinFile = Path.Combine(Path.GetTempPath(), $"aura_alex_{Guid.NewGuid():N}.png");
+        try
+        {
+            await File.WriteAllBytesAsync(tempSkinFile, alexPngBytes);
+
+            Assert.True(SkinService.DetectIsSlim(alexPngBytes));
+            Assert.True(SkinService.DetectIsSlim(tempSkinFile));
+        }
+        finally
+        {
+            try { if (File.Exists(tempSkinFile)) File.Delete(tempSkinFile); } catch { }
         }
     }
 }

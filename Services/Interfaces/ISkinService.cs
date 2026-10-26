@@ -70,7 +70,9 @@ public interface ISkinService
     Task<(ImageSource SkinTexture, bool IsSlim)> GetSkinTextureForPlayerAsync(string nickname, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Мерж конфига CustomSkinLoader.json: добавление AuraLobby первым источником в loadlist.
+    /// Конфигурация CustomSkinLoader.json: LocalSkin (с auto-моделью) первым, AuraLobby вторым,
+    /// forceLoadAllTextures: true, enableTransparentSkin: false, без кэширования.
+    /// Синхронизирует конфиг во все инстансы (instances/1.20.1, instances/1.21.1) и корень.
     /// </summary>
     void EnsureCustomSkinLoaderConfig(string gameDir);
 
@@ -78,6 +80,11 @@ public interface ISkinService
     /// Очистка папки кэша CustomSkinLoader (<gameDir>/CustomSkinLoader/caches).
     /// </summary>
     void ClearCustomSkinLoaderCache(string gameDir);
+
+    /// <summary>
+    /// Очистка локальных файлов скина и плаща игрока в CustomSkinLoader (<gameDir>/CustomSkinLoader/LocalSkin/...) при смене никнейма.
+    /// </summary>
+    void CleanupPlayerGameFiles(string? nickname, string gameDir) { }
 
     /// <summary>
     /// Валидация файла плаща (проверка существования, целостности и допустимых размеров 2:1 от 64x32 до 1024x512, 22x17 или 64x64).
