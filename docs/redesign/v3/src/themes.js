@@ -242,6 +242,34 @@ let cancelSettleTimer = null;
 let reusableCanvas = null;
 let reusableCtx = null;
 
+export function getGeometryKey(width, height, borderRadius) {
+  const targetW = Math.max(64, Math.round(width || 400));
+  const targetH = Math.max(32, Math.round(height || 76));
+  const targetR = Math.max(0, Math.min(Math.min(targetW, targetH) / 2, Math.round(borderRadius ?? 38)));
+  const w = Math.round(targetW / 2);
+  const h = Math.round(targetH / 2);
+  const r = Math.round(targetR / 2);
+  return `${w}x${h}r${r}`;
+}
+
+export function getIslandTargetRadius(island) {
+  if (!island) return 38;
+  const style = window.getComputedStyle(island);
+  const tokenVal = style.getPropertyValue('--island-target-radius').trim();
+  const parsedToken = parseFloat(tokenVal);
+  if (!isNaN(parsedToken) && parsedToken > 0) {
+    return parsedToken;
+  }
+  const rootStyle = window.getComputedStyle(document.documentElement);
+  const isOpen = island.classList.contains('open');
+  const fallbackToken = rootStyle.getPropertyValue(isOpen ? '--island-radius-open' : '--island-radius-compact').trim();
+  const parsedFallback = parseFloat(fallbackToken);
+  if (!isNaN(parsedFallback) && parsedFallback > 0) {
+    return parsedFallback;
+  }
+  return isOpen ? 34 : 38;
+}
+
 export function updateLiquidDisplacementMap(width, height, borderRadius) {
   if (typeof document === 'undefined') return;
   const feImage = document.getElementById('auraLiquidEdgeMap');
@@ -348,15 +376,49 @@ export function updateLiquidDisplacementMap(width, height, borderRadius) {
 export function initLiquidDisplacement() {
   if (typeof document === 'undefined') return;
 
+  let lastPreparedKey = '';
+
+  const getIslandDimensions = (island, useStyleTarget = false) => {
+    if (!island) return null;
+    const parseDim = (val, fallback) => {
+      const n = parseFloat(val);
+      return (!isNaN(n) && n > 0) ? n : fallback;
+    };
+    let w, h;
+    if (useStyleTarget) {
+      w = parseDim(island.style.width, island.offsetWidth || 400);
+      h = parseDim(island.style.height, island.offsetHeight || 76);
+    } else {
+      const rect = island.getBoundingClientRect();
+      w = rect.width;
+      h = rect.height;
+    }
+    const br = getIslandTargetRadius(island);
+    return { w, h, br };
+  };
+
   const refreshMap = () => {
     if (activeMorphProps.size > 0) return;
     if (document.documentElement.getAttribute('data-theme') !== 'liquid') return;
+    if (document.documentElement.getAttribute('data-effects') !== 'full') return;
     const island = document.getElementById('island');
-    if (!island) return;
-    const rect = island.getBoundingClientRect();
-    const style = window.getComputedStyle(island);
-    const br = parseFloat(style.borderRadius) || (island.classList.contains('open') ? 34 : 38);
-    updateLiquidDisplacementMap(rect.width, rect.height, br);
+    const dims = getIslandDimensions(island, false);
+    if (!dims) return;
+    lastPreparedKey = '';
+    updateLiquidDisplacementMap(dims.w, dims.h, dims.br);
+    updateIslandRectCache();
+  };
+
+  const prepareTargetMap = () => {
+    if (document.documentElement.getAttribute('data-theme') !== 'liquid') return;
+    if (document.documentElement.getAttribute('data-effects') !== 'full') return;
+    const island = document.getElementById('island');
+    const dims = getIslandDimensions(island, true);
+    if (!dims) return;
+    const key = getGeometryKey(dims.w, dims.h, dims.br);
+    if (key === lastPreparedKey && key === lastEdgeMapKey) return;
+    lastPreparedKey = key;
+    updateLiquidDisplacementMap(dims.w, dims.h, dims.br);
     updateIslandRectCache();
   };
 
@@ -364,13 +426,15 @@ export function initLiquidDisplacement() {
     const island = document.getElementById('island');
     if (!island) return;
 
-    // Track active transition state to avoid generating intermediate maps during spring animation
+    // Track active transition state and pre-generate edge map for target geometry
+    // This eliminates the terminal pop upon settle without per-frame canvas re-renders
     island.addEventListener('transitionrun', (e) => {
       if (e.target !== island) return;
       if (e.propertyName === 'width' || e.propertyName === 'height') {
         clearTimeout(resizeDebounceTimer);
         clearTimeout(cancelSettleTimer);
         activeMorphProps.add(e.propertyName);
+        prepareTargetMap();
       }
     }, { passive: true });
 
@@ -380,6 +444,7 @@ export function initLiquidDisplacement() {
         clearTimeout(resizeDebounceTimer);
         clearTimeout(cancelSettleTimer);
         activeMorphProps.add(e.propertyName);
+        prepareTargetMap();
       }
     }, { passive: true });
 
@@ -455,6 +520,8 @@ if (typeof window !== 'undefined') {
     applyTheme,
     initThemeBootstrap,
     verifySvgFilterSupport,
+    getGeometryKey,
+    getIslandTargetRadius,
     updateLiquidDisplacementMap,
     initLiquidDisplacement
   };

@@ -1,6 +1,8 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Media;
+using AuraLauncher.Models;
 
 namespace AuraLauncher.Services.Interfaces;
 
@@ -12,6 +14,11 @@ public record SkinUploadResult(bool Success, string? OwnerToken = null, string? 
 /// </summary>
 public interface ISkinService
 {
+    /// <summary>
+    /// Валидация байтов скина (проверка PNG и размеров 64x64 или 64x32).
+    /// </summary>
+    SkinValidationResult ValidateSkinBytes(byte[]? bytes) => new SkinValidationResult(false, "Not implemented");
+
     /// <summary>
     /// Валидация файла скина (проверка существования, целостности и размеров 64x64 или 64x32).
     /// </summary>
@@ -71,6 +78,53 @@ public interface ISkinService
     /// Очистка папки кэша CustomSkinLoader (<gameDir>/CustomSkinLoader/caches).
     /// </summary>
     void ClearCustomSkinLoaderCache(string gameDir);
+
+    /// <summary>
+    /// Валидация файла плаща (проверка существования, целостности и размеров 64x32, 22x17, 64x64 или 128x64).
+    /// </summary>
+    SkinValidationResult ValidateCapeFile(string? filePath) => new SkinValidationResult(false, "Not implemented");
+
+    /// <summary>
+    /// Валидация байтов плаща (проверка PNG и допустимых размеров).
+    /// </summary>
+    SkinValidationResult ValidateCapeBytes(byte[]? bytes) => new SkinValidationResult(false, "Not implemented");
+
+    /// <summary>
+    /// Возвращает канонический путь к каталогу профиля данных лаунчера.
+    /// </summary>
+    string GetProfileDataDir() => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+
+    /// <summary>
+    /// Безопасное разрешение пути к элементу истории гардероба с проверкой канонической изоляции.
+    /// </summary>
+    bool TryResolveWardrobeItemPath(WardrobeItem? item, out string resolvedFullPath)
+    {
+        resolvedFullPath = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Загрузка плаща как ImageSource.
+    /// </summary>
+    ImageSource? LoadCapeImage(string? capePath) => null;
+
+    /// <summary>
+    /// Синхронизация файла плаща в каталог CustomSkinLoader игры Minecraft (<gameDir>/CustomSkinLoader/LocalSkin/capes/<nick>.png).
+    /// Если capePath пустой/отсутствует, локальный плащ удаляется.
+    /// </summary>
+    Task SyncCapeToGameAsync(string? capePath, string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    /// <summary>
+    /// Сохранение файла в managed storage (.aura/skins или .aura/capes) с атомарной записью, валидацией и SHA-256 дедупликацией.
+    /// </summary>
+    Task<(string ManagedPath, string Hash)> SaveToManagedStorageAsync(byte[] fileBytes, string type, string originalFileName, CancellationToken cancellationToken = default)
+        => Task.FromResult((string.Empty, string.Empty));
+
+    /// <summary>
+    /// Сохранение существующего файла в managed storage (.aura/skins или .aura/capes) с атомарным копированием и SHA-256 дедупликацией.
+    /// </summary>
+    Task<(string ManagedPath, string Hash)> SaveToManagedStorageAsync(string sourceFilePath, string type, string? originalFileName = null, CancellationToken cancellationToken = default)
+        => Task.FromResult((string.Empty, string.Empty));
 
     /// <summary>
     /// Сброс оперативного кэша скинов/аватарок в памяти лаунчера.

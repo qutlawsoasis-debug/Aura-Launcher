@@ -20,12 +20,15 @@ public class JsonConfigService : IConfigService
     private readonly string _appDirConfigFilePath;
     private readonly string _velopackRootConfigFilePath;
     private readonly string _legacyConfigFilePath;
+    private readonly string? _profileDir;
+    private readonly string _baseDir;
     private readonly bool _isCustomPath;
     private readonly JsonSerializerOptions _jsonOptions;
     private LauncherConfig _currentConfig = new();
     private readonly SemaphoreSlim _fileLock = new(1, 1);
 
     public LauncherConfig CurrentConfig => _currentConfig;
+    public string ProfileDataDir => _baseDir;
 
     public event EventHandler<LauncherConfig>? ConfigChanged;
 
@@ -53,6 +56,8 @@ public class JsonConfigService : IConfigService
             ? (Path.IsPathRooted(profileDir) ? profileDir : Path.Combine(appData, "Aura", "profiles", profileDir))
             : Path.Combine(appData, "Aura");
 
+        _profileDir = profileDir;
+        _baseDir = baseDir;
         _isCustomPath = !string.IsNullOrWhiteSpace(customConfigPath);
         _configFilePath = customConfigPath ?? Path.Combine(baseDir, "config.json");
         _oldAuraConfigFilePath = Path.Combine(oldAuraBaseDir, "config.json");
@@ -241,7 +246,17 @@ public class JsonConfigService : IConfigService
             needSave = true;
         }
 
-        if (string.IsNullOrWhiteSpace(_currentConfig.GameDir))
+        if (!string.IsNullOrWhiteSpace(_profileDir))
+        {
+            var defaultDotAura = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+            if (string.IsNullOrWhiteSpace(_currentConfig.GameDir) ||
+                string.Equals(Path.GetFullPath(_currentConfig.GameDir).TrimEnd('\\', '/'), Path.GetFullPath(defaultDotAura).TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase))
+            {
+                _currentConfig.GameDir = _baseDir;
+                needSave = true;
+            }
+        }
+        else if (string.IsNullOrWhiteSpace(_currentConfig.GameDir))
         {
             _currentConfig.GameDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
             needSave = true;
@@ -263,8 +278,7 @@ public class JsonConfigService : IConfigService
         {
             try
             {
-                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                var skinsDir = Path.Combine(appData, ".aura", "skins");
+                var skinsDir = Path.Combine(_baseDir, "skins");
                 Directory.CreateDirectory(skinsDir);
                 var fileName = Path.GetFileName(_currentConfig.SkinPath);
                 if (!string.IsNullOrWhiteSpace(fileName))

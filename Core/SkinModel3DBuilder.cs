@@ -89,7 +89,9 @@ public static class SkinModel3DBuilder
         return result;
     }
 
-    public static Model3DGroup BuildPlayerModel(BitmapSource skinBmp, bool isSlim)
+    public static Model3DGroup BuildPlayerModel(BitmapSource skinBmp, bool isSlim) => BuildPlayerModel(skinBmp, isSlim, null);
+
+    public static Model3DGroup BuildPlayerModel(BitmapSource skinBmp, bool isSlim, BitmapSource? capeBmp)
     {
         var rootGroup = new Model3DGroup();
 
@@ -316,6 +318,37 @@ public static class SkinModel3DBuilder
                 overlayMaterial, texW, texH,
                 isOverlay: true, rawPixels: rawPixels, stride: stride, limbPart: PlayerLimbPart.LeftLeg);
             if (leftPant != null) overlayGroup.Children.Add(leftPant);
+        }
+
+        if (capeBmp != null)
+        {
+            try
+            {
+                var capeUpscaled = UpscaleNearestNeighbor(capeBmp, 8);
+                var capeBrush = new ImageBrush(capeUpscaled)
+                {
+                    ViewportUnits = BrushMappingMode.Absolute,
+                    TileMode = TileMode.None,
+                    Stretch = Stretch.Fill
+                };
+                RenderOptions.SetBitmapScalingMode(capeBrush, BitmapScalingMode.NearestNeighbor);
+                var capeMaterial = new DiffuseMaterial(capeBrush);
+                if (capeMaterial.CanFreeze) capeMaterial.Freeze();
+
+                var capeModel = CreateCuboidModel(
+                    -5, 5, -8, 8, -3.2, -2.2,
+                    0, 0, 10, 16, 1,
+                    capeMaterial, capeBmp.PixelWidth, capeBmp.PixelHeight, limbPart: PlayerLimbPart.None);
+
+                if (capeModel != null)
+                {
+                    baseGroup.Children.Add(capeModel);
+                }
+            }
+            catch (Exception ex)
+            {
+                AuraLauncher.Services.Implementations.FabricGameLaunchService.LogLauncherEvent($"[3D-CAPE: ERROR] Failed to attach cape: {ex.Message}");
+            }
         }
 
         if (baseGroup.CanFreeze) baseGroup.Freeze();

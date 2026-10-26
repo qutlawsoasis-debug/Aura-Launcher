@@ -75,3 +75,48 @@ body.has-update .toast-container { top: 66px; }
 html[data-effects="off"] .update-pill,
 html[data-effects="off"] .update-pill .up-bar i { transition: none; }
 html[data-effects="off"] .update-pill .up-dot { animation: none; }
+
+/* ================== ТЕМАТИЧЕСКИЕ МАТЕРИАЛЫ ДЛЯ ПЛАШКИ ОБНОВЛЕНИЯ ================== */
+
+/* Frost: сохраняем матовое стекло */
+html[data-theme="frost"][data-effects="full"] .update-pill,
+:root:not([data-theme="liquid"])[data-effects="full"] .update-pill {
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+/* Liquid: прозрачный кристаллический материал */
+html[data-theme="liquid"] .update-pill {
+  background: var(--theme-glass-sheen), var(--theme-glass-bg);
+  border: var(--theme-glass-border);
+  box-shadow: var(--theme-glass-shadow);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"] .update-pill :is(.up-text, span) {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="liquid"][data-effects="full"] .update-pill {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+}
+
+html[data-theme="liquid"][data-effects="low"] .update-pill {
+  background: var(--theme-glass-sheen), rgba(24, 28, 38, 0.35);
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+html[data-theme="liquid"][data-effects="off"] .update-pill {
+  background: var(--theme-glass-solid);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme="liquid"].no-svg-filter[data-effects="full"] .update-pill {
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+}

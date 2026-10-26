@@ -138,8 +138,19 @@ public partial class WebBridge
             return;
         }
 
-        await _configService.UpdateConfigAsync(c => c.CapeId = cape);
-        _skinService?.ClearCustomSkinLoaderCache(cfg.GameDir);
+        await _configService.UpdateConfigAsync(c =>
+        {
+            c.CapeId = cape;
+            c.CapePath = "";
+            c.CapeOriginalName = "";
+        });
+
+        if (_skinService != null)
+        {
+            await _skinService.SyncCapeToGameAsync(null, cfg.Nickname ?? "", cfg.GameDir);
+            _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
+        }
+
         SendResponse(msg.Id, msg.Name, new { cape });
     }
 }

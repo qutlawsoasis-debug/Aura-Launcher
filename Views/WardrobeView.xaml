@@ -287,7 +287,141 @@
                            Foreground="{StaticResource MuteBrush}"
                            TextWrapping="Wrap"
                            LineHeight="18"
-                           Margin="0,0,0,12" />
+                           Margin="0,0,0,16" />
+
+                <!-- 1px separator line -->
+                <Border Height="1" Background="{StaticResource LineInkBrush}" Margin="0,0,0,16" />
+
+                <!-- Секция Плащ -->
+                <TextBlock Text="Плащ персонажа"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource InkBrush}"
+                           Margin="0,0,0,4" />
+
+                <TextBlock Text="{Binding CapeDisplayName}"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="13"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource DimInkBrush}"
+                           Margin="0,0,0,10" />
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,12">
+                    <Button Command="{Binding SelectCapeCommand}"
+                            Style="{StaticResource StandardBtn}"
+                            Height="34"
+                            Content="Загрузить плащ"
+                            Padding="12,0"
+                            Margin="0,0,8,0" />
+
+                    <Button Command="{Binding SelectCyanCapeCommand}"
+                            Style="{StaticResource GhostBtn}"
+                            Height="34"
+                            Content="Cyan"
+                            Padding="10,0"
+                            Margin="0,0,8,0" />
+
+                    <Button Command="{Binding SelectSilverCapeCommand}"
+                            Style="{StaticResource GhostBtn}"
+                            Height="34"
+                            Content="Silver"
+                            Padding="10,0"
+                            Margin="0,0,8,0" />
+
+                    <Button Command="{Binding RemoveCapeCommand}"
+                            Style="{StaticResource GhostBtn}"
+                            Height="34"
+                            Content="Снять"
+                            Padding="10,0" />
+                </StackPanel>
+
+                <TextBlock Text="Кастомный плащ виден вам в игре. Серверные плащи Aura синхронизируются с лобби."
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="12"
+                           FontWeight="Normal"
+                           Foreground="{StaticResource MuteBrush}"
+                           TextWrapping="Wrap"
+                           LineHeight="16"
+                           Margin="0,0,0,16" />
+
+                <!-- Секция История гардероба -->
+                <TextBlock Text="История гардероба"
+                           FontFamily="{StaticResource MainFont}"
+                           FontSize="14"
+                           FontWeight="Medium"
+                           Foreground="{StaticResource InkBrush}"
+                           Margin="0,0,0,8" />
+
+                <Border BorderBrush="{StaticResource LineInkBrush}"
+                        BorderThickness="1"
+                        Background="#0C141A"
+                        CornerRadius="3"
+                        MaxHeight="140"
+                        Margin="0,0,0,14">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding HistoryItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="{StaticResource LineInkBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="10,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Метка типа -->
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding Type}"
+                                                       FontFamily="{StaticResource MainFont}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource EmberBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,8,0" />
+
+                                            <!-- Имя файла -->
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Name}"
+                                                       FontFamily="{StaticResource MainFont}"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource InkBrush}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,8,0" />
+
+                                            <!-- Кнопка Применить -->
+                                            <Button Grid.Column="2"
+                                                    Content="Надеть"
+                                                    Command="{Binding DataContext.ApplyHistoryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource GhostBtn}"
+                                                    Height="24"
+                                                    FontSize="11"
+                                                    Padding="8,0"
+                                                    Margin="0,0,6,0" />
+
+                                            <!-- Кнопка Удалить -->
+                                            <Button Grid.Column="3"
+                                                    Content="✕"
+                                                    Command="{Binding DataContext.DeleteHistoryItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource GhostBtn}"
+                                                    Height="24"
+                                                    Width="24"
+                                                    FontSize="11"
+                                                    Padding="0" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
 
                 <!-- Status message in OkBrush for success or BadBrush for error, 13px -->
                 <TextBlock Text="{Binding StatusMessage}"

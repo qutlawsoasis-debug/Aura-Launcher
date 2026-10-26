@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using AuraLauncher.Core.WebBridge;
@@ -476,6 +478,9 @@ public class WebBridgeTests
         public SkinValidationResult ValidateSkinFile(string? filePath)
             => new(IsValid, IsValid ? null : (ValidationError ?? "Invalid skin file"), IsValid ? 64 : 0, IsValid ? 64 : 0);
 
+        public SkinValidationResult ValidateSkinBytes(byte[]? bytes)
+            => new(IsValid, IsValid ? null : (ValidationError ?? "Invalid skin file"), IsValid ? 64 : 0, IsValid ? 64 : 0);
+
         public System.Windows.Media.ImageSource LoadSkinImage(string? skinPath) => null!;
         public System.Windows.Media.ImageSource ExtractHeadAvatar(string? skinPath) => null!;
         public System.Windows.Media.ImageSource ExtractFrontSkinPreview(string? skinPath) => null!;
@@ -488,6 +493,25 @@ public class WebBridgeTests
         }
 
         public Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public SkinValidationResult ValidateCapeFile(string? filePath)
+            => new(IsValid, IsValid ? null : (ValidationError ?? "Invalid cape file"), IsValid ? 64 : 0, IsValid ? 32 : 0);
+
+        public SkinValidationResult ValidateCapeBytes(byte[]? bytes)
+            => new(IsValid, IsValid ? null : (ValidationError ?? "Invalid cape file"), IsValid ? 64 : 0, IsValid ? 32 : 0);
+
+        public Task SyncCapeToGameAsync(string? capePath, string nickname, string gameDir, CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public Task<(string ManagedPath, string Hash)> SaveToManagedStorageAsync(byte[] fileBytes, string type, string originalFileName, CancellationToken cancellationToken = default)
+        {
+            var hash = "abcdef1234567890abcdef1234567890";
+            var targetDir = Path.Combine(Path.GetTempPath(), "AuraTestManaged", type);
+            Directory.CreateDirectory(targetDir);
+            var path = Path.Combine(targetDir, $"{hash}.png");
+            File.WriteAllBytes(path, fileBytes);
+            return Task.FromResult((path, hash));
+        }
 
         public Task<SkinUploadResult> UploadSkinToLobbyApiAsync(string? skinPath, string nickname, string model, string? ownerToken, string? baseUrl = null, CancellationToken cancellationToken = default)
         {
@@ -1205,5 +1229,57 @@ public class WebBridgeTests
 
         bridge.Dispose();
         Assert.False(lobby.HasSubscribers);
+    }
+
+    [Fact]
+    public async Task HandleCapeUpload_ValidCape_RegistersInHistoryAndSetsCustomCape()
+    {
+        var cfgService = new TestConfigService(@"C:\test\game");
+        var skinService = new TestBridgeSkinService();
+        using var bridge = new WebBridge(null, new TestGameSessionService(), cfgService, skinService: skinService, logger: _ => {});
+        var posted = new List<BridgeMessage>();
+        bridge.MessagePosted += m => posted.Add(m);
+
+        // Валидная PNG сигнатура
+        byte[] validPng = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4 };
+        string b64 = Convert.ToBase64String(validPng);
+
+        string rawMsg = $"{{\"id\":\"cape_up_1\",\"type\":\"command\",\"name\":\"cape.upload\",\"payload\":{{\"fileName\":\"my_cape.png\",\"base64Data\":\"data:image/png;base64,{b64}\"}}}}";
+        await bridge.ProcessRawMessageAsync(rawMsg);
+
+        Assert.NotEmpty(posted);
+        var resp = posted.FirstOrDefault(m => m.Id == "cape_up_1");
+        Assert.NotNull(resp);
+        Assert.Null(resp.Error);
+
+        var payload = PayloadOf(resp);
+        Assert.True(payload.GetProperty("ok").GetBoolean());
+        Assert.Equal("custom", payload.GetProperty("cape").GetString());
+
+        // Проверяем, что конфиг обновился
+        Assert.Equal("custom", cfgService.CurrentConfig.CapeId);
+        Assert.Equal("my_cape.png", cfgService.CurrentConfig.CapeOriginalName);
+        Assert.NotEmpty(cfgService.CurrentConfig.WardrobeHistory);
+        Assert.Equal("cape", cfgService.CurrentConfig.WardrobeHistory[0].Type);
+    }
+
+    [Fact]
+    public async Task HandleWardrobeGetHistory_ReturnsHistoryWithoutCrashing()
+    {
+        var cfgService = new TestConfigService(@"C:\test\game");
+        var skinService = new TestBridgeSkinService();
+        using var bridge = new WebBridge(null, new TestGameSessionService(), cfgService, skinService: skinService, logger: _ => {});
+        var posted = new List<BridgeMessage>();
+        bridge.MessagePosted += m => posted.Add(m);
+
+        await bridge.ProcessRawMessageAsync("{\"id\":\"hist_1\",\"type\":\"command\",\"name\":\"wardrobe.getHistory\"}");
+
+        var resp = posted.FirstOrDefault(m => m.Id == "hist_1");
+        Assert.NotNull(resp);
+        Assert.Null(resp.Error);
+
+        var payload = PayloadOf(resp);
+        Assert.True(payload.TryGetProperty("skins", out _));
+        Assert.True(payload.TryGetProperty("capes", out _));
     }
 }

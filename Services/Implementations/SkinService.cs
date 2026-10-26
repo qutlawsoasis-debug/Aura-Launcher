@@ -1,11 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using AuraLauncher.Core;
+using AuraLauncher.Models;
 using AuraLauncher.Services.Interfaces;
 
 namespace AuraLauncher.Services.Implementations;
@@ -15,6 +19,138 @@ namespace AuraLauncher.Services.Implementations;
 /// </summary>
 public class SkinService : ISkinService
 {
+    private readonly IConfigService? _configService;
+    private readonly string? _customProfileDir;
+
+    public SkinService() : this(null, null) { }
+
+    public SkinService(IConfigService? configService) : this(configService, null) { }
+
+    public SkinService(IConfigService? configService, string? customProfileDir)
+    {
+        _configService = configService;
+        _customProfileDir = customProfileDir;
+    }
+
+    public string GetProfileDataDir()
+    {
+        if (!string.IsNullOrWhiteSpace(_customProfileDir))
+            return Path.GetFullPath(_customProfileDir);
+
+        if (_configService != null)
+        {
+            var dir = _configService.ProfileDataDir;
+            if (!string.IsNullOrWhiteSpace(dir))
+                return Path.GetFullPath(dir);
+        }
+
+        string? envProfile = Environment.GetEnvironmentVariable("AURA_PROFILE_DIR");
+        if (!string.IsNullOrWhiteSpace(envProfile))
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            return Path.GetFullPath(Path.IsPathRooted(envProfile)
+                ? envProfile
+                : Path.Combine(appData, ".aura", "profiles", envProfile));
+        }
+
+        return Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura"));
+    }
+    public SkinValidationResult ValidateSkinBytes(byte[]? bytes)
+    {
+        if (bytes == null || bytes.Length == 0)
+        {
+            return new SkinValidationResult(false, "Массив байтов скина пуст.");
+        }
+
+        if (bytes.Length > 2 * 1024 * 1024)
+        {
+            return new SkinValidationResult(false, "Размер файла скина превышает допустимый лимит (2 МБ).");
+        }
+
+        try
+        {
+            using var ms = new MemoryStream(bytes);
+            var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+            if (decoder.Frames.Count == 0)
+            {
+                return new SkinValidationResult(false, "Файл не содержит графических кадров или поврежден.");
+            }
+
+            var frame = decoder.Frames[0];
+            int width = frame.PixelWidth;
+            int height = frame.PixelHeight;
+
+            if (width == 64 && height == 64)
+            {
+                return new SkinValidationResult(true, null, 64, 64);
+            }
+
+            if (width == 64 && height == 32)
+            {
+                return new SkinValidationResult(true, null, 64, 32);
+            }
+
+            return new SkinValidationResult(false, $"Неподдерживаемый размер скина ({width}×{height}). Требуется 64×64 или 64×32.", width, height);
+        }
+        catch (Exception ex)
+        {
+            return new SkinValidationResult(false, $"Файл поврежден или не является допустимым PNG: {ex.Message}");
+        }
+    }
+
+    public bool TryResolveWardrobeItemPath(WardrobeItem? item, out string resolvedFullPath)
+    {
+        resolvedFullPath = string.Empty;
+        if (item == null) return false;
+
+        string subFolder = string.Equals(item.Type, "cape", StringComparison.OrdinalIgnoreCase) ? "capes" : "skins";
+        string profileDir = GetProfileDataDir();
+        string managedDir = Path.GetFullPath(Path.Combine(profileDir, subFolder));
+
+        // 1. Полноразмерный SHA-256 хеш (64 hex-символа)
+        if (!string.IsNullOrWhiteSpace(item.Hash) && item.Hash.Length == 64 && Regex.IsMatch(item.Hash, "^[0-9a-fA-F]{64}$"))
+        {
+            string candidate = Path.GetFullPath(Path.Combine(managedDir, $"{item.Hash.ToLowerInvariant()}.png"));
+            if (candidate.StartsWith(managedDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && File.Exists(candidate))
+            {
+                resolvedFullPath = candidate;
+                return true;
+            }
+        }
+
+        // 2. По Id формата type_sha256 (64 hex-символа)
+        if (!string.IsNullOrWhiteSpace(item.Id))
+        {
+            var parts = item.Id.Split('_', 2);
+            if (parts.Length == 2 && parts[1].Length == 64 && Regex.IsMatch(parts[1], "^[0-9a-fA-F]{64}$"))
+            {
+                string candidate = Path.GetFullPath(Path.Combine(managedDir, $"{parts[1].ToLowerInvariant()}.png"));
+                if (candidate.StartsWith(managedDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && File.Exists(candidate))
+                {
+                    resolvedFullPath = candidate;
+                    return true;
+                }
+            }
+        }
+
+        // 3. Fallback: только безопасное имя файла из RelativePath (строго внутри managedDir, без .. и без рутовых путей)
+        if (!string.IsNullOrWhiteSpace(item.RelativePath))
+        {
+            string fileName = Path.GetFileName(item.RelativePath);
+            if (!string.IsNullOrWhiteSpace(fileName) && fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            {
+                string candidate = Path.GetFullPath(Path.Combine(managedDir, fileName));
+                if (candidate.StartsWith(managedDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && File.Exists(candidate))
+                {
+                    resolvedFullPath = candidate;
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public SkinValidationResult ValidateSkinFile(string? filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -302,35 +438,98 @@ public class SkinService : ISkinService
         }
     }
 
+    public static IEnumerable<string> ResolveTargetGameDirectories(string gameDir)
+    {
+        var targets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(gameDir))
+            return targets;
+
+        var fullGameDir = Path.GetFullPath(gameDir);
+        targets.Add(fullGameDir);
+
+        // Если указан корневой GameDir, проверяем папку instances
+        var instancesDir = Path.Combine(fullGameDir, "instances");
+        if (Directory.Exists(instancesDir))
+        {
+            var inst1201 = Path.Combine(instancesDir, "1.20.1");
+            var inst1211 = Path.Combine(instancesDir, "1.21.1");
+            if (Directory.Exists(inst1201)) targets.Add(inst1201);
+            if (Directory.Exists(inst1211)) targets.Add(inst1211);
+        }
+
+        // Если указан подкаталог инстанса (например .../instances/1.20.1)
+        var parent = Directory.GetParent(fullGameDir);
+        if (parent != null && string.Equals(parent.Name, "instances", StringComparison.OrdinalIgnoreCase))
+        {
+            var grandParent = parent.Parent;
+            if (grandParent != null)
+            {
+                targets.Add(grandParent.FullName);
+                var sibling1201 = Path.Combine(parent.FullName, "1.20.1");
+                var sibling1211 = Path.Combine(parent.FullName, "1.21.1");
+                if (Directory.Exists(sibling1201)) targets.Add(sibling1201);
+                if (Directory.Exists(sibling1211)) targets.Add(sibling1211);
+            }
+        }
+
+        return targets;
+    }
+
     public async Task SyncSkinToGameAsync(string? skinPath, string nickname, string gameDir, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(gameDir) || string.IsNullOrWhiteSpace(nickname))
+        if (string.IsNullOrWhiteSpace(gameDir))
             return;
 
-        var localSkinDir = Path.Combine(gameDir, "CustomSkinLoader", "LocalSkin", "skins");
-        Directory.CreateDirectory(localSkinDir);
-        var targetFile = Path.Combine(localSkinDir, $"{nickname.Trim()}.png");
-
-        if (!string.IsNullOrWhiteSpace(skinPath) && File.Exists(skinPath))
+        var val = NicknameValidator.Validate(nickname);
+        if (!val.IsValid)
         {
-            await Task.Run(() => File.Copy(skinPath, targetFile, overwrite: true), cancellationToken);
-        }
-        else
-        {
-            await ResetToDefaultSteveAsync(nickname, gameDir, cancellationToken);
+            throw new ArgumentException($"Недопустимый никнейм игрока для синхронизации скина: '{nickname}' ({val.Error})", nameof(nickname));
         }
 
-        ClearCustomSkinLoaderCache(gameDir);
+        string safeNick = nickname.Trim();
+        var targetDirs = ResolveTargetGameDirectories(gameDir);
+
+        foreach (var dir in targetDirs)
+        {
+            var localSkinDir = Path.GetFullPath(Path.Combine(dir, "CustomSkinLoader", "LocalSkin", "skins"));
+            Directory.CreateDirectory(localSkinDir);
+            var targetFile = Path.GetFullPath(Path.Combine(localSkinDir, $"{safeNick}.png"));
+
+            if (!targetFile.StartsWith(localSkinDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Небезопасный целевой путь для скина: {targetFile}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(skinPath) && File.Exists(skinPath))
+            {
+                await Task.Run(() => File.Copy(skinPath, targetFile, overwrite: true), cancellationToken);
+            }
+            else
+            {
+                await ResetToDefaultSteveForDirAsync(dir, safeNick, cancellationToken);
+            }
+
+            ClearCustomSkinLoaderCache(dir);
+        }
+
+        InvalidateMemoryCache(safeNick);
     }
 
     public async Task ResetToDefaultSteveAsync(string nickname, string gameDir, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(gameDir) || string.IsNullOrWhiteSpace(nickname))
-            return;
+        await SyncSkinToGameAsync(null, nickname, gameDir, cancellationToken);
+    }
 
-        var localSkinDir = Path.Combine(gameDir, "CustomSkinLoader", "LocalSkin", "skins");
+    private static async Task ResetToDefaultSteveForDirAsync(string gameDir, string safeNick, CancellationToken cancellationToken)
+    {
+        var localSkinDir = Path.GetFullPath(Path.Combine(gameDir, "CustomSkinLoader", "LocalSkin", "skins"));
         Directory.CreateDirectory(localSkinDir);
-        var targetFile = Path.Combine(localSkinDir, $"{nickname.Trim()}.png");
+        var targetFile = Path.GetFullPath(Path.Combine(localSkinDir, $"{safeNick}.png"));
+
+        if (!targetFile.StartsWith(localSkinDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
         bool written = false;
         try
@@ -357,8 +556,6 @@ public class SkinService : ISkinService
                 await Task.Run(() => File.Copy(steveLocal, targetFile, overwrite: true), cancellationToken);
             }
         }
-
-        InvalidateMemoryCache(nickname);
     }
 
     private static BitmapSource? _cachedSteveBitmap;
@@ -820,7 +1017,10 @@ public class SkinService : ISkinService
         try
         {
             if (string.IsNullOrWhiteSpace(gameDir)) return;
-            var cachesDir = Path.Combine(gameDir, "CustomSkinLoader", "caches");
+            var fullGameDir = Path.GetFullPath(gameDir);
+            var cachesDir = Path.GetFullPath(Path.Combine(fullGameDir, "CustomSkinLoader", "caches"));
+            if (!cachesDir.StartsWith(fullGameDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                return;
             if (Directory.Exists(cachesDir))
             {
                 var files = Directory.GetFiles(cachesDir, "*", SearchOption.AllDirectories);
@@ -966,6 +1166,307 @@ public class SkinService : ISkinService
         }
 
         return (LoadDefaultSteveBitmap(), false);
+    }
+
+    public SkinValidationResult ValidateCapeBytes(byte[]? bytes)
+    {
+        if (bytes == null || bytes.Length == 0)
+        {
+            return new SkinValidationResult(false, "Массив байтов плаща пуст.");
+        }
+
+        if (bytes.Length > 1024 * 1024)
+        {
+            return new SkinValidationResult(false, "Файл плаща превышает допустимый размер (1 МБ).");
+        }
+
+        try
+        {
+            using var ms = new MemoryStream(bytes);
+            var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+            if (decoder.Frames.Count == 0)
+            {
+                return new SkinValidationResult(false, "Файл не содержит графических кадров или поврежден.");
+            }
+
+            var frame = decoder.Frames[0];
+            int width = frame.PixelWidth;
+            int height = frame.PixelHeight;
+
+            // Допустимые размеры плащей в Minecraft и CustomSkinLoader:
+            // 64x32 (стандартный), 22x17 (классический), 64x64, 128x64 (HD)
+            if ((width == 64 && height == 32) ||
+                (width == 22 && height == 17) ||
+                (width == 64 && height == 64) ||
+                (width == 128 && height == 64))
+            {
+                return new SkinValidationResult(true, null, width, height);
+            }
+
+            return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Требуется 64×32 (или 22×17, 64×64, 128×64).", width, height);
+        }
+        catch (Exception ex)
+        {
+            return new SkinValidationResult(false, $"Файл плаща поврежден или не является допустимым PNG: {ex.Message}");
+        }
+    }
+
+    public SkinValidationResult ValidateCapeFile(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return new SkinValidationResult(false, "Путь к файлу плаща не указан.");
+        }
+
+        if (!File.Exists(filePath))
+        {
+            return new SkinValidationResult(false, "Выбранный файл плаща не существует.");
+        }
+
+        try
+        {
+            var fileInfo = new FileInfo(filePath);
+            if (fileInfo.Length == 0)
+            {
+                return new SkinValidationResult(false, "Файл плаща поврежден (0 байт).");
+            }
+
+            if (fileInfo.Length > 1024 * 1024)
+            {
+                return new SkinValidationResult(false, "Файл плаща превышает допустимый размер (1 МБ).");
+            }
+
+            int width = 0;
+            int height = 0;
+
+            using (var stream = File.OpenRead(filePath))
+            {
+                var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                if (decoder.Frames.Count == 0)
+                {
+                    return new SkinValidationResult(false, "Файл не содержит графических кадров или поврежден.");
+                }
+
+                var frame = decoder.Frames[0];
+                width = frame.PixelWidth;
+                height = frame.PixelHeight;
+            }
+
+            // Допустимые размеры плащей в Minecraft и CustomSkinLoader:
+            // 64x32 (стандартный), 22x17 (классический), 64x64, 128x64 (HD)
+            if ((width == 64 && height == 32) ||
+                (width == 22 && height == 17) ||
+                (width == 64 && height == 64) ||
+                (width == 128 && height == 64))
+            {
+                return new SkinValidationResult(true, null, width, height);
+            }
+
+            return new SkinValidationResult(false, $"Неподдерживаемый размер плаща ({width}×{height}). Требуется 64×32 (или 22×17, 64×64, 128×64).", width, height);
+        }
+        catch (Exception ex)
+        {
+            return new SkinValidationResult(false, $"Файл плаща поврежден или не является допустимым PNG: {ex.Message}");
+        }
+    }
+
+    public ImageSource? LoadCapeImage(string? capePath)
+    {
+        if (string.IsNullOrWhiteSpace(capePath))
+            return null;
+
+        // Встроенные плащи Aura
+        if (string.Equals(capePath, "cyan", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(capePath, "silver", StringComparison.OrdinalIgnoreCase))
+        {
+            string capeName = capePath.ToLowerInvariant();
+            string[] possiblePaths =
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "images", $"cape_{capeName}.png"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs", "redesign", "v3", "dist", "assets", "images", $"cape_{capeName}.png"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "docs", "redesign", "v3", "public", "assets", "images", $"cape_{capeName}.png")
+            };
+
+            foreach (var p in possiblePaths)
+            {
+                if (File.Exists(p))
+                {
+                    try
+                    {
+                        var bmp = new BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(p, UriKind.Absolute);
+                        bmp.CacheOption = BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        if (bmp.CanFreeze) bmp.Freeze();
+                        return bmp;
+                    }
+                    catch { }
+                }
+            }
+
+            return null;
+        }
+
+        if (!File.Exists(capePath))
+            return null;
+
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(capePath, UriKind.Absolute);
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.EndInit();
+            if (bmp.CanFreeze) bmp.Freeze();
+            return bmp;
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[CAPE: ERROR] Ошибка загрузки текстуры плаща: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task SyncCapeToGameAsync(string? capePath, string nickname, string gameDir, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(gameDir))
+            return;
+
+        var val = NicknameValidator.Validate(nickname);
+        if (!val.IsValid)
+        {
+            throw new ArgumentException($"Недопустимый никнейм игрока для синхронизации плаща: '{nickname}' ({val.Error})", nameof(nickname));
+        }
+
+        string safeNick = nickname.Trim();
+        var targetDirs = ResolveTargetGameDirectories(gameDir);
+
+        foreach (var dir in targetDirs)
+        {
+            var localCapeDir = Path.GetFullPath(Path.Combine(dir, "CustomSkinLoader", "LocalSkin", "capes"));
+            Directory.CreateDirectory(localCapeDir);
+            var targetFile = Path.GetFullPath(Path.Combine(localCapeDir, $"{safeNick}.png"));
+
+            if (!targetFile.StartsWith(localCapeDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Небезопасный целевой путь для плаща: {targetFile}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(capePath) && File.Exists(capePath))
+            {
+                await Task.Run(() => File.Copy(capePath, targetFile, overwrite: true), cancellationToken);
+                FabricGameLaunchService.LogLauncherEvent($"[CAPE] Синхронизирован кастомный плащ в {targetFile}");
+            }
+            else
+            {
+                if (File.Exists(targetFile))
+                {
+                    await Task.Run(() => File.Delete(targetFile), cancellationToken);
+                    FabricGameLaunchService.LogLauncherEvent($"[CAPE] Локальный плащ удален: {targetFile}");
+                }
+            }
+
+            ClearCustomSkinLoaderCache(dir);
+        }
+    }
+
+    public async Task<(string ManagedPath, string Hash)> SaveToManagedStorageAsync(byte[] fileBytes, string type, string originalFileName, CancellationToken cancellationToken = default)
+    {
+        if (fileBytes == null || fileBytes.Length == 0)
+            throw new ArgumentException("Массив байтов пуст.", nameof(fileBytes));
+
+        // 1. Валидация формата и декомпрессия графических кадров
+        if (string.Equals(type, "cape", StringComparison.OrdinalIgnoreCase))
+        {
+            var val = ValidateCapeBytes(fileBytes);
+            if (!val.IsValid)
+            {
+                throw new InvalidOperationException(val.ErrorMessage ?? "Недопустимый файл плаща.");
+            }
+        }
+        else
+        {
+            var val = ValidateSkinBytes(fileBytes);
+            if (!val.IsValid)
+            {
+                throw new InvalidOperationException(val.ErrorMessage ?? "Недопустимый файл скина.");
+            }
+        }
+
+        // 2. Вычисление SHA-256 хеша
+        string hashHex;
+        using (var sha = System.Security.Cryptography.SHA256.Create())
+        {
+            byte[] hashBytes = sha.ComputeHash(fileBytes);
+            hashHex = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        }
+
+        // 3. Разрешение изолированного каталога хранилища (через IConfigService / AURA_PROFILE_DIR)
+        string profileDir = GetProfileDataDir();
+        string subFolder = string.Equals(type, "cape", StringComparison.OrdinalIgnoreCase) ? "capes" : "skins";
+        string managedDir = Path.GetFullPath(Path.Combine(profileDir, subFolder));
+        Directory.CreateDirectory(managedDir);
+
+        string targetPath = Path.GetFullPath(Path.Combine(managedDir, $"{hashHex}.png"));
+        if (!targetPath.StartsWith(managedDir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Небезопасный целевой путь managed storage: {targetPath}");
+        }
+
+        // 4. Дедупликация с проверкой целостности существующего файла на диске
+        if (File.Exists(targetPath))
+        {
+            try
+            {
+                var fi = new FileInfo(targetPath);
+                if (fi.Length == fileBytes.Length)
+                {
+                    byte[] existingBytes = await File.ReadAllBytesAsync(targetPath, cancellationToken);
+                    using var sha = System.Security.Cryptography.SHA256.Create();
+                    string existingHash = Convert.ToHexString(sha.ComputeHash(existingBytes)).ToLowerInvariant();
+                    if (string.Equals(existingHash, hashHex, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return (targetPath, hashHex);
+                    }
+                }
+            }
+            catch
+            {
+                // Если чтение существующего файла сбоит, перезаписываем
+            }
+        }
+
+        // 5. Запись через временный .part файл в ТОМ ЖЕ каталоге (гарантирует атомарность перемещения без межтомных сбоев)
+        string partPath = Path.Combine(managedDir, $"{hashHex}.{Guid.NewGuid():N}.part");
+        try
+        {
+            await File.WriteAllBytesAsync(partPath, fileBytes, cancellationToken);
+            File.Move(partPath, targetPath, overwrite: true);
+            return (targetPath, hashHex);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(partPath))
+                    File.Delete(partPath);
+            }
+            catch { }
+        }
+    }
+
+    public async Task<(string ManagedPath, string Hash)> SaveToManagedStorageAsync(string sourceFilePath, string type, string? originalFileName = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sourceFilePath) || !File.Exists(sourceFilePath))
+            throw new FileNotFoundException("Исходный файл не найден.", sourceFilePath);
+
+        byte[] bytes = await File.ReadAllBytesAsync(sourceFilePath, cancellationToken);
+        string safeName = !string.IsNullOrWhiteSpace(originalFileName)
+            ? Path.GetFileName(originalFileName)
+            : Path.GetFileName(sourceFilePath);
+
+        return await SaveToManagedStorageAsync(bytes, type, safeName, cancellationToken);
     }
 
     public void InvalidateMemoryCache(string? nickname = null)
