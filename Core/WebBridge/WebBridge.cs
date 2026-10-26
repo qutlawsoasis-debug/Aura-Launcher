@@ -1303,9 +1303,13 @@ public partial class WebBridge : IDisposable
         // Сохранение в managed storage профиля с SHA-256 дедупликацией
         var (persistentPath, hash) = await _skinService.SaveToManagedStorageAsync(rawBytes, "skin", safeFileName);
 
+        bool isSlim = SkinService.DetectIsSlim(rawBytes);
+        string detectedModel = isSlim ? "slim" : "default";
+
         var cfg = _configService.CurrentConfig;
         cfg.SkinPath = persistentPath;
         cfg.SkinOriginalName = safeFileName;
+        cfg.SkinModel = detectedModel;
 
         // Обновляем историю гардероба
         cfg.WardrobeHistory ??= new List<WardrobeItem>();
@@ -1318,7 +1322,7 @@ public partial class WebBridge : IDisposable
             Type = "skin",
             Name = safeFileName,
             Hash = hash,
-            Model = cfg.SkinModel,
+            Model = detectedModel,
             RelativePath = Path.Combine("skins", $"{hash}.png").Replace('\\', '/'),
             CreatedUtc = DateTime.UtcNow
         };
@@ -1327,6 +1331,7 @@ public partial class WebBridge : IDisposable
         await _configService.SaveConfigAsync(cfg);
 
         await _skinService.SyncSkinToGameAsync(persistentPath, cfg.Nickname, cfg.GameDir);
+        _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
 
         string? uploadError = null;
         try
@@ -1367,6 +1372,7 @@ public partial class WebBridge : IDisposable
             ok = true,
             id = itemId,
             fileName = safeFileName,
+            model = detectedModel,
             uploadError = uploadError
         });
     }

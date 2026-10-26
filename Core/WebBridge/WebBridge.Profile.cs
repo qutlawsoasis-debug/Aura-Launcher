@@ -39,7 +39,8 @@ public partial class WebBridge
             return;
         }
 
-        _logger($"[WEBBRIDGE] nickname.set {cfg.Nickname} -> {nick}");
+        string oldNick = cfg.Nickname;
+        _logger($"[WEBBRIDGE] nickname.set {oldNick} -> {nick}");
         if (_friendService != null)
         {
             var (success, error) = await _friendService.ChangeNicknameAsync(nick);
@@ -58,7 +59,19 @@ public partial class WebBridge
         {
             try
             {
+                if (!string.IsNullOrWhiteSpace(oldNick) && !string.Equals(oldNick, nick, StringComparison.OrdinalIgnoreCase))
+                {
+                    _skinService.CleanupPlayerGameFiles(oldNick, cfg.GameDir);
+                }
+
                 await _skinService.SyncSkinToGameAsync(cfg.SkinPath, nick, cfg.GameDir);
+
+                string? capeToSync = (string.Equals(cfg.CapeId, "custom", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(cfg.CapePath) && File.Exists(cfg.CapePath))
+                    ? cfg.CapePath
+                    : null;
+                await _skinService.SyncCapeToGameAsync(capeToSync, nick, cfg.GameDir);
+
+                _skinService.EnsureCustomSkinLoaderConfig(cfg.GameDir);
                 _skinService.ClearCustomSkinLoaderCache(cfg.GameDir);
 
                 if (!string.IsNullOrWhiteSpace(cfg.SkinPath) && File.Exists(cfg.SkinPath))

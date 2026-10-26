@@ -391,9 +391,9 @@ public class SkinService : ISkinService
         }
     }
 
-    private static bool DetectIsSlim(BitmapSource skinBmp)
+    public static bool DetectIsSlim(BitmapSource skinBmp)
     {
-        if (skinBmp.PixelWidth != 64 || skinBmp.PixelHeight != 64)
+        if (skinBmp == null || skinBmp.PixelWidth != 64 || skinBmp.PixelHeight != 64)
             return false;
 
         try
@@ -418,6 +418,48 @@ public class SkinService : ISkinService
             FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка детекции slim-модели: {ex.Message}");
             return false;
         }
+    }
+
+    public static bool DetectIsSlim(byte[]? skinBytes)
+    {
+        if (skinBytes == null || skinBytes.Length == 0)
+            return false;
+
+        try
+        {
+            using var ms = new MemoryStream(skinBytes);
+            var decoder = BitmapDecoder.Create(ms, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            if (decoder.Frames.Count > 0)
+            {
+                return DetectIsSlim(decoder.Frames[0]);
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка детекции slim-модели по байтам: {ex.Message}");
+        }
+        return false;
+    }
+
+    public static bool DetectIsSlim(string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+            return false;
+
+        try
+        {
+            using var fs = File.OpenRead(filePath);
+            var decoder = BitmapDecoder.Create(fs, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+            if (decoder.Frames.Count > 0)
+            {
+                return DetectIsSlim(decoder.Frames[0]);
+            }
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[SKIN: ERROR] Ошибка детекции slim-модели по файлу: {ex.Message}");
+        }
+        return false;
     }
 
     private static void DrawSubRect(DrawingContext dc, BitmapSource source, Int32Rect crop, Rect dest)
@@ -961,16 +1003,7 @@ public class SkinService : ISkinService
         try
         {
             if (string.IsNullOrWhiteSpace(gameDir)) return;
-            var cslDir = Path.Combine(gameDir, "CustomSkinLoader");
-            Directory.CreateDirectory(cslDir);
-            var cslJsonPath = Path.Combine(cslDir, "CustomSkinLoader.json");
-
-            var auraSource = new System.Text.Json.Nodes.JsonObject
-            {
-                ["name"] = "AuraLobby",
-                ["type"] = "CustomSkinAPI",
-                ["root"] = "https://lobby-api.vercel.app/csl/"
-            };
+            var targetDirs = ResolveTargetGameDirectories(gameDir);
 
             var localSkinSource = new System.Text.Json.Nodes.JsonObject
             {
@@ -983,14 +1016,21 @@ public class SkinService : ISkinService
                 ["elytra"] = "LocalSkin/elytras/{USERNAME}.png"
             };
 
+            var auraSource = new System.Text.Json.Nodes.JsonObject
+            {
+                ["name"] = "AuraLobby",
+                ["type"] = "CustomSkinAPI",
+                ["root"] = "https://lobby-api.vercel.app/csl/"
+            };
+
             var rootObj = new System.Text.Json.Nodes.JsonObject
             {
-                ["version"] = "14.27",
-                ["buildNumber"] = 94,
-                ["loadlist"] = new System.Text.Json.Nodes.JsonArray(auraSource, localSkinSource),
+                ["version"] = "15.0.1",
+                ["buildNumber"] = 40,
+                ["loadlist"] = new System.Text.Json.Nodes.JsonArray(localSkinSource, auraSource),
                 ["enableDynamicSkull"] = true,
-                ["enableTransparentSkin"] = true,
-                ["forceLoadAllTextures"] = false,
+                ["enableTransparentSkin"] = false,
+                ["forceLoadAllTextures"] = true,
                 ["enableCape"] = true,
                 ["threadPoolSize"] = 4,
                 ["enableLogStdOut"] = false,
@@ -1002,9 +1042,20 @@ public class SkinService : ISkinService
             };
 
             var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(cslJsonPath, rootObj.ToJsonString(options));
+            string json = rootObj.ToJsonString(options);
 
-            ClearCustomSkinLoaderCache(gameDir);
+            foreach (var dir in targetDirs)
+            {
+                var cslDir = Path.Combine(dir, "CustomSkinLoader");
+                Directory.CreateDirectory(cslDir);
+                var cslJsonPath = Path.Combine(cslDir, "CustomSkinLoader.json");
+                File.WriteAllText(cslJsonPath, json);
+
+                Directory.CreateDirectory(Path.Combine(cslDir, "LocalSkin", "skins"));
+                Directory.CreateDirectory(Path.Combine(cslDir, "LocalSkin", "capes"));
+
+                ClearCustomSkinLoaderCache(dir);
+            }
         }
         catch (Exception ex)
         {
@@ -1038,6 +1089,44 @@ public class SkinService : ISkinService
         catch (Exception ex)
         {
             FabricGameLaunchService.LogLauncherEvent($"[CSL-CACHE: ERROR] Ошибка очистки кэша: {ex.Message}");
+        }
+    }
+
+    public void CleanupPlayerGameFiles(string? nickname, string gameDir)
+    {
+        if (string.IsNullOrWhiteSpace(nickname) || string.IsNullOrWhiteSpace(gameDir))
+            return;
+
+        var val = NicknameValidator.Validate(nickname);
+        if (!val.IsValid) return;
+
+        string safeNick = nickname.Trim();
+        var targetDirs = ResolveTargetGameDirectories(gameDir);
+
+        foreach (var dir in targetDirs)
+        {
+            try
+            {
+                var skinFile = Path.Combine(dir, "CustomSkinLoader", "LocalSkin", "skins", $"{safeNick}.png");
+                if (File.Exists(skinFile))
+                {
+                    File.Delete(skinFile);
+                    FabricGameLaunchService.LogLauncherEvent($"[CSL-CLEANUP] Удален локальный скин прежнего ника: {skinFile}");
+                }
+
+                var capeFile = Path.Combine(dir, "CustomSkinLoader", "LocalSkin", "capes", $"{safeNick}.png");
+                if (File.Exists(capeFile))
+                {
+                    File.Delete(capeFile);
+                    FabricGameLaunchService.LogLauncherEvent($"[CSL-CLEANUP] Удален локальный плащ прежнего ника: {capeFile}");
+                }
+
+                ClearCustomSkinLoaderCache(dir);
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[CSL-CLEANUP: WARN] Ошибка удаления файлов для '{safeNick}' в {dir}: {ex.Message}");
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using AuraLauncher.Core;
@@ -182,7 +183,22 @@ public class GameSessionService : IGameSessionService
             try
             {
                 var targetGameDir = _launchService.ResolveInstanceDirectory(config.GameDir, config.SelectedVersion);
+
+                if (!string.IsNullOrWhiteSpace(config.SkinPath) && File.Exists(config.SkinPath))
+                {
+                    bool isSlim = SkinService.DetectIsSlim(config.SkinPath);
+                    string detectedModel = isSlim ? "slim" : "default";
+                    if (!string.Equals(config.SkinModel, detectedModel, StringComparison.OrdinalIgnoreCase))
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[SKIN] Автодетекция модели скина перед запуском: {config.SkinModel} -> {detectedModel}");
+                        config.SkinModel = detectedModel;
+                        await _configService.SaveConfigAsync(config, ct);
+                    }
+                }
+
                 _skinService.EnsureCustomSkinLoaderConfig(targetGameDir);
+                _skinService.EnsureCustomSkinLoaderConfig(config.GameDir);
+
                 var uploadResult = await _skinService.UploadSkinToLobbyApiAsync(
                     config.SkinPath,
                     config.Nickname,
@@ -199,7 +215,11 @@ public class GameSessionService : IGameSessionService
                 }
 
                 await _skinService.SyncSkinToGameAsync(config.SkinPath, config.Nickname, targetGameDir, ct);
-                await _skinService.SyncCapeToGameAsync(config.CapePath, config.Nickname, targetGameDir, ct);
+
+                string? capeToSync = (string.Equals(config.CapeId, "custom", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(config.CapePath) && File.Exists(config.CapePath))
+                    ? config.CapePath
+                    : null;
+                await _skinService.SyncCapeToGameAsync(capeToSync, config.Nickname, targetGameDir, ct);
             }
             catch (Exception ex)
             {
