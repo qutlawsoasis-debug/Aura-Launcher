@@ -253,6 +253,10 @@ public partial class WebBridge : IDisposable
                     HandleFsOpenModsFolder(msg);
                     break;
 
+                case "fs.openGameFolder":
+                    HandleFsOpenGameFolder(msg);
+                    break;
+
                 case "skin.get":
                     HandleSkinGet(msg);
                     break;
@@ -796,6 +800,7 @@ public partial class WebBridge : IDisposable
             hideLauncherWhilePlaying = cfg.HideLauncherWhilePlaying,
             graphicsPreset = cfg.GraphicsPreset,
             visualEffectsMode = cfg.VisualEffectsMode,
+            theme = cfg.Theme,
             autoUpdate = cfg.AutoUpdateEnabled,
             discordRpc = cfg.DiscordRpcEnabled
         });
@@ -1110,6 +1115,34 @@ public partial class WebBridge : IDisposable
         catch (Exception ex)
         {
             _logger($"[WEBBRIDGE: ERROR] fs.openModsFolder failed: {ex.Message}");
+            SendError(msg.Id, msg.Name, ex.Message);
+        }
+    }
+
+    private void HandleFsOpenGameFolder(BridgeMessage msg)
+    {
+        string? gameDir = _configService?.CurrentConfig?.GameDir;
+        if (string.IsNullOrWhiteSpace(gameDir) || !Directory.Exists(gameDir))
+        {
+            gameDir = _skinService?.GetProfileDataDir() ?? _configService?.ProfileDataDir ?? Environment.GetEnvironmentVariable("AURA_PROFILE_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".aura");
+        }
+        Directory.CreateDirectory(gameDir);
+
+        _logger($"[WEBBRIDGE] fs.openGameFolder: {gameDir}");
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"\"{gameDir}\"",
+                UseShellExecute = true
+            });
+            SendResponse(msg.Id, msg.Name, new { success = true, path = gameDir });
+        }
+        catch (Exception ex)
+        {
+            _logger($"[WEBBRIDGE: ERROR] fs.openGameFolder failed: {ex.Message}");
             SendError(msg.Id, msg.Name, ex.Message);
         }
     }

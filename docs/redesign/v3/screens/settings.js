@@ -22,7 +22,7 @@
     hideLauncherWhilePlaying: true,
     graphicsPreset: 'Medium',
     visualEffectsMode: 'full',
-    theme: 'frost',
+    theme: (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'frost',
     selectedVersion: '1.20.1',
     gameDir: ''
   };
@@ -225,7 +225,7 @@
 
     // 2b. Theme Selection (Radio Cards)
     const syncThemeUI = (themeId) => {
-      const currentTheme = themeId || (window.AuraThemes ? window.AuraThemes.getCurrentThemeId() : 'frost');
+      const currentTheme = themeId || (window.AuraThemes ? window.AuraThemes.getCurrentThemeId() : (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme'))) || 'frost';
       if (themeGroup) {
         const cards = themeGroup.querySelectorAll('.theme-card');
         cards.forEach(card => {
@@ -236,7 +236,7 @@
         });
       }
       if (themeActiveHint) {
-        const info = window.AuraThemes && window.AuraThemes.THEMES.find(t => t.id === currentTheme);
+        const info = window.AuraThemes && window.AuraThemes.THEMES && window.AuraThemes.THEMES.find(t => t.id === currentTheme);
         themeActiveHint.textContent = info ? info.name : (currentTheme === 'liquid' ? 'Жидкое стекло' : 'Матовое стекло');
       }
     };
@@ -443,6 +443,7 @@
         const urlTheme = urlParams.get('theme');
         if (urlTheme && (window.AuraThemes ? window.AuraThemes.isValidThemeId(urlTheme) : /^[a-z0-9_-]{3,32}$/.test(urlTheme))) {
           activeConfig.theme = urlTheme;
+          selectTheme(urlTheme, false);
         } else if (activeConfig.theme) {
           selectTheme(activeConfig.theme, false);
         }
@@ -476,7 +477,11 @@
       const hint = document.getElementById('gameFolderHint');
       if (hint && folder) {
         hint.textContent = folder;
-        hint.title = folder;
+        hint.title = folder + ' (нажмите, чтобы открыть)';
+        hint.style.cursor = 'pointer';
+        hint.onclick = () => {
+          sendBridge('fs.openGameFolder').catch(() => {});
+        };
       }
     }
 
