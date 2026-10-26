@@ -73,6 +73,20 @@ html[data-theme="liquid"] body.is-open .world-dim {
   background: rgba(0, 0, 0, 0.10);
 }
 
+/* Liquid island transition: backdrop-filter must not interpolate during morphs to avoid GPU shader rebuilds */
+html[data-theme="liquid"] .island {
+  transition: width var(--dur-morph) var(--spring),
+              height var(--dur-morph) var(--spring),
+              border-radius var(--dur-morph) var(--spring),
+              bottom var(--dur-morph) var(--spring),
+              background var(--dur-3) var(--ease-out),
+              box-shadow var(--dur-3) var(--ease-out),
+              border-color var(--dur-3) var(--ease-out),
+              opacity var(--dur-3) var(--ease-out),
+              backdrop-filter 0s linear,
+              -webkit-backdrop-filter 0s linear;
+}
+
 /* Headings and text rows in liquid theme: high-contrast text-shadow for crisp legibility */
 html[data-theme="liquid"] .island {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
@@ -84,12 +98,12 @@ html[data-theme="liquid"] .island :is(h1, h2, h3, h4, .title, .sub, .pane-title,
 
 /* Liquid theme optical displacement and lens refraction on the Island container */
 html[data-theme="liquid"][data-effects="full"] .island {
-  /* Cascade Fallback: 2px blur + saturate + brightness */
-  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(var(--theme-glass-brightness));
-  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(var(--theme-glass-brightness));
+  /* Cascade Fallback: 2px blur + saturate */
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
   /* Enhanced: SVG displacement map filter for 16px edge refraction */
-  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(var(--theme-glass-brightness));
-  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(var(--theme-glass-brightness));
+  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
 }
 
 /* Open island: transparent .05 white + sheen, scene remains fully readable */
@@ -102,20 +116,20 @@ html[data-theme="liquid"][data-tone="light"] .island.open {
 }
 
 html[data-theme="liquid"][data-effects="full"] .island.open {
-  /* Cascade Fallback: 2px blur, maximum brightness(.9) */
-  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(0.9);
-  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(0.9);
+  /* Cascade Fallback: 2px blur + saturate (dimming is handled via .world-dim without multi-pass filter) */
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
   /* Enhanced SVG displacement */
-  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(0.9);
-  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(0.9);
+  backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
+  -webkit-backdrop-filter: url("#auraLiquidFilter") blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate));
 }
 
 /* Fallback when SVG backdrop filters are unsupported, corrupt, or disabled */
 html[data-theme="liquid"].no-svg-filter[data-effects="full"] .island,
 html[data-theme="liquid"].no-svg-filter[data-effects="full"] .island.open,
 html[data-theme="liquid"][data-effects="full"] .island.no-svg-filter {
-  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(var(--theme-glass-brightness)) !important;
-  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) brightness(var(--theme-glass-brightness)) !important;
+  backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
+  -webkit-backdrop-filter: blur(var(--theme-glass-blur)) saturate(var(--theme-glass-saturate)) !important;
 }
 
 /* Internal controls: segments, cards, fields, slider */

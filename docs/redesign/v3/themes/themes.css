@@ -37,7 +37,10 @@
               -webkit-backdrop-filter 250ms var(--ease-out);
 }
 
-html[data-effects="off"] .island,
+html[data-effects="off"] .island {
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .island {
     transition: none !important;
