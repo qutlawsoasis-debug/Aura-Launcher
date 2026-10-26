@@ -116,6 +116,8 @@
 
   window.setIslandMode = function (m, updateHash = true) {
     if (!sizes[m]) return;
+    const prevMode = islandMode;
+    const isExplicitSectionChange = (prevMode !== m) && sections.includes(m);
     islandMode = m;
 
     const [w, h] = sizes[m].map(v => typeof v === 'function' ? v() : v);
@@ -126,6 +128,21 @@
     const targetLayer = document.querySelector(`.layer[data-l="${m}"]`);
     if (targetLayer) {
       targetLayer.style.contentVisibility = 'visible';
+
+      // Reset scroll to top on explicit navigation to a new/different section
+      if (isExplicitSectionChange) {
+        const scrollContainers = targetLayer.querySelectorAll('.sec-body, [data-scrollable]');
+        scrollContainers.forEach(el => {
+          el.scrollTop = 0;
+        });
+        requestAnimationFrame(() => {
+          if (islandMode === m) {
+            scrollContainers.forEach(el => {
+              el.scrollTop = 0;
+            });
+          }
+        });
+      }
     }
 
     if (island) {

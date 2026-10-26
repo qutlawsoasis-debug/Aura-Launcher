@@ -146,32 +146,63 @@ export function initThemeBootstrap() {
   initLiquidDisplacement();
 }
 
-/* ================= 4. SPECULAR CURSOR TRACKING (LIQUID FULL EFFECTS) ================= */
+/* ================= 4. SPECULAR CURSOR TRACKING (OPTIMIZED) ================= */
 let specularRafId = null;
 let specularIslandEl = null;
+let cachedIslandRect = null;
+let lastCursorX = -500;
+let lastCursorY = -500;
+
+function updateIslandRectCache() {
+  if (specularIslandEl) {
+    cachedIslandRect = specularIslandEl.getBoundingClientRect();
+  }
+}
+
+function onIslandPointerEnter(e) {
+  updateIslandRectCache();
+  onIslandPointerMove(e);
+}
 
 function onIslandPointerMove(e) {
   if (!specularIslandEl) return;
   if (document.documentElement.getAttribute('data-theme') !== 'liquid') return;
   if (document.documentElement.getAttribute('data-effects') !== 'full') return;
+  if (activeMorphProps.size > 0) return; // Do not fight morph animation with cursor paints
 
-  const rect = specularIslandEl.getBoundingClientRect();
+  if (!cachedIslandRect) {
+    updateIslandRectCache();
+  }
+  const rect = cachedIslandRect;
+  if (!rect) return;
+
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  if (specularRafId) cancelAnimationFrame(specularRafId);
+  // Filter out subpixel jitter to prevent unnecessary style mutations
+  if (Math.abs(x - lastCursorX) < 3 && Math.abs(y - lastCursorY) < 3) return;
+
+  if (specularRafId) return; // Already scheduled for the next frame
   specularRafId = requestAnimationFrame(() => {
+    specularRafId = null;
     if (!specularIslandEl) return;
     specularIslandEl.style.setProperty('--cursor-x', `${Math.round(x)}px`);
     specularIslandEl.style.setProperty('--cursor-y', `${Math.round(y)}px`);
     specularIslandEl.style.setProperty('--specular-opacity', '1');
+    lastCursorX = x;
+    lastCursorY = y;
   });
 }
 
 function onIslandPointerLeave() {
   if (!specularIslandEl) return;
-  if (specularRafId) cancelAnimationFrame(specularRafId);
+  if (specularRafId) {
+    cancelAnimationFrame(specularRafId);
+    specularRafId = null;
+  }
   specularIslandEl.style.setProperty('--specular-opacity', '0');
+  lastCursorX = -500;
+  lastCursorY = -500;
 }
 
 function updateSpecularTracker(themeId) {
@@ -188,7 +219,7 @@ function initSpecularTracker() {
     specularIslandEl = document.getElementById('island');
     if (!specularIslandEl) return;
 
-    specularIslandEl.addEventListener('pointerenter', onIslandPointerMove, { passive: true });
+    specularIslandEl.addEventListener('pointerenter', onIslandPointerEnter, { passive: true });
     specularIslandEl.addEventListener('pointermove', onIslandPointerMove, { passive: true });
     specularIslandEl.addEventListener('pointerleave', onIslandPointerLeave, { passive: true });
 
@@ -202,31 +233,45 @@ function initSpecularTracker() {
   }
 }
 
-/* ================= 5. LIQUID EDGE DISPLACEMENT MAP GENERATOR ================= */
+/* ================= 5. LIQUID EDGE DISPLACEMENT MAP GENERATOR (OPTIMIZED) ================= */
 let lastEdgeMapKey = '';
 let liquidResizeObserver = null;
+const activeMorphProps = new Set();
+let resizeDebounceTimer = null;
+let cancelSettleTimer = null;
+let reusableCanvas = null;
+let reusableCtx = null;
 
 export function updateLiquidDisplacementMap(width, height, borderRadius) {
   if (typeof document === 'undefined') return;
   const feImage = document.getElementById('auraLiquidEdgeMap');
   if (!feImage) return;
 
-  const w = Math.max(64, Math.round(width || 400));
-  const h = Math.max(32, Math.round(height || 76));
-  const r = Math.max(0, Math.min(Math.min(w, h) / 2, Math.round(borderRadius ?? 38)));
-  const rim = 16;
+  // Generate at half resolution for 4x performance and 4x smaller dataURI
+  const targetW = Math.max(64, Math.round(width || 400));
+  const targetH = Math.max(32, Math.round(height || 76));
+  const targetR = Math.max(0, Math.min(Math.min(targetW, targetH) / 2, Math.round(borderRadius ?? 38)));
+
+  const w = Math.round(targetW / 2);
+  const h = Math.round(targetH / 2);
+  const r = Math.round(targetR / 2);
+  const rim = 8; // 8px at half-res = 16px at 1x
+
   const key = `${w}x${h}r${r}`;
   if (key === lastEdgeMapKey) return;
-  lastEdgeMapKey = key;
 
   try {
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!reusableCanvas) {
+      reusableCanvas = document.createElement('canvas');
+    }
+    reusableCanvas.width = w;
+    reusableCanvas.height = h;
+    if (!reusableCtx) {
+      reusableCtx = reusableCanvas.getContext('2d', { willReadFrequently: false });
+    }
+    if (!reusableCtx) return;
 
-    const imgData = ctx.createImageData(w, h);
+    const imgData = reusableCtx.createImageData(w, h);
     const buf32 = new Uint32Array(imgData.data.buffer);
     buf32.fill(0xFF808080); // Little-endian 32-bit: Alpha=255, Blue=128, Green=128, Red=128
 
@@ -290,10 +335,11 @@ export function updateLiquidDisplacementMap(width, height, borderRadius) {
       }
     }
 
-    ctx.putImageData(imgData, 0, 0);
-    const dataUrl = canvas.toDataURL('image/png');
+    reusableCtx.putImageData(imgData, 0, 0);
+    const dataUrl = reusableCanvas.toDataURL('image/png');
     feImage.setAttribute('href', dataUrl);
     feImage.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', dataUrl);
+    lastEdgeMapKey = key;
   } catch (err) {
     console.warn('[THEMES] updateLiquidDisplacementMap error:', err);
   }
@@ -303,6 +349,7 @@ export function initLiquidDisplacement() {
   if (typeof document === 'undefined') return;
 
   const refreshMap = () => {
+    if (activeMorphProps.size > 0) return;
     if (document.documentElement.getAttribute('data-theme') !== 'liquid') return;
     const island = document.getElementById('island');
     if (!island) return;
@@ -310,25 +357,71 @@ export function initLiquidDisplacement() {
     const style = window.getComputedStyle(island);
     const br = parseFloat(style.borderRadius) || (island.classList.contains('open') ? 34 : 38);
     updateLiquidDisplacementMap(rect.width, rect.height, br);
+    updateIslandRectCache();
   };
 
   const setup = () => {
     const island = document.getElementById('island');
     if (!island) return;
 
+    // Track active transition state to avoid generating intermediate maps during spring animation
+    island.addEventListener('transitionrun', (e) => {
+      if (e.target !== island) return;
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        clearTimeout(resizeDebounceTimer);
+        clearTimeout(cancelSettleTimer);
+        activeMorphProps.add(e.propertyName);
+      }
+    }, { passive: true });
+
+    island.addEventListener('transitionstart', (e) => {
+      if (e.target !== island) return;
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        clearTimeout(resizeDebounceTimer);
+        clearTimeout(cancelSettleTimer);
+        activeMorphProps.add(e.propertyName);
+      }
+    }, { passive: true });
+
+    island.addEventListener('transitionend', (e) => {
+      if (e.target !== island) return;
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        activeMorphProps.delete(e.propertyName);
+        if (activeMorphProps.size === 0) {
+          clearTimeout(cancelSettleTimer);
+          refreshMap();
+        }
+      }
+    }, { passive: true });
+
+    island.addEventListener('transitioncancel', (e) => {
+      if (e.target !== island) return;
+      if (e.propertyName === 'width' || e.propertyName === 'height') {
+        activeMorphProps.delete(e.propertyName);
+        clearTimeout(cancelSettleTimer);
+        cancelSettleTimer = setTimeout(() => {
+          if (activeMorphProps.size === 0) {
+            refreshMap();
+          }
+        }, 120);
+      }
+    }, { passive: true });
+
+    // ResizeObserver ignores calls during morph transitions; debounces window resize
     if (typeof ResizeObserver !== 'undefined') {
       if (liquidResizeObserver) liquidResizeObserver.disconnect();
       liquidResizeObserver = new ResizeObserver(() => {
-        refreshMap();
+        if (activeMorphProps.size > 0) return; // Do not recalculate intermediate transition sizes
+        clearTimeout(resizeDebounceTimer);
+        resizeDebounceTimer = setTimeout(refreshMap, 100);
       });
       liquidResizeObserver.observe(island);
     }
 
-    island.addEventListener('transitionend', (e) => {
-      if (e.propertyName === 'width' || e.propertyName === 'height') {
-        refreshMap();
-      }
-    });
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeDebounceTimer);
+      resizeDebounceTimer = setTimeout(refreshMap, 100);
+    }, { passive: true });
 
     window.addEventListener('aura:themechange', (e) => {
       if (e.detail && e.detail.theme === 'liquid') {
