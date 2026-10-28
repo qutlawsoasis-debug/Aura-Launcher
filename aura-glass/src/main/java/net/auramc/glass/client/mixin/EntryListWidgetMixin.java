@@ -1,0 +1,64 @@
+package net.auramc.glass.client.mixin;
+import net.auramc.glass.client.ui.GlassFrameHooks;
+import net.auramc.glass.common.render.GlassRenderer;
+import net.auramc.glass.common.style.*;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.EntryListWidget;
+import org.spongepowered.asm.mixin.*;
+import org.spongepowered.asm.mixin.injection.*;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+@Mixin(EntryListWidget.class)
+public abstract class EntryListWidgetMixin {
+    @Shadow protected abstract EntryListWidget.Entry getEntryAtPosition(double x,double y);
+    @Shadow protected abstract EntryListWidget.Entry getEntry(int index);
+    @Shadow protected abstract boolean isSelectedEntry(int index);
+    @Shadow protected abstract void renderList(DrawContext c,int mx,int my,float delta);
+    @Shadow protected abstract void renderHeader(DrawContext c,int x,int y);
+    @Shadow protected abstract void renderDecorations(DrawContext c,int mx,int my);
+    @Shadow protected abstract int getMaxPosition();
+    @Shadow protected int left,top,right,bottom;
+    @Shadow protected abstract int getScrollbarPositionX();
+    @Shadow private boolean renderHeader;
+    @Shadow private EntryListWidget.Entry hoveredEntry;
+    @Unique private int aura_left,aura_top,aura_right,aura_bottom;
+    @Inject(method="render",at=@At("HEAD"),cancellable=true)
+    private void aura_list(DrawContext c,int mx,int my,float delta,CallbackInfo ci) {
+        if(!GlassFrameHooks.styledScreen())return;
+        var self=(EntryListWidget<?>)(Object)this;int l=left,t=top,r=right,b=bottom;
+        aura_left=l;aura_top=t;aura_right=r;aura_bottom=b;
+        hoveredEntry=mx>=l && mx<r && my>=t && my<b?getEntryAtPosition(mx,my):null;
+        int screenW=net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledWidth();
+        int panelL=Math.max(12,l),panelR=Math.min(screenW-12,r);
+        int panelBottom=Math.min(b,t+Math.max(24,getMaxPosition()+8));
+        if(self instanceof net.minecraft.client.gui.widget.OptionListWidget){
+            int[] content=net.auramc.glass.client.ui.GlassListBounds.widgets(self);
+            if(content[0]<content[1]){panelL=Math.max(panelL,content[0]-8);panelR=Math.min(panelR,content[1]+8);}
+            GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.get(GlassPreset.PANEL),1);
+        }else GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.get(GlassPreset.PANEL),1);
+        if(renderHeader)GlassRenderer.foreground(()->{c.enableScissor(l,t,r,b);try{renderHeader(c,self.getRowLeft(),t+4-(int)self.getScrollAmount());}finally{c.disableScissor();}});
+        renderList(c,mx,my,delta);
+        int max=self.getMaxScroll();
+        if(max>0){
+            float h=Math.max(16,Math.min(b-t-8,(b-t)*(b-t)/(float)Math.max(1,getMaxPosition())));
+            float y=t+(b-t-h)*(float)self.getScrollAmount()/max;
+            GlassRenderer.draw(getScrollbarPositionX()+2,y,2,h,GlassStyles.get(GlassPreset.BUTTON_FILLED),.85f);
+        }
+        GlassRenderer.foreground(()->renderDecorations(c,mx,my));ci.cancel();
+    }
+    @Inject(method="renderEntry",at=@At("HEAD"),cancellable=true)
+    private void aura_entry(DrawContext c,int mx,int my,float delta,int index,int x,int y,int w,int h,CallbackInfo ci) {
+        if(!GlassFrameHooks.styledScreen())return;
+        EntryListWidget.Entry entry=getEntry(index);boolean hovered=entry==hoveredEntry;
+        int l=aura_left,t=aura_top,r=aura_right,b=aura_bottom;
+        if(!((Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget) && (isSelectedEntry(index) || hovered)){
+            int yy=Math.max(t,y),hh=Math.min(b,y+h)-yy;
+            if(hh>0)GlassRenderer.draw(x,yy,w,hh,isSelectedEntry(index)?GlassStyles.selected():GlassStyles.get(GlassPreset.SELECTED_DARK),isSelectedEntry(index)?1:.55f);
+        }
+        Runnable content=()->{
+            c.enableScissor(l,t,r,b);
+            try{GlassRenderer.withClip(l,t,r,b,()->{if(isSelectedEntry(index))net.auramc.glass.client.ui.GlassScreenText.selected(()->entry.render(c,index,y,x,w,h,mx,my,hovered,delta));else entry.render(c,index,y,x,w,h,mx,my,hovered,delta);});}finally{c.disableScissor();}
+        };
+        if((Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget)content.run();else GlassRenderer.foreground(content);
+        ci.cancel();
+    }
+}

@@ -9,11 +9,9 @@
     "CyclingButtonWidgetMixin",
     "IntegratedServerLoaderMixin",
     "MinecraftClientMixin",
-    "MultiplayerWarningScreenMixin",
     "OpenToLanScreenMixin",
     "PeriodicRunnerMixin",
     "RealmsAvailabilityMixin",
-    "SplashOverlayMixin",
     "TabManagerMixin",
     "TitleScreenMixin",
     "WorldCreatorMixin"

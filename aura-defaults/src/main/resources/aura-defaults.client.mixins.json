@@ -15,7 +15,6 @@
     "Realms32BitWarningCheckerMixin",
     "RealmsMainScreenMixin",
     "RealmsNotificationsScreenMixin",
-    "SplashOverlayMixin",
     "TabManagerMixin",
     "TitleScreenMixin",
     "WorldCreatorMixin"

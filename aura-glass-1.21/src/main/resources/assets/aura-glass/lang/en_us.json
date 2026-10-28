@@ -1,0 +1,15 @@
+{
+  "aura.menu.customize": "Customize Menu",
+  "aura.menu.customize.tooltip": "Freely move and resize main menu buttons and brand",
+  "aura.menu.edit": "Customize Menu",
+  "aura.menu.save": "Save",
+  "aura.menu.reset": "Reset",
+  "aura.menu.done": "Done",
+  "aura.menu.editor_banner": "Menu Customization Mode",
+  "aura.loading.resources": "Loading resources...",
+  "category.aura": "Aura Client",
+  "key.category.aura": "Aura Client",
+  "key.aura.glass_diagnostics": "Glass diagnostics",
+  "key.aura.glass_test": "Test glass panel",
+  "key.aura.glass_gallery": "Glass gallery"
+}

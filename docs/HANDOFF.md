@@ -1,151 +1,65 @@
-# Aura Project Handoff (Контекст для нового чата)
+# Aura — передача текущего состояния
 
-## 1. Репозитории и пути на ПК
-- **Лаунчер (`Aura-Launcher`)**: `C:\Users\magne\Documents\GitHub\Aura-Launcher`
-  - GitHub: `https://github.com/qutlawsoasis-debug/Aura-Launcher`
-  - Стек: C# 12 / .NET 8.0 (`net8.0-windows10.0.19041.0`), WPF, MVVM, CmlLib.Core (запуск Minecraft 1.20.1 + Fabric `0.19.5`), Velopack (`vpk` для автообновлений и инсталлятора).
-  - Текущая версия релиза: **`1.2.99` (`beta 1.0.91`)** — опубликована в GitHub Releases (`v1.2.99`).
-- **Бэкенд лобби, друзей, скинов и отчётов (`lobby-api`)**: `C:\Users\magne\Documents\GitHub\Aura-Launcher\lobby-api`
-  - Хостинг: Vercel (`https://lobby-api.vercel.app`), проект `qutlawsoasis-debugs-projects/lobby-api`.
-  - Хранилище: Upstash Redis (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) + `PLAYIT_SECRET` для playit.gg туннеля.
-- **Сборка модов (`Aura-Pack`)**: `C:\Users\magne\Documents\GitHub\Aura-Pack`
-  - GitHub: `https://github.com/qutlawsoasis-debug/Aura-Pack`
-  - Текущий `packVersion` в `manifest.json`: **`20261013.0148`** (Minecraft 1.20.1, Fabric 0.19.5).
+Срез: 28.10.2026, Europe/Berlin. Источники: реальные Git HEAD/remote, version.json, манифесты Aura-Pack и menu-only dev-проверки. Локальная версия файла не означает опубликованный релиз.
 
----
+## Репозитории и копии
 
-## 2. Где хранятся данные и логи на ПК пользователя
-- **Конфиг лаунчера**: `%APPDATA%\.aura\config.json` (перенесён из `%APPDATA%\Aura\config.json`, старый файл мигрирует автоматически при первом запуске).
-  - При повреждении JSON создаётся копия `config.json.bak`.
-  - `SaveConfigAsync` атомарный (через `.tmp` -> `File.Move`), сохраняет неизвестные JSON-поля.
-- **Директория игры по умолчанию**: `%APPDATA%\.aura`
-  - Моды: `%APPDATA%\.aura\mods`
-  - Логи игры: `%APPDATA%\.aura\logs\latest.log`, `%APPDATA%\.aura\logs\launcher-game.log`
-  - Лог туннеля: `%APPDATA%\.aura\logs\tunnel.log`
-- **Лог самого лаунчера**: `%APPDATA%\Aura\launcher.log`
-- **Установленный через Velopack лаунчер**: `%LOCALAPPDATA%\AuraLauncher`
+| Копия | Состояние |
+|---|---|
+| GitHub Aura-Launcher main | `e4681f1`, последний опубликованный релиз `v1.2.161` / beta1.0.153, опубликован26.10.2026. |
+| Новый интеграционный клон | `C:/Users/magne/AppData/Local/Temp/AuraDev/glass-github-integration-20261028/repo`, ветка `codex/aura-glass`, основан на e4681f1. [PR #10](https://github.com/qutlawsoasis-debug/Aura-Launcher/pull/10) открыт, не слит. Источник сохранён в удалённой ветке; OS-temp-клон не считать единственной резервной копией. |
+| AuraDev | `C:/Users/magne/Documents/AuraDev`, HEAD `d761b14`,49 локальных коммитов включая snapshot/отчёты, remote отсутствует. Рабочая копия чистая. version.json:1.2.154 / beta1.0.146. В этой задаче не изменялась. |
+| Старый Aura-Launcher | `C:/Users/magne/Documents/GitHub/Aura-Launcher`, HEAD `c9dbff9` от25.10; main отстаёт от GitHub на22 коммита. Рабочая копия содержит многочисленные чужие изменения/untracked-файлы, version.json1.2.152 / beta1.0.144. Только чтение; не reset/clean/stash и не переносить её целиком. |
+| GitHub Aura-Pack main | `0cb530f`, оба манифеста имеют packVersion `20261027.1908`; коммит содержимого `c7ef6e0`. Ранний native glass/motion поставляется внутри aura-defaults. Отдельного aura-glass в манифестах нет. |
+| Старый checkout Aura-Pack | `C:/Users/magne/Documents/GitHub/Aura-Pack`, локальный HEAD `a9b5762`, локальные манифесты20261025.1406. Этот checkout отстал; локальный manifest не равен текущему GitHub. В задаче не изменялся. |
 
----
+GitHub: [Aura-Launcher](https://github.com/qutlawsoasis-debug/Aura-Launcher), [Aura-Pack](https://github.com/qutlawsoasis-debug/Aura-Pack). Лаунчер: C#/.NET8 WPF, CmlLib.Core, Velopack; backend lobby-api: TypeScript/Vercel/Redis, исходники рядом в монорепозитории. Никаких секретов в этот документ не переносить.
 
-## 3. Дизайн-система и правила вёрстки
-Подробные правила описаны в `DESIGN.md`:
-- Все цвета только через ресурсы из `Themes/Colors.xaml` (`BgBase`, `Panel`, `PanelRaised`, `TextPrimary`, `Accent`, `Border`, `BorderSubtle` и т.д.).
-- Шрифты: `HeadingFont` и `MainFont` (**Manrope**).
-- Скругления: `CornerRadius="3"`. Без эмодзи (только векторные иконки из `Themes/Icons.xaml`), без свечения (`DropShadowEffect` с цветным glow запрещён).
-- Никаких жёстких `Width`/`Height` у `TextBlock`, `Button` и текстовых панелей.
-- Проверка соблюдения дизайн-системы: `.\scripts\check-design.ps1` (в текущей кодовой базе `0 findings`).
+## Сохранение glass и границы PR
 
----
+Не выполнялся merge независимой snapshot-истории AuraDev. Три glass-модуля перенесены из git archive d761b14 в чистый актуальный main:
 
-## 4. Как выпускать релизы
+- `d86c6e3`: aura-glass, aura-glass-1.21, aura-glass-common; из defaults обеих версий удалён только дублирующий splash-рендер и регистрация. Правила Realms/предупреждений main сохранены.
+- `9a131f6`: сохранены aura-hud-spec.md и clients-research.md из незакоммиченных документов старого клона; уточнена типографика и добавлена сверка этапов1–8.
+- `99b16d8`: реальный запуск выявил неверную init-инъекцию MultiplayerWarningScreenMixin в defaults1.21; устаревший mixin удалён, обход предупреждения остаётся в TitleScreenMixin. Строгая проверка остальных defaults-миксинов сохранена.
+- `59642ad`: Off с плотной заливкой без capture/blur; проверены обе версии и общий код.
 
-### Релиз лаунчера (`Aura-Launcher`)
-1. Обновить версию в `AuraLauncher.csproj` (`<Version>1.2.XX</Version>`) и `version.json` (`internalVersion`: `1.2.XX`, `userFacingVersion`: `beta 1.0.YY`, где `YY = XX - 8`).
-   Альтернатива — не править файлы вручную, а передать флаг `-UpdateVersionFiles -Execute` скрипту сборки (шаг 3): он запишет рассчитанную версию сам.
-2. По явному поручению на релиз подготовить отдельную ветку и PR в `main`. Прямой push в `main` запрещён; перед слиянием требуется независимый approving review. Защиту ветки не отключать.
-3. Собрать пакет через Velopack:
-   ```powershell
-   # План (по умолчанию): только проверка параметров и печать команд, ничего не меняется
-   .\scripts\build-release.ps1 -OutDir "<каталог релиза>"
+Не переносились старый лаунчер/backend, version.json, установщики и pack-бинарники, runtime/QA-автоматика/снимки, несвязанные локальные quiet-chat/Xaero/backup-warning правки defaults. Глобальный override ванильного font provider из AuraDev исключён: он не нужен модульному glass и содержит отсутствующую в snapshot TTF-ссылку. Отдельный клиентский glass и defaults не зависят друг от друга.
 
-   # Реальная упаковка (версия в файлы пишет только с -UpdateVersionFiles)
-   .\scripts\build-release.ps1 -OutDir "<каталог релиза>" -Version 1.2.XX -UpdateVersionFiles -Execute
-   ```
-   Поведение скрипта:
-   - `-OutDir` **обязателен** — каталог вывода задаётся явно; каталога по умолчанию нет, `C:\AuraRelease` скрипт не использует и не чистит.
-   - Без `-Execute` — режим **plan-only**: сборка и упаковка не запускаются, `version.json` / `AuraLauncher.csproj` / git не затрагиваются.
-   - Для дельта-обновлений добавьте `-PreviousPackagesDir "<каталог с прежними AuraLauncher-*.nupkg, RELEASES, releases.win.json>"` — файлы копируются в `-OutDir`, ничего не удаляется.
-   - **Автоочистки старых релизов нет**: скрипт никогда не удаляет чужие версии; очистку каталога вывода выполняйте вручную.
-   - Артефакты появятся в указанном `-OutDir`.
-4. Опубликовать релиз на GitHub через `gh` (пути — из вашего `-OutDir`):
-   ```powershell
-   gh release create v1.2.XX `
-     "<OutDir>\AuraLauncher-win-Setup.exe" `
-     "<OutDir>\AuraLauncher-win-Portable.zip" `
-     "<OutDir>\AuraLauncher-1.2.XX-full.nupkg" `
-     "<OutDir>\AuraLauncher-1.2.XX-delta.nupkg" `
-     "<OutDir>\RELEASES" `
-     "<OutDir>\releases.win.json" `
-     "<OutDir>\assets.win.json" `
-     --title "beta 1.0.YY (v1.2.XX)" --notes "beta 1.0.YY"
-   ```
+Текущая ветка не опубликована в Aura-Pack. Старые pack-бинарники defaults могут содержать прежний UI: не рекомендовать игрокам вручную подмешивать новый glass без согласованного обновления обоих JAR. Любые merge/релиз/изменение manifest требуют отдельного поручения и принятия изменений.
 
-### Обновление сборки модов (`Aura-Pack`)
-В папке `C:\Users\magne\Documents\GitHub\Aura-Pack`:
-```powershell
-.\tools\publish.ps1 -Yes
-```
-Скрипт сам пересчитывает `manifest.json` (SHA-256, размеры, `packVersion`), коммитит и пушит в `main`. Лаунчер у всех игроков подтягивает изменения автоматически при нажатии «Играть» или «Создать лобби».
+## Модули, сборка и режимы
 
----
+- aura-glass: Minecraft1.20.1, Java17+; aura-glass-1.21: Minecraft1.21.1, Java21+.
+- aura-glass-common: общие sourceSets, не отдельный распространяемый JAR. GlassRenderer/BlurService, SDF/GLSL, MSDF, spring-анимации, JSON-пресеты, F6/F7, F8-галерея и UI-миксины.
+- aura-defaults / aura-defaults-1.21: игровые правила и ограничения создания/хостинга миров, предупреждения/onboarding/Realms; серверная часть не переносилась в glass. В интеграции сохраняются текущие правила main, а не все незакоммиченные изменения старых копий.
 
-## 5. Последние выполненные изменения (до `v1.2.61` / `beta 1.0.53`)
-1. **Синхронизация скинов и модели рук (Alex/Steve)**:
-   - В `CustomSkinLoader.json` первым приоритетом добавлен `ElyBy` API (`https://lobby-api.vercel.app/api/csl/`), реализован эндпоинт `lobby-api/api/csl/[...slug].ts`, возвращающий `SKIN` и `metadata: { model: "slim" }` для Alex.
-2. **Интеграция миров, серверов, профилей графики и анализатора крашей (`v1.2.60`)**:
-   - `ServerDatService`: автоматическое добавление/обновление активного сервера лобби в `servers.dat`.
-   - Экспорт и импорт миров (`.zip`) в Мастерской и авто-бэкап мира перед открытием лобби.
-   - `CrashAnalyzerService`: человекочитаемый разбор причин вылета Minecraft (`OutOfMemoryError`, конфликты модов, драйвер видеокарты и т.д.).
-   - Профили графики в Настройках (`Слабый ПК`, `Баланс`, `Ультра`), применяющие пресеты в `options.txt` и `config/iris.properties`.
-   - `Aura-Pack`: добавлен `TaxFreeLevels-1.4.10-fabric-1.20.2.jar` (бесплатные чары на столе зачарований в дополнение к бесплатной наковальне `no_xp_anvils`).
-3. **Редизайн Настроек и сброс скроллбаров (`v1.2.61` / `beta 1.0.53`)**:
-   - В `Styles/UiTheme.xaml` и `Views/SettingsView.xaml` переработаны чипы выбора ОЗУ (`RamPillRadio` в 4 колонки), ползунок `SettingsRamSlider` с янтарным заполнением, сегментированные переключатели профиля графики и режима запуска (`SettingsSegmentRadio`), поле пути к папке игры и кнопка `Изменить` (`SettingsActionBtn`).
-   - В `Behaviors/SmoothScroll.cs` и `MainWindow.xaml.cs` добавлен автоматический сброс скроллбаров (`ResetAllScrollViewers`) в `0` при переключении вкладок сайдбара.
+Из каждого соответствующего модуля: `./gradlew build`, без clean. Все четыре сборки прошли последовательно на JDK21. Общие Java-проверки запускаются отдельно от Gradle module:test: прошли7 тестовых программ, включая Off. Не выдавать Gradle test NO-SOURCE за прохождение common-тестов.
 
----
+Конфиг игры: `config/aura-glass/styles.json`, hot-reload. HIGH/FULL/full — полные эффекты; LOW/low — tint/простая кромка без capture/blur; OFF/off — плотная заливка без capture/blur и оптических эффектов; MEDIUM остаётся совместимым режимом blur. Off использует существующую плоскую shader-ветку, GLSL не изменялся. offFill задаёт RGB28/30/36 и alpha0.94 по умолчанию; primary/selected цвета сохраняются плотными. Off не означает выгрузку всего UI-кеша или нулевое GPU-время.
 
-## 6. Выполненные фичи и фиксы пакета v1.2.62
+selectedPreset по умолчанию SELECTED_TINT; альтернативы SELECTED_GLASS/SELECTED_DARK, акцент отдельно theme.accent. Пресеты2e сохранены, задача2f по стабилизации оттенков/галерее не включена в этот перенос. F6 — тестовая панель, F7 — диагностика, F8 — галерея. Экран настроек эффектов в самой игре ещё не реализован: переключение через JSON.
 
-Все 8 согласованных фич и фиксов полностью реализованы и протестированы:
+## ТЗ, типографика и статус HUD
 
-1. **Баг №1 + Авто-возврат в лобби**:
-   - `lobby-api`: добавлены `playerHeartbeats` гостей, авто-очистка гостей без пульса >25 сек.
-   - Клиент: периодический пульс гостя в `GetStatusAsync(code, playerName)`, сохранение `LastActiveLobbyCode` в конфигурации, при повторном запуске лаунчер проверяет код и автоматически возвращает в активное лобби с показом уведомления.
-2. **Баг №2: Доступность кнопки «Войти» у друзей**:
-   - `lobby-api`: `store.ts` сохраняет и возвращает `lobbyCode` даже при статусе `"playing"`.
-   - Клиент: немедленный `SyncNowAsync` при создании/входе/выходе из лобби, `CanJoin` активен при наличии `LobbyCode`.
-3. **Прямой вход в мир («В мир»)**:
-   - В Мастерской добавлена акцентная кнопка «В мир» с иконкой `IconPlay`, передающая флаг `--quickPlaySingleplayer <FolderName>` в процесс Minecraft для мгновенного входа в одиночный мир.
-4. **Кик участника из лобби хостом**:
-   - Бэкенд: эндпоинт `POST /api/kick` и 403 Forbidden в `/api/join` для исключенных игроков.
-   - Клиент: в карточке игроков у хоста кнопка «Кикнуть» с векторной иконкой `IconKick`. При исключении гость получает всплывающее уведомление и возвращается на главный экран лобби.
-5. **Живой пинг (мс) и статус «Кто уже на сервере»**:
-   - `MinecraftPingService`: измерение реального TCP-пинга + опрос количества игроков через Minecraft SLP Handshake.
-   - В карточке лобби отображаются бейджи с пингом (`IconWifi`) и онлайном (`IconWorld`). При недоступности сервера честно показывается `"—"` (строго без фейковых данных).
-6. **День мира, координаты X/Y/Z, измерение и сид в Мастерской**:
-   - Чтение из `level.dat` через `fNbt` номера игрового дня, измерения (Верхний мир / Незер / Энд), координат позиции игрока и сида генерации.
-   - Отображение чипов характеристик в избранном мире и строках списка миров.
-7. **Авто-копирование скриншота (F2) в буфер Windows**:
-   - `ScreenshotWatcherService`: отслеживание появления новых снимков в `<gameDir>\screenshots`, безопасное чтение и помещение в системный буфер обмена (`Clipboard.SetDataObject` как картинка + файл) для вставки в Discord/Telegram, всплывающий тост в лаунчере.
-8. **Кнопка «Проверить целостность сборки» в Настройках**:
-   - `PackUpdateService`: поддержка `forceFullCheck = true` с принудительной проверкой SHA-256 всех модов и конфигов манифеста, восстановление повреждённых/удалённых файлов в 1 клик.
-   - Пункт в Настройках 1.4 с кнопкой и прогресс-статусом.
-9. **Редизайн тост-уведомлений и новые In-App / Windows Toast оповещения**:
-   - **UI/UX тостов**: объединены в единый вертикальный стек (`StackPanel` в верхнем правом углу) без наложения друг на друга. Карточка тоста выполнена с левой цветной акцентной полосой (`EmberBrush` для действий/скриншотов, `OkBrush` для успеха, `BadBrush` для ошибок/кика), векторной иконкой 28x28 (`IconInfo`, `IconCamera`, `IconCheck`, `IconWarning`, `IconWorld`, `IconUser`), кнопкой быстрого закрытия `IconClose` и кликабельным телом с переходом в целевую вкладку (Мастерская/Лобби/Настройки).
-   - **Плавная анимация**: выезд по горизонтали `TranslateTransform.X` (от 20 до 0 за 220 мс) и фейд `Opacity` (от 0 до 1) с `CubicEase`.
-   - **Windows Notifications**: системные уведомления Windows Action Center поверх открытого окна Minecraft (при F2-скриншоте, краше игры с кодом ошибки и исключением из лобби), гарантирующие видимость событий во время игры.
-   - **Новые сценарии уведомлений**: скриншот скопирован в буфер (с кликом в Мастерскую), аварийный краш Minecraft (с кодом и причиной), исключение из лобби (кик), результат проверки целостности сборки и появление новых обновлений.
+Источник требований: [aura-hud-spec](redesign/reports/aura-hud-spec.md); исследование: [clients-research](redesign/reports/clients-research.md); подробная [сверка1–8](redesign/reports/aura-hud-status-2026-10-28.md).
 
----
+Игра: MSDF Onest400/500/600/700, Manrope только для отсутствующих греческих глифов; если глифа нет в обоих — vanilla fallback одного символа. Лицензии: aura-glass-common/src/main/resources/META-INF/licenses/aura-glass/. Лаунчер отдельно: WPF HeadingFont/MainFont Manrope (Styles/UiTheme.xaml), WebUIv3 Onest (tokens.css/core.css). Это описание текущих реализаций, не замена шрифтов лаунчера.
 
-## 7. Изменения и улучшения (v1.2.63 – v1.2.99)
+Этап1 частично подтверждён фундаментом;2 реализован, но полный GUI-scale/профиль/визуальная приёмка не закрыты. Этапы3(HUD) и4(редактор) не начаты: нет HudRegistry/HudConfig/HudEditorScreen и игровых элементов. WorldGlassHook — только точка захвата для галереи, а AuraSnapSolver не является редактором. Этапы5–8 частичны: pause/menu/options/worlds/servers оформлены через vanilla widgets; tooltip, chat HUD/command suggestions и полная ручная приёмка ещё не закрыты. Следующий код HUD — только после нового ТЗ архитектора.
 
-1. **3D-осмотр скина в Гардеробе**:
-   - Добавлены кнопки быстрого поворота камеры («Спереди», «Сбоку», «Сзади») под 3D-вьюпортом.
-2. **Безопасное удаление миров в Мастерской**:
-   - Удаление мира с inline-подтверждением («Удалить?» / «Отмена»), без случайных потерь данных.
-3. **Очистка кэша и логов в Настройках**:
-   - Кнопка очистки временных файлов и старых логов с динамическим подсчётом освобождённого места.
-4. **Управление фонами**:
-   - Кнопка открытия пользовательской папки фонов (`%APPDATA%\.aura\backgrounds`).
-   - Нормализация всех встроенных обоев до разрешения 1920×1080.
-   - Задержка переключения фона 0.5 сек с защитой от повторных кликов.
-5. **Звуковые и тост-оповещения в Лобби**:
-   - Звуковое уведомление (`SystemSounds.Asterisk`) при подключении игрока для всех участников лобби.
-   - Тост-уведомления при копировании кода или ссылки на лобби.
-6. **Качество кода и безопасность (0 предупреждений)**:
-   - Полная зачистка nullable-предупреждений (CS8604, CS8600, CS8602) в `Core\SceneDiagnostics.cs`, `App.xaml.cs`, `FriendService.cs`, `LobbyViewModel.cs`, `GraphicsPresetService.cs`.
-   - Исправление `async`-методов без `await` (`ReportService.cs`, `SceneDiagnostics.cs`).
-   - Замена хардкодных цветов в разметке окна на централизованные токены из `Themes/Colors.xaml`.
-   - Логирование в пустых `catch`-блоках сервисов (`SkinService`, `WorkshopService`, `ScreenshotWatcherService`).
-   - Отображение точной причины сбоя отправки отчёта в модальном окне ошибки.
+## Фактическая проверка интеграции
+
+Обе версии запускались отдельно в скрытых QA-копиях только до TitleScreen. Проверены совместно glass+defaults, завершение resource reload, строки Created: ...atlas и100 тиков настоящего меню. Окно visible=false/focused=false, звук/lockCursor заблокированы QA-only миксинами; профили данных отдельные. В мир не входили, снимки и ввод ОС не делали. В успешных итоговых логах нет Mixin apply...failed, InvalidInjectionException или ошибок aura-glass. По23 target-класса каждой версии и61 метод-селектор сверены через javap; мировые targets дополнительно проверены по дескрипторам без входа в мир.
+
+После Off обе версии снова прошли HIGH→OFF→LOW→HIGH на меню. В Off: capture=false, blur-path0, fallback0, flat6, один glass draw call; в LOW capture=false, возврат HIGH восстановил capture. Отчёты: [menu smoke](redesign/qa/glass-integration/menu-smoke.md), [Off](redesign/qa/glass-integration/off.md).
+
+Среда: GTX1660SUPER, OpenGL3.2 NVIDIA617.42,1280×720, GUI2, MSAA0, Iris отсутствует. Это smoke, не полный бенчмарк. CPU/аллокации и будущая стоимость HUD не измерены. Реальные сторонние моды/шейдерпаки, миры, остальные GPU, полный GUI scale1–4 и пользовательская визуальная приёмка не проверены.
+
+## Изоляция и дальнейшая работа
+
+Установленные профили APPDATA/.aura, APPDATA/Aura и LOCALAPPDATA/AuraLauncher, миры и установленный лаунчер не запускать/не изменять. AURA_OFFSCREEN сам по себе не доказывает скрытость окна. Разрешённый dev-smoke — только доказанно скрытая отдельная QA-среда до меню, без мира/снимков/захвата ввода/звука. Логи/кеши/распакованные JAR/одноразовые инструменты — в OS temp, не в публикуемых исходниках.
+
+Ветку codex/aura-glass можно продолжать после review; прямой push/merge main запрещён. Staged-файлы перечислять явно; перед коммитом проверять содержимое, перед PR/его обновлением — весь диапазон base..head. Не отключать Git hooks и branch protection. Отдельная публикация Aura-Pack сейчас не разрешена. Условия релизов и секреты backend не менять в рамках HUD.
+
+Старый HANDOFF с v1.2.99 и packVersion20261013.0148 — исторический материал, не текущий статус. Старые клоны сохранены без перезаписи. После согласованных шагов1–5 работа останавливается у архитектора за ТЗ на этап3.

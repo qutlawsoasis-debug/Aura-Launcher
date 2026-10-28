@@ -1,0 +1,11 @@
+{
+  "aura.menu.edit": "Customize Menu",
+  "aura.menu.reset": "Reset",
+  "aura.menu.done": "Done",
+  "aura.menu.editor_banner": "AURA MENU CUSTOMIZATION — DRAG BUTTONS WITH MOUSE",
+  "aura.loading.resources": "Loading resources",
+  "category.aura": "Aura Client",
+  "key.aura.glass_diagnostics": "Glass diagnostics",
+  "key.aura.glass_test": "Test glass panel",
+  "key.aura.glass_gallery": "Glass gallery"
+}
