@@ -87,6 +87,7 @@ public final class GlassDebugOverlay {
         if (client == null || client.getWindow() == null) return;
         if (!GlassDiagnostics.overlayEnabled() && !GlassDiagnostics.panelEnabled()) {
             GlassDiagnostics.endFrame();
+            GlassDiagnostics.reportMode();
             return;
         }
         var window = client.getWindow();
@@ -97,6 +98,7 @@ public final class GlassDebugOverlay {
                 framebuffer == null ? window.getFramebufferHeight() : framebuffer.textureHeight,
                 window.getWidth(), window.getHeight(), window.getScaleFactor(), client.getCurrentFps(), irisLoaded, irisState);
         GlassDiagnostics.endFrame();
+        GlassDiagnostics.reportMode();
         if (!GlassDiagnostics.overlayEnabled()) return;
         List<String> lines = GlassDiagnostics.lines();
         String screen = client.currentScreen == null ? "in game" : client.currentScreen.getClass().getName();

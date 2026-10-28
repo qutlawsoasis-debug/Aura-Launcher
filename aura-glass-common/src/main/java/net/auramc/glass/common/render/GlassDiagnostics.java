@@ -11,6 +11,9 @@ public final class GlassDiagnostics {
     private static final Set<String> REASONS = new HashSet<>();
     private static final GpuGlassTimers TIMERS = new GpuGlassTimers();
     private static boolean overlay, panel, captured;
+    private static int successfulDrawCalls;
+    private static final Set<Object> STYLED_WIDGETS = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    private static final Set<String> MODES = new HashSet<>();
     private static int glassElements, fallbackElements, flatElements, fps, samples, framebufferW, framebufferH, windowW, windowH;
     private static double guiScale, frameMs;
     private static int sampledFbo = -1, sampledW, sampledH;
@@ -30,6 +33,8 @@ public final class GlassDiagnostics {
 
     public static void beginFrame(Object screen, String version) {
         captured = false;
+        successfulDrawCalls = 0;
+        STYLED_WIDGETS.clear();
         glassElements = fallbackElements = flatElements = 0;
         lastFallbackReason = null;
         screenName = screen == null ? "in game" : screen.getClass().getSimpleName();
@@ -63,6 +68,12 @@ public final class GlassDiagnostics {
         }
     }
 
+    public static int successfulDrawCalls() { return successfulDrawCalls; }
+    public static int styledWidgets() { return STYLED_WIDGETS.size(); }
+    public static boolean isWidgetStyled(Object widget) { return STYLED_WIDGETS.contains(widget); }
+    public static void drawSucceeded() { successfulDrawCalls++; }
+    public static void widgetDrawn(Object widget) { STYLED_WIDGETS.add(widget); }
+
     public static void endFrame() {
         BlurService blur = BlurService.get();
         if (rendererError != null) {
@@ -84,6 +95,14 @@ public final class GlassDiagnostics {
             status = "NOT_INIT";
             reason = "no glass capture requested";
         }
+    }
+
+    public static void reportMode() {
+        if (successfulDrawCalls == 0 || STYLED_WIDGETS.isEmpty()) return;
+        String mode = "screen=" + screenName + " configured=" + net.auramc.glass.common.style.GlassStyles.quality()
+                + " effective=" + GlassRenderer.effectiveQuality() + " reason=" + GlassRenderer.fallbackReason();
+        if (MODES.add(mode)) System.out.println("[AuraGlass] " + mode + " drawCalls=" + successfulDrawCalls
+                + " styledWidgets=" + STYLED_WIDGETS.size());
     }
 
     public static void rendererFailure(String message) {

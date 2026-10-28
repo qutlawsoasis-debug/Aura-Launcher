@@ -39,6 +39,7 @@ public final class GlassRenderer {
 
     private static final class Pane {
         float x,y,w,h,alpha;
+        Object widget;
         final GlassStyle style=new GlassStyle();
     }
     private GlassRenderer() {}
@@ -61,7 +62,7 @@ public final class GlassRenderer {
         framebuffer = fbo; width = w; height = h; scale = guiScale;
         quality = GlassStyles.quality();
         if(lowRenderer && quality.needsBackdrop())quality=GlassQuality.LOW;
-        fallbackReason = quality == GlassQuality.OFF ? "effects Off (configured)" : quality == GlassQuality.LOW ? "quality Low (configured)" : "none";
+        fallbackReason = lowRenderer && GlassStyles.quality().needsBackdrop() ? "High shader unavailable; Low fill renderer" : quality == GlassQuality.OFF ? "effects Off (configured)" : quality == GlassQuality.LOW ? "quality Low (configured)" : "none";
     }
 
     public static void captureBackdrop() { captureBackdrop(false); }
@@ -78,11 +79,19 @@ public final class GlassRenderer {
     public static void modalBackground(float progress) { modalProgress=progress; BackdropRenderer.modal(progress,hasBackdrop()); }
 
     public static void draw(float x, float y, float w, float h, GlassStyle style, float alpha) {
+        enqueue(null, x, y, w, h, style, alpha);
+    }
+
+    public static void drawWidget(Object widget, float x, float y, float w, float h, GlassStyle style, float alpha) {
+        enqueue(widget, x, y, w, h, style, alpha);
+    }
+
+    private static void enqueue(Object widget, float x, float y, float w, float h, GlassStyle style, float alpha) {
         if(clip!=null){float right=Math.min(x+w,clip[2]),bottom=Math.min(y+h,clip[3]);x=Math.max(x,clip[0]);y=Math.max(y,clip[1]);w=right-x;h=bottom-y;}
         if (w <= 0 || h <= 0 || alpha <= 0) return;
         if(PANES.size()==MAX_PANES){GlassDiagnostics.log("Menu pane capacity exceeded");return;}
         Pane pane=PANE_POOL[PANES.size()];
-        pane.x=x;pane.y=y;pane.w=w;pane.h=h;pane.alpha=Math.min(1,alpha);
+        pane.x=x;pane.y=y;pane.w=w;pane.h=h;pane.alpha=Math.min(1,alpha);pane.widget=widget;
         GlassStyles.materialInto(style,quality,pane.style);
         PANES.add(pane);
     }
@@ -116,6 +125,7 @@ public final class GlassRenderer {
     public static boolean hasBackdrop() { return captured && BlurService.get().captured(); }
     public static GlassQuality effectiveQuality() { return quality; }
     public static int drawCalls() { return drawCalls; }
+    public static String fallbackReason() { return fallbackReason; }
 
     public static void flush() {
         // List entries may enqueue their own vanilla widgets after the container batch.
@@ -154,11 +164,13 @@ public final class GlassRenderer {
             glEnable(GL_BLEND); glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             if (instanced) glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, PANES.size());
             else glDrawArrays(GL_TRIANGLES, 0, PANES.size() * 6);
-            drawCalls++;
             AdaptiveText.update(hasBackdrop() ? BlurService.get().texture(3) : 0, width, height, scale, 1-.25f*modalProgress, hasBackdrop());
             int error = glGetError();
             if (error != GL_NO_ERROR) throw new IllegalStateException("glass draw GL error 0x" + Integer.toHexString(error));
+            drawCalls++;
+            GlassDiagnostics.drawSucceeded();
             for (int i = 0; i < PANES.size(); i++) {
+                if (PANES.get(i).widget != null) GlassDiagnostics.widgetDrawn(PANES.get(i).widget);
                 if (quality == GlassQuality.OFF) GlassDiagnostics.flatDrawn();
                 else if (quality == GlassQuality.LOW) GlassDiagnostics.fallback(fallbackReason);
                 else GlassDiagnostics.glassDrawn();
@@ -171,6 +183,7 @@ public final class GlassRenderer {
         } finally {
             GlassDiagnostics.timers().end(timer);
             GuiRenderState.restore(framebuffer, width, height);
+            for (Pane pane : PANES) pane.widget = null;
             PANES.clear(); foreground();
         }
     }
@@ -184,6 +197,7 @@ public final class GlassRenderer {
 
     private static void pack(Pane p) {
         GlassStyle s = p.style;
+        if (quality == GlassQuality.LOW) s.tintA = Math.max(s.tintA, .12f);
         float w = p.w * s.scale, h = p.h * s.scale;
         instances.put(p.x + (p.w - w) * .5f).put(p.y + (p.h - h) * .5f).put(w).put(h);
         instances.put(s.refraction).put(Math.min(s.bevel < 0 ? h / 2 : s.bevel, h * .35f)).put(s.splay).put(s.depth);

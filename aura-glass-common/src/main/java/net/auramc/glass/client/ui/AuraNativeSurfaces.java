@@ -83,7 +83,7 @@ public final class AuraNativeSurfaces {
         var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PANEL);
         var style=GlassStyles.frameResolve(base,state,amount);
         net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
-        GlassRenderer.draw(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
+        GlassRenderer.drawWidget(widget, widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
         int rgb = primary ? 0x18232C : 0xF7F9FC;
         return ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
     }

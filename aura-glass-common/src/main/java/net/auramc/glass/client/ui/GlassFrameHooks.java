@@ -14,7 +14,24 @@ public final class GlassFrameHooks {
     private static Object modalScreen;
     private static long modalStarted;
     private static int nativeContentDepth;
-    private static final java.util.Set<String> CARDS=java.util.Set.of("ProgressScreen","DownloadingTerrainScreen","LevelLoadingScreen","MessageScreen","DisconnectedScreen","ConnectScreen","RecoverWorldScreen","BackupPromptScreen","ConfirmScreen","ConfirmLinkScreen","NoticeScreen","DataPackFailureScreen","DatapackFailureScreen","ReconfiguringScreen","OptimizeWorldScreen","PopupScreen");
+    private static final java.util.Set<String> CARDS = cardScreens();
+    private static java.util.Set<String> cardScreens() {
+        var cards = new java.util.HashSet<String>(java.util.Set.of(
+                net.minecraft.client.gui.screen.ProgressScreen.class.getName(),
+                net.minecraft.client.gui.screen.DownloadingTerrainScreen.class.getName(),
+                net.minecraft.client.gui.screen.MessageScreen.class.getName(),
+                net.minecraft.client.gui.screen.DisconnectedScreen.class.getName(),
+                net.minecraft.client.gui.screen.ConfirmScreen.class.getName(),
+                net.minecraft.client.gui.screen.ConfirmLinkScreen.class.getName(),
+                net.minecraft.client.gui.screen.NoticeScreen.class.getName(),
+                net.minecraft.client.gui.screen.world.OptimizeWorldScreen.class.getName()));
+        var mappings = net.fabricmc.loader.api.FabricLoader.getInstance().getMappingResolver();
+        // These screens moved package, changed name, or were introduced in 1.21.
+        for (String id : java.util.List.of("3928", "412", "8897", "405", "5346", "8671", "8816")) {
+            cards.add(mappings.mapClassName("intermediary", "net.minecraft.class_" + id));
+        }
+        return java.util.Set.copyOf(cards);
+    }
     public static boolean modalScreen() {
         var c=MinecraftClient.getInstance(); var screen=c.currentScreen;
         return c.world!=null && screen!=null && !(screen instanceof TitleScreen) && styledScreen();
@@ -41,7 +58,15 @@ public final class GlassFrameHooks {
     public static boolean styledScreen() {
         var screen = MinecraftClient.getInstance().currentScreen;
         if(screen==null || nativeContentDepth>0 || net.auramc.glass.common.render.MenuResources.stopping())return false;
+        boolean ingame = screen instanceof net.minecraft.client.gui.screen.ingame.BookScreen
+                || screen instanceof net.minecraft.client.gui.screen.ingame.BookEditScreen
+                || screen instanceof net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen
+                || screen instanceof net.minecraft.client.gui.screen.ingame.AbstractCommandBlockScreen
+                || screen instanceof net.minecraft.client.gui.screen.ingame.StructureBlockScreen
+                || screen instanceof net.minecraft.client.gui.screen.ingame.JigsawBlockScreen;
+        // Screen's runtime package is named in development and net.minecraft in production.
         return net.auramc.glass.common.ui.MenuScope.applies(screen.getClass().getName(),
+                net.minecraft.client.gui.screen.Screen.class.getPackageName(), ingame,
                 screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>,
                 screen instanceof net.minecraft.client.gui.screen.ChatScreen);
     }
@@ -49,7 +74,7 @@ public final class GlassFrameHooks {
     public static void endNativeContent(){nativeContentDepth=Math.max(0,nativeContentDepth-1);}
     private static void card(DrawContext context){
         var client=MinecraftClient.getInstance();
-        if(!CARDS.contains(client.currentScreen.getClass().getSimpleName()))return;
+        if(!CARDS.contains(client.currentScreen.getClass().getName()))return;
         float width=Math.min(420,context.getScaledWindowWidth()-24),height=Math.min(240,context.getScaledWindowHeight()-48);
         GlassRenderer.draw((context.getScaledWindowWidth()-width)*.5f,(context.getScaledWindowHeight()-height)*.5f,width,height,GlassStyles.frame(GlassPreset.PANEL),1);
         GlassRenderer.flush();
