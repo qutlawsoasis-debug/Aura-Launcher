@@ -52,6 +52,7 @@ public abstract class GlassGalleryScreen extends Screen implements GlassGalleryV
         page=Math.max(0,Math.min(page,Math.max(0,PARAMETERS.length-visibleParameters)));
         addDrawableChild(ButtonWidget.builder(Text.literal(selected.name()),b->{selected=GlassPreset.values()[(selected.ordinal()+1)%GlassPreset.values().length];rebuildControls();}).dimensions(panelX+10,40,width-panelX-20,20).build());
         for(int i=0;i<visibleParameters && page+i<PARAMETERS.length;i++)addDrawableChild(new ParameterSlider(PARAMETERS[page+i],panelX+10,72+i*23,width-panelX-20));
+        addDrawableChild(ButtonWidget.builder(Text.translatable("aura.hud.title"),b->client.setScreen(new net.auramc.glass.common.hud.HudSettingsScreen(this))).dimensions(panelX+10,height-30,width-panelX-20,20).build());
         int half=(width-panelX-24)/2;
         addDrawableChild(ButtonWidget.builder(Text.literal("Save"),b->save()).dimensions(panelX+10,height-55,half,20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Reset to file"),b->{resetToFile();rebuildControls();}).dimensions(panelX+14+half,height-55,half,20).build());

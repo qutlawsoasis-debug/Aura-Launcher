@@ -7,5 +7,15 @@
   "category.aura": "Aura Client",
   "key.aura.glass_diagnostics": "Glass diagnostics",
   "key.aura.glass_test": "Test glass panel",
-  "key.aura.glass_gallery": "Glass gallery"
+  "key.aura.glass_gallery": "Glass gallery",
+  "aura.hud.title": "Aura HUD",
+  "aura.hud.status": "Status pill",
+  "aura.hud.coords": "Coordinates",
+  "aura.hud.toasts": "Notifications",
+  "aura.hud.miniPlayer": "MiniPlayer",
+  "aura.hud.biome": "Biome",
+  "aura.hud.no_source": " (no source)",
+  "key.aura.hud.previous": "MiniPlayer: previous",
+  "key.aura.hud.play": "MiniPlayer: play/pause",
+  "key.aura.hud.next": "MiniPlayer: next"
 }

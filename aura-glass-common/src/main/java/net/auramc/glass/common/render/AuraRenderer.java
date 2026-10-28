@@ -28,7 +28,8 @@ public final class AuraRenderer {
     private static int program, vao, vbo, texture, modelLocation, projectionLocation, fontLocation;
     private static float atlasWidth, atlasHeight, distanceRange, ascender;
     private static boolean ready, failed;
-    private static int count;
+    private static int count,batchDrawCalls;
+    public static int batchDrawCalls(){return batchDrawCalls;}
     private static int contrastLocation, contrastSlotLocation, contrastSlot=-1;
     private static float glyphKind=1;
 
@@ -170,7 +171,7 @@ public final class AuraRenderer {
         // Minecraft's global GUI view moves z=0 inside the projection's near/far planes.
         GuiMatrices.composeModel(view, local, MODEL);
         PROJECTION.set(projection);
-        VERTICES.clear(); count = 0; contrastSlot=-1;
+        VERTICES.clear(); count = 0; contrastSlot=-1; batchDrawCalls=0;
         if (!GuiMatrices.visibleDepth(PROJECTION, MODEL, CLIP_CHECK)) {
             GlassDiagnostics.rendererFailure("GUI depth outside clip volume; native renderer disabled");
             failed = true;
@@ -296,7 +297,7 @@ public final class AuraRenderer {
             glBindVertexArray(vao); glBindBuffer(GL_ARRAY_BUFFER, vbo);
             VERTICES.flip();
             glBufferSubData(GL_ARRAY_BUFFER, 0L, VERTICES);
-            glDrawArrays(GL_TRIANGLES, 0, count);
+            glDrawArrays(GL_TRIANGLES, 0, count);batchDrawCalls++;
         } finally {
             var client = net.minecraft.client.MinecraftClient.getInstance();
             var framebuffer = client.getFramebuffer();

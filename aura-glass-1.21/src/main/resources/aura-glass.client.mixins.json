@@ -29,6 +29,7 @@
     "TabNavigationWidgetMixin",
     "LockButtonWidgetMixin",
     "TextureDeletionMixin",
+    "AuraHudMixin",
     "ExtraMenuWidgetMixin"
   ],
   "injectors": {
