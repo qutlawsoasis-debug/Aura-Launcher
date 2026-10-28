@@ -12,8 +12,8 @@
 
 # Aura Launcher — Правила проекта для ИИ-агента (AGENTS.md)
 
-Полный контекст проекта, версий и путей находится в [docs/HANDOFF.md](docs/HANDOFF.md).
-Что менялось без тебя 21.10.2026 (v3, WebView2, мост, сервер) — [docs/redesign/reports/handoff-2026-10-21.md](docs/redesign/reports/handoff-2026-10-21.md). Прочитай перед любой задачей по v3 или WebView2.
+Полный контекст проекта, версий и путей находится в [C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/HANDOFF.md](C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/HANDOFF.md).
+Что менялось без тебя 21.10.2026 (v3, WebView2, мост, сервер) — [C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/redesign/reports/handoff-2026-10-21.md](C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/redesign/reports/handoff-2026-10-21.md). Прочитай перед любой задачей по v3 или WebView2.
 Эталон дизайна и вёрстки — в [DESIGN.md](DESIGN.md).
 
 ---
@@ -97,19 +97,19 @@
      ```powershell
      $env:AURA_OFFSCREEN = "1"
      $env:AURA_AGENT = "c7560004"
-     cd aura-ui # или cd aura-ui-1.21
+     cd C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/aura-ui # или cd aura-ui-1.21
      .\gradlew runClient
      ```
    - Окно автоматически перемещается за пределы экрана (`glfwSetWindowPos(-32000, -32000)`), отключается пауза при потере фокуса (`pauseOnLostFocus = false`), а звук игры и плеера глушится (`volume = 0`).
    - Кадры снимаются автоматически через `QaAutoshotService` (проверяется минимальный размер снимка > 1024 байт).
-   - Блокировки независимы: `aura-ui/run/agent-run.lock` и `aura-ui-1.21/run/agent-run.lock`.
+   - Блокировки независимы: `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/aura-ui/run/agent-run.lock` и `aura-ui-1.21/run/agent-run.lock`.
 
 2. **Лаунчер (WebView2)**:
    - Использовать флаг `--offscreen` (или `$env:AURA_OFFSCREEN = "1"`):
      ```powershell
-     node tools/qa-webview.js docs/redesign/qa/gallery/screen.png --offscreen
+     node C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/tools/qa-webview.js C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/redesign/qa/gallery/screen.png --offscreen
      ```
    - Окно позиционируется за пределами экрана (`-32000, -32000`), кадр захватывается напрямую через CDP `Page.captureScreenshot` (без захвата рабочего стола и `PrintWindow`).
    - Навигация выполняется строго через JS/CDP события без эмуляции системного курсора.
-   - Блокировка: `tools/launcher-run.lock`.
+   - Блокировка: `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/tools/launcher-run.lock`.
 

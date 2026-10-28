@@ -23,4 +23,9 @@ progress.md
 # Рабочие материалы редизайна — только локально (решение пользователя 22.10)
 /docs/redesign/*
 !/docs/redesign/v3/
-!/docs/redesign/ingame/
+
+# Local QA outputs and runtime data
+/artifacts_screens/
+/docs/redesign/qa/**/*.png
+.chrome_*/
+run/
