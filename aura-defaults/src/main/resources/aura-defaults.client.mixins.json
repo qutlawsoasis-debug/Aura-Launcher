@@ -17,7 +17,8 @@
     "RealmsNotificationsScreenMixin",
     "TabManagerMixin",
     "TitleScreenMixin",
-    "WorldCreatorMixin"
+    "WorldCreatorMixin",
+    "BackupPromptScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
