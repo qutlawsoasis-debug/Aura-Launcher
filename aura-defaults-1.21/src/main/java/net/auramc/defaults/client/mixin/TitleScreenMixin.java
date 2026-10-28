@@ -23,6 +23,10 @@ public abstract class TitleScreenMixin extends Screen {
         super(title);
     }
 
+    @Redirect(method="onDisplayed",at=@At(value="INVOKE",target="Lnet/minecraft/client/realms/gui/screen/RealmsNotificationsScreen;onDisplayed()V"))
+    private void aura_skipDisabledRealmsDisplay(net.minecraft.client.realms.gui.screen.RealmsNotificationsScreen notifications) {
+    }
+
     @Redirect(
         method = "onMultiplayerButtonPressed",
         at = @At(value = "FIELD", target = "Lnet/minecraft/client/option/GameOptions;skipMultiplayerWarning:Z", opcode = Opcodes.GETFIELD)
