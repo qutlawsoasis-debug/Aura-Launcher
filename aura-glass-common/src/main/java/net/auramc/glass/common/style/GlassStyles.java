@@ -50,9 +50,17 @@ public final class GlassStyles {
         return preset.name().startsWith("SELECTED_")?copy.selectedText(preset==GlassPreset.SELECTED_TINT):copy;
     }
     public static GlassStyle selected(){return get(document.selectedPreset);}
-    public static GlassStyle material(GlassStyle value){
+    public static GlassStyle material(GlassStyle value){ return material(value,document.quality); }
+    public static GlassStyle material(GlassStyle value,GlassQuality quality){
         GlassStyle copy=value.copy();
         if(copy.isThemeTint()){int rgb=document.theme.rgb;copy.tintR*=((rgb>>16)&255)/255f;copy.tintG*=((rgb>>8)&255)/255f;copy.tintB*=(rgb&255)/255f;}
+        if(quality==GlassQuality.OFF){
+            FlatFill fill=document.offFill;
+            if(!copy.isSelectedText() && copy.tintA<.5f){copy.tintR=fill.red;copy.tintG=fill.green;copy.tintB=fill.blue;}
+            copy.tintA=Math.max(copy.tintA,fill.alpha);
+            copy.refraction=copy.dispersion=copy.frost=copy.light=copy.gloss=copy.depth=copy.innerGlow=copy.gradient=copy.noise=copy.wobble=0;
+            copy.rimOuter*=.25f;
+        }
         return copy;
     }
     public static GlassQuality quality() { return document.quality; }
@@ -104,6 +112,8 @@ public final class GlassStyles {
         if(candidate.selectedPreset!=GlassPreset.SELECTED_DARK && candidate.selectedPreset!=GlassPreset.SELECTED_GLASS && candidate.selectedPreset!=GlassPreset.SELECTED_TINT)throw new IllegalArgumentException("selectedPreset must name a selected preset");
         if(candidate.theme==null || candidate.theme.accent==null || !candidate.theme.accent.matches("#[0-9a-fA-F]{6}"))throw new IllegalArgumentException("theme.accent must be #RRGGBB");
         candidate.theme.rgb=Integer.parseInt(candidate.theme.accent.substring(1),16);
+        if(candidate.offFill==null)throw new IllegalArgumentException("offFill is required");
+        candidate.offFill.validate();
         for (GlassPreset preset : GlassPreset.values()) {
             GlassStyle style = candidate.presets.get(preset);
             if (style == null) throw new IllegalArgumentException("Missing preset " + preset);
@@ -190,9 +200,18 @@ public final class GlassStyles {
         int version = 4;
         GlassPreset selectedPreset=GlassPreset.SELECTED_TINT;
         Theme theme=new Theme();
+        FlatFill offFill=new FlatFill();
         GlassQuality quality = GlassQuality.HIGH;
         Map<GlassPreset, GlassStyle> presets = new EnumMap<>(GlassPreset.class);
         Map<GlassState, Modifier> states = new EnumMap<>(GlassState.class);
+    }
+    private static final class FlatFill {
+        float red=28/255f,green=30/255f,blue=36/255f,alpha=.94f;
+        void validate(){
+            if(!Float.isFinite(red)||!Float.isFinite(green)||!Float.isFinite(blue)||!Float.isFinite(alpha)
+                    ||red<0||red>1||green<0||green>1||blue<0||blue>1||alpha<.94f||alpha>1)
+                throw new IllegalArgumentException("offFill RGB must be0..1 and alpha0.94..1");
+        }
     }
     private static final class Theme {
         String accent="#40C4FF";

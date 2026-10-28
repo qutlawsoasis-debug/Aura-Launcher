@@ -11,7 +11,7 @@ public final class GlassDiagnostics {
     private static final Set<String> REASONS = new HashSet<>();
     private static final GpuGlassTimers TIMERS = new GpuGlassTimers();
     private static boolean overlay, panel, captured;
-    private static int glassElements, fallbackElements, fps, samples, framebufferW, framebufferH, windowW, windowH;
+    private static int glassElements, fallbackElements, flatElements, fps, samples, framebufferW, framebufferH, windowW, windowH;
     private static double guiScale, frameMs;
     private static int sampledFbo = -1, sampledW, sampledH;
     private static long lastFrame;
@@ -30,7 +30,7 @@ public final class GlassDiagnostics {
 
     public static void beginFrame(Object screen, String version) {
         captured = false;
-        glassElements = fallbackElements = 0;
+        glassElements = fallbackElements = flatElements = 0;
         lastFallbackReason = null;
         screenName = screen == null ? "in game" : screen.getClass().getSimpleName();
         minecraftVersion = version;
@@ -68,6 +68,9 @@ public final class GlassDiagnostics {
         if (rendererError != null) {
             status = "FAILED";
             reason = rendererError;
+        } else if (GlassRenderer.effectiveQuality()==net.auramc.glass.common.style.GlassQuality.OFF) {
+            status="OFF";
+            reason="effects Off; no capture or blur requested";
         } else if (blur.failedForScreen()) {
             reason = blur.failureReason();
             status = reason.contains("MSAA") || reason.contains("multisampled") ? "FALLBACK" : "FAILED";
@@ -89,6 +92,7 @@ public final class GlassDiagnostics {
     }
     public static void fallback(String message) { fallbackElements++; lastFallbackReason = message; log(message); }
     public static void glassDrawn() { glassElements++; }
+    public static void flatDrawn() { flatElements++; }
     public static void captureDone() { captured = true; }
     public static void log(String message) {
         if (message != null && REASONS.add(message)) System.err.println("[AuraGlass] " + message);
@@ -114,7 +118,7 @@ public final class GlassDiagnostics {
         String flat = reason == null ? "none" : reason.replace('\n', ' ').replace('\r', ' ');
         for (int offset = 0; offset < flat.length(); offset += 100) lines.add((offset == 0 ? "Reason: " : "        ") + flat.substring(offset, Math.min(flat.length(), offset + 100)));
         lines.add("Quality: " + GlassRenderer.effectiveQuality() + " | glass draw calls=" + GlassRenderer.drawCalls());
-        lines.add("Last frame: capture=" + captured + " | blur-path=" + glassElements + " | fallback=" + fallbackElements);
+        lines.add("Last frame: capture=" + captured + " | blur-path=" + glassElements + " | fallback=" + fallbackElements+" | flat="+flatElements);
         if (TIMERS.unavailableReason() != null) lines.add(TIMERS.unavailableReason());
         lines.add("GPU delayed >=3f: capture=" + time(GpuGlassTimers.CAPTURE) + " blur=" + time(GpuGlassTimers.BLUR) + " glass=" + time(GpuGlassTimers.GLASS));
         lines.add(String.format(Locale.ROOT, "FPS=%d | frame time=%.3f ms | F6 panel=%s", fps, frameMs, panel));
@@ -123,7 +127,7 @@ public final class GlassDiagnostics {
 
     private static String time(int channel) {
         if (!captured && channel != GpuGlassTimers.GLASS) return "0.000ms (not used)";
-        if (channel == GpuGlassTimers.GLASS && glassElements + fallbackElements == 0) return "0.000ms (not used)";
+        if (channel == GpuGlassTimers.GLASS && glassElements + fallbackElements + flatElements == 0) return "0.000ms (not used)";
         double value = TIMERS.milliseconds(channel);
         return value < 0 ? "pending" : String.format(Locale.ROOT, "%.3fms (age %df)", value, TIMERS.measuredAge(channel));
     }

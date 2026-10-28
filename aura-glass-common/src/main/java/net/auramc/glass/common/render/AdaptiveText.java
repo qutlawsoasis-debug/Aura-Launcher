@@ -23,6 +23,8 @@ public final class AdaptiveText {
         DATA.clear(); count=0;
     }
     public static int request(Object key, float centerX, float centerY, GlassStyle style) {
+        if(net.auramc.glass.common.style.GlassStyles.quality()==net.auramc.glass.common.style.GlassQuality.OFF)
+            style=net.auramc.glass.common.style.GlassStyles.material(style);
         if (!SLOTS.containsKey(key)) {
             if (SLOTS.size() >= CAPACITY) return -1;
             SLOTS.put(key,SLOTS.size());

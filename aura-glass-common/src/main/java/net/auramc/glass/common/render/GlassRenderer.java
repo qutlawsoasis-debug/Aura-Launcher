@@ -34,14 +34,14 @@ public final class GlassRenderer {
         PANES.clear(); FOREGROUND.clear(); captured = false; modalProgress=0; drawCalls = 0;
         framebuffer = fbo; width = w; height = h; scale = guiScale;
         GlassStyles.poll(); quality = GlassStyles.quality();
-        fallbackReason = quality == GlassQuality.LOW ? "quality Low (configured)" : "none";
+        fallbackReason = quality == GlassQuality.OFF ? "effects Off (configured)" : quality == GlassQuality.LOW ? "quality Low (configured)" : "none";
     }
 
     public static void captureBackdrop() { captureBackdrop(false); }
     public static void captureBackdrop(boolean modal) {
-        if (captured) return;
+        if (captured || !quality.needsBackdrop()) return;
         captured = true;
-        if ((modal || quality != GlassQuality.LOW) && !BlurService.get().capture(framebuffer, width, height)) {
+        if (!BlurService.get().capture(framebuffer, width, height)) {
             quality = GlassQuality.LOW; fallbackReason = BlurService.get().failureReason();
         }
     }
@@ -53,7 +53,7 @@ public final class GlassRenderer {
     public static void draw(float x, float y, float w, float h, GlassStyle style, float alpha) {
         if(clip!=null){float right=Math.min(x+w,clip[2]),bottom=Math.min(y+h,clip[3]);x=Math.max(x,clip[0]);y=Math.max(y,clip[1]);w=right-x;h=bottom-y;}
         if (w <= 0 || h <= 0 || alpha <= 0) return;
-        PANES.add(new Pane(x, y, w, h, GlassStyles.material(style), Math.min(1, alpha)));
+        PANES.add(new Pane(x, y, w, h, GlassStyles.material(style,quality), Math.min(1, alpha)));
     }
 
     public static float[] clipBounds(){return clip;}
@@ -78,7 +78,7 @@ public final class GlassRenderer {
         if (PANES.isEmpty()) { foreground(); return; }
         boolean timer = false;
         try {
-            if (!captured && quality != GlassQuality.LOW) {
+            if (!captured && quality.needsBackdrop()) {
                 quality = GlassQuality.LOW;
                 fallbackReason = "backdrop hook not reached; automatic Low";
                 GlassDiagnostics.log(fallbackReason);
@@ -101,7 +101,7 @@ public final class GlassRenderer {
             glUseProgram(program); glBindVertexArray(vao); glBindBuffer(GL_ARRAY_BUFFER, vbo);
             glBufferData(GL_ARRAY_BUFFER, instances, GL_STREAM_DRAW);
             glUniformMatrix4fv(projectionLocation, false, new Matrix4f().setOrtho(0, (float) Math.ceil(width / (double) scale), (float) Math.ceil(height / (double) scale), 0, -1, 1).get(MATRIX));
-            glUniform1i(qualityLocation, quality.ordinal());
+            glUniform1i(qualityLocation, quality.shaderLevel());
             glUniform1i(instancedLocation, instanced ? 1 : 0);
             glUniform2f(sizeLocation, width, height);
             glUniform1f(modalLocation,modalProgress);
@@ -119,7 +119,8 @@ public final class GlassRenderer {
             int error = glGetError();
             if (error != GL_NO_ERROR) throw new IllegalStateException("glass draw GL error 0x" + Integer.toHexString(error));
             for (int i = 0; i < PANES.size(); i++) {
-                if (quality == GlassQuality.LOW) GlassDiagnostics.fallback(fallbackReason);
+                if (quality == GlassQuality.OFF) GlassDiagnostics.flatDrawn();
+                else if (quality == GlassQuality.LOW) GlassDiagnostics.fallback(fallbackReason);
                 else GlassDiagnostics.glassDrawn();
             }
         } catch (Exception error) {

@@ -8,11 +8,12 @@ public final class BackdropRenderer {
     private static int program,vao,amountLocation,dimLocation,availableLocation,worldTexture,worldW,worldH;
     private static boolean requested;
     private BackdropRenderer() {}
-    public static void requestWorldImage() { requested=true; }
+    public static void requestWorldImage() { requested=net.auramc.glass.common.style.GlassStyles.quality().needsBackdrop(); }
     public static boolean hasWorldImage() { return worldTexture!=0; }
     public static void captureWorldIfRequested() {
         if(!requested)return;
         requested=false;
+        if(!net.auramc.glass.common.style.GlassStyles.quality().needsBackdrop())return;
         var c=MinecraftClient.getInstance();if(c.world==null)return;
         var f=c.getFramebuffer();
         if(worldTexture==0)worldTexture=glGenTextures();
