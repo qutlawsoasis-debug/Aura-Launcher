@@ -11,5 +11,15 @@
   "key.category.aura": "Aura Client",
   "key.aura.glass_diagnostics": "Диагностика стекла",
   "key.aura.glass_test": "Тестовая стеклянная панель",
-  "key.aura.glass_gallery": "Галерея стекла"
+  "key.aura.glass_gallery": "Галерея стекла",
+  "aura.hud.title": "HUD Aura",
+  "aura.hud.status": "Плашка состояния",
+  "aura.hud.coords": "Координаты",
+  "aura.hud.toasts": "Уведомления",
+  "aura.hud.miniPlayer": "Мини-плеер",
+  "aura.hud.biome": "Биом",
+  "aura.hud.no_source": " (нет источника)",
+  "key.aura.hud.previous": "Мини-плеер: предыдущий трек",
+  "key.aura.hud.play": "Мини-плеер: воспроизведение/пауза",
+  "key.aura.hud.next": "Мини-плеер: следующий трек"
 }
