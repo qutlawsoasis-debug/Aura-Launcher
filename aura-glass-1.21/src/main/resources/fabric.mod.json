@@ -23,7 +23,8 @@
     "fabricloader": ">=0.14.21",
     "minecraft": "~1.21.1",
     "java": ">=21",
-    "fabric-api": "*"
+    "fabric-api": "*",
+    "mixinextras": ">=0.5.5"
   },
   "accessWidener": "aura-glass.accesswidener"
 }
