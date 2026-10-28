@@ -1,4 +1,6 @@
 package net.auramc.glass.client.mixin;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.auramc.glass.client.ui.GlassFrameHooks;
 import net.auramc.glass.common.render.GlassRenderer;
 import net.auramc.glass.common.style.*;
@@ -33,6 +35,6 @@ public abstract class TextFieldWidgetMixin {
         aura_context=c;aura_mouseX=mx;aura_mouseY=my;aura_delta=delta;
         GlassRenderer.foreground(aura_paint);ci.cancel();
     }
-    @Redirect(method="renderWidget",at=@At(value="INVOKE",target="Lnet/minecraft/client/gui/DrawContext;drawGuiTexture(Lnet/minecraft/util/Identifier;IIII)V"))
-    private void aura_noBox(DrawContext c,net.minecraft.util.Identifier texture,int x,int y,int w,int h){if(!aura_replay || !GlassFrameHooks.styledScreen())c.drawGuiTexture(texture,x,y,w,h);}
+    @WrapOperation(method="renderWidget",at=@At(value="INVOKE",target="Lnet/minecraft/client/gui/DrawContext;drawGuiTexture(Lnet/minecraft/util/Identifier;IIII)V"))
+    private void aura_noBox(DrawContext c,net.minecraft.util.Identifier texture,int x,int y,int w,int h,Operation<Void> original){if(!aura_replay || !GlassFrameHooks.styledScreen())original.call(c,texture,x,y,w,h);}
 }

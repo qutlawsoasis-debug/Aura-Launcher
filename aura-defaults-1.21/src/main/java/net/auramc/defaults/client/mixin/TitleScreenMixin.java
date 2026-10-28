@@ -1,4 +1,6 @@
 package net.auramc.defaults.client.mixin;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.screen.Screen;
@@ -10,7 +12,6 @@ import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -23,15 +24,15 @@ public abstract class TitleScreenMixin extends Screen {
         super(title);
     }
 
-    @Redirect(method="onDisplayed",at=@At(value="INVOKE",target="Lnet/minecraft/client/realms/gui/screen/RealmsNotificationsScreen;onDisplayed()V"))
-    private void aura_skipDisabledRealmsDisplay(net.minecraft.client.realms.gui.screen.RealmsNotificationsScreen notifications) {
+    @WrapOperation(method="onDisplayed",at=@At(value="INVOKE",target="Lnet/minecraft/client/realms/gui/screen/RealmsNotificationsScreen;onDisplayed()V"))
+    private void aura_skipDisabledRealmsDisplay(net.minecraft.client.realms.gui.screen.RealmsNotificationsScreen notifications,Operation<Void> original) {
     }
 
-    @Redirect(
+    @WrapOperation(
         method = "onMultiplayerButtonPressed",
         at = @At(value = "FIELD", target = "Lnet/minecraft/client/option/GameOptions;skipMultiplayerWarning:Z", opcode = Opcodes.GETFIELD)
     )
-    private boolean aura_alwaysSkipMultiplayerWarning(GameOptions options) {
+    private boolean aura_alwaysSkipMultiplayerWarning(GameOptions options,Operation<Boolean> original) {
         return true;
     }
 

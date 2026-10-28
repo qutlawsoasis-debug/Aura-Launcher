@@ -1,4 +1,6 @@
 package net.auramc.defaults.client.mixin;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.option.GameOptions;
@@ -8,7 +10,6 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
@@ -27,11 +28,11 @@ public abstract class MinecraftClientMixin {
         }
     }
 
-    @Redirect(
+    @WrapOperation(
         method = "createInitScreens",
         at = @At(value = "FIELD", target = "Lnet/minecraft/client/option/GameOptions;onboardAccessibility:Z", opcode = Opcodes.GETFIELD)
     )
-    private boolean aura_redirectOnboardAccessibility(GameOptions gameOptions) {
+    private boolean aura_redirectOnboardAccessibility(GameOptions gameOptions,Operation<Boolean> original) {
         return false;
     }
 }

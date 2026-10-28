@@ -1,4 +1,6 @@
 package net.auramc.glass.client.mixin;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import net.auramc.glass.client.ui.GlassFrameHooks;
 import net.auramc.glass.common.render.GlassRenderer;
 import net.auramc.glass.common.style.*;
@@ -33,8 +35,8 @@ public abstract class TextFieldWidgetMixin {
         aura_context=c;aura_mouseX=mx;aura_mouseY=my;aura_delta=delta;
         GlassRenderer.foreground(aura_paint);ci.cancel();
     }
-    @Redirect(method="renderButton",at=@At(value="INVOKE",target="Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V",ordinal=0))
-    private void aura_noBorder(DrawContext c,int x,int y,int r,int b,int color){if(!aura_replay || !GlassFrameHooks.styledScreen())c.fill(x,y,r,b,color);}
-    @Redirect(method="renderButton",at=@At(value="INVOKE",target="Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V",ordinal=1))
-    private void aura_noBox(DrawContext c,int x,int y,int r,int b,int color){if(!aura_replay || !GlassFrameHooks.styledScreen())c.fill(x,y,r,b,color);}
+    @WrapOperation(method="renderButton",at=@At(value="INVOKE",target="Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V",ordinal=0))
+    private void aura_noBorder(DrawContext c,int x,int y,int r,int b,int color,Operation<Void> original){if(!aura_replay || !GlassFrameHooks.styledScreen())original.call(c,x,y,r,b,color);}
+    @WrapOperation(method="renderButton",at=@At(value="INVOKE",target="Lnet/minecraft/client/gui/DrawContext;fill(IIIII)V",ordinal=1))
+    private void aura_noBox(DrawContext c,int x,int y,int r,int b,int color,Operation<Void> original){if(!aura_replay || !GlassFrameHooks.styledScreen())original.call(c,x,y,r,b,color);}
 }

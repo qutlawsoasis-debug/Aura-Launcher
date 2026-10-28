@@ -26,7 +26,6 @@
     "CheckboxWidgetMixin",
     "DrawContextTextMixin",
     "ScrollableWidgetMixin",
-    "TabNavigationWidgetMixin",
     "LockButtonWidgetMixin",
     "TextureDeletionMixin",
     "AuraHudMixin",
