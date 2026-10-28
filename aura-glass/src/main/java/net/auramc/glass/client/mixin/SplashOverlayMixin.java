@@ -21,7 +21,8 @@ import java.util.function.Consumer;
 public abstract class SplashOverlayMixin extends Overlay {
     @Inject(method = "init", at = @At("TAIL"))
     private static void aura_prewarmNativeRenderer(MinecraftClient client, CallbackInfo ci) {
-        net.auramc.glass.common.render.AuraRenderer.initialize();
+        net.auramc.glass.common.render.MenuResources.start(client);
+        AuraUiRenderer.prepareMenuPanorama();
     }
 
     @Shadow

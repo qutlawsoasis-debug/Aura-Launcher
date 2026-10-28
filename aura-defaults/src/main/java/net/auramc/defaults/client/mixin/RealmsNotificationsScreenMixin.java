@@ -8,6 +8,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(RealmsNotificationsScreen.class)
 public abstract class RealmsNotificationsScreenMixin {
+    @Inject(method = "onDisplayed", at = @At("HEAD"), cancellable = true)
+    private void aura_cancelDisplayOfDisabledNotifications(CallbackInfo ci) {
+        ci.cancel();
+    }
+
     @Inject(method = "init", at = @At("HEAD"), cancellable = true)
     private void aura_cancelInit(CallbackInfo ci) {
         ci.cancel();

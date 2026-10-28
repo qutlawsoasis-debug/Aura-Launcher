@@ -11,6 +11,8 @@ public final class GpuGlassTimers {
     private final Slot[] slots = new Slot[SLOT_COUNT];
     private final double[] smoothed = {-1, -1, -1};
     private final long[] measuredFrame = {-1, -1, -1};
+    private final double[] elapsed = new double[3];
+    private final boolean[] measured = new boolean[3];
     private String unavailable;
     private Slot current;
     private int activeQuery;
@@ -18,6 +20,14 @@ public final class GpuGlassTimers {
     private boolean enabled;
 
     public GpuGlassTimers() { this(new OpenGlQueries()); }
+
+    public void prepare() {
+        if(unavailable!=null)return;
+        try {
+            if(!api.supported())return;
+            for(Slot slot:slots)for(int i=0;i<slot.queries.length;i++)if(slot.queries[i]==0)slot.queries[i]=api.create();
+        }catch(RuntimeException error){fail(error);}
+    }
 
     GpuGlassTimers(QueryApi api) {
         this.api = api;
@@ -42,8 +52,8 @@ public final class GpuGlassTimers {
     private void prepareSlot() {
         for (Slot slot : slots) {
             if (slot.pending && frame - slot.frame >= 3 && available(slot)) {
-                double[] elapsed = new double[3];
-                boolean[] measured = new boolean[3];
+                Arrays.fill(elapsed,0);
+                Arrays.fill(measured,false);
                 for (int i = 0; i < slot.count; i++) {
                     int channel = slot.channels[i];
                     elapsed[channel] += api.result(slot.queries[i]) / 1_000_000.0;

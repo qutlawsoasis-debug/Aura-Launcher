@@ -4,6 +4,10 @@
   "package": "net.auramc.glass.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "MenuResizeMixin",
+    "IconButtonWidgetMixin",
+    "TitleBackdropMixin",
+    "AdvancementsScreenMixin",
     "ClickableWidgetMixin",
     "GameMenuScreenMixin",
     "GameRendererMixin",
@@ -25,7 +29,8 @@
     "TabNavigationWidgetMixin",
     "LockButtonWidgetMixin",
     "TextureDeletionMixin",
-    "AuraHudMixin"
+    "AuraHudMixin",
+    "ExtraMenuWidgetMixin"
   ],
   "injectors": {
     "defaultRequire": 0

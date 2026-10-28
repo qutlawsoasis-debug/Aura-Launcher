@@ -18,6 +18,9 @@ public final class GlassStyles {
     private static Document document = defaults();
     private static Path path;
     private static long modified = Long.MIN_VALUE, nextPoll;
+    private static final GlassStyle[] FRAME_STYLES=new GlassStyle[8192];
+    private static int frameCursor;
+    static{for(int i=0;i<FRAME_STYLES.length;i++)FRAME_STYLES[i]=new GlassStyle();}
 
     private GlassStyles() {}
 
@@ -45,6 +48,14 @@ public final class GlassStyles {
     }
 
     public static GlassStyle get(GlassPreset preset) { return tagged(preset,document.presets.get(preset)); }
+    public static void beginFrame(){frameCursor=0;}
+    private static GlassStyle frameCopy(GlassStyle source){GlassStyle target=FRAME_STYLES[frameCursor++%FRAME_STYLES.length];source.copyInto(target);return target;}
+    // Frame styles are borrowed scratch values. Persisted edits must use copy().
+    public static GlassStyle frame(GlassPreset preset){
+        GlassStyle value=frameCopy(document.presets.get(preset));
+        return preset.name().startsWith("SELECTED_")?value.selectedText(preset==GlassPreset.SELECTED_TINT):value;
+    }
+    public static GlassStyle frameSelected(){return frame(document.selectedPreset);}
     private static GlassStyle tagged(GlassPreset preset,GlassStyle value){
         GlassStyle copy=value.copy();
         return preset.name().startsWith("SELECTED_")?copy.selectedText(preset==GlassPreset.SELECTED_TINT):copy;
@@ -53,6 +64,11 @@ public final class GlassStyles {
     public static GlassStyle material(GlassStyle value){ return material(value,document.quality); }
     public static GlassStyle material(GlassStyle value,GlassQuality quality){
         GlassStyle copy=value.copy();
+        return applyMaterial(copy,quality);
+    }
+    public static void materialInto(GlassStyle source,GlassQuality quality,GlassStyle target){source.copyInto(target);applyMaterial(target,quality);}
+    public static GlassStyle frameMaterial(GlassStyle source){return applyMaterial(frameCopy(source),document.quality);}
+    private static GlassStyle applyMaterial(GlassStyle copy,GlassQuality quality){
         if(copy.isThemeTint()){int rgb=document.theme.rgb;copy.tintR*=((rgb>>16)&255)/255f;copy.tintG*=((rgb>>8)&255)/255f;copy.tintB*=(rgb&255)/255f;}
         if(quality==GlassQuality.OFF){
             FlatFill fill=document.offFill;
@@ -75,6 +91,11 @@ public final class GlassStyles {
 
     public static GlassStyle resolve(GlassStyle base, GlassState state, float amount) {
         GlassStyle result = base.copy();
+        return applyState(result,state,amount);
+    }
+    public static GlassStyle frameResolve(GlassPreset preset,GlassState state,float amount){return frameResolve(frame(preset),state,amount);}
+    public static GlassStyle frameResolve(GlassStyle base,GlassState state,float amount){return applyState(frameCopy(base),state,amount);}
+    private static GlassStyle applyState(GlassStyle result,GlassState state,float amount){
         Modifier modifier = document.states.get(state);
         float t = Float.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
         result.scale *= 1 + (modifier.scale - 1) * t;

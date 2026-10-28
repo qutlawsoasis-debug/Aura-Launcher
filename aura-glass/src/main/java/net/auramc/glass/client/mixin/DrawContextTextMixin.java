@@ -14,7 +14,8 @@ public abstract class DrawContextTextMixin {
     }
     @Inject(method="drawText(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/OrderedText;IIIZ)I",at=@At("HEAD"),cancellable=true)
     private void aura_ordered(TextRenderer font,OrderedText text,int x,int y,int color,boolean shadow,CallbackInfoReturnable<Integer> cir){
-        if(GlassScreenText.draw((DrawContext)(Object)this,font,GlassScreenText.plain(text),x,y,color,shadow))cir.setReturnValue(x+font.getWidth(text));
+        if(!net.auramc.glass.client.ui.GlassFrameHooks.styledScreen())return;
+        if(GlassScreenText.draw((DrawContext)(Object)this,font,text,x,y,color,shadow))cir.setReturnValue(x+font.getWidth(text));
     }
     @Inject(method="drawTexture(Lnet/minecraft/util/Identifier;IIFFIIII)V",at=@At("HEAD"),cancellable=true)
     private void aura_separators(net.minecraft.util.Identifier texture,int x,int y,float u,float v,int w,int h,int tw,int th,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){

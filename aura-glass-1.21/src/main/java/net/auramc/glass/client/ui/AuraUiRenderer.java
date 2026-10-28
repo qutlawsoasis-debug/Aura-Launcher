@@ -13,9 +13,10 @@ import java.util.List;
 public final class AuraUiRenderer {
     private static net.minecraft.client.gui.RotatingCubeMapRenderer panorama;
     private AuraUiRenderer() {}
+    public static void prepareMenuPanorama(){if(panorama==null)panorama=new net.minecraft.client.gui.RotatingCubeMapRenderer(new net.minecraft.client.gui.CubeMapRenderer(net.minecraft.util.Identifier.tryParse("minecraft:textures/gui/title/background/panorama")));}
 
     public static void renderMenuPanoramaBackground(DrawContext context,MinecraftClient client,int width,int height) {
-        if(panorama==null)panorama=new net.minecraft.client.gui.RotatingCubeMapRenderer(new net.minecraft.client.gui.CubeMapRenderer(net.minecraft.util.Identifier.tryParse("minecraft:textures/gui/title/background/panorama")));
+        if(panorama==null)return;
         panorama.render(context,width,height,1,1);
     }
 
