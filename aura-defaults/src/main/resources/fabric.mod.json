@@ -16,13 +16,18 @@
       "net.auramc.defaults.AuraDefaultsMod"
     ],
     "client": [
-      "net.auramc.defaults.client.AuraDefaultsClientMod"
+      "net.auramc.defaults.client.AuraDefaultsClientMod",
+      "net.auramc.defaults.client.quiet.AuraQuietMod"
     ]
   },
   "mixins": [
     "aura-defaults.mixins.json",
     {
       "config": "aura-defaults.client.mixins.json",
+      "environment": "client"
+    },
+    {
+      "config": "aura-quiet.client.mixins.json",
       "environment": "client"
     }
   ],
