@@ -1,0 +1,11 @@
+{
+  "aura.menu.edit": "Настроить меню",
+  "aura.menu.reset": "Сброс",
+  "aura.menu.done": "Готово",
+  "aura.menu.editor_banner": "РЕЖИМ НАСТРОЙКИ МЕНЮ AURA — ПЕРЕТАЩИТЕ КНОПКИ МЫШЬЮ",
+  "aura.loading.resources": "Загрузка ресурсов",
+  "category.aura": "Aura Client",
+  "key.aura.glass_diagnostics": "Диагностика стекла",
+  "key.aura.glass_test": "Тестовая стеклянная панель",
+  "key.aura.glass_gallery": "Галерея стекла"
+}

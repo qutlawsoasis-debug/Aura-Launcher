@@ -1,5 +1,6 @@
-package net.auramc.defaults.client.mixin;
+package net.auramc.glass.client.mixin;
 
+import net.auramc.glass.client.ui.AuraUiRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Overlay;
@@ -18,6 +19,11 @@ import java.util.function.Consumer;
 
 @Mixin(SplashOverlay.class)
 public abstract class SplashOverlayMixin extends Overlay {
+    @Inject(method = "init", at = @At("TAIL"))
+    private static void aura_prewarmNativeRenderer(MinecraftClient client, CallbackInfo ci) {
+        net.auramc.glass.common.render.AuraRenderer.initialize();
+    }
+
     @Shadow
     @Final
     private MinecraftClient client;
@@ -34,22 +40,14 @@ public abstract class SplashOverlayMixin extends Overlay {
     private long reloadCompleteTime;
 
     /**
-     * Completely bypass the visual Mojang splash screen (background fill, logo, progress bar, fade delay)
-     * while preserving underlying screen rendering, full ResourceReload execution, single-shot exception handling,
-     * error recovery screens/overlays, and post-load screen initialization.
+     * Replaces vanilla splash overlay with native Aura loading screen.
+     * When reload is complete, transition instantly to the target screen without
+     * artificial 2.0s fade delay while preserving exception handling.
+     * While reloading, render lightweight native Aura UI.
      */
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
-    private void aura_suppressMojangSplash(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
-        ci.cancel();
-
-        // 1. Render the underlying screen if present (e.g. MessageScreen on initial start, or pause menu during F3+T)
-        if (this.client.currentScreen != null) {
-            this.client.currentScreen.render(context, mouseX, mouseY, delta);
-        }
-
-        // 2. Do not proceed or close early until ResourceReload is genuinely complete
+    private void aura_renderLoadingOrInstantComplete(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (this.reload.isComplete()) {
-            // Strictly single-shot exceptionHandler invocation
             if (this.reloadCompleteTime == -1L) {
                 this.reloadCompleteTime = Util.getMeasuringTimeMs();
                 try {
@@ -60,15 +58,19 @@ public abstract class SplashOverlayMixin extends Overlay {
                 }
             }
 
-            // Only remove this overlay if it hasn't been replaced by a recovery/error overlay
             if (this.client.getOverlay() == this) {
                 this.client.setOverlay(null);
             }
 
-            // Properly initialize the target screen to window dimensions
-            if (this.client.currentScreen != null) {
-                this.client.currentScreen.init(this.client, context.getScaledWindowWidth(), context.getScaledWindowHeight());
-            }
+            ci.cancel();
+            return;
         }
+
+        // Render native Aura loading screen
+        int width = context.getScaledWindowWidth();
+        int height = context.getScaledWindowHeight();
+        AuraUiRenderer.renderLoadingScreen(context, this.client, this.reload, width, height);
+
+        ci.cancel();
     }
 }

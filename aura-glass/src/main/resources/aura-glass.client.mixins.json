@@ -1,0 +1,32 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "net.auramc.glass.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "ClickableWidgetMixin",
+    "GameMenuScreenMixin",
+    "GameRendererMixin",
+    "KeyboardMixin",
+    "MouseMixin",
+    "PressableWidgetMixin",
+    "ScreenMixin",
+    "SplashOverlayMixin",
+    "TitleScreenMixin",
+    "TexturedButtonWidgetMixin",
+    "WorldGlassHookMixin",
+    "TabButtonWidgetMixin",
+    "SliderWidgetMixin",
+    "TextFieldWidgetMixin",
+    "EntryListWidgetMixin",
+    "CheckboxWidgetMixin",
+    "DrawContextTextMixin",
+    "ScrollableWidgetMixin",
+    "TabNavigationWidgetMixin",
+    "LockButtonWidgetMixin",
+    "TextureDeletionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

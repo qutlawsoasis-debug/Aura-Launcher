@@ -13,7 +13,6 @@
     "OpenToLanScreenMixin",
     "PeriodicRunnerMixin",
     "RealmsAvailabilityMixin",
-    "SplashOverlayMixin",
     "TabManagerMixin",
     "TitleScreenMixin",
     "WorldCreatorMixin"

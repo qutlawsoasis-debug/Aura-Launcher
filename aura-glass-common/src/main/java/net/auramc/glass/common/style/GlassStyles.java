@@ -1,0 +1,204 @@
+package net.auramc.glass.common.style;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.util.EnumMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+public final class GlassStyles {
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Set<String> LOGGED = new HashSet<>();
+    private static Document document = defaults();
+    private static Path path;
+    private static long modified = Long.MIN_VALUE, nextPoll;
+
+    private GlassStyles() {}
+
+    public static void initialize(Path configDir) {
+        path = configDir.resolve("aura-glass/styles.json");
+        if (!Files.exists(path)) save();
+        nextPoll = 0;
+        poll();
+    }
+
+    public static void poll() {
+        long now = System.nanoTime();
+        if (path == null || now < nextPoll) return;
+        nextPoll = now + 250_000_000L;
+        try {
+            long stamp = Files.getLastModifiedTime(path).toMillis();
+            if (stamp == modified) return;
+            modified = stamp;
+            Document next = GSON.fromJson(Files.readString(path, StandardCharsets.UTF_8), Document.class);
+            validate(next);
+            boolean upgraded = upgrade(next);
+            document = next;
+            if (upgraded) save();
+        } catch (Exception error) { log("Styles reload rejected: " + error.getMessage()); }
+    }
+
+    public static GlassStyle get(GlassPreset preset) { return tagged(preset,document.presets.get(preset)); }
+    private static GlassStyle tagged(GlassPreset preset,GlassStyle value){
+        GlassStyle copy=value.copy();
+        return preset.name().startsWith("SELECTED_")?copy.selectedText(preset==GlassPreset.SELECTED_TINT):copy;
+    }
+    public static GlassStyle selected(){return get(document.selectedPreset);}
+    public static GlassStyle material(GlassStyle value){
+        GlassStyle copy=value.copy();
+        if(copy.isThemeTint()){int rgb=document.theme.rgb;copy.tintR*=((rgb>>16)&255)/255f;copy.tintG*=((rgb>>8)&255)/255f;copy.tintB*=(rgb&255)/255f;}
+        return copy;
+    }
+    public static GlassQuality quality() { return document.quality; }
+    public static void setQuality(GlassQuality quality) { document.quality = quality == null ? GlassQuality.HIGH : quality; }
+    public static void update(GlassPreset preset, GlassStyle style) {
+        GlassStyle copy = style.copy(); copy.validate(); document.presets.put(preset, copy);
+    }
+
+    public static GlassStyle resolve(GlassPreset preset, GlassState state, float amount) {
+        return resolve(get(preset), state, amount);
+    }
+
+    public static GlassStyle resolve(GlassStyle base, GlassState state, float amount) {
+        GlassStyle result = base.copy();
+        Modifier modifier = document.states.get(state);
+        float t = Float.isFinite(amount) ? Math.max(0, Math.min(1, amount)) : 0;
+        result.scale *= 1 + (modifier.scale - 1) * t;
+        result.rimOuter *= 1 + (modifier.rim - 1) * t;
+        result.gloss *= 1 + (modifier.gloss - 1) * t;
+        result.tintA = Math.max(0, Math.min(1, result.tintA + modifier.tintAlpha * t));
+        result.saturation *= 1 + (modifier.saturation - 1) * t;
+        result.light *= 1 + (modifier.light - 1) * t;
+        return result;
+    }
+
+    public static boolean save() {
+        if (path == null) return false;
+        try {
+            validate(document);
+            Files.createDirectories(path.getParent());
+            Path temporary = path.resolveSibling("styles.json.tmp");
+            Files.writeString(temporary, GSON.toJson(document) + "\n", StandardCharsets.UTF_8);
+            try { Files.move(temporary, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
+            catch (AtomicMoveNotSupportedException unsupported) { Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING); }
+            modified = Files.getLastModifiedTime(path).toMillis();
+            return true;
+        } catch (Exception error) { log("Styles save failed: " + error.getMessage()); return false; }
+    }
+
+    public static Path file() { return path; }
+
+    private static void validate(Document candidate) {
+        if (candidate == null || candidate.quality == null || candidate.presets == null || candidate.states == null)
+            throw new IllegalArgumentException("quality, presets and states are required");
+        if(candidate.version<4){
+            Document fresh=defaults();
+            for(GlassPreset preset:new GlassPreset[]{GlassPreset.SELECTED_GLASS,GlassPreset.SELECTED_TINT})candidate.presets.putIfAbsent(preset,fresh.presets.get(preset).copy());
+        }
+        if(candidate.selectedPreset!=GlassPreset.SELECTED_DARK && candidate.selectedPreset!=GlassPreset.SELECTED_GLASS && candidate.selectedPreset!=GlassPreset.SELECTED_TINT)throw new IllegalArgumentException("selectedPreset must name a selected preset");
+        if(candidate.theme==null || candidate.theme.accent==null || !candidate.theme.accent.matches("#[0-9a-fA-F]{6}"))throw new IllegalArgumentException("theme.accent must be #RRGGBB");
+        candidate.theme.rgb=Integer.parseInt(candidate.theme.accent.substring(1),16);
+        for (GlassPreset preset : GlassPreset.values()) {
+            GlassStyle style = candidate.presets.get(preset);
+            if (style == null) throw new IllegalArgumentException("Missing preset " + preset);
+            style.validate();
+        }
+        for (GlassState state : GlassState.values()) {
+            Modifier modifier = candidate.states.get(state);
+            if (modifier == null) throw new IllegalArgumentException("Missing state " + state);
+            for (var field : Modifier.class.getFields()) {
+                try {
+                    float value = field.getFloat(modifier);
+                    if (!Float.isFinite(value) || value < -1 || value > 4)
+                        throw new IllegalArgumentException("Invalid state modifier " + state + "." + field.getName());
+                } catch (IllegalAccessException impossible) { throw new IllegalStateException(impossible); }
+            }
+        }
+    }
+
+    private static Document legacyDefaults() {
+        Document doc = new Document(); doc.version = 1;
+        for (GlassPreset preset : GlassPreset.values()) doc.presets.put(preset, new GlassStyle());
+        for (GlassStyle style : doc.presets.values()) style.lightDirY = .83f;
+        GlassStyle panel = doc.presets.get(GlassPreset.PANEL);
+        panel.refraction = 3; panel.bevel = 10; panel.frost = 2.7f; panel.tintA = .12f;
+        GlassStyle pill = doc.presets.get(GlassPreset.PILL_THICK);
+        pill.refraction = 18; pill.bevel = -1; pill.radius = -1; pill.frost = .8f; pill.depth = .28f; pill.gloss = .45f;
+        GlassStyle filled = doc.presets.get(GlassPreset.BUTTON_FILLED);
+        filled.tintA = .7f; filled.bevel = -1; filled.radius = -1; filled.gradient = .25f; filled.innerGlow = .3f;
+        GlassStyle dark = doc.presets.get(GlassPreset.SELECTED_DARK);
+        dark.tintR = .04f; dark.tintG = .06f; dark.tintB = .09f; dark.tintA = .6f;
+        dark.refraction = .2f; dark.rimOuter = .7f; dark.light = .6f;
+        for (GlassState state : GlassState.values()) doc.states.put(state, new Modifier());
+        Modifier hover = doc.states.get(GlassState.HOVER); hover.scale = 1.03f; hover.rim = 1.4f; hover.gloss = 1.3f;
+        Modifier press = doc.states.get(GlassState.PRESS); press.scale = .97f; press.rim = 1.15f; press.gloss = .8f;
+        Modifier disabled = doc.states.get(GlassState.DISABLED); disabled.saturation = .2f; disabled.light = .4f; disabled.gloss = .3f;
+        Modifier focused = doc.states.get(GlassState.FOCUSED); focused.rim = 1.7f; focused.light = 1.4f;
+        return doc;
+    }
+
+    private static Document defaults() {
+        try(var input=GlassStyles.class.getResourceAsStream("/assets/aura-glass/styles.json")){
+            if(input!=null)return GSON.fromJson(new java.io.InputStreamReader(input,StandardCharsets.UTF_8),Document.class);
+        }catch(Exception error){log("Default styles unavailable: "+error.getMessage());}
+        return legacyDefaults();
+    }
+
+    private static boolean upgrade(Document next) {
+        if (next.version >= 4) return false;
+        if (next.version < 2) {
+            Document old = legacyDefaults(), fresh = defaults();
+            try {
+                for (GlassPreset preset : GlassPreset.values()) for (var field : GlassStyle.class.getFields()) {
+                    float value = field.getFloat(next.presets.get(preset));
+                    if (Math.abs(value - field.getFloat(old.presets.get(preset))) < .00001f)
+                        field.setFloat(next.presets.get(preset), field.getFloat(fresh.presets.get(preset)));
+                }
+            } catch (IllegalAccessException impossible) { throw new IllegalStateException(impossible); }
+        }
+        next.version = 4;
+        log("Styles upgraded to version 4; customized fields retained");
+        return true;
+    }
+
+    public static Map<GlassPreset, GlassStyle> filePresets() throws java.io.IOException {
+        Document file = GSON.fromJson(Files.readString(path, StandardCharsets.UTF_8), Document.class);
+        validate(file); upgrade(file);
+        Map<GlassPreset, GlassStyle> result = new EnumMap<>(GlassPreset.class);
+        for (GlassPreset preset : GlassPreset.values()) result.put(preset, tagged(preset,file.presets.get(preset)));
+        return result;
+    }
+
+    public static boolean reloadFromFile() {
+        try {
+            Document next = GSON.fromJson(Files.readString(path, StandardCharsets.UTF_8), Document.class);
+            validate(next); boolean upgraded = upgrade(next); document = next;
+            modified = Files.getLastModifiedTime(path).toMillis();
+            if (upgraded) save();
+            return true;
+        } catch (Exception error) { log("Styles reset rejected: " + error.getMessage()); return false; }
+    }
+
+    private static void log(String reason) { if (LOGGED.add(reason)) System.err.println("[AuraGlass] " + reason); }
+    private static final class Document {
+        int version = 4;
+        GlassPreset selectedPreset=GlassPreset.SELECTED_TINT;
+        Theme theme=new Theme();
+        GlassQuality quality = GlassQuality.HIGH;
+        Map<GlassPreset, GlassStyle> presets = new EnumMap<>(GlassPreset.class);
+        Map<GlassState, Modifier> states = new EnumMap<>(GlassState.class);
+    }
+    private static final class Theme {
+        String accent="#40C4FF";
+        transient int rgb=0x40C4FF;
+    }
+    public static final class Modifier {
+        public float scale = 1, rim = 1, gloss = 1, tintAlpha = 0, saturation = 1, light = 1;
+    }
+}
