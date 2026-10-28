@@ -6,13 +6,12 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { spawn } = require('child_process');
 
-const http = require('http');
 const { preview } = require('vite');
 
 const CHROME_PATH = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const TEMP_USER_DATA = path.join(__dirname, '..', '.chrome_smoke_profile');
 const BASE_URL = 'http://127.0.0.1:4173';
 const STANDALONE_PATH = path.resolve(__dirname, '..', 'dist-single', 'aura-v3-standalone.html');
 const STANDALONE_URL = 'file:///' + STANDALONE_PATH.replace(/\\/g, '/');
@@ -25,25 +24,54 @@ const targets = [
 ];
 
 async function ensurePreviewServer() {
-  const isRunning = await new Promise(resolve => {
-    const req = http.request({ host: '127.0.0.1', port: 4173, method: 'HEAD', path: '/' }, res => resolve(true));
-    req.on('error', () => resolve(false));
-    req.setTimeout(600, () => { req.destroy(); resolve(false); });
-    req.end();
-  });
-
-  if (isRunning) {
-    console.log('⚡ Using already running vite preview on port 4173');
-    return null;
-  }
-
-  console.log('🚀 Starting vite preview server on port 4173...');
+  console.log('Starting isolated vite preview...');
   const server = await preview({
     root: path.resolve(__dirname, '..'),
     build: { outDir: 'dist' },
-    preview: { port: 4173, host: '127.0.0.1' }
+    preview: { port: 0, strictPort: true, host: '127.0.0.1' }
   });
+  const baseUrl = server.resolvedUrls.local[0].replace(/\/$/, '');
+  for (const target of targets) {
+    if (target.url.startsWith(BASE_URL)) target.url = target.url.replace(BASE_URL, baseUrl);
+  }
   return server;
+}
+
+// Hidden screens still have computed filters; only painted layers consume the budget.
+function inspectBackdropLayers(root = document) {
+  const layers = [];
+  for (const el of root.querySelectorAll('*')) {
+    if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+    const rect = el.getBoundingClientRect();
+    let left = Math.max(0, rect.left);
+    let top = Math.max(0, rect.top);
+    let right = Math.min(innerWidth, rect.right);
+    let bottom = Math.min(innerHeight, rect.bottom);
+    for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+      const style = getComputedStyle(parent);
+      const clip = parent.getBoundingClientRect();
+      if (/hidden|clip|scroll|auto/.test(style.overflowX)) {
+        left = Math.max(left, clip.left);
+        right = Math.min(right, clip.right);
+      }
+      if (/hidden|clip|scroll|auto/.test(style.overflowY)) {
+        top = Math.max(top, clip.top);
+        bottom = Math.min(bottom, clip.bottom);
+      }
+    }
+    if (right <= left || bottom <= top) continue;
+    for (const pseudo of ['', '::before', '::after']) {
+      const style = getComputedStyle(el, pseudo || null);
+      if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) === 0) continue;
+      if (pseudo && (style.content === 'none' || style.content === 'normal')) continue;
+      const filter = style.backdropFilter || style.webkitBackdropFilter;
+      if (filter && filter !== 'none') {
+        layers.push({ element: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') +
+          Array.from(el.classList, name => '.' + name).join('') + pseudo, filter });
+      }
+    }
+  }
+  return layers;
 }
 
 const SECTIONS = ['map', 'lobby', 'friends', 'wardrobe', 'workshop', 'settings'];
@@ -57,7 +85,8 @@ async function runSmokeForTarget(target) {
     buttonsClicked: 0,
     overlappedElements: 0,
     buttonsWithoutEffectOrCmd: 0,
-    backdropLayersOk: false,
+    backdropLayersOk: true,
+    backdropChecks: [],
     mapCanvasSizeOk: false,
     skinview3dOk: false,
     playRunningOk: false,
@@ -65,11 +94,12 @@ async function runSmokeForTarget(target) {
     passed: false
   };
 
+  const tempUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'aura-v3-smoke-'));
   const chrome = spawn(CHROME_PATH, [
     '--headless=new',
     '--allow-file-access-from-files',
-    '--remote-debugging-port=9555',
-    `--user-data-dir=${TEMP_USER_DATA}`,
+    '--remote-debugging-port=0',
+    `--user-data-dir=${tempUserData}`,
     '--window-size=1366,768',
     '--disable-gpu',
     '--no-first-run',
@@ -80,10 +110,9 @@ async function runSmokeForTarget(target) {
   for (let i = 0; i < 40; i++) {
     await new Promise(r => setTimeout(r, 200));
     try {
-      const res = await fetch('http://127.0.0.1:9555/json/version');
-      if (res.ok) {
-        const data = await res.json();
-        wsUrl = data.webSocketDebuggerUrl;
+      const [port, endpoint] = fs.readFileSync(path.join(tempUserData, 'DevToolsActivePort'), 'utf8').trim().split(/\r?\n/);
+      if (port && endpoint) {
+        wsUrl = `ws://127.0.0.1:${port}${endpoint}`;
         break;
       }
     } catch (e) {}
@@ -164,6 +193,41 @@ async function runSmokeForTarget(target) {
 
   ws.addEventListener('message', sessionEventsHandler);
 
+  // Exercise the inspector on real browser styles before loading the application.
+  const inspectorTest = await sendSession('Runtime.evaluate', {
+    expression: `(() => {
+      const inspect = ${inspectBackdropLayers.toString()};
+      document.body.innerHTML = '<style>.sample {width:40px;height:40px;backdrop-filter:blur(2px)}' +
+        '.pseudo::before {content:"";position:absolute;inset:0;backdrop-filter:blur(2px)}</style>' +
+        '<div id="fixture"><div id="sample" class="sample"></div></div>';
+      const fixture = document.getElementById('fixture');
+      const sample = document.getElementById('sample');
+      const failures = [];
+      const expect = (name, count) => {
+        const actual = inspect(fixture).length;
+        if (actual !== count) failures.push({ name, expected: count, actual });
+      };
+      expect('visible filter', 1);
+      sample.style.display = 'none'; expect('display none', 0);
+      sample.style.cssText = 'opacity:0'; expect('transparent', 0);
+      sample.style.cssText = 'visibility:hidden'; expect('hidden', 0);
+      sample.style.cssText = 'position:fixed;top:-100px'; expect('outside viewport', 0);
+      sample.style.cssText = 'position:relative;top:100px';
+      fixture.style.cssText = 'height:10px;overflow:hidden'; expect('clipped', 0);
+      fixture.style.cssText = 'display:none'; expect('hidden ancestor', 0);
+      fixture.style.cssText = ''; sample.style.cssText = 'position:relative;backdrop-filter:none';
+      sample.className = 'sample pseudo'; expect('pseudo filter', 1);
+      sample.style.backdropFilter = 'blur(2px)'; expect('extra layer', 2);
+      document.body.innerHTML = '';
+      return failures;
+    })()`,
+    returnByValue: true
+  });
+  const inspectorFailures = inspectorTest.result?.value;
+  if (!Array.isArray(inspectorFailures) || inspectorFailures.length) {
+    result.consoleErrors.push('Backdrop inspector regression: ' + JSON.stringify(inspectorFailures));
+  }
+
   await sendSession('Page.navigate', { url: target.url });
   await new Promise(r => setTimeout(r, 1200));
 
@@ -205,18 +269,31 @@ async function runSmokeForTarget(target) {
     result.consoleErrors.push(`Asset check failed: fontLoaded=${assetCheck.result?.value?.fontLoaded}, bgLoaded=${assetCheck.result?.value?.bgLoaded}, rawBg=${assetCheck.result?.value?.rawBg}`);
   }
 
-  // 2. Verify backdrop filter count
-  const filterRes = await sendSession('Runtime.evaluate', {
-    expression: `
-      Array.from(document.querySelectorAll('*')).filter(el => {
-        const s = window.getComputedStyle(el);
-        return s.backdropFilter && s.backdropFilter !== 'none';
-      }).length
-    `,
+  async function checkBackdrops(state) {
+    const response = await sendSession('Runtime.evaluate', {
+      expression: `(${inspectBackdropLayers.toString()})()`,
+      returnByValue: true
+    });
+    const layers = response.result?.value;
+    const limit = target.effects === 'off' ? 0 : 1;
+    const passed = Array.isArray(layers) && layers.length <= limit;
+    result.backdropLayersOk &&= passed;
+    result.backdropChecks.push({ state, limit, layers, passed });
+  }
+  await checkBackdrops('startup');
+  const bootReady = await sendSession('Runtime.evaluate', {
+    expression: `new Promise(resolve => {
+      const started = performance.now();
+      const timer = setInterval(() => {
+        if (!document.getElementById('boot')) { clearInterval(timer); resolve(true); }
+        else if (performance.now() - started > 10000) { clearInterval(timer); resolve(false); }
+      }, 50);
+    })`,
+    awaitPromise: true,
     returnByValue: true
   });
-  const filterCount = filterRes.result.value || 0;
-  result.backdropLayersOk = (target.effects === 'off' ? filterCount === 0 : filterCount <= 1);
+  if (bootReady.result?.value !== true) result.consoleErrors.push('Boot did not finish before section checks');
+  await checkBackdrops('compact');
 
   // 2b. If effects=off, check that .toggle and .seg .lens have transition-duration > 0
   if (target.effects === 'off') {
@@ -240,6 +317,26 @@ async function runSmokeForTarget(target) {
     });
     await new Promise(r => setTimeout(r, target.effects === 'off' ? 150 : 800));
     result.sectionsVisited++;
+    await checkBackdrops(sec);
+    if (sec === 'settings') {
+      const previews = await sendSession('Runtime.evaluate', {
+        expression: `Array.from(document.querySelectorAll('.theme-preview .mini-capsule'),
+          el => getComputedStyle(el).backdropFilter)`,
+        returnByValue: true
+      });
+      if (previews.result?.value?.length !== 2 || previews.result.value.some(filter => filter !== 'none')) {
+        result.consoleErrors.push('Theme previews must reuse the island backdrop: ' + JSON.stringify(previews.result?.value));
+      }
+      await sendSession('Runtime.evaluate', {
+        expression: `document.documentElement.setAttribute('data-theme', 'liquid')`
+      });
+      await new Promise(r => setTimeout(r, 300));
+      await checkBackdrops('settings:liquid');
+      await sendSession('Runtime.evaluate', {
+        expression: `document.documentElement.setAttribute('data-theme', 'frost')`
+      });
+      await new Promise(r => setTimeout(r, 300));
+    }
 
     // If map, check canvas size, wrap match and insets
     if (sec === 'map') {
@@ -399,7 +496,7 @@ async function runSmokeForTarget(target) {
   ws.removeEventListener('message', sessionEventsHandler);
   ws.close();
   chrome.kill();
-  try { fs.rmSync(TEMP_USER_DATA, { recursive: true, force: true }); } catch (e) {}
+  try { fs.rmSync(tempUserData, { recursive: true, force: true }); } catch (e) {}
 
   result.passed = (
     result.consoleErrors.length === 0 &&
@@ -468,6 +565,7 @@ async function main() {
   console.log('------------------------------------------------------------------------------------------------------------------------');
 
   for (const r of results) {
+    console.log('Backdrop layers: ' + r.backdropChecks.map(check => check.state + '=' + (check.layers?.length ?? 'ERROR') + '/' + check.limit).join(', '));
     const errStr = `${r.consoleErrors.length}/${r.network404s.length}`;
     console.log(
       r.target.padEnd(38) + ' | ' +
@@ -483,6 +581,7 @@ async function main() {
     if (!r.passed) {
       if (r.consoleErrors.length) console.log(`   Console errors: ${JSON.stringify(r.consoleErrors)}`);
       if (r.network404s.length) console.log(`   404 URLs: ${JSON.stringify(r.network404s)}`);
+      if (!r.backdropLayersOk) console.log('   Backdrop checks: ' + JSON.stringify(r.backdropChecks));
       if (r.buttonsWithoutEffectOrCmd > 0) console.log(`   Buttons missing effect/cmd: ${r.buttonsWithoutEffectOrCmd}`);
     }
   }
