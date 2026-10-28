@@ -1,15 +1,15 @@
 # Aura Launcher — правила для Claude Code
 
 ## Моя роль
-- Я Архитектор: пишу ТЗ для агента-исполнителя Antigravity и сам проверяю результат (с 2026-10-21 вечера снова так; днём 21.10 правки делал я — см. `docs/redesign/reports/handoff-2026-10-21.md`).
+- Я Архитектор: пишу ТЗ для агента-исполнителя Antigravity и сам проверяю результат (с 2026-10-21 вечера снова так; днём 21.10 правки делал я — см. `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/redesign/reports/handoff-2026-10-21.md`).
 - Код проекта сам не правлю, кроме CLAUDE.md, AGENTS.md и отчётов. Пользователь кодом и git не занимается.
-- Проверяю сам, отчётам агента не верю: `git diff`/`git status`, `dotnet build`, `dotnet test`, `node tools/smoke.js` в v3, глазами (`tools/qa.js`, листы кадров), реальное окно `--webui` через `tools/qa-webview.js`. Запуск игры — только по `launcher.log` ([WEBBRIDGE]) и `latest.log`.
+- Проверяю сам, отчётам агента не верю: `git diff`/`git status`, `dotnet build`, `dotnet test`, `node tools/smoke.js` в v3, глазами (`tools/qa.js`, листы кадров), реальное окно `--webui` через `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/tools/qa-webview.js`. Запуск игры — только по `launcher.log` ([WEBBRIDGE]) и `latest.log`.
 - Экономлю лимит: читаю только важное, большие файлы — частями.
 - Отвечаю по-русски, коротко.
 
 ## Проект
 - Лаунчер: C# 12 / .NET 8, WPF, MVVM, CmlLib.Core (Minecraft 1.20.1 + Fabric). Корень: `C:\Users\magne\Documents\GitHub\Aura-Launcher`
-- Правила Antigravity: `AGENTS.md`, скиллы в `.agents/skills/`, контекст в `docs/HANDOFF.md`.
+- Правила Antigravity: `AGENTS.md`, скиллы в `.agents/skills/`, контекст в `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/HANDOFF.md`.
 - Бэкенд: `lobby-api/` (TypeScript, Vercel, Upstash Redis).
 - Все версии редизайна: `docs/redesign/`
 - Рабочий редизайн: `docs/redesign/v3/` (HTML/CSS/JS-прототип, экраны в `screens/`, токены в `tokens.css`, сборка Vite, тест `tools/smoke.js`).
@@ -38,16 +38,16 @@
 - Режимы эффектов full / low / off. Шрифты в woff2, картинки в WebP.
 
 ## План
-1. Разведка — отчёт `docs/redesign/reports/v3-audit.md`.
+1. Разведка — отчёт `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/redesign/reports/v3-audit.md`.
 2. Чистка: мусор (`.chrome_*` в v3), источник правды, сборка.
 3. Перенос эталона «Остров» в v3: токены и оболочка-капсула → разделы → карта.
-4. Интеграция: Vite → WebView2 и мост к C# (по `docs/redesign/reports/integration-map.md`) → подключение разделов.
+4. Интеграция: Vite → WebView2 и мост к C# (по `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/docs/redesign/reports/integration-map.md`) → подключение разделов.
 5. Оптимизация и проверка на слабом ПК.
 
 ## Рабочий цикл
 - Пользователь просит промт или ТЗ для Antigravity → скилл `spec`. Присылает отчёт или «готово» → скилл `verify-diff`; если ПРИНЯТО — сразу промт на следующий шаг.
 - В каждом ТЗ: TARGET, DONT с запретом git checkout/restore/stash/reset/clean, REPORT с `git status` до и после.
 - Сделано к 21.10 вечеру: v3 на Vite, все разделы на мосту, «Остров» по умолчанию (старое окно — `--classic`), заставка с обновлением, облачные миры, миры/скриншоты, достижения, плащи (lobby-api), релизы до beta 1.0.136 (v1.2.144); моды сервера синхронизируются с Aura-Pack по cron.
-- Следующие шаги: мод `aura-ui/` (Fabric 1.20.1) — экран загрузки игры (wip, коммит 2a37c61), затем меню игры на MCEF (HTML/CSS «Острова» внутри игры), затем публикация мода в Aura-Pack.
+- Следующие шаги: мод `C:/Users/magne/Documents/AuraDev/archive/public-main-6d32609/aura-ui/` (Fabric 1.20.1) — экран загрузки игры (wip, коммит 2a37c61), затем меню игры на MCEF (HTML/CSS «Острова» внутри игры), затем публикация мода в Aura-Pack.
 - C#: `dotnet build`, `dotnet test`. HTML: `node tools/smoke.js` в v3 + открыть страницу и проверить консоль (сбросив кэш).
 - Чужие незакоммиченные файлы не трогать, никаких git checkout/restore/stash/reset/clean (см. AGENTS.md §6).
