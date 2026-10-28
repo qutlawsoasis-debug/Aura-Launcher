@@ -5,14 +5,16 @@ public final class HudModelTest {
     public static void main(String[]args)throws Exception {
         Path folder=Path.of(args[0]);Files.createDirectories(folder);
         HudConfig config=new HudConfig(folder);check(Files.exists(config.file()),"created");
-        HudElement e=config.registry().get(HudRegistry.STATUS);e.offsetX=.125f;e.offsetY=.05f;e.scale=1.75f;e.visible=false;config.biome=true;config.enabled=false;
+        check(!config.enabled,"HUD master defaults off");
+        for(HudElement element:config.registry().layouts().values())check(!element.visible,"every HUD element defaults off");
+        HudElement e=config.registry().get(HudRegistry.STATUS);e.offsetX=.125f;e.offsetY=.05f;e.scale=1.75f;e.visible=true;config.biome=true;config.enabled=true;
         check(config.save(),"saved");HudConfig restored=new HudConfig(folder);HudElement copy=restored.registry().get(HudRegistry.STATUS);
-        check(copy.offsetX==.125f&&copy.scale==1.75f&&!copy.visible&&!restored.enabled&&restored.biome,"round trip");
+        check(copy.offsetX==.125f&&copy.scale==1.75f&&copy.visible&&restored.enabled&&restored.biome,"round trip");
         float before=copy.x(1000,100),after=copy.x(500,100);check(before!=after&&copy.offsetX==.125f&&copy.scale==1.75f,"resize does not mutate layout");
         for(HudElement.Anchor anchor:HudElement.Anchor.values()){e.anchor=anchor;check(Float.isFinite(e.x(1280,100))&&Float.isFinite(e.y(720,30)),"anchor");}
         e.scale=9;e.validate();check(e.scale==2,"scale upper");e.scale=.1f;e.validate();check(e.scale==.5f,"scale lower");
         String malformed="{broken";Files.writeString(config.file(),malformed,StandardCharsets.UTF_8);HudConfig recovered=new HudConfig(folder);
-        check(recovered.enabled&&!recovered.biome&&recovered.registry().get(HudRegistry.STATUS).visible,"recovery defaults");
+        check(!recovered.enabled&&!recovered.biome&&!recovered.registry().get(HudRegistry.STATUS).visible,"recovery defaults");
         check(Files.readString(folder.resolve("aura-hud.json.bak"),StandardCharsets.UTF_8).equals(malformed),"backup preserves corrupt file");
         var json=com.google.gson.JsonParser.parseString(Files.readString(recovered.file())).getAsJsonObject();json.addProperty("version",0);Files.writeString(recovered.file(),json.toString(),StandardCharsets.UTF_8);new HudConfig(folder);
         check(com.google.gson.JsonParser.parseString(Files.readString(recovered.file())).getAsJsonObject().get("version").getAsInt()==1,"migration");

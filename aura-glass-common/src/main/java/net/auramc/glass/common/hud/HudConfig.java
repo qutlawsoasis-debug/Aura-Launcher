@@ -10,7 +10,7 @@ public final class HudConfig {
     private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();
     private final Path file;
     private HudRegistry registry=new HudRegistry();
-    public boolean enabled=true,biome;
+    public boolean enabled=false,biome;
     public String loadProblem;
     public HudConfig(Path configDirectory){file=configDirectory.resolve("aura-hud.json");load();}
     public HudRegistry registry(){return registry;}
@@ -25,7 +25,7 @@ public final class HudConfig {
             if(doc.version==0)save();
         }catch(Exception error){
             loadProblem=error.getClass().getSimpleName()+": "+error.getMessage();
-            registry=new HudRegistry();enabled=true;biome=false;
+            registry=new HudRegistry();enabled=false;biome=false;
             try{Files.copy(file,file.resolveSibling("aura-hud.json.bak"),StandardCopyOption.REPLACE_EXISTING);save();}
             catch(Exception backupError){loadProblem+="; backup: "+backupError.getMessage();}
             System.err.println("[AuraGlass] HUD config recovered: "+loadProblem);
@@ -42,5 +42,5 @@ public final class HudConfig {
             return true;
         }catch(Exception error){System.err.println("[AuraGlass] HUD config save failed: "+error.getMessage());return false;}
     }
-    private static final class Document {int version=1;boolean enabled=true,biome;Map<String,HudElement> elements;}
+    private static final class Document {int version=1;boolean enabled=false,biome;Map<String,HudElement> elements;}
 }

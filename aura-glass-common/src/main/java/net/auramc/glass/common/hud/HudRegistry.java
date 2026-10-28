@@ -7,9 +7,9 @@ public final class HudRegistry {
     public static final String STATUS="status",COORDS="coords",TOASTS="toasts",PLAYER="miniPlayer";
     private final Map<String,HudElement> elements=new LinkedHashMap<>();
     public HudRegistry(){
-        register(new HudElement(STATUS,HudElement.Anchor.TOP_CENTER,0,.02f,true));
-        register(new HudElement(COORDS,HudElement.Anchor.TOP_LEFT,.02f,.10f,true));
-        register(new HudElement(TOASTS,HudElement.Anchor.TOP_RIGHT,-.02f,.10f,true));
+        register(new HudElement(STATUS,HudElement.Anchor.TOP_CENTER,0,.02f,false));
+        register(new HudElement(COORDS,HudElement.Anchor.TOP_LEFT,.02f,.10f,false));
+        register(new HudElement(TOASTS,HudElement.Anchor.TOP_RIGHT,-.02f,.10f,false));
         register(new HudElement(PLAYER,HudElement.Anchor.BOTTOM_LEFT,.02f,-.08f,false));
     }
     public void register(HudElement element){element.validate();if(elements.putIfAbsent(element.id,element)!=null)throw new IllegalArgumentException("duplicate HUD id "+element.id);}

@@ -11,7 +11,7 @@ public final class HudElement {
     public String id;
     public Anchor anchor=Anchor.TOP_LEFT;
     public float offsetX,offsetY,scale=1;
-    public boolean visible=true;
+    public boolean visible=false;
     private HudElement(){}
     public HudElement(String id,Anchor anchor,float x,float y,boolean visible){this.id=id;this.anchor=anchor;offsetX=x;offsetY=y;this.visible=visible;}
     public void validate(){
