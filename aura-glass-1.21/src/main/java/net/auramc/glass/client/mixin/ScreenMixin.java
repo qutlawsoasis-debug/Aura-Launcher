@@ -13,4 +13,8 @@ public abstract class ScreenMixin {
     private void aura_replaceBackground(DrawContext c, int mouseX, int mouseY, float delta,CallbackInfo ci){if(GlassFrameHooks.styledScreen())ci.cancel();}
     @Inject(method="renderInGameBackground",at=@At("HEAD"),cancellable=true)
     private void aura_noDirt(DrawContext c,CallbackInfo ci){if(GlassFrameHooks.styledScreen())ci.cancel();}
+    @Inject(method="applyBlur",at=@At("HEAD"),cancellable=true)
+    private void aura_noSecondBlur(float delta,CallbackInfo ci){if(GlassFrameHooks.styledScreen())ci.cancel();}
+    @Inject(method="renderDarkening(Lnet/minecraft/client/gui/DrawContext;IIII)V",at=@At("HEAD"),cancellable=true)
+    private void aura_noMenuTiles(DrawContext c,int x,int y,int width,int height,CallbackInfo ci){if(GlassFrameHooks.styledScreen())ci.cancel();}
 }

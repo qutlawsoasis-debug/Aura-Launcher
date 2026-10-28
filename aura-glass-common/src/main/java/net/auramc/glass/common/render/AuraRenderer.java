@@ -198,6 +198,7 @@ public final class AuraRenderer {
     }
 
     public static boolean hasGlyph(int codePoint) { return ready && codePoint>=0 && codePoint<GLYPHS[0].length && GLYPHS[0][codePoint]!=null; }
+    public static float glyphWidth(int codePoint,float size){return hasGlyph(codePoint)?GLYPHS[0][codePoint].advance*size:0;}
 
     public static boolean supports(String text) {
         if (!ready) return false;

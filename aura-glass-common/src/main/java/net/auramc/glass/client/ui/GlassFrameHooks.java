@@ -11,30 +11,51 @@ import net.minecraft.client.gui.screen.TitleScreen;
 
 public final class GlassFrameHooks {
     private GlassFrameHooks() {}
-    private static net.auramc.glass.common.ui.AuraScreenTransition modalTransition;
+    private static Object modalScreen;
+    private static long modalStarted;
+    private static int nativeContentDepth;
+    private static final java.util.Set<String> CARDS=java.util.Set.of("ProgressScreen","DownloadingTerrainScreen","LevelLoadingScreen","MessageScreen","DisconnectedScreen","ConnectScreen","RecoverWorldScreen","BackupPromptScreen","ConfirmScreen","ConfirmLinkScreen","NoticeScreen","DataPackFailureScreen","DatapackFailureScreen","ReconfiguringScreen","OptimizeWorldScreen","PopupScreen");
     public static boolean modalScreen() {
         var c=MinecraftClient.getInstance(); var screen=c.currentScreen;
-        if(c.world==null || screen==null || screen instanceof TitleScreen || screen instanceof GlassGalleryView)return false;
-        String name=screen.getClass().getName();
-        return name.startsWith("net.minecraft.") || name.startsWith("net.auramc.glass.");
+        return c.world!=null && screen!=null && !(screen instanceof TitleScreen) && styledScreen();
     }
-    public static void beginFrame() { if(!modalScreen())modalTransition=null; }
+    public static void beginFrame() {
+        GlassScreenText.beginFrame();
+        GlassEntryPaint.beginFrame();
+        var screen=MinecraftClient.getInstance().currentScreen;
+        if(screen!=modalScreen){modalScreen=screen;modalStarted=System.nanoTime();}
+    }
     public static void beforeScreen(DrawContext context) {
         var client=MinecraftClient.getInstance();
         if(!styledScreen() || client.currentScreen instanceof TitleScreen)return;
-        if(client.currentScreen instanceof net.minecraft.client.gui.screen.ChatScreen){context.draw();GlassRenderer.captureBackdrop();return;}
         if(client.world==null) {
             AuraUiRenderer.renderMenuPanoramaBackground(context,client,client.getWindow().getScaledWidth(),client.getWindow().getScaledHeight());
-            context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);return;
+            context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);card(context);return;
         }
-        if(modalTransition==null)modalTransition=new net.auramc.glass.common.ui.AuraScreenTransition();
-        context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(modalTransition.getProgress());
+        float elapsed=Math.max(0,Math.min(1,(System.nanoTime()-modalStarted)/200_000_000f));
+        float progress=1-(1-elapsed)*(1-elapsed)*(1-elapsed);
+        context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(progress);
+        card(context);
     }
     public static boolean styledScreen() {
         var screen = MinecraftClient.getInstance().currentScreen;
-        if(screen==null || screen instanceof GlassGalleryView || screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>)return false;
-        String name=screen.getClass().getName();
-        return name.startsWith("net.minecraft.client.gui.screen.");
+        if(screen==null || nativeContentDepth>0 || net.auramc.glass.common.render.MenuResources.stopping())return false;
+        return net.auramc.glass.common.ui.MenuScope.applies(screen.getClass().getName(),
+                screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>,
+                screen instanceof net.minecraft.client.gui.screen.ChatScreen);
+    }
+    public static void beginNativeContent(){nativeContentDepth++;}
+    public static void endNativeContent(){nativeContentDepth=Math.max(0,nativeContentDepth-1);}
+    private static void card(DrawContext context){
+        var client=MinecraftClient.getInstance();
+        if(!CARDS.contains(client.currentScreen.getClass().getSimpleName()))return;
+        float width=Math.min(420,context.getScaledWindowWidth()-24),height=Math.min(240,context.getScaledWindowHeight()-48);
+        GlassRenderer.draw((context.getScaledWindowWidth()-width)*.5f,(context.getScaledWindowHeight()-height)*.5f,width,height,GlassStyles.frame(GlassPreset.PANEL),1);
+        GlassRenderer.flush();
+    }
+    public static void titleBackdrop(DrawContext context){
+        if(!styledScreen())return;
+        context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);
     }
 
     public static void afterBackground(DrawContext context) {

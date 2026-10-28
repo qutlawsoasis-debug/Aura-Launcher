@@ -8,6 +8,11 @@ public final class BackdropRenderer {
     private static int program,vao,amountLocation,dimLocation,availableLocation,worldTexture,worldW,worldH;
     private static boolean requested;
     private BackdropRenderer() {}
+    public static void prepare(){
+        if(program!=0)return;
+        try{initialize();}
+        catch(RuntimeException error){GlassDiagnostics.log("Backdrop renderer unavailable: "+error.getMessage());}
+    }
     public static void requestWorldImage() { requested=net.auramc.glass.common.style.GlassStyles.quality().needsBackdrop(); }
     public static boolean hasWorldImage() { return worldTexture!=0; }
     public static void captureWorldIfRequested() {
@@ -37,7 +42,7 @@ public final class BackdropRenderer {
     private static void draw(int sharp,int blurred,float amount,float dim,boolean available) {
         var f=MinecraftClient.getInstance().getFramebuffer();
         try {
-            if(program==0)initialize();
+            if(program==0)return;
             glBindFramebuffer(GL_FRAMEBUFFER,f.fbo);glViewport(0,0,f.textureWidth,f.textureHeight);
             glDisable(GL_DEPTH_TEST);glDisable(GL_CULL_FACE);glDisable(GL_SCISSOR_TEST);
             glEnable(GL_BLEND);glBlendFuncSeparate(GL_ONE,GL_ONE_MINUS_SRC_ALPHA,GL_ONE,GL_ONE_MINUS_SRC_ALPHA);

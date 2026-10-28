@@ -11,6 +11,7 @@ import net.minecraft.resource.ResourceReload;
 public final class AuraNativeSurfaces {
     private static int lastPercent = -1;
     private static String progressText = "";
+    private static final java.util.Set<String> PRIMARY=java.util.Set.of("menu.singleplayer","menu.returnToGame","gui.done","selectWorld.select","selectWorld.create","selectServer.select","addServer.add","addServer.save","selectServer.direct","mco.select");
 
     private AuraNativeSurfaces() {}
 
@@ -56,7 +57,7 @@ public final class AuraNativeSurfaces {
     public static int button(DrawContext context, ClickableWidget widget, boolean hovered, float alpha) {
         var client = net.minecraft.client.MinecraftClient.getInstance();
         boolean primary = widget.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent label
-                && java.util.Set.of("menu.singleplayer", "menu.returnToGame", "gui.done", "selectWorld.select", "selectWorld.create", "selectServer.select", "addServer.add", "addServer.save", "selectServer.direct", "mco.select").contains(label.getKey());
+                && PRIMARY.contains(label.getKey());
         float hover = 0, press = 0;
         if (widget instanceof AuraMotionWidget motion) {
             long window = client.getWindow().getHandle();
@@ -70,8 +71,8 @@ public final class AuraNativeSurfaces {
                 : widget.isFocused() ? GlassState.FOCUSED : GlassState.HOVER;
         float amount = !widget.active ? 1 : state == GlassState.PRESS ? press : hover;
         boolean selectedTab=widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab();
-        var base=selectedTab?GlassStyles.selected():GlassStyles.get(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PANEL);
-        var style=GlassStyles.resolve(base,state,amount);
+        var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PANEL);
+        var style=GlassStyles.frameResolve(base,state,amount);
         net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
         GlassRenderer.draw(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
         int rgb = primary ? 0x18232C : 0xF7F9FC;
@@ -82,23 +83,13 @@ public final class AuraNativeSurfaces {
     }
 
     public static boolean label(DrawContext context, ClickableWidget widget, int color) {
-        String text = widget.getMessage().getString();
         if (widget.getWidth() <= 8 || !AuraRenderer.isReady()) return false;
-        var local = new org.joml.Matrix4f(context.getMatrices().peek().getPositionMatrix());
-        GlassRenderer.foreground(() -> {
-            context.getMatrices().push();
-            context.getMatrices().peek().getPositionMatrix().set(local);
-            try { drawLabel(context, widget, text, color); }
-            finally { context.getMatrices().pop(); }
-        });
-        return true;
+        return widget instanceof GlassLabelWidget cached && cached.aura_label().enqueue(context,widget,color);
     }
 
-    private static void drawLabel(DrawContext context, ClickableWidget widget, String text, int color) {
-        float size = Math.min(13, widget.getHeight() * .55f);
+    static void drawLabel(DrawContext context, ClickableWidget widget,net.auramc.glass.common.ui.GlassTextFit.Fitted fitted,int color) {
         var font=net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-        var fitted=net.auramc.glass.common.ui.GlassTextFit.fit(text,size,widget.getWidth()-8,value->GlassGlyphText.measure(font,value,1));
-        text=fitted.text();size=fitted.size();float textWidth=fitted.width();
+        String text=fitted.text();float size=fitted.size(),textWidth=fitted.width();
         if (!begin(context)) return;
         float[] clip=GlassRenderer.clipBounds();
         if(clip!=null)context.enableScissor((int)clip[0],(int)clip[1],(int)clip[2],(int)clip[3]);

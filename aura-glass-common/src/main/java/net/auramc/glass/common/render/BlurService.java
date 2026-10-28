@@ -44,10 +44,29 @@ public final class BlurService {
     public static BlurService get() { return INSTANCE; }
 
     public void beginFrame(Object nextScreen, String minecraftVersion) {
-        if (screen != nextScreen) { close(); screen = nextScreen;  }
+        if (screen != nextScreen) {
+            screen=nextScreen;
+            failedForScreen=activeLogged=inactiveLogged=false;
+            failureReason="none";
+        }
         version = minecraftVersion;
         captured = false;
         attempted = false;
+    }
+
+    public void prepare(int mainFbo,int w,int h) {
+        if(w<=0 || h<=0 || width==w && height==h && program!=0)return;
+        try {
+            glBindFramebuffer(GL_FRAMEBUFFER,mainFbo);
+            int samples=glGetInteger(GL_SAMPLES);
+            if(samples>0){fail("MSAA main framebuffer samples="+samples);return;}
+            release();
+            if(program==0)initializeProgram();
+            initialize(w,h);
+            failedForScreen=false;
+            failureReason="none";
+        }catch(RuntimeException error){release();fail("blur prepare: "+error.getMessage());}
+        finally{GuiRenderState.restore(mainFbo,w,h);}
     }
 
     public boolean capture(int mainFbo, int w, int h) {
@@ -67,13 +86,7 @@ public final class BlurService {
             com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0);
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
             GuiRenderState.clearSampler(0);
-            if (width != w || height != h || program == 0) {
-                release();
-                if (program == 0) initializeProgram();
-                int samples = glGetInteger(GL_SAMPLES);
-                if (samples > 0) return fail("MSAA main framebuffer samples=" + samples);
-                initialize(w, h);
-            }
+            if (width != w || height != h || program == 0) return fail("blur resources not prepared for framebuffer");
             glDisable(GL_SCISSOR_TEST);
             glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_STENCIL_TEST);
             glColorMask(true, true, true, true);

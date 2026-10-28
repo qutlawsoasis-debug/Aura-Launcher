@@ -15,25 +15,52 @@ import static org.lwjgl.opengl.GL33C.*;
 
 public final class GlassRenderer {
     private static final int FLOATS = 32;
-    private static final List<Pane> PANES = new ArrayList<>();
-    private static final List<Runnable> FOREGROUND = new ArrayList<>();
+    private static final int MAX_PANES=4096;
+    private static final List<Pane> PANES = new ArrayList<>(MAX_PANES);
+    private static final Pane[] PANE_POOL=new Pane[MAX_PANES];
+    static{for(int i=0;i<PANE_POOL.length;i++)PANE_POOL[i]=new Pane();}
+    private static final int MAX_FOREGROUND=8192;
+    private static final Runnable[] FOREGROUND=new Runnable[MAX_FOREGROUND],PENDING_FOREGROUND=new Runnable[MAX_FOREGROUND];
+    private static int foregroundCount;
+    private static final float[][] CLIPS=new float[8192][4];
+    private static final ClippedCommand[] CLIPPED=new ClippedCommand[MAX_FOREGROUND];
+    private static int clipCursor,clippedCursor;
+    static{for(int i=0;i<CLIPPED.length;i++)CLIPPED[i]=new ClippedCommand();}
     private static final FloatBuffer MATRIX = BufferUtils.createFloatBuffer(16);
-    private static FloatBuffer instances = BufferUtils.createFloatBuffer(128 * FLOATS);
+    private static final Matrix4f PROJECTION = new Matrix4f();
+    private static final FloatBuffer instances = BufferUtils.createFloatBuffer(MAX_PANES * FLOATS * 6);
     private static int program, vao, vbo, noiseTexture, projectionLocation, qualityLocation, sizeLocation, instancedLocation, modalLocation;
     private static int framebuffer, width, height, drawCalls;
     private static float scale, modalProgress;
-    private static boolean captured, failed, instanced;
+    private static boolean captured, failed, instanced,lowRenderer;
     private static String fallbackReason = "none";
     private static GlassQuality quality = GlassQuality.HIGH;
     private static float[] clip;
 
-    private record Pane(float x, float y, float w, float h, GlassStyle style, float alpha) {}
+    private static final class Pane {
+        float x,y,w,h,alpha;
+        final GlassStyle style=new GlassStyle();
+    }
     private GlassRenderer() {}
 
+    public static void prepare() {
+        if(program!=0 || failed)return;
+        try{initialize(false);lowRenderer=false;}
+        catch(Exception highError){
+            GlassDiagnostics.log("High glass renderer unavailable: "+highError.getMessage());
+            releaseGpu();
+            try{initialize(true);lowRenderer=true;}
+            catch(Exception lowError){failed=true;GlassDiagnostics.rendererFailure("Low shader failed: "+lowError.getMessage());}
+        }
+    }
+
     public static void beginFrame(int fbo, int w, int h, float guiScale) {
-        PANES.clear(); FOREGROUND.clear(); captured = false; modalProgress=0; drawCalls = 0;
+        PANES.clear(); java.util.Arrays.fill(FOREGROUND,0,foregroundCount,null);foregroundCount=0; captured = false; modalProgress=0; drawCalls = 0;
+        GlassStyles.beginFrame();
+        clipCursor=clippedCursor=0;clip=null;
         framebuffer = fbo; width = w; height = h; scale = guiScale;
-        GlassStyles.poll(); quality = GlassStyles.quality();
+        quality = GlassStyles.quality();
+        if(lowRenderer && quality.needsBackdrop())quality=GlassQuality.LOW;
         fallbackReason = quality == GlassQuality.OFF ? "effects Off (configured)" : quality == GlassQuality.LOW ? "quality Low (configured)" : "none";
     }
 
@@ -53,17 +80,38 @@ public final class GlassRenderer {
     public static void draw(float x, float y, float w, float h, GlassStyle style, float alpha) {
         if(clip!=null){float right=Math.min(x+w,clip[2]),bottom=Math.min(y+h,clip[3]);x=Math.max(x,clip[0]);y=Math.max(y,clip[1]);w=right-x;h=bottom-y;}
         if (w <= 0 || h <= 0 || alpha <= 0) return;
-        PANES.add(new Pane(x, y, w, h, GlassStyles.material(style,quality), Math.min(1, alpha)));
+        if(PANES.size()==MAX_PANES){GlassDiagnostics.log("Menu pane capacity exceeded");return;}
+        Pane pane=PANE_POOL[PANES.size()];
+        pane.x=x;pane.y=y;pane.w=w;pane.h=h;pane.alpha=Math.min(1,alpha);
+        GlassStyles.materialInto(style,quality,pane.style);
+        PANES.add(pane);
     }
 
     public static float[] clipBounds(){return clip;}
     public static void withClip(float l,float t,float r,float b,Runnable draw){
-        float[] saved=clip;clip=saved==null?new float[]{l,t,r,b}:new float[]{Math.max(l,saved[0]),Math.max(t,saved[1]),Math.min(r,saved[2]),Math.min(b,saved[3])};
-        try{draw.run();}finally{clip=saved;}
+        float[] saved=pushClip(l,t,r,b);
+        try{draw.run();}finally{popClip(saved);}
     }
+    public static float[] pushClip(float l,float t,float r,float b){
+        if(clipCursor==CLIPS.length){GlassDiagnostics.log("Menu clip capacity exceeded");return clip;}
+        float[] saved=clip;clip=CLIPS[clipCursor++];
+        clip[0]=saved==null?l:Math.max(l,saved[0]);clip[1]=saved==null?t:Math.max(t,saved[1]);
+        clip[2]=saved==null?r:Math.min(r,saved[2]);clip[3]=saved==null?b:Math.min(b,saved[3]);
+        return saved;
+    }
+    public static void popClip(float[] saved){clip=saved;}
     public static void foreground(Runnable drawing) {
         float[] bounds=clip;
-        FOREGROUND.add(bounds==null?drawing:()->withClip(bounds[0],bounds[1],bounds[2],bounds[3],drawing));
+        if(foregroundCount==MAX_FOREGROUND){GlassDiagnostics.log("Menu foreground capacity exceeded");return;}
+        if(bounds==null){FOREGROUND[foregroundCount++]=drawing;return;}
+        if(clippedCursor==CLIPPED.length){GlassDiagnostics.log("Menu clipped command capacity exceeded");return;}
+        ClippedCommand command=CLIPPED[clippedCursor++];command.drawing=drawing;
+        command.l=bounds[0];command.t=bounds[1];command.r=bounds[2];command.b=bounds[3];
+        FOREGROUND[foregroundCount++]=command;
+    }
+    private static final class ClippedCommand implements Runnable {
+        float l,t,r,b;Runnable drawing;
+        @Override public void run(){try{withClip(l,t,r,b,drawing);}finally{drawing=null;}}
     }
     public static boolean hasBackdrop() { return captured && BlurService.get().captured(); }
     public static GlassQuality effectiveQuality() { return quality; }
@@ -71,7 +119,7 @@ public final class GlassRenderer {
 
     public static void flush() {
         // List entries may enqueue their own vanilla widgets after the container batch.
-        for(int pass=0;pass<4 && (!PANES.isEmpty() || !FOREGROUND.isEmpty());pass++)flushBatch();
+        for(int pass=0;pass<4 && (!PANES.isEmpty() || foregroundCount>0);pass++)flushBatch();
     }
 
     private static void flushBatch() {
@@ -83,24 +131,16 @@ public final class GlassRenderer {
                 fallbackReason = "backdrop hook not reached; automatic Low";
                 GlassDiagnostics.log(fallbackReason);
             }
-            if (failed) return;
-            if (program == 0) {
-                try { initialize(false); }
-                catch (Exception error) {
-                    BlurService.get().fail(error.getMessage()); quality = GlassQuality.LOW; fallbackReason = error.getMessage();
-                    releaseGpu(); initialize(true);
-                }
-            }
+            if (failed || program==0) return;
             int copies = instanced ? 1 : 6;
             int required = PANES.size() * FLOATS * copies;
-            if (instances.capacity() < required) instances = BufferUtils.createFloatBuffer(Integer.highestOneBit(required - 1) * 2);
             instances.clear();
-            for (Pane pane : PANES) for (int copy = 0; copy < copies; copy++) pack(pane);
+            for(int i=0;i<PANES.size();i++)for(int copy=0;copy<copies;copy++)pack(PANES.get(i));
             instances.flip();
             timer = GlassDiagnostics.timers().begin(GpuGlassTimers.GLASS);
             glUseProgram(program); glBindVertexArray(vao); glBindBuffer(GL_ARRAY_BUFFER, vbo);
             glBufferData(GL_ARRAY_BUFFER, instances, GL_STREAM_DRAW);
-            glUniformMatrix4fv(projectionLocation, false, new Matrix4f().setOrtho(0, (float) Math.ceil(width / (double) scale), (float) Math.ceil(height / (double) scale), 0, -1, 1).get(MATRIX));
+            glUniformMatrix4fv(projectionLocation, false, PROJECTION.setOrtho(0, (float) Math.ceil(width / (double) scale), (float) Math.ceil(height / (double) scale), 0, -1, 1).get(MATRIX));
             glUniform1i(qualityLocation, quality.shaderLevel());
             glUniform1i(instancedLocation, instanced ? 1 : 0);
             glUniform2f(sizeLocation, width, height);
@@ -126,8 +166,7 @@ public final class GlassRenderer {
         } catch (Exception error) {
             quality = GlassQuality.LOW;
             BlurService.get().fail(error.getMessage());
-            try { releaseGpu(); initialize(true); }
-            catch (Exception lowError) { failed = true; GlassDiagnostics.rendererFailure("Low shader failed: " + lowError.getMessage()); }
+            fallbackReason=error.getMessage();
             for (int i = 0; i < PANES.size(); i++) GlassDiagnostics.fallback(error.getMessage());
         } finally {
             GlassDiagnostics.timers().end(timer);
@@ -137,9 +176,10 @@ public final class GlassRenderer {
     }
 
     private static void foreground() {
-        var pending = new ArrayList<>(FOREGROUND);
-        FOREGROUND.clear();
-        for (Runnable draw : pending) draw.run();
+        int count=foregroundCount;
+        System.arraycopy(FOREGROUND,0,PENDING_FOREGROUND,0,count);
+        java.util.Arrays.fill(FOREGROUND,0,count,null);foregroundCount=0;
+        for(int i=0;i<count;i++){Runnable draw=PENDING_FOREGROUND[i];PENDING_FOREGROUND[i]=null;draw.run();}
     }
 
     private static void pack(Pane p) {
@@ -218,5 +258,5 @@ public final class GlassRenderer {
         program = vao = vbo = noiseTexture = 0; failed = false;
     }
 
-    public static void close() { BackdropRenderer.close(); AdaptiveText.close(); releaseGpu(); PANES.clear(); FOREGROUND.clear(); }
+    public static void close() { BackdropRenderer.close(); AdaptiveText.close(); releaseGpu(); PANES.clear();java.util.Arrays.fill(FOREGROUND,null);foregroundCount=0; }
 }

@@ -17,13 +17,13 @@ public final class AuraUiRenderer {
 
     private AuraUiRenderer() {}
 
+    public static void prepareMenuPanorama(){if(MENU_PANORAMA==null)MENU_PANORAMA=new RotatingCubeMapRenderer(TitleScreen.PANORAMA_CUBE_MAP);}
+
     /**
      * Renders out-of-game rotating panorama background for options/menus so they are not opaque black.
      */
     public static void renderMenuPanoramaBackground(DrawContext context, MinecraftClient client, int width, int height) {
-        if (MENU_PANORAMA == null) {
-            MENU_PANORAMA = new RotatingCubeMapRenderer(TitleScreen.PANORAMA_CUBE_MAP);
-        }
+        if(MENU_PANORAMA==null)return;
         MENU_PANORAMA.render(1.0f, 1.0f);
     }
 

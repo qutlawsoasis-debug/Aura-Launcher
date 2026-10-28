@@ -9,7 +9,7 @@ public final class GlassGlyphText {
     public static boolean vanillaGlyph(){return vanillaDepth>0;}
     public static float measure(TextRenderer font,String text,float size){
         float width=0;
-        for(int offset=0;offset<text.length();){int cp=text.codePointAt(offset);String glyph=new String(Character.toChars(cp));width+=AuraRenderer.hasGlyph(cp)?AuraRenderer.textWidth(glyph,size):font.getWidth(glyph)*size/9;offset+=Character.charCount(cp);}
+        for(int offset=0;offset<text.length();){int cp=text.codePointAt(offset);width+=AuraRenderer.hasGlyph(cp)?AuraRenderer.glyphWidth(cp,size):font.getWidth(new String(Character.toChars(cp)))*size/9;offset+=Character.charCount(cp);}
         return width;
     }
     private static boolean begin(DrawContext c){c.draw();return AuraRenderer.begin(c.getMatrices().peek().getPositionMatrix(),RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix());}

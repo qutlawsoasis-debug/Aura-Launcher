@@ -11,8 +11,9 @@ import net.auramc.glass.client.ui.GlassDebugOverlay;
 public final class AuraGlassClientMod implements ClientModInitializer {
     @Override public void onInitializeClient() {
         GlassStyles.initialize(FabricLoader.getInstance().getConfigDir());
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client->{GlassStyles.poll();net.auramc.glass.common.render.MenuResources.prepare(client);});
         GlassDebugOverlay.initialize();
         net.auramc.glass.client.ui.GlassGalleryActions.initialize(net.auramc.glass.client.gui.GlassGallery120::new);
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { GlassRenderer.close(); AuraRenderer.close(); });
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { net.auramc.glass.common.render.MenuResources.stop();GlassRenderer.close(); AuraRenderer.close(); });
     }
 }

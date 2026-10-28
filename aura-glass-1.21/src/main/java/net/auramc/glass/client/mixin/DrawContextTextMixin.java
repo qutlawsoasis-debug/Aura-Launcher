@@ -14,6 +14,7 @@ public abstract class DrawContextTextMixin {
     }
     @Inject(method="drawText(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/OrderedText;IIIZ)I",at=@At("HEAD"),cancellable=true)
     private void aura_ordered(TextRenderer font,OrderedText text,int x,int y,int color,boolean shadow,CallbackInfoReturnable<Integer> cir){
+        if(!net.auramc.glass.client.ui.GlassFrameHooks.styledScreen())return;
         if(GlassScreenText.draw((DrawContext)(Object)this,font,GlassScreenText.plain(text),x,y,color,shadow))cir.setReturnValue(x+font.getWidth(text));
     }
     @Inject(method="drawTexture(Lnet/minecraft/util/Identifier;IIFFIIII)V",at=@At("HEAD"),cancellable=true)

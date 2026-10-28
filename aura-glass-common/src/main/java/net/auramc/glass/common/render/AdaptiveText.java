@@ -16,7 +16,13 @@ public final class AdaptiveText {
     private static int program, vao, vbo, current, count, sizeUniform, dimUniform, backdropUniform;
     private static Object screen;
     private static boolean reset,failed;
+    private static final float[] CLEAR={0,0,0,0};
     private AdaptiveText() {}
+    public static void prepare(){
+        if(program!=0 || failed)return;
+        try{initialize();}
+        catch(RuntimeException error){failed=true;GlassDiagnostics.log("Adaptive text unavailable: "+error.getMessage());}
+    }
 
     public static void beginFrame(Object nextScreen) {
         if (screen != nextScreen) { screen=nextScreen; SLOTS.clear(); reset=true; }
@@ -24,7 +30,7 @@ public final class AdaptiveText {
     }
     public static int request(Object key, float centerX, float centerY, GlassStyle style) {
         if(net.auramc.glass.common.style.GlassStyles.quality()==net.auramc.glass.common.style.GlassQuality.OFF)
-            style=net.auramc.glass.common.style.GlassStyles.material(style);
+            style=net.auramc.glass.common.style.GlassStyles.frameMaterial(style);
         if (!SLOTS.containsKey(key)) {
             if (SLOTS.size() >= CAPACITY) return -1;
             SLOTS.put(key,SLOTS.size());
@@ -42,16 +48,16 @@ public final class AdaptiveText {
     static void update(int backdrop, int width, int height, float scale, float dim, boolean available) {
         if (count==0 || failed) return;
         try {
-            if (program==0) initialize();
+            if (program==0)return;
             if (reset) {
-                for(int fbo:framebuffers) { glBindFramebuffer(GL_DRAW_FRAMEBUFFER,fbo); glClearBufferfv(GL_COLOR,0,new float[]{0,0,0,0}); }
+                for(int fbo:framebuffers) { glBindFramebuffer(GL_DRAW_FRAMEBUFFER,fbo); glClearBufferfv(GL_COLOR,0,CLEAR); }
                 reset=false;
             }
             int next=1-current;
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER,framebuffers[next]); glViewport(0,0,CAPACITY,1);
             glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_SCISSOR_TEST);
             glUseProgram(program); glBindVertexArray(vao); glBindBuffer(GL_ARRAY_BUFFER,vbo);
-            FloatBuffer upload=DATA.duplicate();upload.flip();glBufferData(GL_ARRAY_BUFFER,upload,GL_STREAM_DRAW);
+            int limit=DATA.position();DATA.flip();glBufferData(GL_ARRAY_BUFFER,DATA,GL_STREAM_DRAW);DATA.limit(DATA.capacity());DATA.position(limit);
             glUniform3f(sizeUniform,(float)Math.ceil(width/scale),(float)Math.ceil(height/scale),CAPACITY);
             glUniform1f(dimUniform,dim); glUniform1i(backdropUniform,available?1:0);
             GlStateManager._activeTexture(GL_TEXTURE0); GuiRenderState.clearSampler(0); GlStateManager._bindTexture(backdrop);

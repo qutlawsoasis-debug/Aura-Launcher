@@ -11,6 +11,13 @@ public final class GlassStylesTest {
         GlassStyles.initialize(directory);
         check(Files.isRegularFile(GlassStyles.file()), "default JSON created");
         check(GlassStyles.quality() == GlassQuality.HIGH, "default quality High");
+        GlassStyles.beginFrame();
+        for(GlassPreset preset:GlassPreset.values()){
+            GlassStyle source=GlassStyles.get(preset),copy=new GlassStyle();source.copyInto(copy);
+            for(var field:GlassStyle.class.getFields())check(field.getFloat(source)==field.getFloat(copy),"complete copy: "+field.getName());
+            GlassStyle material=new GlassStyle();GlassStyles.materialInto(source,GlassQuality.OFF,material);
+            check(material.tintA>=.94f && material.frost==0 && source.frost==GlassStyles.get(preset).frost,"borrowed material independent");
+        }
         for (GlassPreset preset : GlassPreset.values()) {
             GlassStyle style = GlassStyles.get(preset);
             check(style != null, "all presets present");

@@ -4,6 +4,10 @@
   "package": "net.auramc.glass.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "MenuResizeMixin",
+    "IconButtonWidgetMixin",
+    "TitleBackdropMixin",
+    "AdvancementsScreenMixin",
     "ClickableWidgetMixin",
     "GameMenuScreenMixin",
     "GameRendererMixin",
@@ -24,7 +28,8 @@
     "ScrollableWidgetMixin",
     "TabNavigationWidgetMixin",
     "LockButtonWidgetMixin",
-    "TextureDeletionMixin"
+    "TextureDeletionMixin",
+    "ExtraMenuWidgetMixin"
   ],
   "injectors": {
     "defaultRequire": 0
