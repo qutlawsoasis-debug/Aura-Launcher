@@ -44,6 +44,7 @@ public final class GlassStyles {
             boolean upgraded = upgrade(next);
             document = next;
             if (upgraded) save();
+            log("Styles loaded: version=" + next.version + " quality=" + next.quality + " selectedPreset=" + next.selectedPreset);
         } catch (Exception error) { log("Styles reload rejected: " + error.getMessage()); }
     }
 
@@ -70,6 +71,7 @@ public final class GlassStyles {
     public static GlassStyle frameMaterial(GlassStyle source){return applyMaterial(frameCopy(source),document.quality);}
     private static GlassStyle applyMaterial(GlassStyle copy,GlassQuality quality){
         if(copy.isThemeTint()){int rgb=document.theme.rgb;copy.tintR*=((rgb>>16)&255)/255f;copy.tintG*=((rgb>>8)&255)/255f;copy.tintB*=(rgb&255)/255f;}
+        if (quality == GlassQuality.LOW) copy.tintA = Math.max(copy.tintA, .12f);
         if(quality==GlassQuality.OFF){
             FlatFill fill=document.offFill;
             if(!copy.isSelectedText() && copy.tintA<.5f){copy.tintR=fill.red;copy.tintG=fill.green;copy.tintB=fill.blue;}

@@ -11,6 +11,12 @@ public final class GlassStylesTest {
         GlassStyles.initialize(directory);
         check(Files.isRegularFile(GlassStyles.file()), "default JSON created");
         check(GlassStyles.quality() == GlassQuality.HIGH, "default quality High");
+        GlassStyle transparent = GlassStyles.get(GlassPreset.PANEL);
+        transparent.tintA = 0;
+        GlassStyle low = GlassStyles.material(transparent, GlassQuality.LOW);
+        check(low.tintA >= .12f, "Low retains visible fill without backdrop or configured tint");
+        check(transparent.tintA == 0, "Low fallback does not overwrite configured preset");
+        check(GlassStyles.material(transparent, GlassQuality.HIGH).tintA == 0, "High custom tint retained");
         GlassStyles.beginFrame();
         for(GlassPreset preset:GlassPreset.values()){
             GlassStyle source=GlassStyles.get(preset),copy=new GlassStyle();source.copyInto(copy);
