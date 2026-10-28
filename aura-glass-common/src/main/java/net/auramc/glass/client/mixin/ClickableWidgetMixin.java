@@ -9,7 +9,13 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(ClickableWidget.class)
-public abstract class ClickableWidgetMixin implements AuraResizableWidget, AuraMotionWidget {
+public abstract class ClickableWidgetMixin implements AuraResizableWidget, AuraMotionWidget,net.auramc.glass.client.ui.GlassLabelWidget {
+    @Unique private final net.auramc.glass.client.ui.GlassLabel aura_label=new net.auramc.glass.client.ui.GlassLabel();
+    @Override public net.auramc.glass.client.ui.GlassLabel aura_label(){return aura_label;}
+    @org.spongepowered.asm.mixin.injection.Inject(method="setWidth",at=@org.spongepowered.asm.mixin.injection.At("TAIL"))
+    private void aura_prepareResizedLabel(int width,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){aura_label.refresh((ClickableWidget)(Object)this);}
+    @org.spongepowered.asm.mixin.injection.Inject(method="setMessage",at=@org.spongepowered.asm.mixin.injection.At("TAIL"))
+    private void aura_updateLabel(net.minecraft.text.Text message,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){aura_label.refresh((ClickableWidget)(Object)this);}
     @Unique private final GlassSpring aura_hoverAnimation = new GlassSpring();
     @Unique private final GlassSpring aura_glassHover = new GlassSpring();
     @Unique private final GlassSpring aura_glassPress = new GlassSpring();
@@ -31,5 +37,6 @@ public abstract class ClickableWidgetMixin implements AuraResizableWidget, AuraM
     public void aura_setDimensions(int width, int height) {
         this.width = width;
         this.height = height;
+        aura_label.refresh((ClickableWidget)(Object)this);
     }
 }

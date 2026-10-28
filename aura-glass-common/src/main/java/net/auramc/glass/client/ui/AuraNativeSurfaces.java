@@ -11,6 +11,16 @@ import net.minecraft.resource.ResourceReload;
 public final class AuraNativeSurfaces {
     private static int lastPercent = -1;
     private static String progressText = "";
+    private static final java.util.Set<String> PRIMARY=java.util.Set.of("menu.singleplayer","menu.returnToGame","gui.done","selectWorld.select","selectWorld.create","selectServer.select","addServer.add","addServer.save","selectServer.direct","mco.select");
+    private static final NativeCommand[] COMMANDS=new NativeCommand[256];
+    private static int cursor;
+    static{for(int i=0;i<COMMANDS.length;i++)COMMANDS[i]=new NativeCommand();}
+    public static void beginFrame(){cursor=0;}
+    private static NativeCommand command(DrawContext context,int type,int color){
+        if(cursor==COMMANDS.length)return null;
+        NativeCommand command=COMMANDS[cursor++];command.context=context;command.type=type;command.color=color;
+        return command;
+    }
 
     private AuraNativeSurfaces() {}
 
@@ -56,7 +66,7 @@ public final class AuraNativeSurfaces {
     public static int button(DrawContext context, ClickableWidget widget, boolean hovered, float alpha) {
         var client = net.minecraft.client.MinecraftClient.getInstance();
         boolean primary = widget.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent label
-                && java.util.Set.of("menu.singleplayer", "menu.returnToGame", "gui.done", "selectWorld.select", "selectWorld.create", "selectServer.select", "addServer.add", "addServer.save", "selectServer.direct", "mco.select").contains(label.getKey());
+                && PRIMARY.contains(label.getKey());
         float hover = 0, press = 0;
         if (widget instanceof AuraMotionWidget motion) {
             long window = client.getWindow().getHandle();
@@ -70,35 +80,26 @@ public final class AuraNativeSurfaces {
                 : widget.isFocused() ? GlassState.FOCUSED : GlassState.HOVER;
         float amount = !widget.active ? 1 : state == GlassState.PRESS ? press : hover;
         boolean selectedTab=widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab();
-        var base=selectedTab?GlassStyles.selected():GlassStyles.get(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PANEL);
-        var style=GlassStyles.resolve(base,state,amount);
+        var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PANEL);
+        var style=GlassStyles.frameResolve(base,state,amount);
         net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
         GlassRenderer.draw(widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
         int rgb = primary ? 0x18232C : 0xF7F9FC;
         return ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
     }
     public static void text(DrawContext context,String text,float x,float y,float size,int color) {
-        GlassRenderer.foreground(()->{if(begin(context)){AuraRenderer.text(text,x,y,size,color);AuraRenderer.flush();}});
+        NativeCommand command=command(context,0,color);if(command==null)return;
+        command.text=text;command.x=x;command.y=y;command.size=size;GlassRenderer.foreground(command);
     }
 
     public static boolean label(DrawContext context, ClickableWidget widget, int color) {
-        String text = widget.getMessage().getString();
         if (widget.getWidth() <= 8 || !AuraRenderer.isReady()) return false;
-        var local = new org.joml.Matrix4f(context.getMatrices().peek().getPositionMatrix());
-        GlassRenderer.foreground(() -> {
-            context.getMatrices().push();
-            context.getMatrices().peek().getPositionMatrix().set(local);
-            try { drawLabel(context, widget, text, color); }
-            finally { context.getMatrices().pop(); }
-        });
-        return true;
+        return widget instanceof GlassLabelWidget cached && cached.aura_label().enqueue(context,widget,color);
     }
 
-    private static void drawLabel(DrawContext context, ClickableWidget widget, String text, int color) {
-        float size = Math.min(13, widget.getHeight() * .55f);
+    static void drawLabel(DrawContext context, ClickableWidget widget,net.auramc.glass.common.ui.GlassTextFit.Fitted fitted,int color) {
         var font=net.minecraft.client.MinecraftClient.getInstance().textRenderer;
-        var fitted=net.auramc.glass.common.ui.GlassTextFit.fit(text,size,widget.getWidth()-8,value->GlassGlyphText.measure(font,value,1));
-        text=fitted.text();size=fitted.size();float textWidth=fitted.width();
+        String text=fitted.text();float size=fitted.size(),textWidth=fitted.width();
         if (!begin(context)) return;
         float[] clip=GlassRenderer.clipBounds();
         if(clip!=null)context.enableScissor((int)clip[0],(int)clip[1],(int)clip[2],(int)clip[3]);
@@ -113,13 +114,9 @@ public final class AuraNativeSurfaces {
     }
     public static void lock(DrawContext context,ClickableWidget widget,boolean locked) {
         int color=button(context,widget,widget.isHovered(),1);
-        GlassRenderer.foreground(()->{
-            if(!begin(context))return;
-            float x=widget.getX()+widget.getWidth()*.5f-3.5f,y=widget.getY()+widget.getHeight()*.5f-1;
-            AuraRenderer.rect(x,y,7,6,1,0,color,0);
-            AuraRenderer.rect(x+1+(locked?0:2),y-4,5,6,2,1,0,color);
-            AuraRenderer.flush();
-        });
+        NativeCommand command=command(context,1,color);if(command==null)return;
+        command.x=widget.getX()+widget.getWidth()*.5f-3.5f;command.y=widget.getY()+widget.getHeight()*.5f-1;command.locked=locked;
+        GlassRenderer.foreground(command);
     }
 
     public static boolean menuIcon(DrawContext context, ClickableWidget widget, boolean hovered, float alpha) {
@@ -129,12 +126,25 @@ public final class AuraNativeSurfaces {
         boolean accessibility = key.equals("narrator.button.accessibility") || key.equals("options.accessibility");
         if (!language && !accessibility) return false;
         int color = button(context, widget, hovered, alpha);
-        GlassRenderer.foreground(() -> {
-        if (!begin(context)) return;
         float size = Math.min(widget.getWidth(), widget.getHeight()) * .62f;
         float x = widget.getX() + (widget.getWidth() - size) * .5f;
         float y = widget.getY() + (widget.getHeight() - size) * .5f;
-        if (language) {
+        NativeCommand command=command(context,language?2:3,color);if(command==null)return false;
+        command.size=size;command.x=x;command.y=y;GlassRenderer.foreground(command);return true;
+    }
+    private static final class NativeCommand implements Runnable {
+        DrawContext context;int type,color;String text;float x,y,size;boolean locked;
+        @Override public void run(){
+            try{paint();}finally{context=null;text=null;}
+        }
+        private void paint(){
+            if(!begin(context))return;
+            if(type==0){AuraRenderer.text(text,x,y,size,color);AuraRenderer.flush();return;}
+            if(type==1){
+                AuraRenderer.rect(x,y,7,6,1,0,color,0);
+                AuraRenderer.rect(x+1+(locked?0:2),y-4,5,6,2,1,0,color);AuraRenderer.flush();return;
+            }
+        if (type==2) {
             AuraRenderer.rect(x, y, size, size, size * .5f, 1, 0, color);
             AuraRenderer.rect(x + size * .28f, y, size * .44f, size, size * .22f, .8f, 0, color);
             AuraRenderer.rect(x, y + size * .47f, size, 1, 0, 0, color, 0);
@@ -146,7 +156,6 @@ public final class AuraNativeSurfaces {
             AuraRenderer.rect(x + size * .58f, y + size * .64f, size * .13f, size * .36f, 1, 0, color, 0);
         }
         AuraRenderer.flush();
-        });
-        return true;
+        }
     }
 }

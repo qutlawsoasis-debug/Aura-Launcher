@@ -16,12 +16,20 @@ public final class GlassStyle {
 
     public GlassStyle copy() {
         GlassStyle copy = new GlassStyle();
-        for (var field : GlassStyle.class.getFields()) {
-            try { field.setFloat(copy, field.getFloat(this)); }
-            catch (IllegalAccessException impossible) { throw new IllegalStateException(impossible); }
-        }
-        copy.selectedText=selectedText;copy.themeTint=themeTint;
+        copyInto(copy);
         return copy;
+    }
+
+    public void copyInto(GlassStyle target) {
+        target.refraction=refraction;target.bevel=bevel;target.splay=splay;target.depth=depth;
+        target.dispersion=dispersion;target.frost=frost;target.light=light;
+        target.lightDirX=lightDirX;target.lightDirY=lightDirY;
+        target.rimOuter=rimOuter;target.rimInner=rimInner;target.gloss=gloss;
+        target.tintR=tintR;target.tintG=tintG;target.tintB=tintB;target.tintA=tintA;
+        target.saturation=saturation;target.noise=noise;target.radius=radius;target.squircleK=squircleK;
+        target.wobble=wobble;target.gradient=gradient;target.innerGlow=innerGlow;target.scale=scale;
+        target.profile=profile;target.cornerSoften=cornerSoften;target.specFalloff=specFalloff;
+        target.selectedText=selectedText;target.themeTint=themeTint;
     }
 
     public void validate() {

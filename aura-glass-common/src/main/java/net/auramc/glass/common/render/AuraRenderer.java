@@ -198,6 +198,17 @@ public final class AuraRenderer {
     }
 
     public static boolean hasGlyph(int codePoint) { return ready && codePoint>=0 && codePoint<GLYPHS[0].length && GLYPHS[0][codePoint]!=null; }
+    public static float glyphWidth(int codePoint,float size){return hasGlyph(codePoint)?GLYPHS[0][codePoint].advance*size:0;}
+    public static float glyphWidth(int codePoint,float size,int weight){return hasGlyph(codePoint)?GLYPHS[weightIndex(weight)][codePoint].advance*size:0;}
+    public static void glyph(int codePoint,float x,float y,float size,int color,int weight){
+        if(!hasGlyph(codePoint))return;
+        Glyph g=GLYPHS[weightIndex(weight)][codePoint];
+        if(g.visible)quad(x+g.left*size,y+(-ascender+g.top)*size,(g.right-g.left)*size,(g.bottom-g.top)*size,0,0,glyphKind,color,0,g.u0,g.v0,g.u1,g.v1);
+    }
+    public static void adaptiveGlyph(int slot,int point,float x,float y,float size,int color,int weight){
+        contrastSlot=slot;glyphKind=1.2f;glyph(point,x+.65f,y+.65f,size,color,weight);
+        glyphKind=1;glyph(point,x,y,size,color,weight);
+    }
 
     public static boolean supports(String text) {
         if (!ready) return false;
