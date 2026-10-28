@@ -21,6 +21,7 @@ public final class GlassFrameHooks {
     }
     public static void beginFrame() {
         GlassScreenText.beginFrame();
+        AuraNativeSurfaces.beginFrame();
         GlassEntryPaint.beginFrame();
         var screen=MinecraftClient.getInstance().currentScreen;
         if(screen!=modalScreen){modalScreen=screen;modalStarted=System.nanoTime();}

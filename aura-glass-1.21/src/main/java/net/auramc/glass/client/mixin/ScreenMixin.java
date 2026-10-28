@@ -7,6 +7,8 @@ import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Screen.class)
 public abstract class ScreenMixin {
+    @Inject(method="init(Lnet/minecraft/client/MinecraftClient;II)V",at=@At("TAIL"))
+    private void aura_prepareLabels(net.minecraft.client.MinecraftClient client,int width,int height,CallbackInfo ci){if(GlassFrameHooks.styledScreen())net.auramc.glass.common.render.AdaptiveText.invalidateScreen();net.auramc.glass.client.ui.GlassLabels.prepare((Screen)(Object)this);}
     @Inject(method="renderWithTooltip",at=@At("HEAD"))
     private void aura_background(DrawContext c,int mx,int my,float delta,CallbackInfo ci){GlassFrameHooks.beforeScreen(c);}
     @Inject(method="renderBackground",at=@At("HEAD"),cancellable=true)

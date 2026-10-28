@@ -18,9 +18,14 @@ public final class GlassLabel implements Runnable {
     private ClickableWidget widget;
     private DrawContext context;
     private int color;
+    public void refresh(ClickableWidget widget){if(fitted!=null)update(widget);}
 
     public void update(ClickableWidget widget){
-        if(!AuraRenderer.isReady())return;
+        if(!AuraRenderer.isReady()||!GlassFrameHooks.styledScreen())return;
+        if(!(widget instanceof net.minecraft.client.gui.widget.PressableWidget)
+                && !(widget instanceof net.minecraft.client.gui.widget.SliderWidget)
+                && !(widget instanceof net.minecraft.client.gui.widget.TabButtonWidget)
+                && !(widget instanceof net.minecraft.client.gui.widget.ToggleButtonWidget))return;
         Object nextLanguage=net.minecraft.util.Language.getInstance();
         if(message==widget.getMessage() && language==nextLanguage && width==widget.getWidth() && height==widget.getHeight())return;
         language=nextLanguage;
@@ -30,7 +35,6 @@ public final class GlassLabel implements Runnable {
         fitted=GlassTextFit.fit(plain,size,width-8,value->GlassGlyphText.measure(font,value,1));
     }
     public boolean enqueue(DrawContext context,ClickableWidget widget,int color){
-        update(widget);
         if(fitted==null)return false;
         this.context=context;this.widget=widget;this.color=color;
         matrix.set(context.getMatrices().peek().getPositionMatrix());

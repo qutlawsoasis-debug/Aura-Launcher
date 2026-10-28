@@ -12,6 +12,15 @@ public final class AuraNativeSurfaces {
     private static int lastPercent = -1;
     private static String progressText = "";
     private static final java.util.Set<String> PRIMARY=java.util.Set.of("menu.singleplayer","menu.returnToGame","gui.done","selectWorld.select","selectWorld.create","selectServer.select","addServer.add","addServer.save","selectServer.direct","mco.select");
+    private static final NativeCommand[] COMMANDS=new NativeCommand[256];
+    private static int cursor;
+    static{for(int i=0;i<COMMANDS.length;i++)COMMANDS[i]=new NativeCommand();}
+    public static void beginFrame(){cursor=0;}
+    private static NativeCommand command(DrawContext context,int type,int color){
+        if(cursor==COMMANDS.length)return null;
+        NativeCommand command=COMMANDS[cursor++];command.context=context;command.type=type;command.color=color;
+        return command;
+    }
 
     private AuraNativeSurfaces() {}
 
@@ -79,7 +88,8 @@ public final class AuraNativeSurfaces {
         return ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
     }
     public static void text(DrawContext context,String text,float x,float y,float size,int color) {
-        GlassRenderer.foreground(()->{if(begin(context)){AuraRenderer.text(text,x,y,size,color);AuraRenderer.flush();}});
+        NativeCommand command=command(context,0,color);if(command==null)return;
+        command.text=text;command.x=x;command.y=y;command.size=size;GlassRenderer.foreground(command);
     }
 
     public static boolean label(DrawContext context, ClickableWidget widget, int color) {
@@ -104,13 +114,9 @@ public final class AuraNativeSurfaces {
     }
     public static void lock(DrawContext context,ClickableWidget widget,boolean locked) {
         int color=button(context,widget,widget.isHovered(),1);
-        GlassRenderer.foreground(()->{
-            if(!begin(context))return;
-            float x=widget.getX()+widget.getWidth()*.5f-3.5f,y=widget.getY()+widget.getHeight()*.5f-1;
-            AuraRenderer.rect(x,y,7,6,1,0,color,0);
-            AuraRenderer.rect(x+1+(locked?0:2),y-4,5,6,2,1,0,color);
-            AuraRenderer.flush();
-        });
+        NativeCommand command=command(context,1,color);if(command==null)return;
+        command.x=widget.getX()+widget.getWidth()*.5f-3.5f;command.y=widget.getY()+widget.getHeight()*.5f-1;command.locked=locked;
+        GlassRenderer.foreground(command);
     }
 
     public static boolean menuIcon(DrawContext context, ClickableWidget widget, boolean hovered, float alpha) {
@@ -120,12 +126,25 @@ public final class AuraNativeSurfaces {
         boolean accessibility = key.equals("narrator.button.accessibility") || key.equals("options.accessibility");
         if (!language && !accessibility) return false;
         int color = button(context, widget, hovered, alpha);
-        GlassRenderer.foreground(() -> {
-        if (!begin(context)) return;
         float size = Math.min(widget.getWidth(), widget.getHeight()) * .62f;
         float x = widget.getX() + (widget.getWidth() - size) * .5f;
         float y = widget.getY() + (widget.getHeight() - size) * .5f;
-        if (language) {
+        NativeCommand command=command(context,language?2:3,color);if(command==null)return false;
+        command.size=size;command.x=x;command.y=y;GlassRenderer.foreground(command);return true;
+    }
+    private static final class NativeCommand implements Runnable {
+        DrawContext context;int type,color;String text;float x,y,size;boolean locked;
+        @Override public void run(){
+            try{paint();}finally{context=null;text=null;}
+        }
+        private void paint(){
+            if(!begin(context))return;
+            if(type==0){AuraRenderer.text(text,x,y,size,color);AuraRenderer.flush();return;}
+            if(type==1){
+                AuraRenderer.rect(x,y,7,6,1,0,color,0);
+                AuraRenderer.rect(x+1+(locked?0:2),y-4,5,6,2,1,0,color);AuraRenderer.flush();return;
+            }
+        if (type==2) {
             AuraRenderer.rect(x, y, size, size, size * .5f, 1, 0, color);
             AuraRenderer.rect(x + size * .28f, y, size * .44f, size, size * .22f, .8f, 0, color);
             AuraRenderer.rect(x, y + size * .47f, size, 1, 0, 0, color, 0);
@@ -137,7 +156,6 @@ public final class AuraNativeSurfaces {
             AuraRenderer.rect(x + size * .58f, y + size * .64f, size * .13f, size * .36f, 1, 0, color, 0);
         }
         AuraRenderer.flush();
-        });
-        return true;
+        }
     }
 }

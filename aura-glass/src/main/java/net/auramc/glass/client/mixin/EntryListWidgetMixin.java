@@ -21,12 +21,23 @@ public abstract class EntryListWidgetMixin {
     @Shadow private boolean renderHeader;
     @Shadow private EntryListWidget.Entry hoveredEntry;
     @Unique private final int[] aura_bounds=new int[2];
+    @Unique private DrawContext aura_context;
+    @Unique private int aura_mouseX,aura_mouseY;
+    @Unique private final Runnable aura_header=this::aura_paintHeader,aura_decorations=this::aura_paintDecorations;
+    @Unique private void aura_paintHeader(){
+        var self=(EntryListWidget<?>)(Object)this;var c=aura_context;
+        c.enableScissor(aura_left,aura_top,aura_right,aura_bottom);
+        try{renderHeader(c,self.getRowLeft(),aura_top+4-(int)self.getScrollAmount());}finally{c.disableScissor();}
+    }
+    @Unique private void aura_paintDecorations(){try{renderDecorations(aura_context,aura_mouseX,aura_mouseY);}finally{aura_context=null;}}
+
     @Unique private int aura_left,aura_top,aura_right,aura_bottom;
     @Inject(method="render",at=@At("HEAD"),cancellable=true)
     private void aura_list(DrawContext c,int mx,int my,float delta,CallbackInfo ci) {
         if(!GlassFrameHooks.styledScreen())return;
         var self=(EntryListWidget<?>)(Object)this;int l=left,t=top,r=right,b=bottom;
         aura_left=l;aura_top=t;aura_right=r;aura_bottom=b;
+        aura_context=c;aura_mouseX=mx;aura_mouseY=my;
         hoveredEntry=mx>=l && mx<r && my>=t && my<b?getEntryAtPosition(mx,my):null;
         int screenW=net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledWidth();
         int panelL=Math.max(12,l),panelR=Math.min(screenW-12,r);
@@ -36,7 +47,7 @@ public abstract class EntryListWidgetMixin {
             if(content[0]<content[1]){panelL=Math.max(panelL,content[0]-8);panelR=Math.min(panelR,content[1]+8);}
             GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.frame(GlassPreset.PANEL),1);
         }else GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.frame(GlassPreset.PANEL),1);
-        if(renderHeader)GlassRenderer.foreground(()->{c.enableScissor(l,t,r,b);try{renderHeader(c,self.getRowLeft(),t+4-(int)self.getScrollAmount());}finally{c.disableScissor();}});
+        if(renderHeader)GlassRenderer.foreground(aura_header);
         renderList(c,mx,my,delta);
         int max=self.getMaxScroll();
         if(max>0){
@@ -44,7 +55,7 @@ public abstract class EntryListWidgetMixin {
             float y=t+(b-t-h)*(float)self.getScrollAmount()/max;
             GlassRenderer.draw(getScrollbarPositionX()+2,y,2,h,GlassStyles.frame(GlassPreset.BUTTON_FILLED),.85f);
         }
-        GlassRenderer.foreground(()->renderDecorations(c,mx,my));ci.cancel();
+        GlassRenderer.foreground(aura_decorations);ci.cancel();
     }
     @Inject(method="renderEntry",at=@At("HEAD"),cancellable=true)
     private void aura_entry(DrawContext c,int mx,int my,float delta,int index,int x,int y,int w,int h,CallbackInfo ci) {

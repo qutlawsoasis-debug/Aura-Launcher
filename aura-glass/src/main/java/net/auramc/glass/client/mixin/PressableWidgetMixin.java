@@ -15,6 +15,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(PressableWidget.class)
 public abstract class PressableWidgetMixin extends ClickableWidget {
+    @org.spongepowered.asm.mixin.Unique private DrawContext aura_labelContext;
+    @org.spongepowered.asm.mixin.Unique private int aura_labelColor;
+    @org.spongepowered.asm.mixin.Unique private final Runnable aura_labelPaint=()->drawMessage(aura_labelContext,MinecraftClient.getInstance().textRenderer,aura_labelColor);
+
     public PressableWidgetMixin(int x, int y, int width, int height, Text message) {
         super(x, y, width, height, message);
     }
@@ -28,7 +32,7 @@ public abstract class PressableWidgetMixin extends ClickableWidget {
         MinecraftClient client = MinecraftClient.getInstance();
         int textColor = AuraUiRenderer.renderButton(context, this, this.isHovered(), this.alpha);
         if ((Object)this instanceof net.minecraft.client.gui.widget.IconButtonWidget || !net.auramc.glass.client.ui.AuraNativeSurfaces.label(context, this, textColor)) {
-            net.auramc.glass.common.render.GlassRenderer.foreground(() -> this.drawMessage(context, client.textRenderer, textColor));
+            aura_labelContext=context;aura_labelColor=textColor;net.auramc.glass.common.render.GlassRenderer.foreground(aura_labelPaint);
         }
         ci.cancel();
     }

@@ -18,6 +18,7 @@ public final class AdaptiveText {
     private static boolean reset,failed;
     private static final float[] CLEAR={0,0,0,0};
     private AdaptiveText() {}
+    public static void invalidateScreen(){SLOTS.clear();reset=true;}
     public static void prepare(){
         if(program!=0 || failed)return;
         try{initialize();}
