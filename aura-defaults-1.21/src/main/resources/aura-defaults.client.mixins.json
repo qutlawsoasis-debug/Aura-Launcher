@@ -9,7 +9,6 @@
     "CyclingButtonWidgetMixin",
     "IntegratedServerLoaderMixin",
     "MinecraftClientMixin",
-    "MultiplayerWarningScreenMixin",
     "OpenToLanScreenMixin",
     "PeriodicRunnerMixin",
     "RealmsAvailabilityMixin",
