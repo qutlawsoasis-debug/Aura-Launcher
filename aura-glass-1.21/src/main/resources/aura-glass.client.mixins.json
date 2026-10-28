@@ -24,7 +24,8 @@
     "ScrollableWidgetMixin",
     "TabNavigationWidgetMixin",
     "LockButtonWidgetMixin",
-    "TextureDeletionMixin"
+    "TextureDeletionMixin",
+    "AuraHudMixin"
   ],
   "injectors": {
     "defaultRequire": 0

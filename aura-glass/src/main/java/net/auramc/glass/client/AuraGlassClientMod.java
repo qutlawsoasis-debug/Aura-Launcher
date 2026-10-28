@@ -12,6 +12,7 @@ public final class AuraGlassClientMod implements ClientModInitializer {
     @Override public void onInitializeClient() {
         GlassStyles.initialize(FabricLoader.getInstance().getConfigDir());
         GlassDebugOverlay.initialize();
+        net.auramc.glass.common.hud.HudRuntime.initialize(()->net.minecraft.client.MinecraftClient.getInstance().options.debugEnabled);
         net.auramc.glass.client.ui.GlassGalleryActions.initialize(net.auramc.glass.client.gui.GlassGallery120::new);
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { GlassRenderer.close(); AuraRenderer.close(); });
     }
