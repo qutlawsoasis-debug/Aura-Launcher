@@ -88,7 +88,7 @@ public final class GlassFrameHooks {
         var screen = MinecraftClient.getInstance().currentScreen;
         if (screen == null) return;
         String name = screen.getClass().getName();
-        if (!name.startsWith("net.minecraft.") && !name.startsWith("net.auramc.glass.")) return;
+        if (!name.startsWith(net.minecraft.client.gui.screen.Screen.class.getPackageName() + ".") && !name.startsWith("net.auramc.glass.")) return;
         if (!styledScreen() && !GlassDiagnostics.panelEnabled()) return;
         context.draw();
         GlassRenderer.captureBackdrop();
