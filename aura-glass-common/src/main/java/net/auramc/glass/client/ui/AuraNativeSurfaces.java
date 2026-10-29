@@ -105,7 +105,7 @@ public final class AuraNativeSurfaces {
         if(clip!=null)context.enableScissor((int)clip[0],(int)clip[1],(int)clip[2],(int)clip[3]);
         context.enableScissor(widget.getX() + 4, widget.getY(), widget.getX() + widget.getWidth() - 4, widget.getY() + widget.getHeight());
         try {
-            int slot=(widget instanceof net.minecraft.client.gui.widget.SliderWidget || widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab())?-2:net.auramc.glass.common.render.AdaptiveText.slot(widget);
+            int slot=(widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab())?-2:net.auramc.glass.common.render.AdaptiveText.slot(widget);
             GlassGlyphText.draw(context,font,text,widget.getX()+(widget.getWidth()-textWidth)*.5f,widget.getY()+(widget.getHeight()-size)*.5f-1,size,color,true,slot);
         } finally {
             context.disableScissor();

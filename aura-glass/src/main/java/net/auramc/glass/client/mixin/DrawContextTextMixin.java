@@ -21,4 +21,12 @@ public abstract class DrawContextTextMixin {
     private void aura_separators(net.minecraft.util.Identifier texture,int x,int y,float u,float v,int w,int h,int tw,int th,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){
         if(net.auramc.glass.client.ui.GlassFrameHooks.styledScreen() && (texture.getPath().contains("header_separator") || texture.getPath().contains("footer_separator")))ci.cancel();
     }
+    @Inject(method="drawOrderedTooltip",at=@At("HEAD"),cancellable=true)
+    private void aura_tooltip(TextRenderer font,java.util.List<? extends OrderedText> lines,int x,int y,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){
+        if(net.auramc.glass.client.ui.GlassTooltip.draw((DrawContext)(Object)this,font,lines,x,y))ci.cancel();
+    }
+    @Inject(method="drawTooltip(Lnet/minecraft/client/font/TextRenderer;Ljava/util/List;Lnet/minecraft/client/gui/tooltip/TooltipPositioner;II)V",at=@At("HEAD"),cancellable=true)
+    private void aura_positionedTooltip(TextRenderer font,java.util.List<OrderedText> lines,net.minecraft.client.gui.tooltip.TooltipPositioner positioner,int x,int y,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){
+        if(net.auramc.glass.client.ui.GlassTooltip.draw((DrawContext)(Object)this,font,lines,x,y))ci.cancel();
+    }
 }
