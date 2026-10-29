@@ -30,7 +30,10 @@
     "TextureDeletionMixin",
     "AuraHudMixin",
     "ExtraMenuWidgetMixin",
-    "WorldRendererMixin"
+    "WorldRendererMixin",
+    "KaraokeQaHiddenWindowMixin",
+    "KaraokeQaNoAudioMixin",
+    "KaraokeQaNoCursorMixin"
   ],
   "injectors": {
     "defaultRequire": 0
