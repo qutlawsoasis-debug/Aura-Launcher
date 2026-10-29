@@ -18,6 +18,7 @@ public abstract class TabNavigationWidgetMixin {
     private void aura_initTabs(CallbackInfo ci) {
         if (GlassFrameHooks.styledScreen()) {
             this.grid.setY(6);
+            this.grid.refreshPositions();
         }
     }
 

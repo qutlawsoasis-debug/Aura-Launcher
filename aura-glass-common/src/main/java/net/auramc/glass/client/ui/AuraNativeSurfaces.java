@@ -88,12 +88,19 @@ public final class AuraNativeSurfaces {
             style.scale=GlassStyles.quality()==GlassQuality.OFF?1:1+.012f*hover-.025f*press;
             if(widget.active&&hovered&&GlassStyles.quality()!=GlassQuality.OFF)style.pointer((float)(client.mouse.getX()/client.getWindow().getScaleFactor()-widget.getX()),(float)(client.mouse.getY()/client.getWindow().getScaleFactor()-widget.getY()));
             if(primary){style.asPrimary();style.tintR=style.tintG=style.tintB=1;style.tintA=.92f;}
-            else{
+            else if(widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab){
+                style.asFill();
+                style.radius = 12;
+                style.rimOuter = 0;
+                style.tintR = 118 / 255f;
+                style.tintG = 118 / 255f;
+                style.tintB = 128 / 255f;
+                style.tintA = tab.isCurrentTab() ? 0.36f : (hovered ? 0.12f : 0.0f);
+            }else{
                 style.asFill();
                 style.tintR=style.tintG=118/255f;
                 style.tintB=128/255f;
-                // Requirement 4: активная вкладка — заливка rgba(118,118,128,0.36)
-                style.tintA=!widget.active?.12f:selectedTab?.36f:.24f+.12f*hover+.14f*press;
+                style.tintA=!widget.active?.12f:.24f+.12f*hover+.14f*press;
             }
         }
         if(!GlassStyles.regular())net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);

@@ -15,7 +15,7 @@ import net.minecraft.client.gui.widget.PressableTextWidget;
 public final class GlassGroups {
     private static final int MAX_WIDGETS = 1024;
     private static final int PAD = 8;
-    private static final int GAP = 12;
+    private static final int GAP = 28;
     private static final int MARGIN = 6;
     private static final ClickableWidget[] WIDGETS = new ClickableWidget[MAX_WIDGETS];
     private static final int[] LEFT = new int[MAX_WIDGETS];
@@ -141,12 +141,25 @@ public final class GlassGroups {
                 shiftY = (height - MARGIN) - gBottom;
             }
 
+            // Return 1, point 1: Title clearance >= 10 GUI above group.
+            // Title is at y=8, h=13.5 (bottom=21.5). Minimum group top must be >= 32 GUI.
+            if (hasScreenTitle(screen) && gTop < 32 && !isAlertOrExperimentalScreen(screen)) {
+                int shiftTitle = 32 - gTop;
+                shiftY = Math.max(shiftY, shiftTitle);
+            }
+            if (hasTabs(screen) && gTop < 38) {
+                int shiftTabs = 38 - gTop;
+                shiftY = Math.max(shiftY, shiftTabs);
+            }
+
             if (shiftX != 0 || shiftY != 0) {
                 for (int k = 0; k < widgetCount; k++) {
                     if (find(k) == group.root) {
                         ClickableWidget w = WIDGETS[k];
-                        w.setX(w.getX() + shiftX);
-                        w.setY(w.getY() + shiftY);
+                        if (w != null) {
+                            w.setX(w.getX() + shiftX);
+                            w.setY(w.getY() + shiftY);
+                        }
                         LEFT[k] += shiftX;
                         RIGHT[k] += shiftX;
                         TOP[k] += shiftY;
@@ -173,12 +186,12 @@ public final class GlassGroups {
                 Group a = GROUPS[i];
                 for (int j = i + 1; j < groupCount; j++) {
                     Group b = GROUPS[j];
+                    if (a.isTabGroup || b.isTabGroup) continue;
                     if (a.left < b.right + 8 && b.left < a.right + 8 && a.top < b.bottom + 8 && b.top < a.bottom + 8) {
                         a.left = Math.min(a.left, b.left);
                         a.top = Math.min(a.top, b.top);
                         a.right = Math.max(a.right, b.right);
                         a.bottom = Math.max(a.bottom, b.bottom);
-                        if (b.isTabGroup) a.isTabGroup = true;
                         GROUPS[j] = GROUPS[--groupCount];
                         GROUPS[groupCount] = b;
                         merged = true;
@@ -197,9 +210,22 @@ public final class GlassGroups {
         if (depth > 32 || widgetCount == MAX_WIDGETS) return;
         var children = root.children();
 
-        // Requirement 8: 1.21.1 «Настройки»: «Готово» внутри основной группы последним рядом
-        if (root instanceof net.minecraft.client.gui.screen.option.OptionsScreen) {
-            alignOptionsDoneButton(root);
+        // Requirement 6: Notice / Confirm / Experimental screens: text + buttons in ONE group
+        if (depth == 0 && isAlertOrExperimentalScreen(root)) {
+            int textW = Math.min(320, width - 40);
+            int textLeft = (width - textW) / 2;
+            int textRight = (width + textW) / 2;
+            int textTop = 60;
+            int textBottom = 115;
+            if (widgetCount < MAX_WIDGETS) {
+                int index = widgetCount++;
+                WIDGETS[index] = null;
+                LEFT[index] = textLeft;
+                TOP[index] = textTop;
+                RIGHT[index] = textRight;
+                BOTTOM[index] = textBottom;
+                PARENT[index] = index;
+            }
         }
 
         for (int i = 0; i < children.size(); i++) {
@@ -307,6 +333,26 @@ public final class GlassGroups {
                 || name.contains("Backup") || name.contains("Confirm");
     }
 
+    private static boolean hasScreenTitle(ParentElement root) {
+        if (root == null || root instanceof net.minecraft.client.gui.screen.TitleScreen) return false;
+        if (root instanceof net.minecraft.client.gui.screen.Screen s) {
+            return s.getTitle() != null && !s.getTitle().getString().isEmpty();
+        }
+        return false;
+    }
+
+    private static boolean hasTabs(ParentElement root) {
+        if (root == null) return false;
+        var children = root.children();
+        for (int i = 0; i < children.size(); i++) {
+            if (children.get(i) instanceof net.minecraft.client.gui.widget.TabButtonWidget
+                    || children.get(i) instanceof net.minecraft.client.gui.widget.TabNavigationWidget) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static int width() { return width; }
     public static int height() { return height; }
 
@@ -317,7 +363,7 @@ public final class GlassGroups {
                 minTop = GROUPS[i].top;
             }
         }
-        return minTop == height ? 40 : minTop;
+        return (minTop == height || minTop > height / 2) ? 40 : minTop;
     }
 
     private static boolean near(int a, int b) {
@@ -364,7 +410,11 @@ public final class GlassGroups {
             style.rimOuter = .22f;
             style.rimInner = 0;
             style.frost = 1.5f;
-            GlassRenderer.drawSurface(group, group.left, group.top, w, h, style, 1);
+            if (group.isTabGroup) {
+                GlassRenderer.drawSurface(group, group.left, 6, w, 24, style, 1);
+            } else {
+                GlassRenderer.drawSurface(group, group.left, group.top, w, h, style, 1);
+            }
         }
     }
 

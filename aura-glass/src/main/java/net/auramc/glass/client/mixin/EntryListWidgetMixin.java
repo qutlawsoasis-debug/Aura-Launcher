@@ -50,6 +50,25 @@ public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui
         aura_context=c;aura_mouseX=mx;aura_mouseY=my;
         hoveredEntry=mx>=l && mx<r && my>=t && my<b?getEntryAtPosition(mx,my):null;
 
+        if (!((Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget)
+                && !this.getClass().getName().contains("Keybind")) {
+            if (self.getSelectedOrNull() == null && !self.children().isEmpty()) {
+                self.setSelected(self.children().get(0));
+            }
+            float listX = self.getRowLeft() - 8;
+            float listW = self.getRowWidth() + 16;
+            float listY = t;
+            float listH = b - t;
+            var listBacking = GlassStyles.frame(GlassPreset.PANEL);
+            listBacking.asFill();
+            listBacking.radius = 12;
+            listBacking.tintR = 118f / 255f;
+            listBacking.tintG = 118f / 255f;
+            listBacking.tintB = 128f / 255f;
+            listBacking.tintA = 0.50f;
+            GlassRenderer.draw(listX, listY, listW, listH, listBacking, 1.0f);
+        }
+
         if(renderHeader)GlassRenderer.foreground(aura_header);
         renderList(c,mx,my,delta);
         int max=self.getMaxScroll();
