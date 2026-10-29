@@ -1,6 +1,5 @@
 package net.auramc.glass.client.music;
 
-import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.net.URI;
@@ -24,6 +23,7 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
     private final Path configPath;
     private final HttpClient httpClient;
     private final Thread pollerThread;
+    private final java.util.concurrent.atomic.AtomicLong httpPollCount = new java.util.concurrent.atomic.AtomicLong();
     private volatile boolean running = true;
 
     private volatile BridgeConfig currentConfig;
@@ -58,10 +58,15 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
 
     public static Path resolveDefaultConfigPath() {
         try {
-            return FabricLoader.getInstance().getConfigDir().resolve("aura-music-bridge.json");
+            Class<?> flClass = Class.forName("net.fabricmc.loader.api.FabricLoader");
+            Object instance = flClass.getMethod("getInstance").invoke(null);
+            Object configDir = flClass.getMethod("getConfigDir").invoke(instance);
+            if (configDir instanceof Path p) {
+                return p.resolve("aura-music-bridge.json");
+            }
         } catch (Throwable ignored) {
-            return Path.of("config", "aura-music-bridge.json");
         }
+        return Path.of("config", "aura-music-bridge.json");
     }
 
     @Override
@@ -130,6 +135,7 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
                     .GET()
                     .build();
 
+            httpPollCount.incrementAndGet();
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() == 200) {
                 return MusicJsonParser.parseTrackList(resp.body());
@@ -160,6 +166,7 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
                     .GET()
                     .build();
 
+            httpPollCount.incrementAndGet();
             HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (resp.statusCode() == 200) {
                 NowPlaying parsed = MusicJsonParser.parseNowPlaying(resp.body());
@@ -211,7 +218,10 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
 
             CompletableFuture<Void> future = new CompletableFuture<>();
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.discarding())
-                    .whenComplete((resp, ex) -> future.complete(null));
+                    .whenComplete((resp, ex) -> {
+                        try { pollOnce(); } catch (Throwable ignored) {}
+                        future.complete(null);
+                    });
             return future;
         } catch (Exception ignored) {
             return CompletableFuture.completedFuture(null);
@@ -222,9 +232,15 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
+    public long httpPollCount() {
+        return httpPollCount.get();
+    }
+
     @Override
     public void close() {
         running = false;
+        available = false;
+        cachedNow = NowPlaying.stopped();
         if (pollerThread != null) {
             pollerThread.interrupt();
         }

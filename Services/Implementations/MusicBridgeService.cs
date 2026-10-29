@@ -167,13 +167,13 @@ public class MusicBridgeService : IMusicBridgeService
     {
         lock (_lock)
         {
-            if (_httpListener == null) return;
+            if (_httpListener == null && _activeInstanceDirs.Count == 0) return;
 
             try
             {
                 _listenerCts?.Cancel();
-                _httpListener.Stop();
-                _httpListener.Close();
+                _httpListener?.Stop();
+                _httpListener?.Close();
             }
             catch { }
             finally
@@ -183,6 +183,20 @@ public class MusicBridgeService : IMusicBridgeService
                 _listenerCts = null;
                 _listenerTask = null;
             }
+
+            foreach (var instanceDir in _activeInstanceDirs.ToList())
+            {
+                try
+                {
+                    string filePath = Path.Combine(instanceDir, "config", "aura-music-bridge.json");
+                    if (File.Exists(filePath))
+                    {
+                        File.Delete(filePath);
+                    }
+                }
+                catch { }
+            }
+            _activeInstanceDirs.Clear();
 
             FabricGameLaunchService.LogLauncherEvent("[MUSIC-BRIDGE] Server stopped");
         }
