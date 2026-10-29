@@ -260,7 +260,7 @@ public final class QuickMenuScreen extends Screen {
                 clipTop = viewportTop;
                 clipRight = right - 18;
                 clipBottom = viewportBottom;
-                float rowsY = viewportTop + 6 - scroll + box.sectionOffset(2);
+                float rowsY = viewportTop + 16 - scroll + box.sectionOffset(2);
                 textOpacity = box.sectionOpacity(2);
 
                 if (section == 0) visual(contentX, rowsY, contentW);
@@ -345,7 +345,7 @@ public final class QuickMenuScreen extends Screen {
     private float edgeFade(float itemY, float itemH) {
         if (clipBottom <= clipTop) return 1.0f;
         if (itemY + itemH <= clipTop || itemY >= clipBottom) return 0.0f;
-        float topFade = Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
+        float topFade = scroll <= 0 ? 1.0f : Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
         float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + itemH)) / 16.0f));
         return Math.max(0.0f, Math.min(1.0f, Math.min(topFade, bottomFade)));
     }
