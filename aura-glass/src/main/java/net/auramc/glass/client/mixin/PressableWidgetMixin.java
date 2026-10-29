@@ -30,6 +30,8 @@ public abstract class PressableWidgetMixin extends ClickableWidget {
     private void aura_renderButton(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!net.auramc.glass.client.ui.GlassFrameHooks.styledScreen()) return;
         if ((Object)this instanceof net.minecraft.client.gui.widget.PressableTextWidget) return;
+        String className = this.getClass().getName();
+        if (className.contains("ConfigButton") || className.contains("supplementaries")) return;
         MinecraftClient client = MinecraftClient.getInstance();
         int textColor = AuraUiRenderer.renderButton(context, this, this.isHovered(), this.alpha);
         if ((Object)this instanceof net.minecraft.client.gui.widget.IconButtonWidget || !net.auramc.glass.client.ui.AuraNativeSurfaces.label(context, this, textColor)) {

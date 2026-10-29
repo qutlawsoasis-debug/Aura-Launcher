@@ -58,13 +58,37 @@ jar {
 loom {
     accessWidenerPath = file("src/main/resources/aura-glass.accesswidener")
     runs {
-        client {
+        if (project.hasProperty("aura.karaokeDemo") && project.property("aura.karaokeDemo").toString() == "true") {
+            client {
+                property "aura.karaoke.demo", "true"
+                property "aura.qa.headless", "true"
+                property "aura.qa.versionSuffix", "120"
+                property "aura.qa.proofDir", file("../../frames").absolutePath
+                runDir "../../run/120"
+            }
+        } else if (project.hasProperty("aura.layoutTour") && project.property("aura.layoutTour").toString() == "true") {
+            client {
+                property "aura.qa.headless", "true"
+                property "aura.qa.layoutTour", "true"
+                property "aura.qa.proofDir", file("../../frames-w3e/1.20.1").absolutePath
+                property "aura.qa.versionSuffix", "120"
+            }
+        }
+        karaokeDemo {
             client()
             runDir "../../run/120"
             property "aura.karaoke.demo", "true"
             property "aura.qa.headless", "true"
             property "aura.qa.versionSuffix", "120"
             property "aura.qa.proofDir", file("../../frames").absolutePath
+        }
+        layoutTour {
+            client()
+            runDir "../../run/120"
+            property "aura.qa.headless", "true"
+            property "aura.qa.layoutTour", "true"
+            property "aura.qa.proofDir", file("../../frames-w3e/1.20.1").absolutePath
+            property "aura.qa.versionSuffix", "120"
         }
     }
 }

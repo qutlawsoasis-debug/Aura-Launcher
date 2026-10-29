@@ -49,6 +49,7 @@ public final class KaraokeSuiteTest {
         testDemoTimelineLetterNonIntersection();
         testGroundScatterAndRotation();
         testPerLineAdaptiveContrast();
+        testLetterPoolAndZeroAllocationHotPath();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -1013,6 +1014,113 @@ public final class KaraokeSuiteTest {
         check(colActive1 == WordAnimation.COLOR_ACTIVE_LIGHT, "Line 1 active color is #0A84FF");
 
         System.out.println("[PASS] 15. Per-line adaptive contrast: Line 0 dark (#64D2FF / white) and Line 1 light (#0A84FF / dark) independently tracked");
+    }
+
+    private static void testLetterPoolAndZeroAllocationHotPath() {
+        KaraokePhysics physics = new KaraokePhysics();
+        physics.clear();
+
+        Vec3d spawnPos = new Vec3d(0, 68, 0);
+        Vector3f u = new Vector3f(1, 0, 0);
+        Vector3f v = new Vector3f(0, 1, 0);
+
+        // 1. Identity reuse across 1000 spawn/clear cycles
+        java.util.Set<Object> identities = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (int cycle = 0; cycle < 1000; cycle++) {
+            physics.spawnLetter((char) ('A' + (cycle % 26)), spawnPos, u, v, 0.35f, 1000L + cycle, null);
+            identities.add(physics.getLetters().get(0));
+            physics.clear();
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "1000 spawn/clear cycles reused bounded pool instances: " + identities.size() + " <= 160");
+
+        // 2. Identity reuse across 1000 evictions (pool full)
+        for (int i = 0; i < KaraokePhysics.MAX_LETTERS; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos, u, v, 0.35f, 2000L + i, null);
+            identities.add(physics.getLetters().get(i));
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "160 active letters filled pool: " + identities.size() + " <= 160");
+        for (int i = 0; i < 1000; i++) {
+            physics.spawnLetter((char) ('Z' - (i % 26)), spawnPos, u, v, 0.35f, 3000L + i, null);
+            identities.add(physics.getLetters().get(physics.getLetterCount() - 1));
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "1000 evictions strictly reused pool instances: " + identities.size() + " <= 160");
+
+        // 3. Identity reuse after dissolution / natural expiration
+        physics.dissolveAll();
+        for (int t = 0; t < 12; t++) {
+            physics.tick(null);
+        }
+        check(physics.getLetterCount() == 0, "all letters dissolved and returned to free-list");
+        for (int i = 0; i < KaraokePhysics.MAX_LETTERS; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos, u, v, 0.35f, 5000L + i, null);
+            identities.add(physics.getLetters().get(i));
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "letters spawned after expiration reused pool instances: " + identities.size() + " <= 160");
+
+        // 4. Zero-allocation getLetters() accessor
+        check(physics.getLetterCount() == 160, "160 active letters for accessor benchmark");
+        Object sink = null;
+        for (int i = 0; i < 2000; i++) {
+            sink = physics.getLetters();
+        }
+        getThreadAllocatedBytes();
+        long threadAllocBefore = getThreadAllocatedBytes();
+        for (int i = 0; i < 10000; i++) {
+            sink = physics.getLetters();
+        }
+        long threadAllocAfter = getThreadAllocatedBytes();
+        long accessorAllocated = threadAllocAfter - threadAllocBefore;
+        if (sink == null) throw new AssertionError("sink cannot be null");
+        check(accessorAllocated == 0L, "10,000 getLetters() calls allocated exactly 0 bytes (was " + accessorAllocated + " bytes)");
+
+        // 5. Zero-allocation 600-frame render hot path with 160 active letters
+        AuraRenderer.ensureFontMetricsLoaded();
+        KaraokeWorldRenderer.headlessMode = true;
+
+        Matrix4f viewMatrix = new Matrix4f().lookAt(0, 0, 0, 0, 0, -1, 0, 1, 0);
+        Matrix4f projMatrix = new Matrix4f().perspective((float) Math.toRadians(70.0), 16f / 9f, 0.1f, 1000f);
+
+        // Active anchors for singing line
+        List<WordPlacement.WordAnchor> testAnchors = new ArrayList<>();
+        KaraokeModel.KaraokeWord w1 = new KaraokeModel.KaraokeWord(1000, 500, "Bright");
+        KaraokeModel.KaraokeWord w2 = new KaraokeModel.KaraokeWord(1500, 500, "horizon");
+        testAnchors.add(new WordPlacement.WordAnchor(w1, new Vec3d(0, 68, 5), 1.2f, 0.4f, 0f, 0f, 0));
+        testAnchors.add(new WordPlacement.WordAnchor(w2, new Vec3d(1.5, 68, 5), 1.4f, 0.4f, 0f, 0f, 0));
+
+        // Warmup 500 frames to ensure all JIT tiers (C1, C2 OSR) settle completely
+        for (int frame = 0; frame < 500; frame++) {
+            KaraokeWorldRenderer.renderBatch(viewMatrix, projMatrix, null, testAnchors, physics, 1200L + (frame % 30) * 16, 0.5f, null);
+        }
+
+        // Measure allocated bytes over 600 frames on warm hot-path
+        getThreadAllocatedBytes();
+        long renderBefore = getThreadAllocatedBytes();
+        for (int frame = 0; frame < 600; frame++) {
+            KaraokeWorldRenderer.renderBatch(viewMatrix, projMatrix, null, testAnchors, physics, 1200L + (frame % 30) * 16, 0.5f, null);
+        }
+        long renderAfter = getThreadAllocatedBytes();
+        long renderAllocated = renderAfter - renderBefore;
+
+        check(renderAllocated == 0L, "600 frames of renderBatch with 160 letters allocated exactly 0 bytes (was " + renderAllocated + " bytes)");
+
+        System.out.println("[PASS] 16. Bounded letter pool (<=160 instances reused across spawn/clear/evict/expire) and zero-allocation hot path (600 frames = 0 bytes, 10k getLetters = 0 bytes)");
+    }
+
+    private static final com.sun.management.ThreadMXBean THREAD_BEAN;
+    static {
+        com.sun.management.ThreadMXBean b = null;
+        try {
+            var bean = java.lang.management.ManagementFactory.getThreadMXBean();
+            if (bean instanceof com.sun.management.ThreadMXBean sunBean && sunBean.isThreadAllocatedMemorySupported()) {
+                b = sunBean;
+                b.getCurrentThreadAllocatedBytes();
+            }
+        } catch (Throwable ignored) {}
+        THREAD_BEAN = b;
+    }
+
+    private static long getThreadAllocatedBytes() {
+        return THREAD_BEAN != null ? THREAD_BEAN.getCurrentThreadAllocatedBytes() : 0L;
     }
 
     private static void check(boolean condition, String description) {

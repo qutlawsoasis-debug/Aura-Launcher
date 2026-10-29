@@ -22,7 +22,56 @@ public final class AuraRenderer {
     private static final FloatBuffer MODEL_BUFFER = BufferUtils.createFloatBuffer(16);
     private static final FloatBuffer PROJECTION_BUFFER = BufferUtils.createFloatBuffer(16);
     private static final Glyph[][] GLYPHS = new Glyph[4][65536];
-    private static final java.util.Map<Long, Float> KERNING = new java.util.HashMap<>();
+    private static final PrimitiveKerningMap KERNING = new PrimitiveKerningMap(4096);
+    private static final class PrimitiveKerningMap {
+        private final long[] keys;
+        private final float[] values;
+        private final int mask;
+        private int size = 0;
+
+        PrimitiveKerningMap(int capacity) {
+            int cap = 1;
+            while (cap < capacity * 2) cap <<= 1;
+            keys = new long[cap];
+            values = new float[cap];
+            mask = cap - 1;
+        }
+
+        void clear() {
+            java.util.Arrays.fill(keys, 0L);
+            java.util.Arrays.fill(values, 0.0f);
+            size = 0;
+        }
+
+        void put(long key, float val) {
+            int idx = (int) mix(key) & mask;
+            while (keys[idx] != 0L && keys[idx] != key) {
+                idx = (idx + 1) & mask;
+            }
+            if (keys[idx] == 0L) size++;
+            keys[idx] = key;
+            values[idx] = val;
+        }
+
+        float get(long key) {
+            int idx = (int) mix(key) & mask;
+            while (true) {
+                long k = keys[idx];
+                if (k == key) return values[idx];
+                if (k == 0L) return 0.0f;
+                idx = (idx + 1) & mask;
+            }
+        }
+
+        int size() { return size; }
+        boolean isEmpty() { return size == 0; }
+
+        private static long mix(long z) {
+            z = (z ^ (z >>> 30)) * 0xbf58476d1ce4e5b9L;
+            z = (z ^ (z >>> 27)) * 0x94d049bb133111ebL;
+            return z ^ (z >>> 31);
+        }
+    }
     private static final Matrix4f MODEL = new Matrix4f();
     private static final Matrix4f PROJECTION = new Matrix4f();
     private static final Matrix4f CLIP_CHECK = new Matrix4f();
@@ -230,10 +279,21 @@ public final class AuraRenderer {
         vertex(x - pad, y + h + pad, -pad, h + pad, w, h, radius, 0, -1, color, 0, 0, 0);
     }
 
-    public static boolean hasGlyph(int codePoint) { return ready && codePoint>=0 && codePoint<GLYPHS[0].length && GLYPHS[0][codePoint]!=null; }
-    public static float glyphWidth(int codePoint,float size){return hasGlyph(codePoint)?GLYPHS[0][codePoint].advance*size:0;}
-    public static float glyphWidth(int codePoint,float size,int weight){return hasGlyph(codePoint)?GLYPHS[weightIndex(weight)][codePoint].advance*size:0;}
+    public static char mapChar(char c) {
+        if (c == '−') return '–';
+        if (c == '›') return '>';
+        if (c == '˅' || c == '⌄') return 'v';
+        return c;
+    }
+
+    public static boolean hasGlyph(int codePoint) {
+        codePoint = mapChar((char) codePoint);
+        return ready && codePoint>=0 && codePoint<GLYPHS[0].length && GLYPHS[0][codePoint]!=null;
+    }
+    public static float glyphWidth(int codePoint,float size){return hasGlyph(codePoint)?GLYPHS[0][mapChar((char)codePoint)].advance*size:0;}
+    public static float glyphWidth(int codePoint,float size,int weight){return hasGlyph(codePoint)?GLYPHS[weightIndex(weight)][mapChar((char)codePoint)].advance*size:0;}
     public static void glyph(int codePoint,float x,float y,float size,int color,int weight){
+        codePoint = mapChar((char) codePoint);
         if(!hasGlyph(codePoint))return;
         Glyph g=GLYPHS[weightIndex(weight)][codePoint];
         if(g.visible)quad(x+g.left*size,y+(-ascender+g.top)*size,(g.right-g.left)*size,(g.bottom-g.top)*size,0,0,glyphKind,color,0,g.u0,g.v0,g.u1,g.v1);
@@ -261,15 +321,18 @@ public final class AuraRenderer {
         if (text == null || text.isEmpty()) return 0;
         ensureFontMetricsLoaded();
         float width = 0;
-        int w = weightIndex(weight);
+        int wIdx = weightIndex(weight);
         for (int i = 0; i < text.length(); i++) {
-            char ch = text.charAt(i);
-            Glyph g = GLYPHS[w][ch];
-            if (g != null) {
-                width += g.advance * size;
-                if (i > 0) {
-                    width -= 0.01f * size; // Inter-letter spacing -0.01 em
-                    width += getKerning(text.charAt(i - 1), ch) * size; // Font kerning
+            char rawCh = text.charAt(i);
+            char ch = mapChar(rawCh);
+            if (ch < GLYPHS[wIdx].length) {
+                Glyph g = GLYPHS[wIdx][ch];
+                if (g != null) {
+                    width += g.advance * size;
+                    if (i > 0) {
+                        width -= 0.01f * size; // Inter-letter spacing -0.01 em
+                        width += getKerning(text.charAt(i - 1), rawCh) * size; // Font kerning
+                    }
                 }
             }
         }
@@ -283,8 +346,11 @@ public final class AuraRenderer {
     public static void text(String text, float x, float y, float size, int color, int weight) {
         if (!ready) return;
         float pen = x;
+        int wIdx = weightIndex(weight);
         for (int i = 0; i < text.length(); i++) {
-            Glyph g = GLYPHS[weightIndex(weight)][text.charAt(i)];
+            char ch = mapChar(text.charAt(i));
+            if (ch >= GLYPHS[wIdx].length) continue;
+            Glyph g = GLYPHS[wIdx][ch];
             if (g == null) continue;
             if (g.visible) quad(pen + g.left * size, y + (-ascender + g.top) * size,
                     (g.right - g.left) * size, (g.bottom - g.top) * size,
@@ -369,8 +435,7 @@ public final class AuraRenderer {
         ensureFontMetricsLoaded();
         if (KERNING.isEmpty()) return 0.0f;
         long key = (((long) cp1) << 32) | (((long) cp2) & 0xFFFFFFFFL);
-        Float k = KERNING.get(key);
-        return k != null ? k : 0.0f;
+        return KERNING.get(key);
     }
 
     public static Glyph getGlyph(int weight, int codePoint) {

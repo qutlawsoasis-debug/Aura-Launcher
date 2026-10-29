@@ -18,9 +18,9 @@ public final class QuickMenuConfig {
     public boolean hitParticles, damageNumbers, targetHud, projectilePrediction, hitTint, handTransform, cooldownHud;
     public int hitParticleStyle, hitParticleColor = 0x64D2FF, hitParticleCount = 8, hitTintColor = 0xFF7070, swingAnimation;
     public double handOffsetX, handOffsetY, handOffsetZ, handScale = 1;
-    public boolean karaoke = true, karaokePhysics = true;
-    public double karaokeSize = 1, karaokeDistance = 5, musicVolume = .5;
-    public int karaokeDensity = 1, lyricsOffsetMs;
+    public boolean karaoke = true, karaokePhysics = true, karaokeOnlyStanding = false;
+    public double karaokeSize = 1.0, karaokeDistance = 5, musicVolume = .5;
+    public int karaokeDensity = 1, lyricsOffsetMs = 0, karaokeMaxWords = 4;
 
 
     public static QuickMenuConfig get() { return value; }
@@ -55,8 +55,9 @@ public final class QuickMenuConfig {
         handOffsetX = bounded(handOffsetX,-1,1,0); handOffsetY=bounded(handOffsetY,-1,1,0); handOffsetZ=bounded(handOffsetZ,-1,1,0); handScale=bounded(handScale,.5,1.5,1);
         hitParticleCount=Math.max(1,Math.min(24,hitParticleCount));hitParticleStyle=Math.max(0,Math.min(2,hitParticleStyle));swingAnimation=Math.max(0,Math.min(2,swingAnimation));
         hitParticleColor&=0xFFFFFF;hitTintColor&=0xFFFFFF;
-        karaokeSize=bounded(karaokeSize,.5,2,1);karaokeDistance=bounded(karaokeDistance,3,7,5);musicVolume=bounded(musicVolume,0,1,.5);
+        karaokeSize=bounded(karaokeSize,0.75,1.50,1.0);karaokeDistance=bounded(karaokeDistance,3,7,5);musicVolume=bounded(musicVolume,0,1,.5);
         karaokeDensity=Math.max(0,Math.min(2,karaokeDensity));lyricsOffsetMs=Math.max(-500,Math.min(500,lyricsOffsetMs));
+        karaokeMaxWords=Math.max(1,Math.min(6,karaokeMaxWords));
         particles = Math.max(-1, Math.min(2, particles)); crosshairColor &= 0xFFFFFF; outlineColor &= 0xFFFFFF;
     }
     private static double bounded(double v, double min, double max, double fallback) {

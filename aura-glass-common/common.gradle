@@ -16,6 +16,12 @@ tasks.register('runAutoCompleteTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.ui.AutoCompleteGlassTest'
 }
 
+tasks.register('runGlassLayoutTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.ui.GlassLayoutTest'
+}
+
 tasks.register('runKaraokeTest', JavaExec) {
     dependsOn tasks.named('compileTestJava')
     classpath = sourceSets.test.runtimeClasspath
@@ -28,9 +34,38 @@ tasks.register('runMusicKaraokeIntegrationTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.karaoke.MusicKaraokeIntegrationTest'
 }
 
+tasks.register('runKaraokeSettingsTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.karaoke.KaraokeSettingsTest'
+}
+
+tasks.register('runGlassInvariantsTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.common.render.GlassRenderInvariantsTest'
+}
+
+tasks.register('runQuickMenuMotionTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.quickmenu.QuickMenuMotionTest'
+}
+
+tasks.register('runQuickMenuMusicRegressionTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.quickmenu.music.QuickMenuMusicRegressionTest'
+}
+
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
+    dependsOn 'runGlassLayoutTest'
     dependsOn 'runKaraokeTest'
     dependsOn 'runMusicKaraokeIntegrationTest'
+    dependsOn 'runKaraokeSettingsTest'
+    dependsOn 'runGlassInvariantsTest'
+    dependsOn 'runQuickMenuMotionTest'
+    dependsOn 'runQuickMenuMusicRegressionTest'
 }

@@ -45,6 +45,29 @@ public final class KaraokeWorldRenderer {
     private static final FloatBuffer VERTEX_BUFFER = BufferUtils.createFloatBuffer(MAX_VERTICES * STRIDE);
     private static final FloatBuffer PROJECTION_BUF = BufferUtils.createFloatBuffer(16);
     private static final FloatBuffer MODELVIEW_BUF = BufferUtils.createFloatBuffer(16);
+
+    // Preallocated buffers for zero-allocation rendering hot-path
+    public static boolean headlessMode = false;
+    private static final Vector3f BILLBOARD_U = new Vector3f();
+    private static final Vector3f BILLBOARD_V = new Vector3f();
+    private static final Vector3f ACTIVE_ROT_U = new Vector3f();
+    private static final Vector3f ACTIVE_ROT_V = new Vector3f();
+    private static final Quaternionf SCRATCH_QUAT = new Quaternionf();
+    private static final Vector4f SCRATCH_CAM_PT = new Vector4f();
+    private static final Vector4f SCRATCH_CLIP_PT = new Vector4f();
+    private static final Vector3f SCRATCH_LET_U = new Vector3f();
+    private static final Vector3f SCRATCH_LET_V = new Vector3f();
+    private static final WordPlacement.WordRect[] ACTIVE_RECT_POOL = new WordPlacement.WordRect[32];
+    static {
+        for (int i = 0; i < ACTIVE_RECT_POOL.length; i++) {
+            ACTIVE_RECT_POOL[i] = new WordPlacement.WordRect(0, 0, 0, 0);
+        }
+    }
+    private static int activeRectCount = 0;
+    private static final WordPlacement.WordRect SCRATCH_LETTER_RECT = new WordPlacement.WordRect(0, 0, 0, 0);
+    private static final List<WordPlacement.WordAnchor> LINE0_ANCHORS = new ArrayList<>(16);
+    private static final List<WordPlacement.WordAnchor> LINE1_ANCHORS = new ArrayList<>(16);
+    private static final int[] SAMPLE_POINTS_X = new int[3];
     private static final ByteBuffer SAMPLE_BUF = BufferUtils.createByteBuffer(4 * 4 * 4); // 4x4 RGBA pixels = 64 bytes
 
     private static int program = 0;
@@ -87,7 +110,12 @@ public final class KaraokeWorldRenderer {
         }
     }
 
-    private static final Map<Integer, LineToneState> LINE_TONE_STATES = new ConcurrentHashMap<>();
+    private static final LineToneState[] LINE_TONES = new LineToneState[8];
+    static {
+        for (int i = 0; i < LINE_TONES.length; i++) {
+            LINE_TONES[i] = new LineToneState();
+        }
+    }
 
     // Luminance & adaptive contrast state
     private static Object lastSampledWorld = null;
@@ -106,7 +134,10 @@ public final class KaraokeWorldRenderer {
     }
 
     public static LineToneState getLineTone(int lineIndex) {
-        return LINE_TONE_STATES.computeIfAbsent(lineIndex, k -> new LineToneState());
+        if (lineIndex >= 0 && lineIndex < LINE_TONES.length) {
+            return LINE_TONES[lineIndex];
+        }
+        return LINE_TONES[0];
     }
 
     public static boolean isLightBackground(int lineIndex) {
@@ -200,15 +231,19 @@ public final class KaraokeWorldRenderer {
         lightProgress = 0.0f;
         lastSampledLuminance = 0.0f;
         luminanceSampleCallCount = 0;
-        LINE_TONE_STATES.clear();
+        for (int i = 0; i < LINE_TONES.length; i++) {
+            LINE_TONES[i].isLight = false;
+            LINE_TONES[i].lightProgress = 0.0f;
+            LINE_TONES[i].lastSampledLuma = 0.0f;
+            LINE_TONES[i].lastFrameTimeMs = 0L;
+        }
     }
 
     public static void updateTransition(long nowMs) {
-        for (LineToneState state : LINE_TONE_STATES.values()) {
-            state.updateTransition(nowMs);
+        for (int i = 0; i < LINE_TONES.length; i++) {
+            LINE_TONES[i].updateTransition(nowMs);
         }
-        LineToneState l0 = getLineTone(0);
-        l0.updateTransition(nowMs);
+        LineToneState l0 = LINE_TONES[0];
         lightProgress = l0.lightProgress;
         isLightBackground = l0.isLight;
         lastFrameTimeMs = nowMs;
@@ -307,7 +342,11 @@ public final class KaraokeWorldRenderer {
                                    float tickDelta,
                                    World world) {
         if (!initialized && !failed) {
-            initialize();
+            if (headlessMode) {
+                initialized = true;
+            } else {
+                initialize();
+            }
         }
         if (!initialized || failed) return;
         if (activeAnchors.isEmpty() && (physics == null || physics.getBodyCount() == 0)) return;
@@ -320,11 +359,14 @@ public final class KaraokeWorldRenderer {
         VERTEX_BUFFER.clear();
         vertexCount = 0;
 
-        Vec3d camPos = camera.getPos();
+        Vec3d camPos = camera != null ? camera.getPos() : null;
+        double camX = camPos != null ? camPos.x : 0.0;
+        double camY = camPos != null ? camPos.y : 0.0;
+        double camZ = camPos != null ? camPos.z : 0.0;
 
         // Basis vectors in camera-relative space derived directly from viewMatrix:
-        Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
-        Vector3f billboardV = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
+        BILLBOARD_U.set(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
+        BILLBOARD_V.set(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
 
         int fbWidth = 1920;
         int fbHeight = 1080;
@@ -339,13 +381,13 @@ public final class KaraokeWorldRenderer {
             }
         }
 
-        // Screen bounding rectangles of active singing words
-        List<WordPlacement.WordRect> activeRects = new ArrayList<>();
-        for (WordPlacement.WordAnchor anchor : activeAnchors) {
-            if (anchor.word != null && playbackMs >= anchor.word.t) {
-                WordPlacement.WordRect r = WordPlacement.projectWordToScreen(anchor, viewMatrix, projMatrix, fbWidth, fbHeight, camPos);
-                if (r != null) {
-                    activeRects.add(r);
+        // Screen bounding rectangles of active singing words (zero allocation)
+        activeRectCount = 0;
+        for (int i = 0; i < activeAnchors.size(); i++) {
+            WordPlacement.WordAnchor anchor = activeAnchors.get(i);
+            if (anchor.word != null && playbackMs >= anchor.word.t && activeRectCount < ACTIVE_RECT_POOL.length) {
+                if (WordPlacement.projectWordToScreen(anchor, viewMatrix, projMatrix, fbWidth, fbHeight, camX, camY, camZ, ACTIVE_RECT_POOL[activeRectCount])) {
+                    activeRectCount++;
                 }
             }
         }
@@ -353,22 +395,27 @@ public final class KaraokeWorldRenderer {
         // 1. Emit physical falling letters FIRST (W6d: rendered behind active current line)
         if (physics != null) {
             int sungColor = WordAnimation.getSungWordColor(lightProgress);
+            List<KaraokePhysics.PhysicalLetter> letters = physics.getLetters();
 
-            for (KaraokePhysics.PhysicalLetter pl : physics.getLetters()) {
-                Vec3d interpPos = pl.getInterpolatedPos(tickDelta);
+            for (int li = 0; li < letters.size(); li++) {
+                KaraokePhysics.PhysicalLetter pl = letters.get(li);
+                double interpX = pl.getInterpX(tickDelta);
+                double interpY = pl.getInterpY(tickDelta);
+                double interpZ = pl.getInterpZ(tickDelta);
 
                 // Project falling letter into screen rectangle to check line intersection
-                WordPlacement.WordRect letRect = WordPlacement.projectBoxToScreen(
-                        interpPos,
+                boolean hasRect = WordPlacement.projectBoxToScreen(
+                        interpX, interpY, interpZ,
                         pl.baseSize * 0.5f,
                         pl.baseSize * 0.5f,
-                        viewMatrix, projMatrix, fbWidth, fbHeight, camPos
+                        viewMatrix, projMatrix, fbWidth, fbHeight, camX, camY, camZ,
+                        SCRATCH_LETTER_RECT
                 );
 
                 boolean isIntersecting = false;
-                if (letRect != null && !activeRects.isEmpty()) {
-                    for (WordPlacement.WordRect ar : activeRects) {
-                        if (letRect.intersects(ar)) {
+                if (hasRect && activeRectCount > 0) {
+                    for (int r = 0; r < activeRectCount; r++) {
+                        if (SCRATCH_LETTER_RECT.intersects(ACTIVE_RECT_POOL[r])) {
                             isIntersecting = true;
                             break;
                         }
@@ -381,34 +428,37 @@ public final class KaraokeWorldRenderer {
 
                 int col = WordAnimation.applyAlpha(sungColor, alpha);
 
-                // Letter 3D rotation
-                Quaternionf rot = new Quaternionf()
+                // Letter 3D rotation (reusable quaternion & vectors: zero allocation)
+                SCRATCH_QUAT.identity()
                         .rotateY((float) Math.toRadians(-pl.getInterpolatedYaw(tickDelta)))
                         .rotateX((float) Math.toRadians(pl.getInterpolatedPitch(tickDelta)))
                         .rotateZ((float) Math.toRadians(pl.getInterpolatedRoll(tickDelta)));
 
-                Vector3f letU = new Vector3f(1, 0, 0);
-                Vector3f letV = new Vector3f(0, -1, 0);
-                rot.transform(letU);
-                rot.transform(letV);
+                SCRATCH_LET_U.set(1.0f, 0.0f, 0.0f);
+                SCRATCH_LET_V.set(0.0f, -1.0f, 0.0f);
+                SCRATCH_QUAT.transform(SCRATCH_LET_U);
+                SCRATCH_QUAT.transform(SCRATCH_LET_V);
 
-                emitSingleLetter(pl.ch, interpPos, camPos, letU, letV, col, pl.getScale());
+                emitSingleLetter(pl.ch, interpX, interpY, interpZ, camX, camY, camZ, SCRATCH_LET_U, SCRATCH_LET_V, col, pl.getScale());
             }
 
             // Legacy physical words (if any)
-            for (KaraokePhysics.PhysicalWord pw : physics.getBodies()) {
-                Vec3d interpPos = pw.getInterpolatedPos(tickDelta);
+            List<KaraokePhysics.PhysicalWord> bodies = physics.getBodies();
+            for (int bi = 0; bi < bodies.size(); bi++) {
+                KaraokePhysics.PhysicalWord pw = bodies.get(bi);
+                double interpX = pw.prevX + (pw.x - pw.prevX) * tickDelta;
+                double interpY = pw.prevY + (pw.y - pw.prevY) * tickDelta;
+                double interpZ = pw.prevZ + (pw.z - pw.prevZ) * tickDelta;
                 float alpha = pw.getAlpha();
                 if (alpha <= 0.01f || pw.expired) continue;
                 int col = WordAnimation.applyAlpha(sungColor, alpha);
-                Vector3f pwU = new Vector3f(billboardU);
-                Vector3f pwV = new Vector3f(billboardV);
-                emitString(pw.text, interpPos, camPos, pwU, pwV, col, 10000L, KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE);
+                emitString(pw.text, interpX, interpY, interpZ, camX, camY, camZ, BILLBOARD_U, BILLBOARD_V, col, 10000L, KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE);
             }
         }
 
         // 2. Emit active line letters SECOND (rendered ON TOP of falling letters, zero Z-fighting)
-        for (WordPlacement.WordAnchor anchor : activeAnchors) {
+        for (int ai = 0; ai < activeAnchors.size(); ai++) {
+            WordPlacement.WordAnchor anchor = activeAnchors.get(ai);
             KaraokeModel.KaraokeWord kw = anchor.word;
             if (kw == null || kw.w == null || kw.w.isEmpty()) continue;
 
@@ -445,20 +495,28 @@ public final class KaraokeWorldRenderer {
 
                         if (letAlpha > 0.01f && letScale > 0.001f) {
                             float charCenterOffsetX = penX + adv * 0.5f;
-                            Vec3d letBasePos = anchor.position
-                                    .add(billboardU.x * charCenterOffsetX, 0.0, billboardU.z * charCenterOffsetX)
-                                    .add(billboardV.x * (-yOff), -yOff, billboardV.z * (-yOff));
+                            double letX = anchor.position.x + BILLBOARD_U.x * charCenterOffsetX + BILLBOARD_V.x * (-yOff);
+                            double letY = anchor.position.y - yOff;
+                            double letZ = anchor.position.z + BILLBOARD_U.z * charCenterOffsetX + BILLBOARD_V.z * (-yOff);
 
                             // Rotate U and V by rotZ in billboard plane
                             float radZ = (float) Math.toRadians(rotZ);
                             float cosZ = (float) Math.cos(radZ);
                             float sinZ = (float) Math.sin(radZ);
 
-                            Vector3f rotU = new Vector3f(billboardU).mul(cosZ).add(new Vector3f(billboardV).mul(sinZ));
-                            Vector3f rotV = new Vector3f(billboardU).mul(-sinZ).add(new Vector3f(billboardV).mul(cosZ));
+                            ACTIVE_ROT_U.set(
+                                    BILLBOARD_U.x * cosZ + BILLBOARD_V.x * sinZ,
+                                    BILLBOARD_U.y * cosZ + BILLBOARD_V.y * sinZ,
+                                    BILLBOARD_U.z * cosZ + BILLBOARD_V.z * sinZ
+                            );
+                            ACTIVE_ROT_V.set(
+                                    BILLBOARD_U.x * (-sinZ) + BILLBOARD_V.x * cosZ,
+                                    BILLBOARD_U.y * (-sinZ) + BILLBOARD_V.y * cosZ,
+                                    BILLBOARD_U.z * (-sinZ) + BILLBOARD_V.z * cosZ
+                            );
 
                             int letCol = WordAnimation.applyAlpha(wordColor, letAlpha);
-                            emitSingleLetter(ch, letBasePos, camPos, rotU, rotV, letCol, letScale);
+                            emitSingleLetter(ch, letX, letY, letZ, camX, camY, camZ, ACTIVE_ROT_U, ACTIVE_ROT_V, letCol, letScale);
                         }
                     }
                 }
@@ -467,7 +525,10 @@ public final class KaraokeWorldRenderer {
             }
         }
 
-        if (vertexCount == 0) return;
+        if (vertexCount == 0 || headlessMode || program == 0) {
+            lastRenderTimeMs = (System.nanoTime() - startTime) / 1_000_000.0;
+            return;
+        }
 
         // OpenGL rendering: single draw call
         VERTEX_BUFFER.flip();
@@ -549,12 +610,18 @@ public final class KaraokeWorldRenderer {
 
         // Strict rate limit gate: once per >= 4 game ticks per group (no wall-time bypass)
         if (checkAndTickSampleGate(world, currentTick, nowMs)) {
-            Map<Integer, List<WordPlacement.WordAnchor>> linesMap = new HashMap<>();
-            for (WordPlacement.WordAnchor a : activeAnchors) {
-                linesMap.computeIfAbsent(a.lineIndex, k -> new ArrayList<>()).add(a);
+            LINE0_ANCHORS.clear();
+            LINE1_ANCHORS.clear();
+            for (int i = 0; i < activeAnchors.size(); i++) {
+                WordPlacement.WordAnchor a = activeAnchors.get(i);
+                if (a.lineIndex == 0) {
+                    LINE0_ANCHORS.add(a);
+                } else {
+                    LINE1_ANCHORS.add(a);
+                }
             }
 
-            if (linesMap.isEmpty()) {
+            if (LINE0_ANCHORS.isEmpty() && LINE1_ANCHORS.isEmpty()) {
                 float sampledLuma = sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, Collections.emptyList(), world);
                 LineToneState state = getLineTone(0);
                 state.lastSampledLuma = sampledLuma;
@@ -564,12 +631,19 @@ public final class KaraokeWorldRenderer {
                     state.isLight = false;
                 }
             } else {
-                for (Map.Entry<Integer, List<WordPlacement.WordAnchor>> entry : linesMap.entrySet()) {
-                    int lineIdx = entry.getKey();
-                    List<WordPlacement.WordAnchor> lineAnchors = entry.getValue();
-                    float sampledLuma = sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, lineAnchors, world);
-
-                    LineToneState state = getLineTone(lineIdx);
+                if (!LINE0_ANCHORS.isEmpty()) {
+                    float sampledLuma = sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, LINE0_ANCHORS, world);
+                    LineToneState state = getLineTone(0);
+                    state.lastSampledLuma = sampledLuma;
+                    if (sampledLuma > 0.60f) {
+                        state.isLight = true;
+                    } else if (sampledLuma < 0.50f) {
+                        state.isLight = false;
+                    }
+                }
+                if (!LINE1_ANCHORS.isEmpty()) {
+                    float sampledLuma = sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, LINE1_ANCHORS, world);
+                    LineToneState state = getLineTone(1);
                     state.lastSampledLuma = sampledLuma;
                     if (sampledLuma > 0.60f) {
                         state.isLight = true;
@@ -609,20 +683,19 @@ public final class KaraokeWorldRenderer {
                         int sumY = 0;
                         int projectedCount = 0;
 
-                        for (WordPlacement.WordAnchor a : lineAnchors) {
+                        for (int i = 0; i < lineAnchors.size(); i++) {
+                            WordPlacement.WordAnchor a = lineAnchors.get(i);
                             if (a.position == null) continue;
-                            Vector3f relPos = new Vector3f(
-                                    (float) (a.position.x - camPos.x),
-                                    (float) (a.position.y - camPos.y),
-                                    (float) (a.position.z - camPos.z)
-                            );
-                            Vector4f clip = new Vector4f(relPos.x, relPos.y, relPos.z, 1.0f);
-                            viewMatrix.transform(clip);
-                            projMatrix.transform(clip);
+                            float relX = (float) (a.position.x - camPos.x);
+                            float relY = (float) (a.position.y - camPos.y);
+                            float relZ = (float) (a.position.z - camPos.z);
 
-                            if (clip.w > 0.001f) {
-                                float ndcX = clip.x / clip.w;
-                                float ndcY = clip.y / clip.w;
+                            viewMatrix.transform(relX, relY, relZ, 1.0f, SCRATCH_CAM_PT);
+                            projMatrix.transform(SCRATCH_CAM_PT, SCRATCH_CLIP_PT);
+
+                            if (SCRATCH_CLIP_PT.w > 0.001f) {
+                                float ndcX = SCRATCH_CLIP_PT.x / SCRATCH_CLIP_PT.w;
+                                float ndcY = SCRATCH_CLIP_PT.y / SCRATCH_CLIP_PT.w;
                                 int sx = (int) Math.max(0, Math.min(fbWidth - 4, (ndcX + 1.0f) * 0.5f * fbWidth));
                                 int sy = (int) Math.max(0, Math.min(fbHeight - 4, (ndcY + 1.0f) * 0.5f * fbHeight));
 
@@ -639,12 +712,22 @@ public final class KaraokeWorldRenderer {
                             int leftX = (minX + midX) / 2;
                             int rightX = (midX + maxX) / 2;
 
-                            int[] samplePointsX = (minX == maxX) ? new int[]{midX} : new int[]{leftX, midX, rightX};
+                            int samplePointCount;
+                            if (minX == maxX) {
+                                SAMPLE_POINTS_X[0] = midX;
+                                samplePointCount = 1;
+                            } else {
+                                SAMPLE_POINTS_X[0] = leftX;
+                                SAMPLE_POINTS_X[1] = midX;
+                                SAMPLE_POINTS_X[2] = rightX;
+                                samplePointCount = 3;
+                            }
 
                             float totalLuma = 0.0f;
                             int totalPixels = 0;
 
-                            for (int sampleX : samplePointsX) {
+                            for (int sp = 0; sp < samplePointCount; sp++) {
+                                int sampleX = SAMPLE_POINTS_X[sp];
                                 int clampedX = Math.max(0, Math.min(fbWidth - 4, sampleX));
                                 int clampedY = Math.max(0, Math.min(fbHeight - 4, avgY));
 
@@ -690,17 +773,16 @@ public final class KaraokeWorldRenderer {
         return 0.2f;
     }
 
-    private static void emitSingleLetter(char ch, Vec3d worldPos, Vec3d camPos,
+    private static void emitSingleLetter(char ch, double worldX, double worldY, double worldZ,
+                                         double camX, double camY, double camZ,
                                          Vector3f U, Vector3f V,
                                          int color, float scale) {
         var glyph = AuraRenderer.getGlyph(700, ch);
         if (glyph == null || !glyph.visible) return;
 
-        Vector3f D = new Vector3f(
-                (float) (worldPos.x - camPos.x),
-                (float) (worldPos.y - camPos.y),
-                (float) (worldPos.z - camPos.z)
-        );
+        float dx = (float) (worldX - camX);
+        float dy = (float) (worldY - camY);
+        float dz = (float) (worldZ - camZ);
 
         float distRange = AuraRenderer.distanceRange();
         float ascender = AuraRenderer.fontAscender();
@@ -712,22 +794,21 @@ public final class KaraokeWorldRenderer {
         float ly0 = (-ascender + glyph.top) * scale - verticalCenterOffset;
         float ly1 = (-ascender + glyph.bottom) * scale - verticalCenterOffset;
 
-        emitQuad(D, U, V, lx0, ly0, lx1, ly1,
+        emitQuad(dx, dy, dz, U, V, lx0, ly0, lx1, ly1,
                 glyph.u0, glyph.v0, glyph.u1, glyph.v1,
                 glyph.u0, glyph.v0, glyph.u1, glyph.v1,
                 color, 0, distRange);
     }
 
-    private static void emitString(String text, Vec3d worldPos, Vec3d camPos,
+    private static void emitString(String text, double worldX, double worldY, double worldZ,
+                                   double camX, double camY, double camZ,
                                    Vector3f U, Vector3f V,
                                    int color, long wordElapsedMs, float scale) {
         if (text == null || text.isEmpty()) return;
 
-        Vector3f D = new Vector3f(
-                (float) (worldPos.x - camPos.x),
-                (float) (worldPos.y - camPos.y),
-                (float) (worldPos.z - camPos.z)
-        );
+        float dx = (float) (worldX - camX);
+        float dy = (float) (worldY - camY);
+        float dz = (float) (worldZ - camZ);
 
         float totalW = AuraRenderer.textWidth(text, scale, 700);
         float penX = -totalW * 0.5f;
@@ -754,7 +835,7 @@ public final class KaraokeWorldRenderer {
                 float ly0 = (-ascender + glyph.top) * scale - verticalCenterOffset;
                 float ly1 = (-ascender + glyph.bottom) * scale - verticalCenterOffset;
 
-                emitQuad(D, U, V, lx0, ly0, lx1, ly1,
+                emitQuad(dx, dy, dz, U, V, lx0, ly0, lx1, ly1,
                         glyph.u0, glyph.v0, glyph.u1, glyph.v1,
                         glyph.u0, glyph.v0, glyph.u1, glyph.v1,
                         color, 0, distRange);
@@ -764,32 +845,44 @@ public final class KaraokeWorldRenderer {
         }
     }
 
-    private static void emitQuad(Vector3f D, Vector3f U, Vector3f V,
+    private static void emitQuad(float dx, float dy, float dz, Vector3f U, Vector3f V,
                                  float lx0, float ly0, float lx1, float ly1,
                                  float u0, float v0, float u1, float v1,
                                  float bu0, float bv0, float bu1, float bv1,
                                  int color, int outline, float distRange) {
         if (vertexCount + 6 > MAX_VERTICES) return;
 
-        Vector3f p0 = new Vector3f(D).add(new Vector3f(U).mul(lx0)).add(new Vector3f(V).mul(ly0));
-        Vector3f p1 = new Vector3f(D).add(new Vector3f(U).mul(lx1)).add(new Vector3f(V).mul(ly0));
-        Vector3f p2 = new Vector3f(D).add(new Vector3f(U).mul(lx1)).add(new Vector3f(V).mul(ly1));
-        Vector3f p3 = new Vector3f(D).add(new Vector3f(U).mul(lx0)).add(new Vector3f(V).mul(ly1));
+        // Scalar corner positions (zero Vector3f allocation per quad)
+        float p0x = dx + U.x * lx0 + V.x * ly0;
+        float p0y = dy + U.y * lx0 + V.y * ly0;
+        float p0z = dz + U.z * lx0 + V.z * ly0;
+
+        float p1x = dx + U.x * lx1 + V.x * ly0;
+        float p1y = dy + U.y * lx1 + V.y * ly0;
+        float p1z = dz + U.z * lx1 + V.z * ly0;
+
+        float p2x = dx + U.x * lx1 + V.x * ly1;
+        float p2y = dy + U.y * lx1 + V.y * ly1;
+        float p2z = dz + U.z * lx1 + V.z * ly1;
+
+        float p3x = dx + U.x * lx0 + V.x * ly1;
+        float p3y = dy + U.y * lx0 + V.y * ly1;
+        float p3z = dz + U.z * lx0 + V.z * ly1;
 
         // Triangle 1
-        putVertex(p0, u0, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
-        putVertex(p1, u1, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
-        putVertex(p2, u1, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p0x, p0y, p0z, u0, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p1x, p1y, p1z, u1, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p2x, p2y, p2z, u1, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
 
         // Triangle 2
-        putVertex(p0, u0, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
-        putVertex(p2, u1, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
-        putVertex(p3, u0, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p0x, p0y, p0z, u0, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p2x, p2y, p2z, u1, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p3x, p3y, p3z, u0, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
     }
 
-    private static void putVertex(Vector3f pos, float u, float v, int col, int outline, float distRange,
+    private static void putVertex(float px, float py, float pz, float u, float v, int col, int outline, float distRange,
                                   float bu0, float bv0, float bu1, float bv1) {
-        VERTEX_BUFFER.put(pos.x).put(pos.y).put(pos.z);
+        VERTEX_BUFFER.put(px).put(py).put(pz);
         VERTEX_BUFFER.put(u).put(v);
 
         // Color RGBA

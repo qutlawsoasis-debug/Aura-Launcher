@@ -35,19 +35,25 @@ public final class PlayerAdaptiveness {
         public final int minGroup;
         public final int maxGroup;
         public final float gazeAngleFactor; // 1.0 = normal (4-12°), 0.6 = closer to gaze
+        public final boolean onlyStandingSuppressed;
 
         public EvaluationResult(ActivityState state, boolean canSpawn, int minGroup, int maxGroup, float gazeAngleFactor) {
+            this(state, canSpawn, minGroup, maxGroup, gazeAngleFactor, false);
+        }
+
+        public EvaluationResult(ActivityState state, boolean canSpawn, int minGroup, int maxGroup, float gazeAngleFactor, boolean onlyStandingSuppressed) {
             this.state = state;
             this.canSpawn = canSpawn;
             this.minGroup = minGroup;
             this.maxGroup = maxGroup;
             this.gazeAngleFactor = gazeAngleFactor;
+            this.onlyStandingSuppressed = onlyStandingSuppressed;
         }
 
         @Override
         public String toString() {
-            return String.format("%s (canSpawn=%b, range=%d..%d, gazeFactor=%.2f)",
-                    state, canSpawn, minGroup, maxGroup, gazeAngleFactor);
+            return String.format("%s (canSpawn=%b, range=%d..%d, gazeFactor=%.2f, onlyStandingSuppressed=%b)",
+                    state, canSpawn, minGroup, maxGroup, gazeAngleFactor, onlyStandingSuppressed);
         }
     }
 
@@ -185,25 +191,25 @@ public final class PlayerAdaptiveness {
 
         // Priority 3: Flying or falling (1 word)
         if (isFlying || isFalling) {
-            currentResult = new EvaluationResult(ActivityState.FLYING_FALLING, true, 1, 1, 1.0f);
+            currentResult = applyOnlyStanding(new EvaluationResult(ActivityState.FLYING_FALLING, true, 1, 1, 1.0f));
             return;
         }
 
         // Priority 4: Fast turning (> 90°/s -> 1–2 words, closer to gaze center)
         if (smoothedTurnRate > 90.0) {
-            currentResult = new EvaluationResult(ActivityState.FAST_TURN, true, 1, 2, 0.60f);
+            currentResult = applyOnlyStanding(new EvaluationResult(ActivityState.FAST_TURN, true, 1, 2, 0.60f));
             return;
         }
 
         // Priority 5: Running / sprinting / jumping (1–2 words)
         if (isSprinting || isJumping || smoothedSpeed >= 0.22) {
-            currentResult = new EvaluationResult(ActivityState.RUNNING_JUMPING, true, 1, 2, 1.0f);
+            currentResult = applyOnlyStanding(new EvaluationResult(ActivityState.RUNNING_JUMPING, true, 1, 2, 1.0f));
             return;
         }
 
         // Priority 6: Walking (speed >= 0.05 blocks/tick -> 2–3 words)
         if (smoothedSpeed >= 0.05) {
-            currentResult = new EvaluationResult(ActivityState.WALKING, true, 2, 3, 1.0f);
+            currentResult = applyOnlyStanding(new EvaluationResult(ActivityState.WALKING, true, 2, 3, 1.0f));
             return;
         }
 
@@ -211,20 +217,28 @@ public final class PlayerAdaptiveness {
         currentResult = new EvaluationResult(ActivityState.STANDING, true, 3, 6, 1.0f);
     }
 
+    private EvaluationResult applyOnlyStanding(EvaluationResult candidate) {
+        if (KaraokeConfig.get().isOnlyStanding()) {
+            return new EvaluationResult(candidate.state, false, 0, 0, candidate.gazeAngleFactor, true);
+        }
+        return candidate;
+    }
+
     public EvaluationResult getCurrentResult() {
         return currentResult;
     }
 
     public int clampGroupSize(int desiredWords) {
-        if (!currentResult.canSpawn) return 0;
-        int min = currentResult.minGroup;
-        int max = currentResult.maxGroup;
+        if (!currentResult.canSpawn || desiredWords <= 0) return 0;
+        int configuredMax = KaraokeConfig.get().getMaxWords();
+        int min = Math.min(currentResult.minGroup, configuredMax);
+        int max = Math.min(currentResult.maxGroup, configuredMax);
         // Density modifier
         float mult = KaraokeConfig.get().getDensity().wordGroupMultiplier;
-        max = Math.max(min, Math.round(max * mult));
-        // Comfort limit: in standing state support full phrases up to 8 words; in motion clamp to 4
-        int limit = (currentResult.state == ActivityState.STANDING) ? 8 : Math.min(max, 4);
-        return Math.max(min, Math.min(limit, desiredWords));
+        max = Math.min(configuredMax, Math.max(min, Math.round(max * mult)));
+        // Comfort limit: in standing state support full phrases up to configuredMax (up to 8 words); in motion clamp to 4
+        int limit = (currentResult.state == ActivityState.STANDING) ? Math.min(configuredMax, 8) : Math.min(max, 4);
+        return Math.max(1, Math.max(min, Math.min(limit, desiredWords)));
     }
 
     private static float wrapDegrees(float deg) {

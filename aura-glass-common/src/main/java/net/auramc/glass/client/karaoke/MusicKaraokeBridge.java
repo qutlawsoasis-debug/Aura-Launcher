@@ -151,7 +151,7 @@ public final class MusicKaraokeBridge implements AutoCloseable {
         // 1. Check for epoch change (seek / track change / resync)
         if (lastEpoch >= 0 && currentEpoch != lastEpoch) {
             // epoch increased -> reset shown and flying words
-            long currentPos = clock.positionMs(nowTimeMs);
+            long currentPos = clock.positionMs(nowTimeMs) + KaraokeConfig.get().getTimingOffsetMs();
             engine.seekTo(currentPos);
         }
         lastEpoch = currentEpoch;

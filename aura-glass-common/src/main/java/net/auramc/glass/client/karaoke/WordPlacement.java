@@ -84,12 +84,19 @@ public final class WordPlacement {
     }
 
     public static final class WordRect {
-        public final double xMin;
-        public final double xMax;
-        public final double yMin;
-        public final double yMax;
+        public double xMin;
+        public double xMax;
+        public double yMin;
+        public double yMax;
 
         public WordRect(double xMin, double xMax, double yMin, double yMax) {
+            this.xMin = xMin;
+            this.xMax = xMax;
+            this.yMin = yMin;
+            this.yMax = yMax;
+        }
+
+        public void set(double xMin, double xMax, double yMin, double yMax) {
             this.xMin = xMin;
             this.xMax = xMax;
             this.yMin = yMin;
@@ -504,106 +511,107 @@ public final class WordPlacement {
     /**
      * Projects a word billboard into screen-space 2D bounding rectangle [xMin..xMax, yMin..yMax].
      */
-    public static WordRect projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
-        // Basis vectors in camera-relative world space:
-        // viewMatrix * U == (1, 0, 0) [Screen RIGHT] (Row 0 of viewMatrix: m00, m10, m20)
-        // viewMatrix * V == (0, -1, 0) [Screen DOWN] (-Row 1 of viewMatrix: -m01, -m11, -m21)
-        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
-        Vector3f V = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
+    private static final Vector4f SCRATCH_CAM_PT = new Vector4f();
+    private static final Vector4f SCRATCH_CLIP_PT = new Vector4f();
+
+    public static boolean projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, double camX, double camY, double camZ, WordRect dest) {
+        if (anchor == null || anchor.position == null || viewMatrix == null || projMatrix == null || dest == null) return false;
+
+        float uX = viewMatrix.m00();
+        float uY = viewMatrix.m10();
+        float uZ = viewMatrix.m20();
+
+        float vX = -viewMatrix.m01();
+        float vY = -viewMatrix.m11();
+        float vZ = -viewMatrix.m21();
 
         float halfW = anchor.width * 0.5f;
         float fullH = anchor.height > 0.01f ? anchor.height : (BASE_FONT_SCALE * FONT_LINE_HEIGHT_EM);
         float halfH = fullH * 0.5f;
 
-        Vec3d center = anchor.position;
-        Vector3f relCenter = new Vector3f(
-                (float) (center.x - camPos.x),
-                (float) (center.y - camPos.y),
-                (float) (center.z - camPos.z)
-        );
+        float relX = (float) (anchor.position.x - camX);
+        float relY = (float) (anchor.position.y - camY);
+        float relZ = (float) (anchor.position.z - camZ);
 
-        float[] dxs = new float[]{-halfW, halfW, halfW, -halfW};
-        float[] dys = new float[]{-halfH, -halfH, halfH, halfH};
-
-        double minX = Double.POSITIVE_INFINITY;
-        double maxX = Double.NEGATIVE_INFINITY;
-        double minY = Double.POSITIVE_INFINITY;
-        double maxY = Double.NEGATIVE_INFINITY;
-
-        for (int i = 0; i < 4; i++) {
-            Vector3f worldPt = new Vector3f(relCenter)
-                    .add(new Vector3f(U).mul(dxs[i]))
-                    .add(new Vector3f(V).mul(dys[i]));
-
-            Vector4f camPt = new Vector4f(worldPt.x, worldPt.y, worldPt.z, 1.0f);
-            viewMatrix.transform(camPt);
-
-            Vector4f clipPt = new Vector4f(camPt);
-            projMatrix.transform(clipPt);
-
-            if (clipPt.w <= 0.001f) continue;
-            float ndcX = clipPt.x / clipPt.w;
-            float ndcY = clipPt.y / clipPt.w;
-
-            double sx = (ndcX + 1.0) * 0.5 * screenWidth;
-            double sy = (1.0 - ndcY) * 0.5 * screenHeight;
-
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx);
-            minY = Math.min(minY, sy);
-            maxY = Math.max(maxY, sy);
-        }
-
-        return new WordRect(minX, maxX, minY, maxY);
+        return projectQuadToScreen(relX, relY, relZ, uX, uY, uZ, vX, vY, vZ, halfW, halfH, viewMatrix, projMatrix, screenWidth, screenHeight, dest);
     }
 
-    public static WordRect projectBoxToScreen(Vec3d center, float halfWidth, float halfHeight, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
-        if (center == null || viewMatrix == null || projMatrix == null || camPos == null) return null;
-        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
-        Vector3f V = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
+    public static boolean projectBoxToScreen(double cx, double cy, double cz, float halfWidth, float halfHeight, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, double camX, double camY, double camZ, WordRect dest) {
+        if (viewMatrix == null || projMatrix == null || dest == null) return false;
 
-        Vector3f relCenter = new Vector3f(
-                (float) (center.x - camPos.x),
-                (float) (center.y - camPos.y),
-                (float) (center.z - camPos.z)
-        );
+        float uX = viewMatrix.m00();
+        float uY = viewMatrix.m10();
+        float uZ = viewMatrix.m20();
 
-        float[] dxs = new float[]{-halfWidth, halfWidth, halfWidth, -halfWidth};
-        float[] dys = new float[]{-halfHeight, -halfHeight, halfHeight, halfHeight};
+        float vX = -viewMatrix.m01();
+        float vY = -viewMatrix.m11();
+        float vZ = -viewMatrix.m21();
 
+        float relX = (float) (cx - camX);
+        float relY = (float) (cy - camY);
+        float relZ = (float) (cz - camZ);
+
+        return projectQuadToScreen(relX, relY, relZ, uX, uY, uZ, vX, vY, vZ, halfWidth, halfHeight, viewMatrix, projMatrix, screenWidth, screenHeight, dest);
+    }
+
+    private static boolean projectQuadToScreen(float relX, float relY, float relZ,
+                                               float uX, float uY, float uZ,
+                                               float vX, float vY, float vZ,
+                                               float halfW, float halfH,
+                                               Matrix4f viewMatrix, Matrix4f projMatrix,
+                                               int screenWidth, int screenHeight,
+                                               WordRect dest) {
         double minX = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY;
         double minY = Double.POSITIVE_INFINITY;
         double maxY = Double.NEGATIVE_INFINITY;
-
         int valid = 0;
+
         for (int i = 0; i < 4; i++) {
-            Vector3f worldPt = new Vector3f(relCenter)
-                    .add(new Vector3f(U).mul(dxs[i]))
-                    .add(new Vector3f(V).mul(dys[i]));
+            float dx = (i == 0 || i == 3) ? -halfW : halfW;
+            float dy = (i == 0 || i == 1) ? -halfH : halfH;
 
-            Vector4f camPt = new Vector4f(worldPt.x, worldPt.y, worldPt.z, 1.0f);
-            viewMatrix.transform(camPt);
+            float wX = relX + uX * dx + vX * dy;
+            float wY = relY + uY * dx + vY * dy;
+            float wZ = relZ + uZ * dx + vZ * dy;
 
-            Vector4f clipPt = new Vector4f(camPt);
-            projMatrix.transform(clipPt);
+            viewMatrix.transform(wX, wY, wZ, 1.0f, SCRATCH_CAM_PT);
+            projMatrix.transform(SCRATCH_CAM_PT, SCRATCH_CLIP_PT);
 
-            if (clipPt.w <= 0.001f) continue;
-            float ndcX = clipPt.x / clipPt.w;
-            float ndcY = clipPt.y / clipPt.w;
+            if (SCRATCH_CLIP_PT.w <= 0.001f) continue;
+            float ndcX = SCRATCH_CLIP_PT.x / SCRATCH_CLIP_PT.w;
+            float ndcY = SCRATCH_CLIP_PT.y / SCRATCH_CLIP_PT.w;
 
             double sx = (ndcX + 1.0) * 0.5 * screenWidth;
             double sy = (1.0 - ndcY) * 0.5 * screenHeight;
 
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx);
-            minY = Math.min(minY, sy);
-            maxY = Math.max(maxY, sy);
+            if (sx < minX) minX = sx;
+            if (sx > maxX) maxX = sx;
+            if (sy < minY) minY = sy;
+            if (sy > maxY) maxY = sy;
             valid++;
         }
 
-        if (valid == 0) return null;
-        return new WordRect(minX, maxX, minY, maxY);
+        if (valid == 0) return false;
+        dest.set(minX, maxX, minY, maxY);
+        return true;
+    }
+
+    public static WordRect projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
+        WordRect r = new WordRect(0, 0, 0, 0);
+        if (projectWordToScreen(anchor, viewMatrix, projMatrix, screenWidth, screenHeight, camPos != null ? camPos.x : 0, camPos != null ? camPos.y : 0, camPos != null ? camPos.z : 0, r)) {
+            return r;
+        }
+        return null;
+    }
+
+    public static WordRect projectBoxToScreen(Vec3d center, float halfWidth, float halfHeight, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
+        if (center == null) return null;
+        WordRect r = new WordRect(0, 0, 0, 0);
+        if (projectBoxToScreen(center.x, center.y, center.z, halfWidth, halfHeight, viewMatrix, projMatrix, screenWidth, screenHeight, camPos != null ? camPos.x : 0, camPos != null ? camPos.y : 0, camPos != null ? camPos.z : 0, r)) {
+            return r;
+        }
+        return null;
     }
 
     public static float estimateWordWidth(String text) {

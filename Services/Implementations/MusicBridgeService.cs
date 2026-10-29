@@ -48,6 +48,7 @@ public class MusicBridgeService : IMusicBridgeService
     private readonly HttpClient _httpClient;
     private readonly object _lock = new();
     private readonly HashSet<string> _activeInstanceDirs = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Action<string> _logger;
 
     private HttpListener? _httpListener;
     private CancellationTokenSource? _listenerCts;
@@ -88,7 +89,8 @@ public class MusicBridgeService : IMusicBridgeService
         IEmbedMusicPlayer? embedPlayer = null,
         HttpClient? httpClient = null,
         int port = 0,
-        string? token = null)
+        string? token = null,
+        Action<string>? logger = null)
     {
         _audioService = audioService ?? throw new ArgumentNullException(nameof(audioService));
         _lobbyApiClient = lobbyApiClient;
@@ -97,6 +99,7 @@ public class MusicBridgeService : IMusicBridgeService
 
         _port = port;
         _token = token ?? GenerateSecureToken();
+        _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
     }
 
     private static string GenerateSecureToken()
@@ -147,14 +150,14 @@ public class MusicBridgeService : IMusicBridgeService
                     _listenerCts = new CancellationTokenSource();
                     _listenerTask = Task.Run(() => ListenLoopAsync(_listenerCts.Token));
 
-                    FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE] Server started on 127.0.0.1:{_port}");
+                    _logger($"[MUSIC-BRIDGE] Server started on 127.0.0.1:{_port}");
                     return;
                 }
                 catch (Exception ex)
                 {
                     _httpListener?.Close();
                     _httpListener = null;
-                    FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE: WARN] Port {_port} busy, retrying: {ex.Message}");
+                    _logger($"[MUSIC-BRIDGE: WARN] Port {_port} busy, retrying: {ex.Message}");
                     _port = 0; // Choose new port on next attempt
                 }
             }
@@ -167,13 +170,13 @@ public class MusicBridgeService : IMusicBridgeService
     {
         lock (_lock)
         {
-            if (_httpListener == null) return;
+            if (_httpListener == null && _activeInstanceDirs.Count == 0) return;
 
             try
             {
                 _listenerCts?.Cancel();
-                _httpListener.Stop();
-                _httpListener.Close();
+                _httpListener?.Stop();
+                _httpListener?.Close();
             }
             catch { }
             finally
@@ -184,7 +187,21 @@ public class MusicBridgeService : IMusicBridgeService
                 _listenerTask = null;
             }
 
-            FabricGameLaunchService.LogLauncherEvent("[MUSIC-BRIDGE] Server stopped");
+            foreach (var instanceDir in _activeInstanceDirs.ToList())
+            {
+                try
+                {
+                    string filePath = Path.Combine(instanceDir, "config", "aura-music-bridge.json");
+                    if (File.Exists(filePath))
+                    {
+                        File.Delete(filePath);
+                    }
+                }
+                catch { }
+            }
+            _activeInstanceDirs.Clear();
+
+            _logger("[MUSIC-BRIDGE] Server stopped");
         }
     }
 
@@ -213,11 +230,11 @@ public class MusicBridgeService : IMusicBridgeService
                 _activeInstanceDirs.Add(instanceDir);
             }
 
-            FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE] Written bridge config to {filePath}");
+            _logger($"[MUSIC-BRIDGE] Written bridge config to {filePath}");
         }
         catch (Exception ex)
         {
-            FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE: ERROR] Failed to write bridge config: {ex.Message}");
+            _logger($"[MUSIC-BRIDGE: ERROR] Failed to write bridge config: {ex.Message}");
         }
     }
 
@@ -231,12 +248,12 @@ public class MusicBridgeService : IMusicBridgeService
             if (File.Exists(filePath))
             {
                 File.Delete(filePath);
-                FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE] Deleted bridge config {filePath}");
+                _logger($"[MUSIC-BRIDGE] Deleted bridge config {filePath}");
             }
         }
         catch (Exception ex)
         {
-            FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE: ERROR] Failed to delete bridge config: {ex.Message}");
+            _logger($"[MUSIC-BRIDGE: ERROR] Failed to delete bridge config: {ex.Message}");
         }
         finally
         {
@@ -349,7 +366,7 @@ public class MusicBridgeService : IMusicBridgeService
             catch (Exception ex)
             {
                 if (ct.IsCancellationRequested || !IsRunning) break;
-                FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE: ERROR] Accept loop error: {ex.Message}");
+                _logger($"[MUSIC-BRIDGE: ERROR] Accept loop error: {ex.Message}");
                 continue;
             }
 
@@ -779,7 +796,7 @@ public class MusicBridgeService : IMusicBridgeService
             }
             catch (Exception ex)
             {
-                FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE: WARN] Search catalog parse failed: {ex.Message}");
+                _logger($"[MUSIC-BRIDGE: WARN] Search catalog parse failed: {ex.Message}");
             }
         }
 
