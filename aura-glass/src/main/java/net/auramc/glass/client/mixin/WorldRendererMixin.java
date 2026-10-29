@@ -31,6 +31,6 @@ public abstract class WorldRendererMixin {
                 .rotationX((float) Math.toRadians(camera.getPitch()))
                 .rotationY((float) Math.toRadians(camera.getYaw() + 180.0f));
         Matrix4f proj = projectionMatrix != null ? projectionMatrix : RenderSystem.getProjectionMatrix();
-        KaraokeEngine.getInstance().render(viewMatrix, proj, camera, tickDelta);
+        KaraokeEngine.getInstance().render(viewMatrix, proj, camera, tickDelta); net.auramc.glass.client.quickmenu.MaxFpsBenchmarkRunner.onWorldRenderFrame(net.minecraft.client.MinecraftClient.getInstance());
     }
 }

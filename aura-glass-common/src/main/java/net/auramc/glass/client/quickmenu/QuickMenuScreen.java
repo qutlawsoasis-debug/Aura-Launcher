@@ -400,7 +400,7 @@ public final class QuickMenuScreen extends Screen {
     private int maxScroll(float viewportH) {
         float contentH;
         if (section == 0) {
-            contentH = 29 * 38 + 24;
+            contentH = 30 * 38 + 46 + 24;
         } else if (section == 1) {
             contentH = 3 * 44 + 80;
         } else if (section == 2) {
@@ -423,7 +423,8 @@ public final class QuickMenuScreen extends Screen {
 
     private void visual(float x, float y, float w) {
         var c = QuickMenuConfig.get();
-        toggle(x, y, w, "Zoom · удерживать C", () -> c.zoomEnabled, v -> c.zoomEnabled = v);
+        maxFpsToggle(x, y, w);
+        toggle(x, y += 46, w, "Zoom · удерживать C", () -> c.zoomEnabled, v -> c.zoomEnabled = v);
         slider(x, y += 38, w, "Кратность", c.zoomFactor, 1, 16, v -> c.zoomFactor = v, v -> String.format(Locale.ROOT, "%.1f×", v));
         toggle(x, y += 38, w, "Fullbright", () -> c.fullbright, v -> c.fullbright = v);
         slider(x, y += 38, w, "Яркость", c.brightness, 0, 1, v -> c.brightness = v, v -> Math.round(v * 100) + " %");
@@ -876,6 +877,21 @@ public final class QuickMenuScreen extends Screen {
         int end = text.length();
         while (end > 0 && AuraRenderer.textWidth(text.substring(0, end) + "…", size) > width) end--;
         return text.substring(0, end) + "…";
+    }
+
+    private void maxFpsToggle(float x, float y, float w) {
+        float rowFade = edgeFade(y, 44);
+        if (rowFade <= 0.01f) return;
+        boolean on = QuickMenuMaxFps.isEnabled();
+        int textColor = on ? 0xEBFFFFFF : 0x73FFFFFF;
+        text("Максимум FPS", x, y + 4, 18, textColor, 500, rowFade);
+        text("Выключает тяжёлые эффекты. Повторное нажатие вернёт как было.", x, y + 25, 13, 0x8CFFFFFF, 400, rowFade);
+        rect(x, y + 43, w, 1, 0, 0x16767680, 0, rowFade);
+        rect(x + w - 44, y + 7, 42, 23, 11.5f, on ? ACCENT : 0x80767680, 0x1AFFFFFF, rowFade);
+        rect(x + w - (on ? 22 : 40), y + 10, 17, 17, 8.5f, on ? ACCENT_TEXT : 0xFFFFFFFF, 0, rowFade);
+        controls.add(new Control(x, y, w, 44, "Максимум FPS", () -> {
+            QuickMenuMaxFps.toggle();
+        }, null));
     }
 
     private void toggle(float x, float y, float w, String label, BooleanSupplier get, Consumer<Boolean> set) {
