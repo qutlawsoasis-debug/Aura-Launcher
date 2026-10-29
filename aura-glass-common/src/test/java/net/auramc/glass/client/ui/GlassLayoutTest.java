@@ -68,6 +68,9 @@ public final class GlassLayoutTest {
         testRequirement9_TitleScreenMonochromeIcons();
         System.out.println("9. Title screen language/accessibility icons (white 0.92, size 16 GUI): PASS");
 
+        testRequirement10_AppleSegmentedControl();
+        System.out.println("10. Apple HIG Segmented Control (h=32px, r=h/2, thumb 2px pad, spring 0.3s/0.82, stretch +8%, text colors): PASS");
+
         System.out.println("=== All Glass Screen Layout tests PASSED successfully! ===");
     }
 
@@ -341,5 +344,45 @@ public final class GlassLayoutTest {
 
         assertEquals(16.0f, iconSize, 0.001f, "Icon size is 16 GUI");
         assertEquals(0xEBFFFFFF, iconColor, "Icon color is 0xEBFFFFFF (white 0.92)");
+    }
+    // 10. Вкладки как сегмент-контрол Apple (Задача 7):
+    // Контейнер: rgba(118,118,128,0.24), h=32px (16 GUI @ scale 2), r=h/2.
+    // Thumb: margin 2px, r=(h-4)/2, тёмный rgba(255,255,255,0.18), светлый белый 0.90 + тень 0 1 3 rgba(0,0,0,0.12).
+    // Пружина: response 0.3s, damping 0.82; растяжение до +8% в середине перелёта; сжатие 0.96 при зажатии.
+    // Текст: 14 px medium 0.60 / semibold 0.95 с плавным переходом 150 мс.
+    private static void testRequirement10_AppleSegmentedControl() {
+        float containerH = TabSegmentControl.computeContainerHeight(1080, 2.0f);
+        assertEquals(16.0f, containerH, 0.001f, "Container height at 1080p scale 2 must be 16 GUI (32 physical px)");
+
+        float thumbH = TabSegmentControl.computeThumbHeight(containerH, 2.0f);
+        assertEquals(14.0f, thumbH, 0.001f, "Thumb height must be 14 GUI (28 physical px, 2px margin from top and bottom)");
+        assertEquals(7.0f, thumbH * 0.5f, 0.001f, "Thumb radius must be (height - 4) / 2 = 14 px (7 GUI)");
+
+        // Stretch test
+        float restStretch = TabSegmentControl.computeStretchFactor(100f, 100f, 200f);
+        assertEquals(1.00f, restStretch, 0.001f, "Stretch at start must be 1.0 (0% stretch)");
+
+        float midStretch = TabSegmentControl.computeStretchFactor(150f, 100f, 200f);
+        assertEquals(1.08f, midStretch, 0.001f, "Stretch at midpoint must be exactly 1.08 (+8% stretch)");
+
+        float endStretch = TabSegmentControl.computeStretchFactor(200f, 100f, 200f);
+        assertEquals(1.00f, endStretch, 0.001f, "Stretch at destination must be 1.0 (0% stretch)");
+
+        // Text color tests:
+        int darkInactive = TabSegmentControl.computeTextColor(false, 0.0f);
+        assertEquals(0x99FFFFFF, darkInactive, "Dark mode inactive text color is 0x99FFFFFF (white 0.60)");
+
+        int darkActive = TabSegmentControl.computeTextColor(false, 1.0f);
+        assertEquals(0xF2FFFFFF, darkActive, "Dark mode active text color is 0xF2FFFFFF (white 0.95)");
+
+        int lightInactive = TabSegmentControl.computeTextColor(true, 0.0f);
+        assertEquals(0x99000000, lightInactive, "Light mode inactive text color is 0x99000000 (black 0.60)");
+
+        int lightActive = TabSegmentControl.computeTextColor(true, 1.0f);
+        assertEquals(0xF2000000, lightActive, "Light mode active text color is 0xF2000000 (black 0.95)");
+
+        // Spring constants check:
+        assertEquals(0.30f, TabSegmentControl.SPRING_RESPONSE, 0.001f, "Spring response must be 0.3s");
+        assertEquals(0.82f, TabSegmentControl.SPRING_DAMPING, 0.001f, "Spring damping must be 0.82");
     }
 }
