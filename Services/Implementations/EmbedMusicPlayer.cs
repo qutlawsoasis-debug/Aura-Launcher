@@ -17,6 +17,9 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         PropertyNameCaseInsensitive = true
     };
 
+    private const string DefaultChannel = "aura-music";
+    private const string DefaultEmbedOrigin = "https://lobby-api.vercel.app";
+
     private readonly object _lock = new();
     private readonly Stopwatch _stopwatch = new();
     private dynamic? _coreWebView2;
@@ -24,6 +27,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
 
     private string _state = "stopped";
     private MusicBridgeTrack? _currentTrack;
+    private MusicBridgeTrack? _pendingTrackToLoad;
     private double _currentTimeSeconds = 0.0;
     private long _lastUpdatedAtUnixMs = 0;
     private double _volume = 1.0;
@@ -160,19 +164,31 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         {
             _ = Task.Run(async () =>
             {
-                string initScript = """
+                string initScript = $$"""
                 (function() {
                     const IFRAME_ID = 'aura-yt-embed-frame';
-                    const CHANNEL = 'aura-music';
+                    const CHANNEL = '{{DefaultChannel}}';
+                    const EXPECTED_ORIGIN = '{{DefaultEmbedOrigin}}';
                     if (!window.__auraMusicHostAdapterInstalled) {
                         window.__auraMusicHostAdapterInstalled = true;
                         window.addEventListener('message', function(event) {
                             try {
+                                var frame = document.getElementById(IFRAME_ID);
+                                if (!frame || !frame.contentWindow) return;
+                                var frameOrigin = EXPECTED_ORIGIN;
+                                try { frameOrigin = new URL(frame.src).origin; } catch (e) {}
+
+                                if (event.source !== frame.contentWindow) return;
+                                if (event.origin !== frameOrigin) return;
+
                                 var d = event.data;
-                                if (d && d.source === 'aura-yt-embed' && d.channel === CHANNEL) {
-                                    if (window.chrome && window.chrome.webview) {
-                                        window.chrome.webview.postMessage(typeof d === 'string' ? d : JSON.stringify(d));
-                                    }
+                                if (!d || d.source !== 'aura-yt-embed' || d.channel !== CHANNEL) return;
+
+                                var payload = typeof d === 'string' ? JSON.parse(d) : Object.assign({}, d);
+                                payload.origin = event.origin;
+
+                                if (window.chrome && window.chrome.webview) {
+                                    window.chrome.webview.postMessage(JSON.stringify(payload));
                                 }
                             } catch (e) {}
                         });
@@ -198,16 +214,43 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                 return;
             }
 
+            if (root.TryGetProperty("channel", out var chanProp))
+            {
+                string? chan = chanProp.GetString();
+                if (!string.IsNullOrEmpty(chan) && !string.Equals(chan, DefaultChannel, StringComparison.OrdinalIgnoreCase))
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: WARN] Rejected message with invalid channel '{chan}'");
+                    return;
+                }
+            }
+
+            if (root.TryGetProperty("origin", out var originProp))
+            {
+                string? origin = originProp.GetString();
+                if (!string.IsNullOrEmpty(origin) && !IsValidEmbedOrigin(origin))
+                {
+                    FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: WARN] Rejected message from untrusted origin '{origin}'");
+                    return;
+                }
+            }
+
             string evt = root.TryGetProperty("event", out var evProp) ? evProp.GetString() ?? "" : "";
             string videoId = root.TryGetProperty("videoId", out var vidProp) ? vidProp.GetString() ?? "" : "";
 
             string? newStateToNotify = null;
+            MusicBridgeTrack? trackToReplayOnReady = null;
+
             lock (_lock)
             {
                 switch (evt)
                 {
                     case "ready":
                         _isReady = true;
+                        if (_pendingTrackToLoad != null)
+                        {
+                            trackToReplayOnReady = _pendingTrackToLoad;
+                            _pendingTrackToLoad = null;
+                        }
                         break;
 
                     case "timeUpdate":
@@ -280,6 +323,12 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                 }
             }
 
+            if (trackToReplayOnReady != null)
+            {
+                var payload = new { videoId = trackToReplayOnReady.Id, startSeconds = 0 };
+                _ = DispatchCommandAsync("load", payload);
+            }
+
             if (newStateToNotify != null)
             {
                 StateChanged?.Invoke(newStateToNotify);
@@ -289,6 +338,26 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         {
             FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: ERROR] Failed to parse embed message: {ex.Message}");
         }
+    }
+
+    private static bool IsValidEmbedOrigin(string origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin)) return false;
+        try
+        {
+            var uri = new Uri(origin);
+            string host = uri.Host.ToLowerInvariant();
+            if (host == "lobby-api.vercel.app" || host == "localhost" || host == "127.0.0.1" || host == "[::1]")
+            {
+                return true;
+            }
+            if (host.EndsWith(".auramc.net") || host.EndsWith(".vercel.app"))
+            {
+                return true;
+            }
+        }
+        catch { }
+        return false;
     }
 
     public long GetExactPositionMs(out long updatedAtUnixMs)
@@ -381,6 +450,15 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             _durationMs = track.DurationMs;
             _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             _stopwatch.Reset();
+
+            if (!_isReady)
+            {
+                _pendingTrackToLoad = track;
+            }
+            else
+            {
+                _pendingTrackToLoad = null;
+            }
         }
 
         TrackChanged?.Invoke(track);
@@ -392,6 +470,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             lock (_lock)
             {
                 _state = "stopped";
+                _pendingTrackToLoad = null;
             }
             return false;
         }
@@ -518,7 +597,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         var dict = new Dictionary<string, object?>
         {
             ["source"] = "aura-yt-host",
-            ["channel"] = "aura-music",
+            ["channel"] = DefaultChannel,
             ["op"] = op
         };
 
@@ -534,6 +613,32 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         return JsonSerializer.Serialize(dict, _jsonOptions);
     }
 
+    private static bool ParseJsBooleanResult(string? res)
+    {
+        if (string.IsNullOrWhiteSpace(res)) return false;
+        string trimmed = res.Trim();
+        if (string.Equals(trimmed, "true", StringComparison.OrdinalIgnoreCase)) return true;
+        if (string.Equals(trimmed, "false", StringComparison.OrdinalIgnoreCase)) return false;
+        if (string.Equals(trimmed, "null", StringComparison.OrdinalIgnoreCase)) return false;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(trimmed);
+            if (doc.RootElement.ValueKind == JsonValueKind.True) return true;
+            if (doc.RootElement.ValueKind == JsonValueKind.False) return false;
+            if (doc.RootElement.ValueKind == JsonValueKind.Null) return false;
+            if (doc.RootElement.ValueKind == JsonValueKind.String)
+            {
+                return bool.TryParse(doc.RootElement.GetString(), out bool b) && b;
+            }
+        }
+        catch
+        {
+            return false;
+        }
+        return false;
+    }
+
     private async Task<bool> DispatchCommandAsync(string op, object? payload)
     {
         CommandDispatched?.Invoke(op, payload);
@@ -543,11 +648,20 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             return false;
         }
 
-        string cmdJson = BuildCommandJson(op, payload);
-        string script = $"(function(){{var f=document.getElementById('aura-yt-embed-frame')||document.querySelector('iframe[src*=\"embed/player.html\"]');if(!f){{f=document.createElement('iframe');f.id='aura-yt-embed-frame';f.style.display='none';f.allow='autoplay; encrypted-media';var p=window.location.origin||'http://127.0.0.1';f.src='https://lobby-api.vercel.app/embed/player.html?channel=aura-music&parentOrigin='+encodeURIComponent(p);document.body.appendChild(f);}}if(f&&f.contentWindow){{f.contentWindow.postMessage({cmdJson},'*');return true;}}return false;}})();";
+        try
+        {
+            string cmdJson = BuildCommandJson(op, payload);
+            const string targetOrigin = DefaultEmbedOrigin;
+            string script = $"(function(){{try{{var f=document.getElementById('aura-yt-embed-frame')||document.querySelector('iframe[src*=\"embed/player.html\"]');if(!f){{f=document.createElement('iframe');f.id='aura-yt-embed-frame';f.style.display='none';f.allow='autoplay; encrypted-media';var p=window.location.origin||'http://127.0.0.1';f.src='{targetOrigin}/embed/player.html?channel={DefaultChannel}&parentOrigin='+encodeURIComponent(p);document.body.appendChild(f);}}if(f&&f.contentWindow){{var o='{targetOrigin}';try{{o=new URL(f.src).origin;}}catch(e){{}}f.contentWindow.postMessage({cmdJson},o);return true;}}return false;}}catch(e){{return false;}}}})();";
 
-        string? res = await ExecuteScriptOnUiAsync(script);
-        return res != null;
+            string? res = await ExecuteScriptOnUiAsync(script);
+            return ParseJsBooleanResult(res);
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: ERROR] DispatchCommandAsync failed: {ex.Message}");
+            return false;
+        }
     }
 
     private static object? GetUiDispatcher()
@@ -574,7 +688,15 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
     {
         if (_customScriptExecutor != null)
         {
-            return await _customScriptExecutor(script);
+            try
+            {
+                return await _customScriptExecutor(script);
+            }
+            catch (Exception ex)
+            {
+                FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: ERROR] Custom script executor failed: {ex.Message}");
+                return null;
+            }
         }
 
         if (_coreWebView2 == null) return null;
@@ -643,6 +765,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         _stopwatch.Stop();
         _coreWebView2 = null;
         _customScriptExecutor = null;
+        _pendingTrackToLoad = null;
         _queue.Clear();
     }
 }

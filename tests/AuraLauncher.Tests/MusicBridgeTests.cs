@@ -563,10 +563,11 @@ public class MusicBridgeTests : IDisposable
         p.AttachWebView(core);
         bool loadWithTransport = await p.LoadVideoAsync("abcdefghijk");
         Assert.True(loadWithTransport);
-        Assert.Contains("contentWindow.postMessage", core.LastScript);
-        Assert.Contains("\"op\":\"load\"", core.LastScript);
-        Assert.Contains("\"videoId\":\"abcdefghijk\"", core.LastScript);
-        Assert.DoesNotContain("\"data\":{", core.LastScript); // Must be flat!
+        var loadScript = core.ExecutedScripts.Find(s => s.Contains("contentWindow.postMessage"));
+        Assert.NotNull(loadScript);
+        Assert.Contains("\"op\":\"load\"", loadScript);
+        Assert.Contains("\"videoId\":\"abcdefghijk\"", loadScript);
+        Assert.DoesNotContain("\"data\":{", loadScript); // Must be flat!
     }
 
     [Fact]
@@ -581,8 +582,12 @@ public class MusicBridgeTests : IDisposable
 
         using var player = new EmbedMusicPlayer(script =>
         {
+            // Verify origin binding: commands must target explicit origin 'o', never '*'
+            Assert.DoesNotContain("'*'", script);
+            Assert.Contains("f.contentWindow.postMessage", script);
+
             // Extract postMessage argument from script
-            var match = System.Text.RegularExpressions.Regex.Match(script, @"postMessage\((\{.*\}),\s*'\*'\)");
+            var match = System.Text.RegularExpressions.Regex.Match(script, @"postMessage\((\{.*?\}),\s*o\)");
             if (match.Success)
             {
                 using var doc = JsonDocument.Parse(match.Groups[1].Value);
@@ -693,6 +698,155 @@ public class MusicBridgeTests : IDisposable
         await p.PlayAsync();
         long posAfterRepeatedPlay = p.GetExactPositionMs(out _);
         Assert.True(posAfterRepeatedPlay >= posBeforeRepeatedPlay, "Repeated play must not lose progress");
+    }
+
+    [Theory]
+    [InlineData("false", false)]
+    [InlineData("null", false)]
+    [InlineData("true", true)]
+    [InlineData("undefined", false)]
+    [InlineData("", false)]
+    [InlineData("{}", false)]
+    [InlineData("0", false)]
+    [InlineData("1", false)]
+    [InlineData("{\"error\": true}", false)]
+    [InlineData("invalid json", false)]
+    public async Task EmbedPlayer_ExecuteScriptAsync_ParsesBooleanResults(string jsResult, bool expectedSuccess)
+    {
+        using var player = new EmbedMusicPlayer(_ => Task.FromResult<string?>(jsResult));
+        bool result = await player.LoadVideoAsync("abcdefghijk");
+        Assert.Equal(expectedSuccess, result);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_ExecuteScriptAsync_Exception_ReturnsFalseAndConsistentState()
+    {
+        using var throwingPlayer = new EmbedMusicPlayer(_ => throw new InvalidOperationException("WebView2 disconnected"));
+        bool result = await throwingPlayer.LoadVideoAsync("abcdefghijk");
+        Assert.False(result);
+        Assert.Equal("stopped", throwingPlayer.State);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_ColdFirstTrack_BuffersLoadUntilReady()
+    {
+        int commandCount = 0;
+        string? lastScript = null;
+
+        using var cold = new EmbedMusicPlayer(script =>
+        {
+            commandCount++;
+            lastScript = script;
+            return Task.FromResult<string?>("true");
+        });
+
+        // 1. Initial state: not ready
+        Assert.False(cold.IsReady);
+
+        // 2. Cold load before iframe ready
+        bool coldLoadResult = await cold.LoadVideoAsync("testCold123");
+        Assert.True(coldLoadResult);
+        Assert.False(cold.IsReady);
+        Assert.Equal(1, commandCount);
+        Assert.NotNull(cold.CurrentTrack);
+        Assert.Equal("testCold123", cold.CurrentTrack.Id);
+
+        // 3. Ready event arrives from iframe
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"ready"}""");
+        Assert.True(cold.IsReady);
+        // Buffered track must be automatically re-dispatched upon ready
+        Assert.Equal(2, commandCount);
+        Assert.NotNull(lastScript);
+        Assert.Contains("\"op\":\"load\"", lastScript);
+        Assert.Contains("\"videoId\":\"testCold123\"", lastScript);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_Security_RejectsForeignOriginAndChannelMessages()
+    {
+        using var player = new EmbedMusicPlayer(_ => Task.FromResult<string?>("true"));
+        await player.LoadVideoAsync("security123");
+
+        // Legitimate ready and initial playing state
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"ready"}""");
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"stateChange","state":1}""");
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"timeUpdate","currentTime":15.0}""");
+
+        Assert.Equal("playing", player.State);
+        long initialPos = player.GetExactPositionMs(out _);
+        Assert.InRange(initialPos, 14900, 15500);
+
+        // 1. Untrusted origin must be rejected and must NOT alter state or position
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://attacker.evil.com","event":"stateChange","state":2}""");
+        Assert.Equal("playing", player.State);
+
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://attacker.evil.com","event":"timeUpdate","currentTime":999.0}""");
+        long posAfterAttackerOrigin = player.GetExactPositionMs(out _);
+        Assert.True(posAfterAttackerOrigin < 30000, "Untrusted origin altered player position!");
+
+        // 2. Untrusted/wrong channel must be rejected
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"hacked-channel","event":"stateChange","state":2}""");
+        Assert.Equal("playing", player.State);
+
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"hacked-channel","event":"timeUpdate","currentTime":999.0}""");
+        long posAfterAttackerChannel = player.GetExactPositionMs(out _);
+        Assert.True(posAfterAttackerChannel < 30000, "Untrusted channel altered player position!");
+
+        // 3. Foreign source field must be rejected
+        player.HandleEmbedMessage("""{"source":"some-foreign-window","channel":"aura-music","event":"stateChange","state":2}""");
+        Assert.Equal("playing", player.State);
+
+        // 4. Valid trusted origin updates correctly
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"stateChange","state":2}""");
+        Assert.Equal("paused", player.State);
+    }
+
+    [Fact]
+    public async Task MusicBridge_Commands_WhenJsReturnsFalse_ReturnHttpErrorNotSuccess()
+    {
+        using var failingPlayer = new EmbedMusicPlayer(_ => Task.FromResult<string?>("false"));
+        using var bridge = new MusicBridgeService(_audioService, _lobbyApiClient, failingPlayer);
+        bridge.Start();
+
+        using var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{bridge.Port}/") };
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bridge.Token);
+
+        // 1. /queue with failing player returns 503
+        var queueContent = new StringContent("""{"trackId": "dQw4w9WgXcQ", "title": "Test", "artist": "Rick"}""", Encoding.UTF8, "application/json");
+        var queueResp = await client.PostAsync("/queue", queueContent);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, queueResp.StatusCode);
+
+        // Now setup player with a current track so /play, /pause, /seek, /volume delegate to embed player
+        using var selectivePlayer = new EmbedMusicPlayer(script =>
+        {
+            if (script.Contains("\"op\":\"load\"")) return Task.FromResult<string?>("true");
+            return Task.FromResult<string?>("false"); // fail other commands
+        });
+        await selectivePlayer.LoadVideoAsync("dQw4w9WgXcQ");
+
+        using var selectiveBridge = new MusicBridgeService(_audioService, _lobbyApiClient, selectivePlayer);
+        selectiveBridge.Start();
+
+        using var selectiveClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{selectiveBridge.Port}/") };
+        selectiveClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", selectiveBridge.Token);
+
+        // 2. /play returning false -> 409
+        var playResp = await selectiveClient.PostAsync("/play", null);
+        Assert.Equal(HttpStatusCode.Conflict, playResp.StatusCode);
+
+        // 3. /pause returning false -> 409
+        var pauseResp = await selectiveClient.PostAsync("/pause", null);
+        Assert.Equal(HttpStatusCode.Conflict, pauseResp.StatusCode);
+
+        // 4. /seek returning false -> 409
+        var seekContent = new StringContent("""{"ms": 10000}""", Encoding.UTF8, "application/json");
+        var seekResp = await selectiveClient.PostAsync("/seek", seekContent);
+        Assert.Equal(HttpStatusCode.Conflict, seekResp.StatusCode);
+
+        // 5. /volume returning false -> 409
+        var volContent = new StringContent("""{"volume": 0.5}""", Encoding.UTF8, "application/json");
+        var volResp = await selectiveClient.PostAsync("/volume", volContent);
+        Assert.Equal(HttpStatusCode.Conflict, volResp.StatusCode);
     }
 
     [Fact]
@@ -818,10 +972,15 @@ public class MusicBridgeTests : IDisposable
 
     public class FakeCoreWebView
     {
+        public List<string> ExecutedScripts { get; } = new();
         public string LastScript { get; set; } = "";
         public Task<string> ExecuteScriptAsync(string script)
         {
-            LastScript = script;
+            lock (ExecutedScripts)
+            {
+                ExecutedScripts.Add(script);
+                LastScript = script;
+            }
             return Task.FromResult("true");
         }
     }
