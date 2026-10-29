@@ -33,6 +33,13 @@ public abstract class ClickableWidgetMixin implements AuraResizableWidget, AuraM
     @Shadow
     protected int height;
 
+    @org.spongepowered.asm.mixin.injection.Inject(method="render",at=@org.spongepowered.asm.mixin.injection.At("HEAD"),cancellable=true)
+    private void aura_renderAutoComplete(net.minecraft.client.gui.DrawContext context,int mx,int my,float delta,org.spongepowered.asm.mixin.injection.callback.CallbackInfo ci){
+        if(net.auramc.glass.client.ui.GlassAutoComplete.render((ClickableWidget)(Object)this,context,mx,my,delta)){
+            ci.cancel();
+        }
+    }
+
     @Override
     public void aura_setDimensions(int width, int height) {
         this.width = width;
