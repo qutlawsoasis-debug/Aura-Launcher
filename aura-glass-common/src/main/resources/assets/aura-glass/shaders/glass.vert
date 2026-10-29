@@ -26,7 +26,8 @@ void main() {
         index = (index == 2 || index == 4) ? 3 : index == 3 ? 0 : index == 5 ? 2 : index;
     }
     vec2 corner = vec2(index & 1, index >> 1);
-    point = corner * (Rect.zw + 2.0) - 1.0;
+    float padding=Opacity.y == -1.0 ? 12.0 : 1.0;
+    point = corner * (Rect.zw + 2.0*padding) - padding;
     extent = Rect.zw;
     lens = Lens; optical = Optical; lighting = Lighting;
     tint = Tint; finish = Finish; extra = Extra; opacity = Opacity.x; profileShape = Opacity.yzw;

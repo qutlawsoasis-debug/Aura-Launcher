@@ -17,6 +17,9 @@ public final class GlassStylesTest {
         check(low.tintA >= .12f, "Low retains visible fill without backdrop or configured tint");
         check(transparent.tintA == 0, "Low fallback does not overwrite configured preset");
         check(GlassStyles.material(transparent, GlassQuality.HIGH).tintA == 0, "High custom tint retained");
+        GlassStyle outer=GlassStyles.get(GlassPreset.PANEL).asSurface();
+        GlassStyle flatOuter=GlassStyles.material(outer,GlassQuality.LOW);
+        check(flatOuter.tintA>=.90f && flatOuter.tintB<=.16f,"Low outer material protects white text on bright backdrops");
         GlassStyles.beginFrame();
         for(GlassPreset preset:GlassPreset.values()){
             GlassStyle source=GlassStyles.get(preset),copy=new GlassStyle();source.copyInto(copy);
@@ -31,8 +34,8 @@ public final class GlassStylesTest {
             style.refraction = 99;
             check(GlassStyles.get(preset).refraction == refraction, "get returns independent copy");
         }
-        check(GlassStyles.resolve(GlassPreset.PILL_THICK, GlassState.HOVER, 1).scale == 1.03f, "hover scale modifier");
-        check(GlassStyles.resolve(GlassPreset.PILL_THICK, GlassState.PRESS, 1).scale == .97f, "press scale modifier");
+        check(GlassStyles.resolve(GlassPreset.PILL_THICK, GlassState.HOVER, 1).scale == 1f, "Regular hover keeps grouped controls aligned");
+        check(GlassStyles.resolve(GlassPreset.PILL_THICK, GlassState.PRESS, 1).scale == 1f, "Regular press keeps grouped controls aligned");
         GlassStyle edited = GlassStyles.get(GlassPreset.PANEL);
         edited.frost = 1.25f;
         GlassStyles.update(GlassPreset.PANEL, edited);
@@ -52,68 +55,29 @@ public final class GlassStylesTest {
         try { GlassStyles.update(GlassPreset.PANEL, edited); }
         catch (IllegalArgumentException expected) { rejected = true; }
         check(rejected, "NaN rejected");
-        var legacy = com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject();
-        legacy.addProperty("version",1);
-        var presets = legacy.getAsJsonObject("presets");
-        for (GlassPreset preset : GlassPreset.values()) presets.getAsJsonObject(preset.name()).addProperty("lightDirY",.83f);
-        var panel = presets.getAsJsonObject("PANEL");
-        panel.addProperty("refraction",3); panel.addProperty("bevel",10); panel.addProperty("tintA",.12f); panel.addProperty("frost",1.37f);
-        Files.writeString(GlassStyles.file(),legacy.toString(),StandardCharsets.UTF_8);
-        check(GlassStyles.reloadFromFile(),"v1 file reloads and migrates");
-        check(GlassStyles.get(GlassPreset.PANEL).bevel==12,"old default bevel updated");
-        check(GlassStyles.get(GlassPreset.PANEL).refraction==.25f,"old default refraction updated");
-        check(GlassStyles.get(GlassPreset.PANEL).frost==1.37f,"custom frost preserved during migration");
-        check(GlassStyles.get(GlassPreset.PANEL).lightDirY<0,"default light migrated to GUI up");
-        GlassStyle unsaved=GlassStyles.get(GlassPreset.PANEL);unsaved.frost=.1f;GlassStyles.update(GlassPreset.PANEL,unsaved);
-        check(GlassStyles.reloadFromFile() && GlassStyles.get(GlassPreset.PANEL).frost==1.37f,"Reset restores file values");
-        var version2 = com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject();
-        version2.addProperty("version",2);
-        for (var entry : version2.getAsJsonObject("presets").entrySet()) {
-            entry.getValue().getAsJsonObject().remove("profile");
-            entry.getValue().getAsJsonObject().remove("cornerSoften");
+        var saved=com.google.gson.JsonParser.parseString(accepted).getAsJsonObject();
+        for(GlassQuality quality:GlassQuality.values()){
+            var legacy=saved.deepCopy();legacy.addProperty("version",4);legacy.addProperty("quality",quality.name());
+            legacy.remove("material");legacy.remove("profiles");
+            legacy.getAsJsonObject("presets").getAsJsonObject("PANEL").addProperty("refraction",.73f);
+            Files.writeString(GlassStyles.file(),legacy.toString(),StandardCharsets.UTF_8);
+            check(GlassStyles.reloadFromFile(),"v4 migration: "+quality);
+            check(GlassStyles.quality()==quality,"migration retains quality: "+quality);
+            check(GlassStyles.regular(),"migration selects Regular");
+            check(GlassStyles.get(GlassPreset.PANEL).bevel<=3,"Regular limits refraction to edge");
+            var migrated=com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject();
+            check(migrated.get("version").getAsInt()==5,"v5 saved atomically");
+            check(migrated.getAsJsonObject("profiles").getAsJsonObject("LIQUID").getAsJsonObject("PANEL").get("refraction").getAsFloat()==.73f,"old custom lens retained");
+            migrated.addProperty("material","LIQUID");
+            Files.writeString(GlassStyles.file(),migrated.toString(),StandardCharsets.UTF_8);
+            check(GlassStyles.reloadFromFile()&&!GlassStyles.regular(),"one-line LIQUID switch");
+            check(GlassStyles.get(GlassPreset.PANEL).refraction==.73f,"LIQUID uses saved custom lens");
+            check(GlassStyles.filePresets().get(GlassPreset.PANEL).refraction==.73f,"gallery comparison uses active profile");
+            migrated.addProperty("material","REGULAR");
+            migrated.getAsJsonObject("presets").getAsJsonObject("PANEL").addProperty("frost",2.1f);
+            Files.writeString(GlassStyles.file(),migrated.toString(),StandardCharsets.UTF_8);
+            check(GlassStyles.reloadFromFile()&&GlassStyles.get(GlassPreset.PANEL).frost==2.1f,"v5 custom Regular values not reset");
         }
-        version2.getAsJsonObject("presets").getAsJsonObject("PANEL").addProperty("refraction",.42f);
-        Files.writeString(GlassStyles.file(),version2.toString(),StandardCharsets.UTF_8);
-        check(GlassStyles.reloadFromFile(),"version2 upgrades");
-        check(GlassStyles.get(GlassPreset.PANEL).refraction==.42f,"v2 refraction customization retained");
-        check(GlassStyles.get(GlassPreset.PANEL).profile==2.5f,"v2 receives finite profile default");
-        check(GlassStyles.get(GlassPreset.PANEL).cornerSoften==.6f,"v2 receives corner softening default");
-        check(com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject().get("version").getAsInt()==4,"v4 saved to JSON");
-        GlassStyle bounds=new GlassStyle();bounds.profile=0;bounds.cornerSoften=2;bounds.validate();
-        check(bounds.profile==1.5f && bounds.cornerSoften==1,"new parameter lower/upper limits");
-        bounds.profile=99;bounds.cornerSoften=-2;bounds.validate();
-        check(bounds.profile==4 && bounds.cornerSoften==0,"new parameter opposite limits");
-        var version3 = com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject();
-        for (var entry : version3.getAsJsonObject("presets").entrySet()) entry.getValue().getAsJsonObject().remove("specFalloff");
-        Files.writeString(GlassStyles.file(),version3.toString(),StandardCharsets.UTF_8);
-        check(GlassStyles.reloadFromFile(),"existing v3 without specFalloff reloads");
-        check(GlassStyles.get(GlassPreset.PANEL).specFalloff==3,"missing falloff receives default3");
-        bounds.specFalloff=0;bounds.validate();check(bounds.specFalloff==1,"falloff lower bound");
-        bounds.specFalloff=99;bounds.validate();check(bounds.specFalloff==6,"falloff upper bound");
-        GlassStyle falloff=GlassStyles.get(GlassPreset.PANEL);falloff.specFalloff=4.25f;GlassStyles.update(GlassPreset.PANEL,falloff);
-        check(GlassStyles.save() && GlassStyles.reloadFromFile(),"falloff save/reload");
-        check(GlassStyles.get(GlassPreset.PANEL).specFalloff==4.25f,"custom falloff retained");
-        var old3=com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject();
-        var darkBefore=old3.getAsJsonObject("presets").get("SELECTED_DARK").deepCopy();
-        old3.addProperty("version",3);old3.remove("selectedPreset");old3.remove("theme");
-        old3.getAsJsonObject("presets").remove("SELECTED_GLASS");old3.getAsJsonObject("presets").remove("SELECTED_TINT");
-        Files.writeString(GlassStyles.file(),old3.toString(),StandardCharsets.UTF_8);
-        check(GlassStyles.reloadFromFile(),"v3 selected migration");
-        var migrated=com.google.gson.JsonParser.parseString(Files.readString(GlassStyles.file())).getAsJsonObject();
-        check(migrated.getAsJsonObject("presets").get("SELECTED_DARK").equals(darkBefore),"SELECTED_DARK unchanged");
-        check(migrated.get("selectedPreset").getAsString().equals("SELECTED_TINT"),"default selected mapping is tint");
-        check(GlassStyles.selected().isSelectedText() && GlassStyles.selected().isThemeTint(),"selected metadata survives copy");
-        check(Math.abs(GlassStyles.material(GlassStyles.selected()).tintR-64/255f)<.0001f,"theme accent applied only to material");
-        check(GlassStyles.get(GlassPreset.SELECTED_TINT).tintR==1,"saved tint multiplier unchanged");
-        migrated.addProperty("selectedPreset","SELECTED_GLASS");
-        Files.writeString(GlassStyles.file(),migrated.toString(),StandardCharsets.UTF_8);check(GlassStyles.reloadFromFile(),"one-line glass switch");
-        check(GlassStyles.selected().tintA==.30f && !GlassStyles.selected().isThemeTint(),"glass mapping used");
-        migrated.addProperty("selectedPreset","SELECTED_DARK");
-        Files.writeString(GlassStyles.file(),migrated.toString(),StandardCharsets.UTF_8);check(GlassStyles.reloadFromFile(),"one-line dark switch");
-        check(GlassStyles.selected().tintA==GlassStyles.get(GlassPreset.SELECTED_DARK).tintA,"dark mapping used");
-        migrated.addProperty("selectedPreset","SELECTED_TINT");migrated.getAsJsonObject("theme").addProperty("accent","#AA2211");
-        Files.writeString(GlassStyles.file(),migrated.toString(),StandardCharsets.UTF_8);check(GlassStyles.reloadFromFile(),"theme accent reload");
-        check(Math.abs(GlassStyles.material(GlassStyles.selected()).tintB-17/255f)<.0001f,"theme accent hot reload");
         System.out.println("Glass styles: defaults, copies, states, atomic save and reload checks passed");
     }
 

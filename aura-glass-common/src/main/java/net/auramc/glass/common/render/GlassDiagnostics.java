@@ -136,7 +136,7 @@ public final class GlassDiagnostics {
         lines.add("BlurService: " + status + " | failedForScreen=" + BlurService.get().failedForScreen());
         String flat = reason == null ? "none" : reason.replace('\n', ' ').replace('\r', ' ');
         for (int offset = 0; offset < flat.length(); offset += 100) lines.add((offset == 0 ? "Reason: " : "        ") + flat.substring(offset, Math.min(flat.length(), offset + 100)));
-        lines.add("Quality: " + GlassRenderer.effectiveQuality() + " | glass draw calls=" + GlassRenderer.drawCalls());
+        lines.add("Quality: " + GlassRenderer.effectiveQuality() + " | glass draw calls=" + GlassRenderer.drawCalls()+" surfaces="+GlassRenderer.surfaceCount()+" fills="+GlassRenderer.fillCount());
         lines.add("Last frame: capture=" + captured + " | blur-path=" + glassElements + " | fallback=" + fallbackElements+" | flat="+flatElements);
         if (TIMERS.unavailableReason() != null) lines.add(TIMERS.unavailableReason());
         lines.add("GPU delayed >=3f: capture=" + time(GpuGlassTimers.CAPTURE) + " blur=" + time(GpuGlassTimers.BLUR) + " glass=" + time(GpuGlassTimers.GLASS));

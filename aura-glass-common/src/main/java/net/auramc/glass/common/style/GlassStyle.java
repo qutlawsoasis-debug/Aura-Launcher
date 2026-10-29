@@ -2,6 +2,15 @@ package net.auramc.glass.common.style;
 
 public final class GlassStyle {
     private transient boolean selectedText,themeTint;
+    private transient int renderPath;
+    private transient float pointerX=-1,pointerY=-1;
+    public float pointerX(){return pointerX;}
+    public float pointerY(){return pointerY;}
+    public void pointer(float x,float y){pointerX=x;pointerY=y;}
+    public int renderPath(){return renderPath;}
+    public GlassStyle asSurface(){renderPath=1;return this;}
+    public GlassStyle asFill(){renderPath=2;return this;}
+    public GlassStyle asPrimary(){renderPath=3;return this;}
     public boolean isSelectedText(){return selectedText;}
     public boolean isThemeTint(){return themeTint;}
     public GlassStyle selectedText(boolean tint){selectedText=true;themeTint=tint;return this;}
@@ -29,7 +38,7 @@ public final class GlassStyle {
         target.saturation=saturation;target.noise=noise;target.radius=radius;target.squircleK=squircleK;
         target.wobble=wobble;target.gradient=gradient;target.innerGlow=innerGlow;target.scale=scale;
         target.profile=profile;target.cornerSoften=cornerSoften;target.specFalloff=specFalloff;
-        target.selectedText=selectedText;target.themeTint=themeTint;
+        target.pointerX=pointerX;target.pointerY=pointerY;target.renderPath=renderPath;target.selectedText=selectedText;target.themeTint=themeTint;
     }
 
     public void validate() {

@@ -80,9 +80,16 @@ public final class AuraNativeSurfaces {
                 : widget.isFocused() ? GlassState.FOCUSED : GlassState.HOVER;
         float amount = !widget.active ? 1 : state == GlassState.PRESS ? press : hover;
         boolean selectedTab=widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab();
-        var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PANEL);
+        var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PILL_THICK);
         var style=GlassStyles.frameResolve(base,state,amount);
-        net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
+        if(GlassStyles.regular()){
+            style.radius=6;style.rimOuter=.10f;
+            style.scale=GlassStyles.quality()==GlassQuality.OFF?1:1+.012f*hover-.025f*press;
+            if(widget.active&&hovered&&GlassStyles.quality()!=GlassQuality.OFF)style.pointer((float)(client.mouse.getX()/client.getWindow().getScaleFactor()-widget.getX()),(float)(client.mouse.getY()/client.getWindow().getScaleFactor()-widget.getY()));
+            if(primary){style.asPrimary();style.tintR=style.tintG=style.tintB=1;style.tintA=.92f;}
+            else{style.asFill();style.tintR=style.tintG=118/255f;style.tintB=128/255f;style.tintA=!widget.active?.12f:selectedTab?.50f:.24f+.12f*hover+.14f*press;}
+        }
+        if(!GlassStyles.regular())net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
         GlassRenderer.drawWidget(widget, widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
         int rgb = primary ? 0x18232C : 0xF7F9FC;
         return ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
@@ -105,8 +112,8 @@ public final class AuraNativeSurfaces {
         if(clip!=null)context.enableScissor((int)clip[0],(int)clip[1],(int)clip[2],(int)clip[3]);
         context.enableScissor(widget.getX() + 4, widget.getY(), widget.getX() + widget.getWidth() - 4, widget.getY() + widget.getHeight());
         try {
-            int slot=(widget instanceof net.minecraft.client.gui.widget.SliderWidget || widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab())?-2:net.auramc.glass.common.render.AdaptiveText.slot(widget);
-            GlassGlyphText.draw(context,font,text,widget.getX()+(widget.getWidth()-textWidth)*.5f,widget.getY()+(widget.getHeight()-size)*.5f-1,size,color,true,slot);
+            int slot=GlassStyles.regular()?-1:(widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab())?-2:net.auramc.glass.common.render.AdaptiveText.slot(widget);
+            GlassGlyphText.draw(context,font,text,widget.getX()+(widget.getWidth()-textWidth)*.5f,widget.getY()+(widget.getHeight()-size)*.5f-1,size,color,!GlassStyles.regular(),slot);
         } finally {
             context.disableScissor();
             if(clip!=null)context.disableScissor();

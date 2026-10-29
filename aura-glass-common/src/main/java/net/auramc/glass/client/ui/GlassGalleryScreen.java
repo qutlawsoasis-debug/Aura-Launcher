@@ -78,7 +78,7 @@ public abstract class GlassGalleryScreen extends Screen implements GlassGalleryV
     @Override public void render(DrawContext c,int mouseX,int mouseY,float delta) {
         background(c,delta);c.draw();GlassRenderer.captureBackdrop();
         GlassStyle panel=edits.get(GlassPreset.PANEL).copy();panel.refraction=0;
-        GlassRenderer.draw(panelX,10,width-panelX-6,height-20,panel,1);
+        GlassRenderer.drawSurface(this,panelX,10,width-panelX-6,height-20,panel,1);
         if(comparing)comparison(c);else matrix(c);
         if(!comparing)examples(c,mouseX,mouseY);
         GlassRenderer.foreground(()->{
@@ -166,7 +166,7 @@ public abstract class GlassGalleryScreen extends Screen implements GlassGalleryV
     private static boolean inside(double x,double y,float bx,float by,float bw,float bh){return x>=bx && x<bx+bw && y>=by && y<by+bh;}
     private void surfaceLabel(DrawContext c,Object key,float x,float y,float w,float h,GlassStyle style,String text,boolean centered){
         if(!visible(y,h) || w<=0)return;
-        GlassRenderer.draw(x,y,w,h,style,1);adaptiveLabel(c,key,x,y,w,h,style,text,centered);
+        GlassRenderer.drawSurface(key,x,y,w,h,style,1);adaptiveLabel(c,key,x,y,w,h,style,text,centered);
     }
     private void adaptiveLabel(DrawContext c,Object key,float x,float y,float w,float h,GlassStyle style,String text,boolean centered){
         AdaptiveText.request(key,x+w*.5f,y+h*.5f,style);

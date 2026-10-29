@@ -7,6 +7,7 @@ public final class MenuResources {
     private static boolean started;
     private static boolean stopping;
     private static int width,height;
+    private static boolean regular;
     private static net.auramc.glass.common.style.GlassQuality quality;
     private MenuResources() {}
     public static boolean stopping(){return stopping;}
@@ -23,8 +24,8 @@ public final class MenuResources {
         if(!started || client.getFramebuffer()==null)return;
         var framebuffer=client.getFramebuffer();
         var nextQuality=GlassStyles.quality();
-        if(width==framebuffer.textureWidth && height==framebuffer.textureHeight && quality==nextQuality)return;
-        width=framebuffer.textureWidth;height=framebuffer.textureHeight;quality=nextQuality;
+        if(width==framebuffer.textureWidth && height==framebuffer.textureHeight && quality==nextQuality && regular==GlassStyles.regular())return;
+        width=framebuffer.textureWidth;height=framebuffer.textureHeight;quality=nextQuality;regular=GlassStyles.regular();
         try {
             GlassRenderer.prepare();
             BackdropRenderer.prepare();

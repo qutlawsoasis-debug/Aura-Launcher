@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(EntryListWidget.class)
-public abstract class EntryListWidgetMixin {
+public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui.GlassListViewport {
     @Shadow protected abstract EntryListWidget.Entry getEntryAtPosition(double x,double y);
     @Shadow protected abstract EntryListWidget.Entry getEntry(int index);
     @Shadow protected abstract boolean isSelectedEntry(int index);
@@ -17,6 +17,8 @@ public abstract class EntryListWidgetMixin {
     @Shadow protected abstract void renderDecorations(DrawContext c,int mx,int my);
     @Shadow protected abstract int getMaxPosition();
     @Shadow protected int left,top,right,bottom;
+    public int aura_glassTop(){return top;}
+    public int aura_glassBottom(){return bottom;}
     @Shadow protected abstract int getScrollbarPositionX();
     @Shadow private boolean renderHeader;
     @Shadow private EntryListWidget.Entry hoveredEntry;
@@ -39,14 +41,6 @@ public abstract class EntryListWidgetMixin {
         aura_left=l;aura_top=t;aura_right=r;aura_bottom=b;
         aura_context=c;aura_mouseX=mx;aura_mouseY=my;
         hoveredEntry=mx>=l && mx<r && my>=t && my<b?getEntryAtPosition(mx,my):null;
-        int screenW=net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledWidth();
-        int panelL=Math.max(12,l),panelR=Math.min(screenW-12,r);
-        int panelBottom=Math.min(b,t+Math.max(24,getMaxPosition()+8));
-        if(self instanceof net.minecraft.client.gui.widget.OptionListWidget){
-            int[] content=net.auramc.glass.client.ui.GlassListBounds.widgets(self,aura_bounds);
-            if(content[0]<content[1]){panelL=Math.max(panelL,content[0]-8);panelR=Math.min(panelR,content[1]+8);}
-            GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.frame(GlassPreset.PANEL),1);
-        }else GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.frame(GlassPreset.PANEL),1);
         if(renderHeader)GlassRenderer.foreground(aura_header);
         renderList(c,mx,my,delta);
         int max=self.getMaxScroll();
@@ -64,7 +58,7 @@ public abstract class EntryListWidgetMixin {
         int l=aura_left,t=aura_top,r=aura_right,b=aura_bottom;
         if(!((Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget) && (isSelectedEntry(index) || hovered)){
             int yy=Math.max(t,y),hh=Math.min(b,y+h)-yy;
-            if(hh>0)GlassRenderer.draw(x,yy,w,hh,isSelectedEntry(index)?GlassStyles.frameSelected():GlassStyles.frame(GlassPreset.SELECTED_DARK),isSelectedEntry(index)?1:.55f);
+            if(hh>0)GlassRenderer.draw(x,yy,w,hh,net.auramc.glass.client.ui.GlassListBounds.rowStyle(isSelectedEntry(index)),isSelectedEntry(index)?1:.55f);
         }
         net.auramc.glass.client.ui.GlassEntryPaint.draw(c,entry,index,x,y,w,h,mx,my,hovered,delta,l,t,r,b,isSelectedEntry(index),
                 (Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget);

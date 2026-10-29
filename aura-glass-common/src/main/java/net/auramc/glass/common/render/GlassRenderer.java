@@ -30,7 +30,9 @@ public final class GlassRenderer {
     private static final Matrix4f PROJECTION = new Matrix4f();
     private static final FloatBuffer instances = BufferUtils.createFloatBuffer(MAX_PANES * FLOATS * 6);
     private static int program, vao, vbo, noiseTexture, projectionLocation, qualityLocation, sizeLocation, instancedLocation, modalLocation;
-    private static int framebuffer, width, height, drawCalls;
+    private static int framebuffer, width, height, drawCalls,surfaceCount,fillCount;
+    public static int surfaceCount(){return surfaceCount;}
+    public static int fillCount(){return fillCount;}
     private static float scale, modalProgress;
     private static boolean captured, failed, instanced,lowRenderer;
     private static String fallbackReason = "none";
@@ -56,7 +58,7 @@ public final class GlassRenderer {
     }
 
     public static void beginFrame(int fbo, int w, int h, float guiScale) {
-        PANES.clear(); java.util.Arrays.fill(FOREGROUND,0,foregroundCount,null);foregroundCount=0; captured = false; modalProgress=0; drawCalls = 0;
+        PANES.clear(); java.util.Arrays.fill(FOREGROUND,0,foregroundCount,null);foregroundCount=0; captured = false; modalProgress=0; drawCalls = 0;surfaceCount=fillCount=0;
         GlassStyles.beginFrame();
         clipCursor=clippedCursor=0;clip=null;
         framebuffer = fbo; width = w; height = h; scale = guiScale;
@@ -82,6 +84,9 @@ public final class GlassRenderer {
         enqueue(null, x, y, w, h, style, alpha);
     }
 
+    public static void drawSurface(Object group,float x,float y,float w,float h,GlassStyle style,float alpha){
+        style.asSurface();enqueue(group,x,y,w,h,style,alpha);
+    }
     public static void drawWidget(Object widget, float x, float y, float w, float h, GlassStyle style, float alpha) {
         enqueue(widget, x, y, w, h, style, alpha);
     }
@@ -93,6 +98,10 @@ public final class GlassRenderer {
         Pane pane=PANE_POOL[PANES.size()];
         pane.x=x;pane.y=y;pane.w=w;pane.h=h;pane.alpha=Math.min(1,alpha);pane.widget=widget;
         GlassStyles.materialInto(style,quality,pane.style);
+        if(GlassStyles.regular()){
+            if(pane.style.renderPath()==1)surfaceCount++;
+            else{if(pane.style.renderPath()==0)pane.style.asFill();fillCount++;}
+        }else surfaceCount++;
         PANES.add(pane);
     }
 
@@ -183,7 +192,7 @@ public final class GlassRenderer {
         } finally {
             GlassDiagnostics.timers().end(timer);
             GuiRenderState.restore(framebuffer, width, height);
-            for (Pane pane : PANES) pane.widget = null;
+            for (int i=0;i<PANES.size();i++) PANES.get(i).widget = null;
             PANES.clear(); foreground();
         }
     }
@@ -206,7 +215,7 @@ public final class GlassRenderer {
         instances.put(s.tintR).put(s.tintG).put(s.tintB).put(s.tintA);
         instances.put(s.saturation).put(s.noise).put(s.radius < 0 ? h / 2 : s.radius).put(s.squircleK);
         instances.put(s.wobble).put(s.gradient).put(s.innerGlow).put(scale);
-        instances.put(p.alpha).put(s.profile).put(s.cornerSoften).put(s.specFalloff);
+        instances.put(p.alpha).put(GlassStyles.regular()?-Math.max(1,s.renderPath()):s.profile).put(GlassStyles.regular()&&s.renderPath()>=2?s.pointerX():s.cornerSoften).put(GlassStyles.regular()&&s.renderPath()>=2?s.pointerY():s.specFalloff);
     }
 
     private static int shader(int type, String file) throws Exception {

@@ -18,7 +18,10 @@ public abstract class AdvancementsScreenMixin {
     @Inject(method="render",at=@At("HEAD"))
     private void aura_window(DrawContext context,int mx,int my,float delta,CallbackInfo ci){
         if(!GlassFrameHooks.styledScreen())return;
-        GlassRenderer.draw((context.getScaledWindowWidth()-252)*.5f,(context.getScaledWindowHeight()-140)*.5f,252,140,GlassStyles.frame(GlassPreset.PANEL),1);
+        var style=GlassStyles.frame(GlassPreset.PANEL);
+        style.asSurface();
+        style.radius=14;style.bevel=3;style.refraction=.30f;style.dispersion=.005f;style.frost=1.5f;
+        GlassRenderer.drawSurface(this,(context.getScaledWindowWidth()-252)*.5f,(context.getScaledWindowHeight()-140)*.5f,252,140,style,1);
         context.draw();GlassRenderer.flush();
     }
     @Inject(method={"drawAdvancementTree","drawWidgetTooltip"},at=@At("HEAD"))
