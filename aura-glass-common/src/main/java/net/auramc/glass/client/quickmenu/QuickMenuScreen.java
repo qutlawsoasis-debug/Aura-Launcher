@@ -373,6 +373,10 @@ public final class QuickMenuScreen extends Screen {
             if (scissorActive) context.disableScissor();
             RenderSystem.setShaderColor(1, 1, 1, 1);
         }
+
+        if (MaxFpsBenchmarkRunner.isWaitingForScreenshot() && client != null) {
+            MaxFpsBenchmarkRunner.onScreenRendered(client);
+        }
     }
 
     private void nativeClip() {

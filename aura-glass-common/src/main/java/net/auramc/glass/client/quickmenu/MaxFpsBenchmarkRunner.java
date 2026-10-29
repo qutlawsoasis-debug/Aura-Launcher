@@ -27,12 +27,13 @@ public final class MaxFpsBenchmarkRunner {
         SETTLE_AFTER,
         BENCHMARK_AFTER,
         OPEN_F8,
-        CAPTURE_AND_FINISH,
+        AWAITING_F8_CAPTURE,
         DONE
     }
 
     private static State state = ENABLED ? State.WARMUP : State.IDLE;
     private static int frameCounter = 0;
+    private static int f8RenderFrames = 0;
     private static long lastFrameNano = 0;
     private static int tickCounter = 0;
     private static boolean worldLaunchInitiated = false;
@@ -140,17 +141,26 @@ public final class MaxFpsBenchmarkRunner {
             }
             case OPEN_F8 -> {
                 client.setScreen(new QuickMenuScreen());
-                frameCounter = 0;
-                state = State.CAPTURE_AND_FINISH;
+                f8RenderFrames = 0;
+                state = State.AWAITING_F8_CAPTURE;
             }
-            case CAPTURE_AND_FINISH -> {
-                frameCounter++;
-                if (frameCounter >= F8_FRAMES) {
-                    state = State.DONE;
-                    processResultsAndExit(client);
-                }
+            case AWAITING_F8_CAPTURE -> {
+                // Wait for QuickMenuScreen to render and trigger onScreenRendered
             }
             case DONE -> {}
+        }
+    }
+
+    public static boolean isWaitingForScreenshot() {
+        return ENABLED && state == State.AWAITING_F8_CAPTURE;
+    }
+
+    public static void onScreenRendered(MinecraftClient client) {
+        if (!isWaitingForScreenshot()) return;
+        f8RenderFrames++;
+        if (f8RenderFrames >= 35) {
+            state = State.DONE;
+            processResultsAndExit(client);
         }
     }
 
