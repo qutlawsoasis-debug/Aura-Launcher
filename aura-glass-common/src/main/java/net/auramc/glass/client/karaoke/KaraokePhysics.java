@@ -63,7 +63,7 @@ public final class KaraokePhysics {
         public boolean dissolving = false;
         public boolean expired = false;
 
-        public float currentAlpha = 0.70f;
+        public float currentAlpha = 0.70f; // Falling letters alpha 0.70, on ground 0.85 (Return 1)
         public float currentScale = 1.0f;
         public boolean isOccluded = false;
 
@@ -154,7 +154,10 @@ public final class KaraokePhysics {
 
         public float getAlpha() {
             if (isOccluded) {
-                return 0.25f * (currentAlpha / 0.70f);
+                return 0.25f;
+            }
+            if (sleeping && !dissolving) {
+                return 0.85f;
             }
             return currentAlpha;
         }
@@ -283,7 +286,7 @@ public final class KaraokePhysics {
                     if (l.dissolving) {
                         l.dissolveTicks++;
                         float p = Math.min(1.0f, (float) l.dissolveTicks / DISSOLVE_TICKS);
-                        l.currentAlpha = 0.70f * (1.0f - p);
+                        l.currentAlpha = 0.85f * (1.0f - p); // Return 1: letters on ground alpha 0.85
                         l.currentScale = 1.0f - 0.15f * p; // scale -> 0.85
                         if (l.dissolveTicks >= DISSOLVE_TICKS) {
                             it.remove();
@@ -321,6 +324,7 @@ public final class KaraokePhysics {
                         if (Math.abs(l.vy) < 0.02 && Math.abs(l.vx) < 0.015 && Math.abs(l.vz) < 0.015) {
                             l.vy = 0; l.vx = 0; l.vz = 0;
                             l.sleeping = true;
+                            l.currentAlpha = 0.85f;
                         }
                     } else {
                         l.vy = -l.vy * RESTITUTION;

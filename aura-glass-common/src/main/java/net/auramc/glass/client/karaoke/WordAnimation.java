@@ -28,12 +28,12 @@ public final class WordAnimation {
     // Dark background (< 0.50):
     public static final int COLOR_ACTIVE_DARK = 0xFF64D2FF;   // Accent cyan #64D2FF
     public static final int COLOR_BASE_DARK = 0xFFFFFFFF;     // White
-    public static final int COLOR_SUNG_DARK = 0xB364D2FF;     // #64D2FF alpha 0.70 (0.70 * 255 = 179 = 0xB3)
+    public static final int COLOR_SUNG_DARK = 0xB3FFFFFF;     // White alpha 0.70 (Return 1)
 
     // Light background (> 0.60):
     public static final int COLOR_ACTIVE_LIGHT = 0xFF0A84FF;  // Apple systemBlue #0A84FF
     public static final int COLOR_BASE_LIGHT = 0xFF1D1D1F;    // Dark rgb(29,29,31)
-    public static final int COLOR_SUNG_LIGHT = 0xB30A84FF;    // #0A84FF alpha 0.70
+    public static final int COLOR_SUNG_LIGHT = 0xB31D1D1F;    // rgb(29,29,31) alpha 0.70 (Return 1)
 
     // Backward-compatible constants
     public static final int COLOR_ACTIVE = COLOR_ACTIVE_DARK;
@@ -178,7 +178,7 @@ public final class WordAnimation {
             // Actively singing: 100% active accent
             return getActiveWordColor(lightProgress);
         } else {
-            // Sung: same accent at 0.70 alpha
+            // Sung (Return 1: sung words white alpha 0.70 on dark / rgb(29,29,31) alpha 0.70 on light)
             return getSungWordColor(lightProgress);
         }
     }

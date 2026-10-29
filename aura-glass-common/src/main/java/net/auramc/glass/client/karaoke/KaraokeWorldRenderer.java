@@ -363,6 +363,14 @@ public final class KaraokeWorldRenderer {
 
             int wordColor = WordAnimation.getLetterColor(playbackMs, kw.t, kw.d, lightProgress);
             float fontScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+            // Return 1: Capital letter height strictly >= 28px on frame (target 33-34px)
+            if (camPos != null && anchor.position != null) {
+                double distToEye = camPos.distanceTo(anchor.position);
+                float minFontScale = (float) (33.0 * distToEye / 650.7);
+                if (fontScale < minFontScale && KaraokeConfig.get().getSize() <= 1.25f) {
+                    fontScale = minFontScale;
+                }
+            }
 
             float totalW = AuraRenderer.textWidth(kw.w, fontScale, 700);
             float penX = -totalW * 0.5f;

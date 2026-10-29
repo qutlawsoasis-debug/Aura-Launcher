@@ -445,15 +445,15 @@ public final class KaraokeSuiteTest {
         check(WordAnimation.letterAlpha(1030L, 1000L, 400L, 6, 2) == 0.0f, "letter 2 not visible before its start time");
         check(WordAnimation.letterAlpha(1050L, 1000L, 400L, 6, 2) > 0.0f, "letter 2 visible after start time");
 
-        // 4. W6d Adaptive Palette Colors
-        // Dark background (factor 0.0): text white (0xFFFFFFFF), active #64D2FF (0xFF64D2FF), sung #64D2FF 0.70 (0xB364D2FF)
+        // 4. W6d Adaptive Palette Colors (Return 1: active is accent, sung is white 0.70 / dark 0.70)
+        // Dark background (factor 0.0): text white (0xFFFFFFFF), active #64D2FF (0xFF64D2FF), sung white 0.70 (0xB3FFFFFF)
         check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "dark active #64D2FF");
-        check(WordAnimation.getSungWordColor(0.0f) == 0xB364D2FF, "dark sung #64D2FF 0.70 (0xB364D2FF)");
+        check(WordAnimation.getSungWordColor(0.0f) == 0xB3FFFFFF, "dark sung white 0.70 (0xB3FFFFFF)");
         check(WordAnimation.getUpcomingWordColor(0.0f) == 0xFFFFFFFF, "dark upcoming white (0xFFFFFFFF)");
 
-        // Light background (factor 1.0): text rgb(29,29,31) (0xFF1D1D1F), active #0A84FF (0xFF0A84FF), sung #0A84FF 0.70 (0xB30A84FF)
+        // Light background (factor 1.0): text rgb(29,29,31) (0xFF1D1D1F), active #0A84FF (0xFF0A84FF), sung rgb(29,29,31) 0.70 (0xB31D1D1F)
         check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "light active #0A84FF");
-        check(WordAnimation.getSungWordColor(1.0f) == 0xB30A84FF, "light sung #0A84FF 0.70 (0xB30A84FF)");
+        check(WordAnimation.getSungWordColor(1.0f) == 0xB31D1D1F, "light sung dark 0.70 (0xB31D1D1F)");
         check(WordAnimation.getUpcomingWordColor(1.0f) == 0xFF1D1D1F, "light upcoming rgb(29,29,31) (0xFF1D1D1F)");
 
         System.out.println("[PASS] 5. Apple Spring animation (response 0.32s, damping 0.62, overshoot ~6%), letter pop-in metrics, and W6d adaptive palette");
@@ -522,6 +522,7 @@ public final class KaraokeSuiteTest {
         physics.spawnLetter('B', spawnPos, null, null, 0.35f, 1000L, null);
         var let = physics.getLetters().get(0);
         let.sleeping = true; // Landed on ground
+        check(Math.abs(let.getAlpha() - 0.85f) < 0.01f, "letters on the ground alpha 0.85: " + let.getAlpha());
 
         for (int tick = 0; tick < 24; tick++) {
             check(!let.dissolving, "letter rests motionless on ground for 24 ticks (tick " + tick + ")");
@@ -533,7 +534,7 @@ public final class KaraokeSuiteTest {
         for (int tick = 0; tick < 7; tick++) {
             physics.tick(null);
             check(let.getScale() < let.baseSize && let.getScale() >= 0.849f * let.baseSize, "dissolving scale shrinks towards 0.85: " + let.getScale());
-            check(let.getAlpha() < 0.70f, "dissolving alpha fades towards 0: " + let.getAlpha());
+            check(let.getAlpha() < 0.85f, "dissolving alpha fades towards 0: " + let.getAlpha());
         }
         // 8th tick: letter completely removed
         physics.tick(null);
@@ -687,21 +688,25 @@ public final class KaraokeSuiteTest {
 
     private static void testAdaptiveContrastAndHaloHysteresis() {
         // 1. W6d Palette check: Zero halo / shadow / outline (pure razor-sharp MSDF)
-        // Dark background (< 0.50): letters white (0xFFFFFFFF), active #64D2FF (0xFF64D2FF), sung #64D2FF 0.70 (0xB364D2FF)
+        // Dark background (< 0.50): letters white (0xFFFFFFFF), active #64D2FF (0xFF64D2FF)
         check(WordAnimation.COLOR_BASE_DARK == 0xFFFFFFFF, "dark background letters white (0xFFFFFFFF)");
         check(WordAnimation.COLOR_ACTIVE_DARK == 0xFF64D2FF, "dark background active #64D2FF (0xFF64D2FF)");
-        check(WordAnimation.COLOR_SUNG_DARK == 0xB364D2FF, "dark background sung #64D2FF 0.70 (0xB364D2FF)");
+        check(WordAnimation.COLOR_SUNG_DARK == 0xB3FFFFFF, "dark background sung white 0.70 (0xB3FFFFFF)");
 
-        // Light background (> 0.60): letters rgb(29,29,31) (0xFF1D1D1F), active #0A84FF (0xFF0A84FF), sung #0A84FF 0.70 (0xB30A84FF)
+        // Light background (> 0.60): letters rgb(29,29,31) (0xFF1D1D1F), active #0A84FF (0xFF0A84FF)
         check(WordAnimation.COLOR_BASE_LIGHT == 0xFF1D1D1F, "light background letters rgb(29,29,31) (0xFF1D1D1F)");
         check(WordAnimation.COLOR_ACTIVE_LIGHT == 0xFF0A84FF, "light background active #0A84FF (0xFF0A84FF)");
-        check(WordAnimation.COLOR_SUNG_LIGHT == 0xB30A84FF, "light background sung #0A84FF 0.70 (0xB30A84FF)");
+        check(WordAnimation.COLOR_SUNG_LIGHT == 0xB31D1D1F, "light background sung dark 0.70 (0xB31D1D1F)");
 
-        // Dynamic active and sung colors
+        // Return 1: Only the current word is accent-colored; sung words revert to base color
+        check(WordAnimation.getLetterColor(1400L, 1200L, 500L, 0.0f) == 0xFF64D2FF, "active word is accent-colored #64D2FF");
+        check(WordAnimation.getLetterColor(2000L, 1200L, 500L, 0.0f) == 0xB3FFFFFF, "sung word white 0.70 (0xB3FFFFFF)");
+        check(WordAnimation.getLetterColor(1400L, 1200L, 500L, 1.0f) == 0xFF0A84FF, "active word on light bg is #0A84FF");
+        check(WordAnimation.getLetterColor(2000L, 1200L, 500L, 1.0f) == 0xB31D1D1F, "sung word on light bg dark 0.70 (0xB31D1D1F)");
+
+        // Dynamic active and base colors
         check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "active color at 0.0 is #64D2FF");
         check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "active color at 1.0 is #0A84FF");
-        check(WordAnimation.getSungWordColor(0.0f) == 0xB364D2FF, "sung color at 0.0 is #64D2FF 0.70");
-        check(WordAnimation.getSungWordColor(1.0f) == 0xB30A84FF, "sung color at 1.0 is #0A84FF 0.70");
 
         // 2. Luminance Hysteresis (> 0.60 light, < 0.50 dark) & 300 ms transition
         KaraokeWorldRenderer.resetState();

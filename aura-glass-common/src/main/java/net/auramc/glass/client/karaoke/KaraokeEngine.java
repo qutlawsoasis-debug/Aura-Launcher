@@ -221,6 +221,14 @@ public final class KaraokeEngine {
                 KaraokeModel.KaraokeWord kw = anchor.word;
                 if (kw == null || kw.w == null) continue;
                 float fontScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+                MinecraftClient mc = MinecraftClient.getInstance();
+                if (mc != null && mc.player != null && anchor.position != null) {
+                    double distToEye = anchor.position.distanceTo(mc.player.getCameraPosVec(1.0f));
+                    float minFontScale = (float) (33.0 * distToEye / 650.7);
+                    if (fontScale < minFontScale && KaraokeConfig.get().getSize() <= 1.25f) {
+                        fontScale = minFontScale;
+                    }
+                }
                 float totalW = AuraRenderer.textWidth(kw.w, fontScale, 700);
                 if (totalW <= 0.001f) totalW = kw.w.length() * 0.5f * fontScale;
                 float penX = -totalW * 0.5f;
@@ -342,7 +350,7 @@ public final class KaraokeEngine {
                 int cz = player.getBlockZ() >> 4;
                 if (world.isChunkLoaded(cx, cz)) {
                     worldStabilizationTicks++;
-                    if (worldStabilizationTicks >= 40) { // 2.0s of steady in-world ticks
+                    if (worldStabilizationTicks >= 90) { // 4.5s of steady in-world ticks to let EMI & chunks settle
                         demoWorldStarted = true;
                         currentLineIndex = 0;
                         currentWordIndex = 0;
@@ -513,6 +521,24 @@ public final class KaraokeEngine {
             billboardV = new Vector3f(0, 1, 0);
         }
 
+        // Return 1: The whole line stays until its LAST word ends, then shatters into letters
+        long lineEndTime = 0L;
+        for (WordPlacement.WordAnchor anchor : activeAnchors) {
+            if (anchor.word != null) {
+                long end = anchor.word.t + anchor.word.d;
+                if (end > lineEndTime) {
+                    lineEndTime = end;
+                }
+            }
+        }
+
+        long lineDetachBaseTime = lineEndTime + WordAnimation.POST_WORD_HOLD_MS; // 350 ms hold after line ends
+
+        // Whole line stays visible until 350ms after the last word ends
+        if (playbackMs < lineDetachBaseTime) {
+            return;
+        }
+
         boolean allAnchorsDetached = true;
 
         for (WordPlacement.WordAnchor anchor : activeAnchors) {
@@ -520,10 +546,18 @@ public final class KaraokeEngine {
             if (kw == null || kw.w == null || kw.w.isEmpty()) continue;
 
             long wordEnd = kw.t + kw.d;
-            long detachBaseTime = wordEnd + WordAnimation.POST_WORD_HOLD_MS; // 350 ms
+            long detachBaseTime = lineDetachBaseTime;
 
             if (playbackMs >= detachBaseTime) {
                 float fontScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+                MinecraftClient mc = MinecraftClient.getInstance();
+                if (mc != null && mc.player != null && anchor.position != null) {
+                    double distToEye = anchor.position.distanceTo(mc.player.getCameraPosVec(1.0f));
+                    float minFontScale = (float) (33.0 * distToEye / 650.7);
+                    if (fontScale < minFontScale && KaraokeConfig.get().getSize() <= 1.25f) {
+                        fontScale = minFontScale;
+                    }
+                }
                 float totalW = AuraRenderer.textWidth(kw.w, fontScale, 700);
                 if (totalW <= 0.001f) totalW = kw.w.length() * 0.5f * fontScale;
                 float penX = -totalW * 0.5f;
@@ -796,6 +830,9 @@ public final class KaraokeEngine {
         if (world instanceof net.minecraft.client.world.ClientWorld cw) {
             cw.setTimeOfDay(18000L); // Midnight starlit sky
         }
+        if (player != null) {
+            player.setPitch(-15.0f); // Look up at midnight starlit sky
+        }
     }
 
     private void captureProofFrame(MinecraftClient client, String phase) {
@@ -863,38 +900,43 @@ public final class KaraokeEngine {
             captureProofFrame(client, "appear-5");
         }
 
-        // 2. Falling sequence: Word 1 letters detach at 1750..1810 ms
-        // 4 frames of falling (separate rotating letters, bounce off ground):
-        if (!shotFall0Taken && playbackMs >= 1850L) {
+        // 2. Falling letters (MiSide style) after whole line 1 shatters (line ends at 4200ms + 350ms hold = 4550ms)
+        if (!shotFall0Taken && playbackMs >= 4570L) {
             shotFall0Taken = true;
             captureProofFrame(client, "fall-0");
         }
-        if (!shotFall1Taken && playbackMs >= 2000L) {
+        if (!shotFall1Taken && playbackMs >= 4650L) {
             shotFall1Taken = true;
             captureProofFrame(client, "fall-1");
         }
-        if (!shotFall2Taken && playbackMs >= 2150L) {
+        if (!shotFall2Taken && playbackMs >= 4750L) {
             shotFall2Taken = true;
             captureProofFrame(client, "fall-2");
         }
-        if (!shotFall3Taken && playbackMs >= 2350L) {
+        if (!shotFall3Taken && playbackMs >= 4850L) {
             shotFall3Taken = true;
             captureProofFrame(client, "fall-3");
         }
 
-        // 3. Resting letters on snow ground (rest for 1.2s before dissolving)
-        if (!shotFallGroundTaken && playbackMs >= 2600L) {
+        // 3. Resting letters on ground (alpha 0.85)
+        if (!shotFallGroundTaken && playbackMs >= 5150L) {
             shotFallGroundTaken = true;
             captureProofFrame(client, "fall-ground");
         }
 
-        // 4. Snow daytime: active line in progress on snow daytime
-        if (!shotSnowDayTaken && playbackMs >= 3200L) {
+        // 4. Snow daytime: active line 1 in progress on snow daytime
+        if (!shotSnowDayTaken && playbackMs >= 3400L) {
             shotSnowDayTaken = true;
             captureProofFrame(client, "snow-day");
         }
 
-        // 5. Night: midnight starlit sky, line 4 in progress (white text, active #64D2FF)
+        // Switch to real midnight environment before line 4 starts at 14500ms
+        if (!nightEnvApplied && playbackMs >= 13500L) {
+            nightEnvApplied = true;
+            setupNightEnvironment(client.player, client.world);
+        }
+
+        // 5. Night: real midnight starlit sky, line 4 in progress (white text, active #64D2FF)
         if (!shotNightTaken && playbackMs >= 16200L) {
             shotNightTaken = true;
             captureProofFrame(client, "night");
