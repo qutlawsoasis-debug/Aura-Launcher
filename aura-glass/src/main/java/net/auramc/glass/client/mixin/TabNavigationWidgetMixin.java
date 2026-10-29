@@ -17,6 +17,7 @@ public abstract class TabNavigationWidgetMixin {
     @Inject(method="init", at=@At("TAIL"))
     private void aura_initTabs(CallbackInfo ci) {
         if (GlassFrameHooks.styledScreen()) {
+            // Requirement 4: Tab capsule top at y=6 GUI (12 px at scale 2)
             this.grid.setY(6);
             this.grid.refreshPositions();
         }
