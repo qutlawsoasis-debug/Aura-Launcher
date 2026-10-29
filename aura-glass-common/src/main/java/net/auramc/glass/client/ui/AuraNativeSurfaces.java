@@ -83,11 +83,18 @@ public final class AuraNativeSurfaces {
         var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PILL_THICK);
         var style=GlassStyles.frameResolve(base,state,amount);
         if(GlassStyles.regular()){
-            style.radius=6;style.rimOuter=.10f;
+            style.radius=selectedTab ? 12 : 6;
+            style.rimOuter=.10f;
             style.scale=GlassStyles.quality()==GlassQuality.OFF?1:1+.012f*hover-.025f*press;
             if(widget.active&&hovered&&GlassStyles.quality()!=GlassQuality.OFF)style.pointer((float)(client.mouse.getX()/client.getWindow().getScaleFactor()-widget.getX()),(float)(client.mouse.getY()/client.getWindow().getScaleFactor()-widget.getY()));
             if(primary){style.asPrimary();style.tintR=style.tintG=style.tintB=1;style.tintA=.92f;}
-            else{style.asFill();style.tintR=style.tintG=118/255f;style.tintB=128/255f;style.tintA=!widget.active?.12f:selectedTab?.50f:.24f+.12f*hover+.14f*press;}
+            else{
+                style.asFill();
+                style.tintR=style.tintG=118/255f;
+                style.tintB=128/255f;
+                // Requirement 4: активная вкладка — заливка rgba(118,118,128,0.36)
+                style.tintA=!widget.active?.12f:selectedTab?.36f:.24f+.12f*hover+.14f*press;
+            }
         }
         if(!GlassStyles.regular())net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
         GlassRenderer.drawWidget(widget, widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
@@ -130,13 +137,16 @@ public final class AuraNativeSurfaces {
         if (!AuraRenderer.isReady() || !(widget.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent text)) return false;
         String key = text.getKey();
         boolean language = key.equals("narrator.button.language") || key.equals("options.language");
-        boolean accessibility = key.equals("narrator.button.accessibility") || key.equals("options.accessibility");
+        boolean accessibility = key.equals("narrator.button.accessibility") || key.equals("options.accessibility")
+                || key.equals("accessibility.onboarding.accessibility.button");
         if (!language && !accessibility) return false;
-        int color = button(context, widget, hovered, alpha);
-        float size = Math.min(widget.getWidth(), widget.getHeight()) * .62f;
+        button(context, widget, hovered, alpha);
+        // Requirement 9: монохромные белые 0.92 как в 1.20.1, 16 GUI
+        float size = 16.0f;
         float x = widget.getX() + (widget.getWidth() - size) * .5f;
         float y = widget.getY() + (widget.getHeight() - size) * .5f;
-        NativeCommand command=command(context,language?2:3,color);if(command==null)return false;
+        int iconColor = 0xEBFFFFFF; // 255 * 0.92 = 235 (0xEB)
+        NativeCommand command=command(context,language?2:3,iconColor);if(command==null)return false;
         command.size=size;command.x=x;command.y=y;GlassRenderer.foreground(command);return true;
     }
     private static final class NativeCommand implements Runnable {
