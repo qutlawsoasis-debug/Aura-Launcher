@@ -408,6 +408,19 @@ public final class KaraokeEngine {
                     world
             );
 
+            if (activeAnchors.isEmpty()) {
+                // Obstacle closer than MIN_DISTANCE: do NOT spawn behind wall; drop elapsed words
+                while (currentWordIndex < currentLine.words.size()) {
+                    KaraokeModel.KaraokeWord w = currentLine.words.get(currentWordIndex);
+                    if (playbackMs > w.end()) {
+                        currentWordIndex++;
+                    } else {
+                        break;
+                    }
+                }
+                return;
+            }
+
             List<KaraokeModel.KaraokeWord> placedWords = new ArrayList<>();
             for (WordPlacement.WordAnchor anchor : activeAnchors) {
                 placedWords.add(anchor.word);

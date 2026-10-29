@@ -292,6 +292,43 @@ public final class KaraokeSuiteTest {
         double x1 = shortAnchors.get(1).position.subtract(eyePos).dotProduct(camRight0);
         check(x1 > x0, "To (x=" + x0 + ") before the (x=" + x1 + ")");
 
+        // QA ConeProbe with motion lead (strafing and diagonal movement)
+        List<KaraokeModel.KaraokeWord> probeWords = List.of(
+                new KaraokeModel.KaraokeWord(1000, 300, "probe"),
+                new KaraokeModel.KaraokeWord(1350, 300, "word")
+        );
+        Vec3d[] testVelocities = {
+                new Vec3d(0.2, 0, 0), // QA exact reproduction test case
+                new Vec3d(-0.2, 0, 0),
+                new Vec3d(0.5, 0, 0),
+                new Vec3d(-0.5, 0, 0),
+                new Vec3d(0.2, 0, 0.2),
+                new Vec3d(-0.2, 0.2, -0.2),
+                new Vec3d(0, 0.4, 0),
+                new Vec3d(0, -0.4, 0)
+        };
+        for (Vec3d vel : testVelocities) {
+            for (float testYaw : testYaws) {
+                for (float testPitch : testPitches) {
+                    double yRad = Math.toRadians(testYaw);
+                    double pRad = Math.toRadians(testPitch);
+                    Vec3d currentLook = new Vec3d(
+                            -Math.sin(yRad) * Math.cos(pRad),
+                            -Math.sin(pRad),
+                            Math.cos(yRad) * Math.cos(pRad)
+                    ).normalize();
+
+                    var motionAnchors = WordPlacement.layoutGroup(probeWords, eyePos, testYaw, testPitch, vel, 1.0f, null);
+                    check(!motionAnchors.isEmpty(), "motion anchors created");
+                    for (var a : motionAnchors) {
+                        double ang = WordPlacement.angleFromLook(a.position, eyePos, currentLook);
+                        check(ang >= 3.0, "motion anchor angle outside 3° dead zone: " + ang + " at vel=" + vel);
+                        check(ang <= 12.05, "motion anchor angle <= 12°: " + ang + " at vel=" + vel);
+                    }
+                }
+            }
+        }
+
         System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), cone limit (<= 12° for all anchors and bounds including long words), and left-to-right screen order with spaces");
     }
 
@@ -415,11 +452,14 @@ public final class KaraokeSuiteTest {
 
         int totalComparisons = 0;
 
+        Vec3d[] vels = {Vec3d.ZERO, new Vec3d(0.2, 0, 0), new Vec3d(-0.2, 0, 0.2)};
+
         for (List<KaraokeModel.KaraokeWord> group : testGroups) {
-            for (float yaw : testYaws) {
-                for (float pitch : testPitches) {
-                    var anchors = WordPlacement.layoutGroup(group, eyePos, yaw, pitch, Vec3d.ZERO, 1.0f, null);
-                    check(!anchors.isEmpty(), "anchors generated for group size " + group.size());
+            for (Vec3d vel : vels) {
+                for (float yaw : testYaws) {
+                    for (float pitch : testPitches) {
+                        var anchors = WordPlacement.layoutGroup(group, eyePos, yaw, pitch, vel, 1.0f, null);
+                        check(!anchors.isEmpty(), "anchors generated for group size " + group.size());
 
                     for (int res = 0; res < screenWidths.length; res++) {
                         int sw = screenWidths[res];
@@ -454,6 +494,7 @@ public final class KaraokeSuiteTest {
                     }
                 }
             }
+        }
         }
 
         check(totalComparisons >= 400, "verified >= 400 rectangle non-intersection pairs: " + totalComparisons);
