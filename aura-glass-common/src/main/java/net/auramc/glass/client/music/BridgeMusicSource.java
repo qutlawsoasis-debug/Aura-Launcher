@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 
 public final class BridgeMusicSource implements MusicSource, AutoCloseable {
     private static final Duration CONNECT_TIMEOUT = Duration.ofMillis(1000);
-    private static final Duration POLL_TIMEOUT = Duration.ofMillis(450);
+    private static final Duration POLL_TIMEOUT = Duration.ofMillis(2000);
     private static final Duration CMD_TIMEOUT = Duration.ofMillis(1000);
     private static final Duration SEARCH_TIMEOUT = Duration.ofMillis(2000);
 
@@ -24,6 +24,7 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
     private final HttpClient httpClient;
     private final Thread pollerThread;
     private final java.util.concurrent.atomic.AtomicLong httpPollCount = new java.util.concurrent.atomic.AtomicLong();
+    private final Object pollLock = new Object();
     private volatile boolean running = true;
 
     private volatile BridgeConfig currentConfig;
@@ -147,39 +148,42 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
     }
 
     public void pollOnce() {
-        BridgeConfig config = BridgeConfig.load(configPath);
-        if (config == null || !config.isValid()) {
-            this.currentConfig = null;
-            this.available = false;
-            this.cachedNow = NowPlaying.stopped();
-            return;
-        }
-
-        this.currentConfig = config;
-        try {
-            String url = "http://127.0.0.1:" + config.port() + "/now";
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(POLL_TIMEOUT)
-                    .header("Authorization", "Bearer " + config.token())
-                    .header("Accept", "application/json")
-                    .GET()
-                    .build();
-
-            httpPollCount.incrementAndGet();
-            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (resp.statusCode() == 200) {
-                NowPlaying parsed = MusicJsonParser.parseNowPlaying(resp.body());
-                this.cachedNow = parsed;
-                this.available = true;
-            } else {
+        synchronized (pollLock) {
+            BridgeConfig config = BridgeConfig.load(configPath);
+            if (config == null || !config.isValid()) {
+                this.currentConfig = null;
                 this.available = false;
                 this.cachedNow = NowPlaying.stopped();
+                return;
             }
-        } catch (Exception ignored) {
-            // Quiet wait: server offline or error -> available = false
-            this.available = false;
-            this.cachedNow = NowPlaying.stopped();
+
+            this.currentConfig = config;
+            try {
+                String url = "http://127.0.0.1:" + config.port() + "/now";
+                HttpRequest req = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .timeout(POLL_TIMEOUT)
+                        .header("Authorization", "Bearer " + config.token())
+                        .header("Accept", "application/json")
+                        .GET()
+                        .build();
+
+                httpPollCount.incrementAndGet();
+                HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+                if (resp.statusCode() == 200) {
+                    NowPlaying parsed = MusicJsonParser.parseNowPlaying(resp.body());
+                    this.cachedNow = parsed;
+                    this.available = true;
+                } else {
+                    this.available = false;
+                    this.cachedNow = NowPlaying.stopped();
+                }
+            } catch (Exception ignored) {
+                if (!java.nio.file.Files.exists(configPath)) {
+                    this.available = false;
+                    this.cachedNow = NowPlaying.stopped();
+                }
+            }
         }
     }
 
@@ -188,8 +192,10 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
             try {
                 pollOnce();
             } catch (Throwable ignored) {
-                this.available = false;
-                this.cachedNow = NowPlaying.stopped();
+                if (!java.nio.file.Files.exists(configPath)) {
+                    this.available = false;
+                    this.cachedNow = NowPlaying.stopped();
+                }
             }
 
             try {
@@ -219,7 +225,7 @@ public final class BridgeMusicSource implements MusicSource, AutoCloseable {
             CompletableFuture<Void> future = new CompletableFuture<>();
             httpClient.sendAsync(req, HttpResponse.BodyHandlers.discarding())
                     .whenComplete((resp, ex) -> {
-                        try { pollOnce(); } catch (Throwable ignored) {}
+                        CompletableFuture.runAsync(this::pollOnce);
                         future.complete(null);
                     });
             return future;
