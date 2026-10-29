@@ -118,7 +118,7 @@ public final class QuickMenuMotion {
             double arc = Math.sin(Math.PI * phase) * Math.min(48, Math.abs(startCenter - anchorX) * .16);
             displayBottom = startBottom + (anchorY - startBottom) * phase - arc;
         }
-        if (!open && (elapsed >= CLOSE_TIME && progress < .004f || elapsed >= 650_000_000L)) {
+        if (!open && (elapsed >= CLOSE_TIME && progress < .004f || elapsed >= 2_000_000_000L)) {
             displayCenter = startCenter = anchorX;
             displayBottom = startBottom = anchorY;
             geometry = new Geometry(anchorX, anchorY, 0, 0, 0, 0, 0, anchorX, anchorY, 0);
