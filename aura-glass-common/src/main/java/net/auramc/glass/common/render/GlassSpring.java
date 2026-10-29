@@ -19,7 +19,7 @@ public final class GlassSpring {
         if (previous == 0) { previous = now; return value; }
         float dt = Math.min(.05f, Math.max(0f, (now - previous) / 1_000_000_000f));
         previous = now;
-        // SwiftUI spring(response: .35, dampingFraction: .825); preserve velocity on retarget.
+        // Apple spring(response: 0.35, dampingFraction: 0.85); preserve velocity on retarget.
         float omega = (float)(2 * Math.PI / response);
         float damped = omega * (float) Math.sqrt(1f - zeta * zeta);
         float delta = value - target;
