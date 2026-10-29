@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Aura — пауза</title>
+<style>
+@font-face {
+  font-family: 'Onest';
+  src: url('Onest.ttf') format('truetype'), url('Onest.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+}
+:root {
+  --accent: #64D2FF; --accent-hover: #8EDEFF; --accent-ink: #00283A;
+  --ink: #fff; --ink-2: rgba(255,255,255,.76); --ink-3: rgba(255,255,255,.56);
+  --glass: rgba(40,42,50,.40);
+  --sheen: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.04) 40%, rgba(255,255,255,.02));
+  --hair: rgba(255,255,255,.10);
+  --fill: rgba(118,118,128,.24); --fill-2: rgba(118,118,128,.36); --fill-3: rgba(118,118,128,.50);
+  --danger: #FF8A8A;
+  --spring: cubic-bezier(.34,1.3,.5,1); --smooth: cubic-bezier(.22,1,.36,1);
+}
+* { box-sizing: border-box; margin: 0; }
+/* Прозрачный фон: размытие мира рисует aura-glass под страницей. */
+html, body { height: 100%; background: transparent; color: var(--ink); font-family: Onest, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; user-select: none; overflow: hidden; }
+body.preview { background: #070b10 url(preview-bg.jpg) center / cover; }
+body.preview::before { content: ""; position: fixed; inset: 0; backdrop-filter: blur(22px) saturate(190%); background: rgba(0,0,0,.12); }
+
+.stage { position: fixed; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.panel {
+  position: relative; width: 440px; padding: 22px; border-radius: 28px;
+  background: var(--sheen), var(--glass);
+  border: 1px solid var(--hair);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.40), 0 12px 32px rgba(0,0,0,.28);
+  opacity: 0; transform: translateY(14px) scale(.96);
+  transition: opacity .28s var(--smooth), transform .45s var(--spring);
+}
+.open .panel { opacity: 1; transform: none; }
+.closing .panel { opacity: 0; transform: scale(.97); transition-duration: .18s; }
+
+.head { display: flex; align-items: center; padding: 2px 4px 18px; }
+.face { width: 44px; height: 44px; border-radius: 12px; flex: none; image-rendering: pixelated;
+  background: url(steve.png) -44px -44px / 352px 352px; border: 1px solid var(--hair); margin-right: 14px; }
+.who { flex: 1; min-width: 0; }
+.name { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.world { font-size: 14px; color: var(--ink-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title { font-size: 13px; font-weight: 600; color: var(--ink-3); letter-spacing: .08em; text-transform: uppercase; }
+
+.btn { display: flex; align-items: center; width: 100%; height: 48px; padding: 0 16px; border: 1px solid var(--hair); border-radius: 14px;
+  font: 500 17px/1 Onest, system-ui, sans-serif; color: var(--ink); background: var(--fill); cursor: pointer;
+  transition: background .15s, border-color .15s, transform .25s var(--spring); outline: none; }
+.btn:hover, .btn.focus { background: var(--fill-2); border-color: rgba(255,255,255,.22); }
+.btn:active { background: var(--fill-3); transform: scale(.98); }
+.btn svg { width: 20px; height: 20px; flex: none; opacity: .9; margin-right: 12px; }
+.btn .sub { margin-left: auto; font-size: 14px; color: var(--ink-3); }
+.btn.primary { justify-content: center; height: 54px; font-weight: 600; color: var(--accent-ink); background: var(--accent); border-color: transparent; }
+.btn.primary:hover, .btn.primary.focus { background: var(--accent-hover); }
+.btn.quit { justify-content: center; color: var(--danger); }
+
+.grid { display: flex; flex-wrap: wrap; margin: 10px -4px; }
+.grid .btn { width: calc(50% - 8px); margin: 4px; }
+.list { display: flex; flex-direction: column; }
+.list .btn + .btn { margin-top: 8px; }
+
+.foot { display: flex; justify-content: space-between; padding: 14px 6px 0; font-size: 13px; color: var(--ink-3); }
+kbd { font: inherit; padding: 1px 6px; border-radius: 6px; background: var(--fill); color: var(--ink-2); }
+@media (prefers-reduced-motion: reduce) { .panel { transition: opacity .15s; transform: none; } }
+</style>
+</head>
+<body>
+<div class="stage">
+  <section class="panel" role="dialog" aria-label="Пауза">
+    <div class="head">
+      <div class="face" aria-hidden="true"></div>
+      <div class="who">
+        <div class="name" id="player">Игрок</div>
+        <div class="world" id="world">Мир</div>
+      </div>
+      <div class="title">Пауза</div>
+    </div>
+
+    <button class="btn primary" data-action="resume">Вернуться к игре</button>
+
+    <div class="grid">
+      <button class="btn" data-action="advancements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Достижения</button>
+      <button class="btn" data-action="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Статистика</button>
+      <button class="btn" data-action="mods"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>Моды</button>
+      <button class="btn" data-action="lan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Для сети</button>
+    </div>
+
+    <div class="list">
+      <button class="btn" data-action="options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Настройки<span class="sub" id="fps"></span></button>
+      <button class="btn quit" data-action="quit">Сохранить и выйти</button>
+    </div>
+
+    <div class="foot"><span><kbd>Esc</kbd> вернуться</span><span><kbd>F8</kbd> меню Aura</span></div>
+  </section>
+</div>
+<script>
+(() => {
+  // Мост: игра ставит window.aura.action (Java). В браузере — заглушка для превью.
+  const bridge = window.aura || (window.aura = { action: a => console.log('[aura-action]:' + a) });
+  const preview = !window.auraNative;
+  if (preview) document.body.classList.add('preview');
+
+  const buttons = [...document.querySelectorAll('.btn')];
+  let focus = -1, closing = false;
+
+  function act(action) {
+    if (closing) return;
+    if (action === 'resume') {
+      closing = true;
+      document.body.classList.add('closing');
+      setTimeout(() => bridge.action('resume'), 180);
+    } else bridge.action(action);
+  }
+  buttons.forEach(b => b.addEventListener('click', () => act(b.dataset.action)));
+
+  function setFocus(i) {
+    focus = (i + buttons.length) % buttons.length;
+    buttons.forEach((b, k) => b.classList.toggle('focus', k === focus));
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); act('resume'); }
+    else if (e.key === 'ArrowDown' || e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); setFocus(focus + 1); }
+    else if (e.key === 'ArrowUp' || e.key === 'Tab' && e.shiftKey) { e.preventDefault(); setFocus(focus - 1); }
+    else if ((e.key === 'Enter' || e.key === ' ') && focus >= 0) { e.preventDefault(); act(buttons[focus].dataset.action); }
+  });
+  document.addEventListener('mousemove', () => { if (focus >= 0) { focus = -1; buttons.forEach(b => b.classList.remove('focus')); } });
+
+  // Java → JS: aura.state({player, world, fps, skin})
+  bridge.state = s => {
+    if (!s) return;
+    const p = document.getElementById('player');
+    const w = document.getElementById('world');
+    const f = document.getElementById('fps');
+    if (p && s.player) p.textContent = s.player;
+    if (w && s.world) w.textContent = s.world;
+    if (f && s.fps != null) f.textContent = s.fps + ' FPS';
+    if (s.skin) {
+      const face = document.querySelector('.face');
+      if (face) face.style.backgroundImage = `url(${s.skin})`;
+    }
+    console.log('[aura-bridge] state applied: player=' + (s.player || '') + ' world=' + (s.world || ''));
+  };
+  if (bridge._state) bridge.state(bridge._state);
+  if (preview) bridge.state({ player: 'Cooock0ld', world: 'Новый мир · Выживание', fps: 144 });
+
+  if (document.fonts) {
+    document.fonts.ready.then(() => {
+      const loaded = document.fonts.check('17px Onest');
+      console.log('[aura-font] document.fonts.ready, Onest 17px loaded: ' + loaded);
+    });
+  }
+
+  requestAnimationFrame(() => document.body.classList.add('open'));
+})();
+</script>
+</body>
+</html>

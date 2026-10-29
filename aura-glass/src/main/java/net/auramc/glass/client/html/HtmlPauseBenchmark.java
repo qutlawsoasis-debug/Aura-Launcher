@@ -1,5 +1,9 @@
 package net.auramc.glass.client.html;
 
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.screen.TitleScreen;
@@ -7,13 +11,8 @@ import net.minecraft.client.gui.screen.world.CreateWorldScreen;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.util.ScreenshotRecorder;
 import org.lwjgl.opengl.GL11;
-import com.sun.jna.Pointer;
-import com.sun.jna.Structure;
-import com.sun.jna.Library;
-import com.sun.jna.Native;
 
 import java.io.File;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,26 +25,40 @@ public class HtmlPauseBenchmark {
 
     public enum Phase {
         WAIT_FOR_WORLD,
-        START_REGULAR_PAUSE,
-        BENCHMARK_REGULAR_PAUSE,
-        START_HTML_PAUSE,
-        BENCHMARK_HTML_PAUSE_STATIC,
-        BENCHMARK_HTML_PAUSE_HOVER,
+        WARMUP_60S,
+        INIT_CORE_MEASURE_MEM,
+        START_REG_1, REG_1,
+        START_HTML_1, HTML_1,
+        START_REG_2, REG_2,
+        START_HTML_2, HTML_2,
+        START_REG_3, REG_3,
+        START_HTML_3, HTML_3,
+        START_HOVER, HOVER,
+        MEASURE_WARM_OPEN,
         WAIT_60S_MEMORY,
         COMPLETE
     }
 
     private static Phase phase = Phase.WAIT_FOR_WORLD;
-    private static int tickCounter = 0;
     private static int autoWorldTicks = 0;
     private static boolean worldLaunchInitiated = false;
+    private static int warmupTicks = 0;
 
-    private static long memBeforeBytes = 0;
+    private static long memBaselineBytes = 0;
+    private static long memCoreBytes = 0;
     private static long memAfterBytes = 0;
     private static long pauseStartTimeMs = 0;
 
-    private static final List<Double> regularFrameTimes = new ArrayList<>(700);
-    private static final List<Double> htmlStaticFrameTimes = new ArrayList<>(700);
+    private static final List<Double> regBlock1 = new ArrayList<>(160);
+    private static final List<Double> regBlock2 = new ArrayList<>(160);
+    private static final List<Double> regBlock3 = new ArrayList<>(160);
+
+    private static final List<Double> htmlBlock1 = new ArrayList<>(160);
+    private static final List<Double> htmlBlock2 = new ArrayList<>(160);
+    private static final List<Double> htmlBlock3 = new ArrayList<>(160);
+
+    private static final List<Double> regularFrameTimes = new ArrayList<>(500);
+    private static final List<Double> htmlStaticFrameTimes = new ArrayList<>(500);
     private static final List<Double> htmlHoverFrameTimes = new ArrayList<>(700);
 
     private static long lastFrameNano = 0;
@@ -58,7 +71,7 @@ public class HtmlPauseBenchmark {
     public static void initialize() {
         if (Boolean.getBoolean("aura.htmlPause.benchmark")) {
             active = true;
-            System.out.println("[AuraBenchmark] In-game HTML Pause Benchmark enabled");
+            System.out.println("[AuraBenchmark] In-game HTML Pause Benchmark enabled (Fair A/B 60s Warmup + Alternating Blocks)");
         }
     }
 
@@ -109,32 +122,87 @@ public class HtmlPauseBenchmark {
         // We are in-world!
         switch (phase) {
             case WAIT_FOR_WORLD:
-                tickCounter++;
-                if (tickCounter > 80) { // Wait 4 seconds for chunks, lighting and shaders to settle
-                    System.out.println("[AuraBenchmark] World settled. Recording baseline memory...");
-                    memBeforeBytes = getProcessPrivateBytes();
-                    System.out.println("[AuraBenchmark] Private Bytes before: " + (memBeforeBytes / 1024 / 1024) + " MB");
-                    phase = Phase.START_REGULAR_PAUSE;
+                System.out.println("[AuraBenchmark] In-world reached. Beginning 60s warmup (1200 ticks) without movement...");
+                warmupTicks = 0;
+                phase = Phase.WARMUP_60S;
+                break;
+
+            case WARMUP_60S:
+                warmupTicks++;
+                if (warmupTicks % 200 == 0) {
+                    System.out.println("[AuraBenchmark] Warmup progress: " + (warmupTicks / 20) + "s / 60s");
+                }
+                if (warmupTicks >= 1200) { // 60s at 20 tps
+                    System.out.println("[AuraBenchmark] 60s Warmup complete. Measuring baseline memory...");
+                    memBaselineBytes = getProcessPrivateBytes();
+                    System.out.println("[AuraBenchmark] Baseline Private Bytes (before Ultralight): " + (memBaselineBytes / 1024 / 1024) + " MB");
+                    phase = Phase.INIT_CORE_MEASURE_MEM;
                 }
                 break;
 
-            case START_REGULAR_PAUSE:
-                System.out.println("[AuraBenchmark] Starting Regular Pause benchmark (600 frames)...");
-                allowVanillaMenu = true;
-                client.setScreen(new GameMenuScreen(true));
-                allowVanillaMenu = false;
-                lastFrameNano = System.nanoTime();
-                phase = Phase.BENCHMARK_REGULAR_PAUSE;
+            case INIT_CORE_MEASURE_MEM:
+                System.out.println("[AuraBenchmark] Initializing Ultralight SDK core...");
+                UltralightNative.init();
+                memCoreBytes = getProcessPrivateBytes();
+                long coreDelta = memCoreBytes - memBaselineBytes;
+                System.out.println("[AuraBenchmark] Ultralight core initialized. Core Private Bytes: " + (memCoreBytes / 1024 / 1024) + " MB (core delta: +" + (coreDelta / 1024 / 1024) + " MB)");
+                phase = Phase.START_REG_1;
                 break;
 
-            case START_HTML_PAUSE:
-                System.out.println("[AuraBenchmark] Starting HTML Pause benchmark (600 static frames)...");
-                long t0 = System.currentTimeMillis();
-                client.setScreen(new HtmlPauseScreen());
-                firstOpenTimeMs = Math.max(1, System.currentTimeMillis() - t0);
+            case START_REG_1:
+                System.out.println("[AuraBenchmark] Starting Regular Block 1 (150 frames)...");
+                openRegular(client);
+                phase = Phase.REG_1;
+                break;
+
+            case START_HTML_1:
+                System.out.println("[AuraBenchmark] Starting HTML Static Block 1 (150 frames)...");
+                openHtml(client, true);
+                if (pauseStartTimeMs == 0) pauseStartTimeMs = System.currentTimeMillis();
+                phase = Phase.HTML_1;
+                break;
+
+            case START_REG_2:
+                System.out.println("[AuraBenchmark] Starting Regular Block 2 (150 frames)...");
+                openRegular(client);
+                phase = Phase.REG_2;
+                break;
+
+            case START_HTML_2:
+                System.out.println("[AuraBenchmark] Starting HTML Static Block 2 (150 frames)...");
+                openHtml(client, false);
+                phase = Phase.HTML_2;
+                break;
+
+            case START_REG_3:
+                System.out.println("[AuraBenchmark] Starting Regular Block 3 (150 frames)...");
+                openRegular(client);
+                phase = Phase.REG_3;
+                break;
+
+            case START_HTML_3:
+                System.out.println("[AuraBenchmark] Starting HTML Static Block 3 (150 frames)...");
+                openHtml(client, false);
+                phase = Phase.HTML_3;
+                break;
+
+            case START_HOVER:
+                System.out.println("[AuraBenchmark] Starting HTML Hover Scenario (10s / 600 frames)...");
+                openHtml(client, false);
+                hoverFrameCount = 0;
                 lastFrameNano = System.nanoTime();
-                pauseStartTimeMs = System.currentTimeMillis();
-                phase = Phase.BENCHMARK_HTML_PAUSE_STATIC;
+                phase = Phase.HOVER;
+                break;
+
+            case MEASURE_WARM_OPEN:
+                System.out.println("[AuraBenchmark] Measuring warm open timing...");
+                client.setScreen(null);
+                long t1 = System.currentTimeMillis();
+                client.setScreen(new HtmlPauseScreen());
+                secondOpenTimeMs = Math.max(1, System.currentTimeMillis() - t1);
+                System.out.println("[AuraBenchmark] Warm open time: " + secondOpenTimeMs + " ms");
+                System.out.println("[AuraBenchmark] Waiting for 60s total pause duration...");
+                phase = Phase.WAIT_60S_MEMORY;
                 break;
 
             case WAIT_60S_MEMORY:
@@ -152,6 +220,26 @@ public class HtmlPauseBenchmark {
         }
     }
 
+    private static void openRegular(MinecraftClient client) {
+        client.setScreen(null);
+        allowVanillaMenu = true;
+        client.setScreen(new GameMenuScreen(true));
+        allowVanillaMenu = false;
+        lastFrameNano = System.nanoTime();
+    }
+
+    private static void openHtml(MinecraftClient client, boolean isFirst) {
+        client.setScreen(null);
+        long t0 = System.currentTimeMillis();
+        HtmlPauseScreen screen = new HtmlPauseScreen();
+        client.setScreen(screen);
+        if (isFirst) {
+            firstOpenTimeMs = Math.max(1, System.currentTimeMillis() - t0);
+            System.out.println("[AuraBenchmark] Cold open time: " + firstOpenTimeMs + " ms");
+        }
+        lastFrameNano = System.nanoTime();
+    }
+
     public static void onRenderFrame(MinecraftClient client) {
         if (!active) return;
         long now = System.nanoTime();
@@ -162,54 +250,98 @@ public class HtmlPauseBenchmark {
         double dtMs = (now - lastFrameNano) / 1_000_000.0;
         lastFrameNano = now;
 
-        if (phase == Phase.BENCHMARK_REGULAR_PAUSE) {
-            if (client.currentScreen instanceof GameMenuScreen) {
-                regularFrameTimes.add(dtMs);
-                if (regularFrameTimes.size() >= 600) {
-                    System.out.println("[AuraBenchmark] Finished 600 regular frames. Switching to HTML pause.");
-                    phase = Phase.START_HTML_PAUSE;
+        switch (phase) {
+            case REG_1:
+                if (client.currentScreen instanceof GameMenuScreen) {
+                    regBlock1.add(dtMs);
+                    regularFrameTimes.add(dtMs);
+                    if (regBlock1.size() >= 150) {
+                        System.out.println("[AuraBenchmark] Finished Reg Block 1. Switching to HTML Block 1.");
+                        phase = Phase.START_HTML_1;
+                    }
                 }
-            }
-        } else if (phase == Phase.BENCHMARK_HTML_PAUSE_STATIC) {
-            if (client.currentScreen instanceof HtmlPauseScreen) {
-                htmlStaticFrameTimes.add(dtMs);
+                break;
 
-                // Take screenshot at frame 150 (after CSS open transition 0.45s settles)
-                if (htmlStaticFrameTimes.size() == 150 && !screenshotTaken) {
-                    screenshotTaken = true;
-                    captureInGameFrame(client);
+            case HTML_1:
+                if (client.currentScreen instanceof HtmlPauseScreen) {
+                    htmlBlock1.add(dtMs);
+                    htmlStaticFrameTimes.add(dtMs);
+                    if (htmlBlock1.size() == 75 && !screenshotTaken) {
+                        screenshotTaken = true;
+                        captureInGameFrame(client);
+                    }
+                    if (htmlBlock1.size() >= 150) {
+                        System.out.println("[AuraBenchmark] Finished HTML Block 1. Switching to Reg Block 2.");
+                        phase = Phase.START_REG_2;
+                    }
                 }
+                break;
 
-                if (htmlStaticFrameTimes.size() >= 600) {
-                    System.out.println("[AuraBenchmark] Finished 600 static HTML frames. Starting hover scenario (10s)...");
-                    phase = Phase.BENCHMARK_HTML_PAUSE_HOVER;
-                    hoverFrameCount = 0;
+            case REG_2:
+                if (client.currentScreen instanceof GameMenuScreen) {
+                    regBlock2.add(dtMs);
+                    regularFrameTimes.add(dtMs);
+                    if (regBlock2.size() >= 150) {
+                        System.out.println("[AuraBenchmark] Finished Reg Block 2. Switching to HTML Block 2.");
+                        phase = Phase.START_HTML_2;
+                    }
                 }
-            }
-        } else if (phase == Phase.BENCHMARK_HTML_PAUSE_HOVER) {
-            if (client.currentScreen instanceof HtmlPauseScreen screen) {
-                htmlHoverFrameTimes.add(dtMs);
-                hoverFrameCount++;
+                break;
 
-                // Simulate continuous mouse movement across the buttons
-                int fbW = client.getWindow().getFramebufferWidth();
-                int fbH = client.getWindow().getFramebufferHeight();
-                double scale = client.getWindow().getScaleFactor();
-                double mx = (fbW / 2.0) / scale;
-                double my = ((fbH / 2.0) + Math.sin(hoverFrameCount * 0.1) * 150.0) / scale;
-                screen.mouseMoved(mx, my);
-
-                if (hoverFrameCount >= 600) { // ~10s at 60 FPS
-                    System.out.println("[AuraBenchmark] Finished hover scenario. Measuring warm open timing...");
-                    client.setScreen(null);
-                    long t1 = System.currentTimeMillis();
-                    client.setScreen(new HtmlPauseScreen());
-                    secondOpenTimeMs = Math.max(1, System.currentTimeMillis() - t1);
-
-                    System.out.println("[AuraBenchmark] Waiting for 60s total pause duration...");
-                    phase = Phase.WAIT_60S_MEMORY;
+            case HTML_2:
+                if (client.currentScreen instanceof HtmlPauseScreen) {
+                    htmlBlock2.add(dtMs);
+                    htmlStaticFrameTimes.add(dtMs);
+                    if (htmlBlock2.size() >= 150) {
+                        System.out.println("[AuraBenchmark] Finished HTML Block 2. Switching to Reg Block 3.");
+                        phase = Phase.START_REG_3;
+                    }
                 }
-            }
+                break;
+
+            case REG_3:
+                if (client.currentScreen instanceof GameMenuScreen) {
+                    regBlock3.add(dtMs);
+                    regularFrameTimes.add(dtMs);
+                    if (regBlock3.size() >= 150) {
+                        System.out.println("[AuraBenchmark] Finished Reg Block 3. Switching to HTML Block 3.");
+                        phase = Phase.START_HTML_3;
+                    }
+                }
+                break;
+
+            case HTML_3:
+                if (client.currentScreen instanceof HtmlPauseScreen) {
+                    htmlBlock3.add(dtMs);
+                    htmlStaticFrameTimes.add(dtMs);
+                    if (htmlBlock3.size() >= 150) {
+                        System.out.println("[AuraBenchmark] Finished HTML Block 3. Switching to Hover scenario.");
+                        phase = Phase.START_HOVER;
+                    }
+                }
+                break;
+
+            case HOVER:
+                if (client.currentScreen instanceof HtmlPauseScreen screen) {
+                    htmlHoverFrameTimes.add(dtMs);
+                    hoverFrameCount++;
+
+                    int fbW = client.getWindow().getFramebufferWidth();
+                    int fbH = client.getWindow().getFramebufferHeight();
+                    double scale = client.getWindow().getScaleFactor();
+                    double mx = (fbW / 2.0) / scale;
+                    double my = ((fbH / 2.0) + Math.sin(hoverFrameCount * 0.1) * 150.0) / scale;
+                    screen.mouseMoved(mx, my);
+
+                    if (hoverFrameCount >= 600) {
+                        System.out.println("[AuraBenchmark] Finished hover scenario. Measuring warm open timing...");
+                        phase = Phase.MEASURE_WARM_OPEN;
+                    }
+                }
+                break;
+
+            default:
+                break;
         }
     }
 
@@ -223,10 +355,6 @@ public class HtmlPauseBenchmark {
                 image.writeTo(fullPng);
                 System.out.println("[AuraBenchmark] Saved in-game full frame: " + fullPng.getAbsolutePath() + " (" + fullPng.length() + " bytes)");
 
-                // Crop 17px primary button text "Вернуться к игре"
-                // Screen width 1920, center 960. Panel 440px wide -> x=740..1180.
-                // Button "Вернуться к игре" is primary button: height 54px, y ~ 420..474.
-                // Text is centered: x ~ 860..1060, y ~ 432..462.
                 int imgW = image.getWidth();
                 int imgH = image.getHeight();
                 int cropW = 200;
@@ -241,7 +369,6 @@ public class HtmlPauseBenchmark {
                                 crop.setColor(x, y, image.getColor(cropX + x, cropY + y));
                             }
                         }
-                        // Scale 400% Nearest Neighbor: 200x30 -> 800x120
                         try (NativeImage zoom400 = new NativeImage(cropW * 4, cropH * 4, false)) {
                             for (int y = 0; y < cropH * 4; y++) {
                                 for (int x = 0; x < cropW * 4; x++) {
@@ -325,32 +452,54 @@ public class HtmlPauseBenchmark {
                 }
             }
 
-            // 4. Compute statistics
-            Stats regStats = computeStats(regularFrameTimes);
-            Stats htmlStats = computeStats(htmlStaticFrameTimes);
+            // 4. Compute statistics for all blocks
+            Stats regB1 = computeStats(regBlock1);
+            Stats regB2 = computeStats(regBlock2);
+            Stats regB3 = computeStats(regBlock3);
+            Stats regComb = computeStats(regularFrameTimes);
+
+            Stats htmlB1 = computeStats(htmlBlock1);
+            Stats htmlB2 = computeStats(htmlBlock2);
+            Stats htmlB3 = computeStats(htmlBlock3);
+            Stats htmlComb = computeStats(htmlStaticFrameTimes);
+
             Stats hoverStats = computeStats(htmlHoverFrameTimes);
+
+            double coreDeltaMb = (memCoreBytes - memBaselineBytes) / (1024.0 * 1024.0);
+            double pageDeltaMb = (memAfterBytes - memCoreBytes) / (1024.0 * 1024.0);
+            double totalDeltaMb = (memAfterBytes - memBaselineBytes) / (1024.0 * 1024.0);
 
             // 5. Write summary
             File summaryFile = new File(perfDir, "benchmark_summary.txt");
             StringBuilder sb = new StringBuilder();
-            sb.append("=== AURA ULTRALIGHT IN-GAME BENCHMARK RESULTS ===\n");
+            sb.append("=== AURA ULTRALIGHT FAIR IN-GAME BENCHMARK RESULTS ===\n");
             sb.append("GL_RENDERER: ").append(GL11.glGetString(GL11.GL_RENDERER)).append("\n");
             sb.append("GL_VENDOR: ").append(GL11.glGetString(GL11.GL_VENDOR)).append("\n");
             sb.append("GL_VERSION: ").append(GL11.glGetString(GL11.GL_VERSION)).append("\n");
-            sb.append(String.format(Locale.ROOT, "Private Bytes Before: %.2f MB\n", memBeforeBytes / (1024.0 * 1024.0)));
-            sb.append(String.format(Locale.ROOT, "Private Bytes After 60s: %.2f MB\n", memAfterBytes / (1024.0 * 1024.0)));
-            sb.append(String.format(Locale.ROOT, "Private Bytes Delta: +%.2f MB\n", (memAfterBytes - memBeforeBytes) / (1024.0 * 1024.0)));
-            sb.append("--- REGULAR PAUSE (600 frames) ---\n");
-            sb.append(String.format(Locale.ROOT, "Avg FPS: %.2f (%.2f ms)\n", regStats.avgFps, regStats.avgMs));
-            sb.append(String.format(Locale.ROOT, "1%% Low FPS (P99): %.2f (%.2f ms)\n", regStats.lowFps, regStats.p99Ms));
-            sb.append("--- HTML PAUSE STATIC (600 frames) ---\n");
-            sb.append(String.format(Locale.ROOT, "Avg FPS: %.2f (%.2f ms)\n", htmlStats.avgFps, htmlStats.avgMs));
-            sb.append(String.format(Locale.ROOT, "1%% Low FPS (P99): %.2f (%.2f ms)\n", htmlStats.lowFps, htmlStats.p99Ms));
-            double deltaFps = ((htmlStats.avgFps - regStats.avgFps) / regStats.avgFps) * 100.0;
+            sb.append(String.format(Locale.ROOT, "Private Bytes Baseline (before UL): %.2f MB\n", memBaselineBytes / (1024.0 * 1024.0)));
+            sb.append(String.format(Locale.ROOT, "Private Bytes Core Init (no page): %.2f MB (Core Delta: +%.2f MB)\n", memCoreBytes / (1024.0 * 1024.0), coreDeltaMb));
+            sb.append(String.format(Locale.ROOT, "Private Bytes After 60s (with page): %.2f MB (Page Delta: +%.2f MB)\n", memAfterBytes / (1024.0 * 1024.0), pageDeltaMb));
+            sb.append(String.format(Locale.ROOT, "Private Bytes Total Delta: +%.2f MB\n", totalDeltaMb));
+
+            sb.append("--- REGULAR PAUSE BLOCKS (3 x 150 frames = 450 frames) ---\n");
+            sb.append(String.format(Locale.ROOT, "Block 1 (150 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", regB1.avgFps, regB1.avgMs, regB1.lowFps, regB1.p99Ms));
+            sb.append(String.format(Locale.ROOT, "Block 2 (150 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", regB2.avgFps, regB2.avgMs, regB2.lowFps, regB2.p99Ms));
+            sb.append(String.format(Locale.ROOT, "Block 3 (150 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", regB3.avgFps, regB3.avgMs, regB3.lowFps, regB3.p99Ms));
+            sb.append(String.format(Locale.ROOT, "Combined Regular (450 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", regComb.avgFps, regComb.avgMs, regComb.lowFps, regComb.p99Ms));
+
+            sb.append("--- HTML PAUSE STATIC BLOCKS (3 x 150 frames = 450 frames) ---\n");
+            sb.append(String.format(Locale.ROOT, "Block 1 (150 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", htmlB1.avgFps, htmlB1.avgMs, htmlB1.lowFps, htmlB1.p99Ms));
+            sb.append(String.format(Locale.ROOT, "Block 2 (150 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", htmlB2.avgFps, htmlB2.avgMs, htmlB2.lowFps, htmlB2.p99Ms));
+            sb.append(String.format(Locale.ROOT, "Block 3 (150 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", htmlB3.avgFps, htmlB3.avgMs, htmlB3.lowFps, htmlB3.p99Ms));
+            sb.append(String.format(Locale.ROOT, "Combined HTML Static (450 frames): Avg FPS = %.2f (%.2f ms), 1%% Low = %.2f (%.2f ms)\n", htmlComb.avgFps, htmlComb.avgMs, htmlComb.lowFps, htmlComb.p99Ms));
+
+            double deltaFps = ((htmlComb.avgFps - regComb.avgFps) / regComb.avgFps) * 100.0;
             sb.append(String.format(Locale.ROOT, "Static FPS Delta: %.2f%%\n", deltaFps));
-            sb.append("--- HTML PAUSE HOVER (10s) ---\n");
+
+            sb.append("--- HTML PAUSE HOVER (10s / 600 frames) ---\n");
             sb.append(String.format(Locale.ROOT, "Avg FPS: %.2f (%.2f ms)\n", hoverStats.avgFps, hoverStats.avgMs));
             sb.append(String.format(Locale.ROOT, "1%% Low FPS (P99): %.2f (%.2f ms)\n", hoverStats.lowFps, hoverStats.p99Ms));
+
             sb.append("--- OPEN TIMINGS ---\n");
             sb.append(String.format(Locale.ROOT, "First open (cold): %d ms\n", firstOpenTimeMs));
             sb.append(String.format(Locale.ROOT, "Second open (warm): %d ms\n", secondOpenTimeMs));

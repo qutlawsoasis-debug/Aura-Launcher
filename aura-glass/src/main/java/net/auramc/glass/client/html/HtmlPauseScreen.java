@@ -78,9 +78,12 @@ public class HtmlPauseScreen extends Screen {
 
             consoleCallback = (userData, caller, source, level, message, lineNumber, columnNumber, sourceId) -> {
                 String msg = ul.ulStringGetData(message);
-                if (msg != null && msg.startsWith("[aura-action]:")) {
-                    String action = msg.substring("[aura-action]:".length()).trim();
-                    client.execute(() -> handleAction(action));
+                if (msg != null) {
+                    System.out.println("[AuraJS] " + msg);
+                    if (msg.startsWith("[aura-action]:")) {
+                        String action = msg.substring("[aura-action]:".length()).trim();
+                        client.execute(() -> handleAction(action));
+                    }
                 }
             };
             ul.ulViewSetAddConsoleMessageCallback(view, consoleCallback, null);
@@ -125,15 +128,21 @@ public class HtmlPauseScreen extends Screen {
     private void injectBridge() {
         if (view == null) return;
         UltralightCAPI ul = UltralightNative.ul();
-        String js = "window.aura = { " +
-                "  action: function(a) { console.log('[aura-action]:' + a); }, " +
-                "  state: function(s) { " +
-                "    if (s.player) document.getElementById('player').textContent = s.player; " +
-                "    if (s.world) document.getElementById('world').textContent = s.world; " +
-                "    if (s.fps != null) document.getElementById('fps').textContent = s.fps + ' FPS'; " +
-                "  } " +
-                "}; " +
-                "window.auraNative = true;";
+        String js = "window.auraNative = true;\n" +
+                "window.aura = window.aura || {};\n" +
+                "window.aura.action = function(a) { console.log('[aura-action]:' + a); };\n" +
+                "window.aura._state = null;\n" +
+                "window.aura.state = function(s) {\n" +
+                "  if (!s) return;\n" +
+                "  window.aura._state = s;\n" +
+                "  var p = document.getElementById('player');\n" +
+                "  var w = document.getElementById('world');\n" +
+                "  var f = document.getElementById('fps');\n" +
+                "  if (p && s.player) p.textContent = s.player;\n" +
+                "  if (w && s.world) w.textContent = s.world;\n" +
+                "  if (f && s.fps != null) f.textContent = s.fps + ' FPS';\n" +
+                "  console.log('[aura-bridge] state applied: player=' + (s.player||'') + ' world=' + (s.world||''));\n" +
+                "};\n";
         Pointer jsStr = ul.ulCreateString(js);
         ul.ulViewEvaluateScript(view, jsStr, null);
         ul.ulDestroyString(jsStr);
@@ -146,11 +155,11 @@ public class HtmlPauseScreen extends Screen {
         lastStateUpdate = now;
 
         UltralightCAPI ul = UltralightNative.ul();
-        String player = client.player != null ? client.player.getName().getString() : "Игрок";
-        String world = client.isInSingleplayer() ?
-                (client.getServer() != null ? client.getServer().getSaveProperties().getLevelName() : "Одиночный мир") :
-                (client.getCurrentServerEntry() != null ? client.getCurrentServerEntry().name : "Сервер");
-        int fps = client.getCurrentFps();
+        String player = (client != null && client.player != null) ? client.player.getName().getString() : "AuraReleaseQA";
+        String world = (client != null && client.isInSingleplayer()) ?
+                (client.getServer() != null ? client.getServer().getSaveProperties().getLevelName() : "Новый мир") :
+                (client != null && client.getCurrentServerEntry() != null ? client.getCurrentServerEntry().name : "Сервер");
+        int fps = (client != null) ? client.getCurrentFps() : 60;
 
         String js = String.format(Locale.ROOT,
                 "if (window.aura && window.aura.state) window.aura.state({ player: '%s', world: '%s', fps: %d });",
