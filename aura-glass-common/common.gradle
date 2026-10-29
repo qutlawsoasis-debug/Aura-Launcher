@@ -1,3 +1,15 @@
 def commonDir = file("${project.projectDir}/../aura-glass-common")
 sourceSets.main.java.srcDir "${commonDir}/src/main/java"
 sourceSets.main.resources.srcDir "${commonDir}/src/main/resources"
+sourceSets.test.java.srcDir "${commonDir}/src/test/java"
+sourceSets.test.resources.srcDir "${commonDir}/src/test/resources"
+
+tasks.register('runMusicClientTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.music.MusicClientTest'
+}
+
+tasks.named('test') {
+    dependsOn 'runMusicClientTest'
+}
