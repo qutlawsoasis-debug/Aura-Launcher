@@ -55,4 +55,16 @@ jar {
     }
 }
 
-loom { accessWidenerPath = file("src/main/resources/aura-glass.accesswidener") }
+loom {
+    accessWidenerPath = file("src/main/resources/aura-glass.accesswidener")
+    runs {
+        client {
+            client()
+            runDir "../../run/120"
+            property "aura.karaoke.demo", "true"
+            property "aura.qa.headless", "true"
+            property "aura.qa.versionSuffix", "120"
+            property "aura.qa.proofDir", file("../../frames").absolutePath
+        }
+    }
+}

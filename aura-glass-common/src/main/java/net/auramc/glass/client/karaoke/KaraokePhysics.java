@@ -283,16 +283,21 @@ public final class KaraokePhysics {
                     if (l.restTicks >= GROUND_REST_TICKS) {
                         l.dissolving = true;
                     }
-                    if (l.dissolving) {
-                        l.dissolveTicks++;
-                        float p = Math.min(1.0f, (float) l.dissolveTicks / DISSOLVE_TICKS);
-                        l.currentAlpha = 0.85f * (1.0f - p); // Return 1: letters on ground alpha 0.85
-                        l.currentScale = 1.0f - 0.15f * p; // scale -> 0.85
-                        if (l.dissolveTicks >= DISSOLVE_TICKS) {
-                            it.remove();
-                            continue;
-                        }
+                }
+
+                if (l.dissolving) {
+                    l.dissolveTicks++;
+                    float p = Math.min(1.0f, (float) l.dissolveTicks / DISSOLVE_TICKS);
+                    l.currentAlpha = (l.sleeping ? 0.85f : 0.70f) * (1.0f - p); // Return 1: letters on ground alpha 0.85
+                    l.currentScale = 1.0f - 0.15f * p; // scale -> 0.85
+                    if (l.dissolveTicks >= DISSOLVE_TICKS) {
+                        it.remove();
+                        continue;
                     }
+                    if (l.sleeping) {
+                        continue;
+                    }
+                } else if (l.sleeping) {
                     continue;
                 }
 

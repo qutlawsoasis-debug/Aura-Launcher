@@ -224,7 +224,7 @@ public final class KaraokeEngine {
                 MinecraftClient mc = MinecraftClient.getInstance();
                 if (mc != null && mc.player != null && anchor.position != null) {
                     double distToEye = anchor.position.distanceTo(mc.player.getCameraPosVec(1.0f));
-                    float minFontScale = (float) (33.0 * distToEye / 650.7);
+                    float minFontScale = (float) (35.0 * distToEye / 650.7);
                     if (fontScale < minFontScale && KaraokeConfig.get().getSize() <= 1.25f) {
                         fontScale = minFontScale;
                     }
@@ -286,7 +286,7 @@ public final class KaraokeEngine {
         } catch (Throwable ignored) {
         }
 
-        if (json == null) {
+        if (json == null || json.trim().isEmpty() || json.trim().equals("{}")) {
             try (InputStream in = KaraokeEngine.class.getResourceAsStream("/assets/aura-glass/karaoke/demo.json")) {
                 if (in != null) {
                     json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
@@ -436,6 +436,9 @@ public final class KaraokeEngine {
             return;
         }
 
+        if (KaraokeConfig.get().isDemoMode() && client.currentScreen != null && client.currentScreen.getClass().getSimpleName().contains("GameMenu")) {
+            client.setScreen(null);
+        }
         if (KaraokeConfig.get().isDemoMode() && !demoWorldStarted) {
             return;
         }
@@ -467,6 +470,15 @@ public final class KaraokeEngine {
         if (client == null || client.getOverlay() != null) return;
         if (client.currentScreen != null) {
             String screenName = client.currentScreen.getClass().getSimpleName();
+            if (screenName.contains("GameMenu")) {
+                client.setScreen(null);
+                return;
+            }
+            if (screenName.contains("Onboarding")) {
+                System.out.println("[AuraKaraoke] Dismissing " + screenName + " -> TitleScreen");
+                client.setScreen(new net.minecraft.client.gui.screen.TitleScreen());
+                return;
+            }
             if (screenName.contains("BackupPrompt") || screenName.contains("Confirm") || screenName.contains("Warning")) {
                 System.out.println("[AuraKaraoke] Auto-dismissing prompt screen " + screenName + " with Enter");
                 client.currentScreen.keyPressed(257, 0, 0);
@@ -533,8 +545,14 @@ public final class KaraokeEngine {
         }
 
         long lineDetachBaseTime = lineEndTime + WordAnimation.POST_WORD_HOLD_MS; // 350 ms hold after line ends
+        if (lyrics != null && currentLineIndex + 1 < lyrics.lines.size()) {
+            long nextLineStart = lyrics.lines.get(currentLineIndex + 1).t;
+            if (nextLineStart < lineDetachBaseTime) {
+                lineDetachBaseTime = nextLineStart;
+            }
+        }
 
-        // Whole line stays visible until 350ms after the last word ends
+        // Whole line stays visible until lineDetachBaseTime
         if (playbackMs < lineDetachBaseTime) {
             return;
         }
@@ -553,7 +571,7 @@ public final class KaraokeEngine {
                 MinecraftClient mc = MinecraftClient.getInstance();
                 if (mc != null && mc.player != null && anchor.position != null) {
                     double distToEye = anchor.position.distanceTo(mc.player.getCameraPosVec(1.0f));
-                    float minFontScale = (float) (33.0 * distToEye / 650.7);
+                    float minFontScale = (float) (35.0 * distToEye / 650.7);
                     if (fontScale < minFontScale && KaraokeConfig.get().getSize() <= 1.25f) {
                         fontScale = minFontScale;
                     }
@@ -816,6 +834,9 @@ public final class KaraokeEngine {
         var server = mc.getServer();
         if (server != null) {
             server.execute(() -> {
+                try {
+                    server.getCommandManager().executeWithPrefix(server.getCommandSource().withSilent(), "time set 18000");
+                } catch (Throwable ignored) {}
                 for (var sw : server.getWorlds()) {
                     sw.setTimeOfDay(18000L);
                 }
@@ -934,6 +955,7 @@ public final class KaraokeEngine {
         if (!nightEnvApplied && playbackMs >= 13500L) {
             nightEnvApplied = true;
             setupNightEnvironment(client.player, client.world);
+            if (client.world != null) client.world.setTimeOfDay(18000L);
         }
 
         // 5. Night: real midnight starlit sky, line 4 in progress (white text, active #64D2FF)
