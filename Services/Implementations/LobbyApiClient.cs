@@ -258,4 +258,19 @@ public class LobbyApiClient : ILobbyApiClient
             return null;
         }
     }
+
+    public async Task<string> SearchMusicRawAsync(string query, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var uri = GetRequestUri($"api/music/search?q={Uri.EscapeDataString(query)}&kind=tracks");
+            using var response = await _httpClient.GetAsync(uri, cancellationToken);
+            if (!response.IsSuccessStatusCode) return "[]";
+            return await response.Content.ReadAsStringAsync(cancellationToken);
+        }
+        catch
+        {
+            return "[]";
+        }
+    }
 }

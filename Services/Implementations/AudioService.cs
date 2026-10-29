@@ -327,6 +327,36 @@ public sealed class AudioService : IAudioService
         catch { }
     }
 
+    public void Enqueue(AudioTrack track)
+    {
+        if (_disposed || track == null) return;
+        _playlist.Add(track);
+        if (_playlist.Count == 1)
+        {
+            _currentTrackIndex = 0;
+            PrepareTrack(0, autoOpen: false);
+        }
+        else
+        {
+            TrackChanged?.Invoke(this, CurrentTrack);
+        }
+    }
+
+    public bool PlayTrack(string trackIdOrTitle)
+    {
+        if (_disposed || _playlist.Count == 0 || string.IsNullOrWhiteSpace(trackIdOrTitle)) return false;
+        int idx = _playlist.FindIndex(t =>
+            string.Equals(t.Title, trackIdOrTitle, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(t.Path, trackIdOrTitle, StringComparison.OrdinalIgnoreCase));
+        if (idx >= 0)
+        {
+            PrepareTrack(idx, autoOpen: true);
+            Play();
+            return true;
+        }
+        return false;
+    }
+
     private void ApplyVolume()
     {
         if (_disposed) return;
