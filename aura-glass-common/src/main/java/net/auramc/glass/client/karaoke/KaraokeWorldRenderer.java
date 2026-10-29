@@ -10,9 +10,11 @@ import net.minecraft.world.World;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.lwjgl.BufferUtils;
 
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -21,19 +23,22 @@ import static org.lwjgl.opengl.GL33C.*;
 
 /**
  * High-performance MSDF Onest 3D world renderer for in-world karaoke:
- * - Single-pass batched instanced quad geometry
- * - Depth-tested with GL_LEQUAL and glDepthMask(false)
- * - Apple HIG typography: soft dark outline and subtle halo for legibility on all backgrounds
- * - World ambient light + night emissive glow (minimum 0.65 brightness)
+ * - Single-pass batched instanced quad geometry with expanded halo padding
+ * - Adaptive light/dark background luminance sensing (sampled 1 time per 4 ticks, 0 new FBOs)
+ * - 300 ms smooth transition between dark (#64D2FF, 0.35 halo) and light (#0A84FF, 0.60 halo)
+ * - MSDF outline / soft shadow: width 0.10 em, blur 0.08 em, color rgb(0,0,0)
+ * - Apple HIG typography: white 0.95 upcoming, white 0.80 sung, falling words fade halo with alpha
  * - Budget <= 0.3 ms/frame (typical ~0.03 ms)
  */
 public final class KaraokeWorldRenderer {
 
-    private static final int STRIDE = 15; // 3 pos + 2 uv + 4 col + 4 outline + 2 params
+    // Stride: 3 pos + 2 uv + 4 col + 4 outline + 2 params + 4 uvBounds = 19 floats
+    private static final int STRIDE = 19;
     private static final int MAX_VERTICES = 8192;
     private static final FloatBuffer VERTEX_BUFFER = BufferUtils.createFloatBuffer(MAX_VERTICES * STRIDE);
     private static final FloatBuffer PROJECTION_BUF = BufferUtils.createFloatBuffer(16);
     private static final FloatBuffer MODELVIEW_BUF = BufferUtils.createFloatBuffer(16);
+    private static final ByteBuffer SAMPLE_BUF = BufferUtils.createByteBuffer(4 * 4 * 4); // 4x4 RGBA pixels = 64 bytes
 
     private static int program = 0;
     private static int vao = 0;
@@ -41,16 +46,119 @@ public final class KaraokeWorldRenderer {
     private static int projUniform = -1;
     private static int mvUniform = -1;
     private static int fontUniform = -1;
+    private static int haloConfigUniform = -1;
 
     private static boolean initialized = false;
     private static boolean failed = false;
     private static int vertexCount = 0;
     private static double lastRenderTimeMs = 0.0;
 
+    // Luminance & adaptive contrast state
+    private static Object lastSampledWorld = null;
+    private static long lastSampleTick = -1L;
+    private static long lastSampleTimeMs = 0L;
+    private static long lastFrameTimeMs = 0L;
+    private static boolean isLightBackground = false;
+    private static float lightProgress = 0.0f; // 0.0 = dark, 1.0 = light (300 ms smooth transition)
+    private static float lastSampledLuminance = 0.0f;
+    private static int luminanceSampleCallCount = 0;
+
     private KaraokeWorldRenderer() {}
 
     public static double getLastRenderTimeMs() {
         return lastRenderTimeMs;
+    }
+
+    public static boolean isLightBackground() {
+        return isLightBackground;
+    }
+
+    public static float getLightProgress() {
+        return lightProgress;
+    }
+
+    public static float getLastSampledLuminance() {
+        return lastSampledLuminance;
+    }
+
+    public static int getLuminanceSampleCallCount() {
+        return luminanceSampleCallCount;
+    }
+
+    /**
+     * Strict rate limit gate for background luminance sampling:
+     * - When world is active: strictly once per >= 4 game ticks. NO wall-time bypass during pause / low TPS.
+     * - Resets on world transition or time rewind.
+     * - Fallback to 50ms tick-equivalent only when world is null (headless).
+     */
+    public static boolean checkAndTickSampleGate(Object worldRef, long currentTick, long nowMs) {
+        if (worldRef != null) {
+            if (lastSampledWorld != worldRef || currentTick < lastSampleTick) {
+                lastSampleTick = -1L;
+                lastSampledWorld = worldRef;
+            }
+            if (lastSampleTick < 0 || (currentTick - lastSampleTick >= 4L)) {
+                lastSampleTick = currentTick;
+                lastSampleTimeMs = nowMs;
+                lastSampledWorld = worldRef;
+                luminanceSampleCallCount++;
+                return true;
+            }
+            return false;
+        } else {
+            long fallbackTick = nowMs / 50L;
+            if (lastSampleTick < 0 || (fallbackTick - lastSampleTick >= 4L)) {
+                lastSampleTick = fallbackTick;
+                lastSampleTimeMs = nowMs;
+                luminanceSampleCallCount++;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /**
+     * For unit tests / scripted testing without an active OpenGL viewport.
+     */
+    public static void setScriptedLuminance(float luminance, long timeMs) {
+        lastSampledLuminance = luminance;
+        if (luminance > 0.60f) {
+            isLightBackground = true;
+        } else if (luminance < 0.50f) {
+            isLightBackground = false;
+        }
+        lastFrameTimeMs = timeMs;
+    }
+
+    public static void resetState() {
+        lastSampledWorld = null;
+        lastSampleTick = -1L;
+        lastSampleTimeMs = 0L;
+        lastFrameTimeMs = 0L;
+        isLightBackground = false;
+        lightProgress = 0.0f;
+        lastSampledLuminance = 0.0f;
+        luminanceSampleCallCount = 0;
+    }
+
+    public static void updateTransition(long nowMs) {
+        if (lastFrameTimeMs <= 0L) {
+            lastFrameTimeMs = nowMs;
+            lightProgress = isLightBackground ? 1.0f : 0.0f;
+            return;
+        }
+        float dt = Math.max(0.0f, Math.min(0.5f, (nowMs - lastFrameTimeMs) / 1000.0f));
+        lastFrameTimeMs = nowMs;
+
+        float target = isLightBackground ? 1.0f : 0.0f;
+        if (dt > 0.0f) {
+            float step = dt / 0.300f; // Exactly 300 ms for full 0.0 <-> 1.0 transition
+            if (target > lightProgress) {
+                lightProgress = Math.min(target, lightProgress + step);
+            } else if (target < lightProgress) {
+                lightProgress = Math.max(target, lightProgress - step);
+            }
+        }
     }
 
     public static void initialize() {
@@ -73,6 +181,7 @@ public final class KaraokeWorldRenderer {
             glBindAttribLocation(program, 2, "Color");
             glBindAttribLocation(program, 3, "Outline");
             glBindAttribLocation(program, 4, "Params");
+            glBindAttribLocation(program, 5, "UVBounds");
 
             glLinkProgram(program);
             glDeleteShader(vs);
@@ -86,6 +195,7 @@ public final class KaraokeWorldRenderer {
             projUniform = glGetUniformLocation(program, "Projection");
             mvUniform = glGetUniformLocation(program, "ModelView");
             fontUniform = glGetUniformLocation(program, "Font");
+            haloConfigUniform = glGetUniformLocation(program, "HaloConfig");
 
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
@@ -118,6 +228,11 @@ public final class KaraokeWorldRenderer {
             // 4: Params (2 floats)
             glEnableVertexAttribArray(4);
             glVertexAttribPointer(4, 2, GL_FLOAT, false, STRIDE * Float.BYTES, (long) offset * Float.BYTES);
+            offset += 2;
+
+            // 5: UVBounds (4 floats)
+            glEnableVertexAttribArray(5);
+            glVertexAttribPointer(5, 4, GL_FLOAT, false, STRIDE * Float.BYTES, (long) offset * Float.BYTES);
 
             glBindVertexArray(0);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -161,34 +276,37 @@ public final class KaraokeWorldRenderer {
 
         long startTime = System.nanoTime();
 
+        // 0. Update background luminance (sampled strictly 1 time per 4 ticks, 0 new FBOs)
+        updateBackgroundLuminance(viewMatrix, projMatrix, camera, activeAnchors, world);
+
         VERTEX_BUFFER.clear();
         vertexCount = 0;
 
         Vec3d camPos = camera.getPos();
-        Quaternionf camRot = camera.getRotation();
 
-        // 1. Emit active singing words (billboard facing camera)
         // Basis vectors in camera-relative space derived directly from viewMatrix:
         // viewMatrix * U == (1, 0, 0) [Screen RIGHT]
         // viewMatrix * V == (0, -1, 0) [Screen DOWN]
         Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
         Vector3f billboardV = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
 
+        int haloBase = WordAnimation.getHaloColor(lightProgress);
+        float haloWidth = WordAnimation.getHaloWidth(lightProgress);
+        float haloBlur = WordAnimation.getHaloBlur(lightProgress);
+
+        // 1. Emit active singing words (billboard facing camera)
         for (WordPlacement.WordAnchor anchor : activeAnchors) {
             KaraokeModel.KaraokeWord kw = anchor.word;
-            float lightFactor = computeLightFactor(anchor.position, world);
 
             // Time elapsed since word started
             long wordElapsedMs = playbackMs - (kw.t - KaraokeClock.PREROLL_MS);
             if (wordElapsedMs < 0) continue;
 
-            int wordColor = WordAnimation.getWordColor(playbackMs, kw.t, kw.d, 1.0f);
-            if (wordColor != WordAnimation.COLOR_ACTIVE) {
-                // Apply ambient light with minimum 0.65 readability floor
-                wordColor = applyLightToColor(wordColor, lightFactor);
-            }
+            // Dynamic color: #64D2FF on dark bg, #0A84FF on light bg, adaptive upcoming/sung
+            int wordColor = WordAnimation.getWordColor(playbackMs, kw.t, kw.d, 1.0f, lightProgress);
 
-            int outlineColor = applyAlpha(WordAnimation.COLOR_OUTLINE, ((wordColor >>> 24) & 0xFF) / 255f);
+            // Halo outline: white 0.45 light, black 0.55 dark
+            int outlineColor = WordAnimation.applyAlpha(haloBase, ((wordColor >>> 24) / 255f));
 
             float wordScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
             emitString(kw.w, anchor.position, camPos, billboardU, billboardV, wordColor, outlineColor, wordElapsedMs, wordScale);
@@ -200,10 +318,10 @@ public final class KaraokeWorldRenderer {
             float alpha = pw.getAlpha();
             if (alpha <= 0.01f) continue;
 
-            float lightFactor = computeLightFactor(interpPos, world);
-            int baseColor = applyLightToColor(WordAnimation.COLOR_SUNG, lightFactor);
-            int color = applyAlpha(baseColor, alpha);
-            int outlineColor = applyAlpha(WordAnimation.COLOR_OUTLINE, alpha * 0.85f);
+            // Falling words: sung color fading with body alpha, halo fading with alpha
+            int sungColor = WordAnimation.getSungWordColor(lightProgress);
+            int color = WordAnimation.applyAlpha(sungColor, alpha);
+            int outlineColor = WordAnimation.applyAlpha(haloBase, alpha);
 
             // Body rotation quaternion
             Quaternionf bodyRot = new Quaternionf()
@@ -256,6 +374,10 @@ public final class KaraokeWorldRenderer {
 
             glUniform1i(fontUniform, 0);
 
+            if (haloConfigUniform >= 0) {
+                glUniform2f(haloConfigUniform, haloWidth, haloBlur);
+            }
+
             GlStateManager._bindTexture(AuraRenderer.fontTexture());
 
             glBindVertexArray(vao);
@@ -279,6 +401,103 @@ public final class KaraokeWorldRenderer {
         }
     }
 
+    private static void updateBackgroundLuminance(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera,
+                                                  List<WordPlacement.WordAnchor> activeAnchors, World world) {
+        long nowMs = System.currentTimeMillis();
+        long currentTick = (world != null) ? world.getTime() : (nowMs / 50L);
+
+        // Strict rate limit gate: once per >= 4 game ticks when world is active (no wall-time bypass)
+        if (checkAndTickSampleGate(world, currentTick, nowMs)) {
+            float sampledLuma = sampleScreenLuminance(viewMatrix, projMatrix, camera, activeAnchors, world);
+            lastSampledLuminance = sampledLuma;
+
+            // Hysteresis: > 0.60 is light, < 0.50 is dark, between maintains current state
+            if (sampledLuma > 0.60f) {
+                isLightBackground = true;
+            } else if (sampledLuma < 0.50f) {
+                isLightBackground = false;
+            }
+        }
+
+        // Smooth 300 ms transition updated every frame
+        updateTransition(nowMs);
+    }
+
+    private static float sampleScreenLuminance(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera,
+                                               List<WordPlacement.WordAnchor> activeAnchors, World world) {
+        try {
+            net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
+            if (client != null && client.getFramebuffer() != null) {
+                int fbWidth = client.getFramebuffer().textureWidth;
+                int fbHeight = client.getFramebuffer().textureHeight;
+                if (fbWidth > 10 && fbHeight > 10) {
+                    int sampleX = fbWidth / 2;
+                    int sampleY = fbHeight / 2;
+
+                    if (!activeAnchors.isEmpty() && camera != null) {
+                        double avgX = 0, avgY = 0, avgZ = 0;
+                        for (WordPlacement.WordAnchor a : activeAnchors) {
+                            avgX += a.position.x;
+                            avgY += a.position.y;
+                            avgZ += a.position.z;
+                        }
+                        int n = activeAnchors.size();
+                        avgX /= n; avgY /= n; avgZ /= n;
+
+                        Vec3d camPos = camera.getPos();
+                        Vector3f relPos = new Vector3f((float) (avgX - camPos.x), (float) (avgY - camPos.y), (float) (avgZ - camPos.z));
+
+                        Vector4f clip = new Vector4f(relPos.x, relPos.y, relPos.z, 1.0f);
+                        viewMatrix.transform(clip);
+                        projMatrix.transform(clip);
+
+                        if (clip.w > 0.01f) {
+                            float ndcX = clip.x / clip.w;
+                            float ndcY = clip.y / clip.w;
+                            sampleX = Math.max(2, Math.min(fbWidth - 3, (int) ((ndcX * 0.5f + 0.5f) * fbWidth)));
+                            sampleY = Math.max(2, Math.min(fbHeight - 3, (int) ((ndcY * 0.5f + 0.5f) * fbHeight)));
+                        }
+                    }
+
+                    SAMPLE_BUF.clear();
+                    // Read tiny 4x4 pixels (64 bytes) from existing main framebuffer
+                    glReadPixels(sampleX - 2, sampleY - 2, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, SAMPLE_BUF);
+
+                    float sumLuma = 0.0f;
+                    int count = 0;
+                    for (int i = 0; i < 16; i++) {
+                        int r = SAMPLE_BUF.get() & 0xFF;
+                        int g = SAMPLE_BUF.get() & 0xFF;
+                        int b = SAMPLE_BUF.get() & 0xFF;
+                        SAMPLE_BUF.get(); // skip alpha
+                        float rf = r / 255.0f;
+                        float gf = g / 255.0f;
+                        float bf = b / 255.0f;
+                        sumLuma += (0.2126f * rf + 0.7152f * gf + 0.0722f * bf);
+                        count++;
+                    }
+                    if (count > 0) {
+                        return sumLuma / count;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+            // Safe headless fallback
+        }
+
+        return fallbackWorldLuminance(activeAnchors, world);
+    }
+
+    private static float fallbackWorldLuminance(List<WordPlacement.WordAnchor> activeAnchors, World world) {
+        if (world == null || activeAnchors == null || activeAnchors.isEmpty()) return 0.5f;
+        Vec3d pos = activeAnchors.get(0).position;
+        BlockPos bp = BlockPos.ofFloored(pos.x, pos.y, pos.z);
+        int sky = world.getLightLevel(LightType.SKY, bp);
+        float timeOfDay = (world.getTimeOfDay() % 24000L) / 24000.0f;
+        boolean isDay = timeOfDay < 0.5f;
+        return isDay ? (sky / 15.0f) : 0.2f;
+    }
+
     private static void emitString(String text, Vec3d worldPos, Vec3d camPos,
                                    Vector3f U, Vector3f V,
                                    int color, int outlineColor,
@@ -296,6 +515,8 @@ public final class KaraokeWorldRenderer {
         float penX = -totalW * 0.5f;
         float distRange = AuraRenderer.distanceRange();
         float ascender = AuraRenderer.fontAscender();
+        float atlasW = AuraRenderer.atlasWidth() > 0 ? AuraRenderer.atlasWidth() : 2048.0f;
+        float atlasH = AuraRenderer.atlasHeight() > 0 ? AuraRenderer.atlasHeight() : 2048.0f;
 
         for (int i = 0; i < text.length(); i++) {
             char ch = text.charAt(i);
@@ -312,17 +533,24 @@ public final class KaraokeWorldRenderer {
                 continue;
             }
 
-            int charCol = applyAlpha(color, charAlpha * ((color >>> 24) / 255f));
-            int charOut = applyAlpha(outlineColor, charAlpha * ((outlineColor >>> 24) / 255f));
+            int charCol = WordAnimation.applyAlpha(color, charAlpha * ((color >>> 24) / 255f));
+            int charOut = WordAnimation.applyAlpha(outlineColor, charAlpha * ((outlineColor >>> 24) / 255f));
 
             if (glyph.visible) {
                 float verticalCenterOffset = 0.726f * charScale;
-                float lx0 = (penX + glyph.left) * charScale;
-                float lx1 = (penX + glyph.right) * charScale;
-                float ly0 = (-ascender + glyph.top) * charScale - verticalCenterOffset;
-                float ly1 = (-ascender + glyph.bottom) * charScale - verticalCenterOffset;
+                // Expand quad by 0.08 em padding to allow the 0.10 em halo to render completely without clipping
+                float pad = 0.08f * charScale;
+                float lx0 = (penX + glyph.left) * charScale - pad;
+                float lx1 = (penX + glyph.right) * charScale + pad;
+                float ly0 = (-ascender + glyph.top) * charScale - verticalCenterOffset - pad;
+                float ly1 = (-ascender + glyph.bottom) * charScale - verticalCenterOffset + pad;
+
+                float uPad = pad * 40.0f / atlasW;
+                float vPad = pad * 40.0f / atlasH;
 
                 emitQuad(D, U, V, lx0, ly0, lx1, ly1,
+                        glyph.u0 - uPad, glyph.v0 - vPad,
+                        glyph.u1 + uPad, glyph.v1 + vPad,
                         glyph.u0, glyph.v0, glyph.u1, glyph.v1,
                         charCol, charOut, distRange);
             }
@@ -334,6 +562,7 @@ public final class KaraokeWorldRenderer {
     private static void emitQuad(Vector3f D, Vector3f U, Vector3f V,
                                  float lx0, float ly0, float lx1, float ly1,
                                  float u0, float v0, float u1, float v1,
+                                 float bu0, float bv0, float bu1, float bv1,
                                  int color, int outline, float distRange) {
         if (vertexCount + 6 > MAX_VERTICES) return;
 
@@ -347,17 +576,18 @@ public final class KaraokeWorldRenderer {
         Vector3f p3 = new Vector3f(D).add(new Vector3f(U).mul(lx0)).add(new Vector3f(V).mul(ly1));
 
         // Triangle 1: p0, p1, p2
-        putVertex(p0, u0, v0, color, outline, distRange);
-        putVertex(p1, u1, v0, color, outline, distRange);
-        putVertex(p2, u1, v1, color, outline, distRange);
+        putVertex(p0, u0, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p1, u1, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p2, u1, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
 
         // Triangle 2: p0, p2, p3
-        putVertex(p0, u0, v0, color, outline, distRange);
-        putVertex(p2, u1, v1, color, outline, distRange);
-        putVertex(p3, u0, v1, color, outline, distRange);
+        putVertex(p0, u0, v0, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p2, u1, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
+        putVertex(p3, u0, v1, color, outline, distRange, bu0, bv0, bu1, bv1);
     }
 
-    private static void putVertex(Vector3f pos, float u, float v, int col, int outline, float distRange) {
+    private static void putVertex(Vector3f pos, float u, float v, int col, int outline, float distRange,
+                                  float bu0, float bv0, float bu1, float bv1) {
         VERTEX_BUFFER.put(pos.x).put(pos.y).put(pos.z);
         VERTEX_BUFFER.put(u).put(v);
 
@@ -376,29 +606,9 @@ public final class KaraokeWorldRenderer {
         // Params (distRange, 1.0 = MSDF text)
         VERTEX_BUFFER.put(distRange).put(1.0f);
 
+        // UVBounds (bu0, bv0, bu1, bv1)
+        VERTEX_BUFFER.put(bu0).put(bv0).put(bu1).put(bv1);
+
         vertexCount++;
-    }
-
-    private static float computeLightFactor(Vec3d pos, World world) {
-        if (world == null) return 1.0f;
-        BlockPos bp = BlockPos.ofFloored(pos.x, pos.y, pos.z);
-        int blockLight = world.getLightLevel(LightType.BLOCK, bp);
-        int skyLight = world.getLightLevel(LightType.SKY, bp);
-        int maxLight = Math.max(blockLight, skyLight);
-        // Minimum brightness floor 0.65 ensures readability at night or inside caves
-        return Math.max(0.65f, maxLight / 15.0f);
-    }
-
-    private static int applyLightToColor(int color, float light) {
-        int a = (color >>> 24) & 0xFF;
-        int r = (int) (((color >> 16) & 0xFF) * light);
-        int g = (int) (((color >> 8) & 0xFF) * light);
-        int b = (int) ((color & 0xFF) * light);
-        return (a << 24) | (r << 16) | (g << 8) | b;
-    }
-
-    private static int applyAlpha(int color, float alpha) {
-        int a = Math.max(0, Math.min(255, (int) (((color >>> 24) & 0xFF) * alpha)));
-        return (a << 24) | (color & 0x00FFFFFF);
     }
 }

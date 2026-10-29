@@ -62,6 +62,14 @@ public final class KaraokeEngine {
     private boolean shotAppearTaken = false;
     private boolean shotHoldTaken = false;
     private boolean shotFallTaken = false;
+    private boolean shotSnowHoldTaken = false;
+    private boolean shotSnowFallTaken = false;
+    private boolean shotForestHoldTaken = false;
+    private boolean shotForestFallTaken = false;
+    private boolean shotNightHoldTaken = false;
+    private boolean shotNightFallTaken = false;
+    private boolean forestEnvApplied = false;
+    private boolean nightEnvApplied = false;
     private long lastTickWallTimeMs = -1L;
 
     public KaraokeEngine() {}
@@ -308,7 +316,9 @@ public final class KaraokeEngine {
      */
     public synchronized void tick(MinecraftClient client) {
         checkDemoStartup();
-        MusicKaraokeBridge.getInstance().update();
+        if (!KaraokeConfig.get().isDemoMode()) {
+            MusicKaraokeBridge.getInstance().update();
+        }
 
         if (client == null) return;
         if (!KaraokeConfig.get().isEnabled()) {
@@ -326,7 +336,7 @@ public final class KaraokeEngine {
         long wallNow = System.currentTimeMillis();
         if (lastTickWallTimeMs > 0L) {
             long deltaWall = wallNow - lastTickWallTimeMs;
-            if (deltaWall > 250L) {
+            if (deltaWall > 300L && !demoWorldStarted) {
                 clock.shiftDemoStartTime(deltaWall - 50L);
             }
         }
@@ -363,10 +373,8 @@ public final class KaraokeEngine {
                         shotFallTaken = false;
                         demoDone = false;
 
-                        // Set daytime (noon)
-                        if (world instanceof net.minecraft.client.world.ClientWorld cw) {
-                            cw.setTimeOfDay(6000L);
-                        }
+                        // Initial Snow daytime environment for line 1
+                        setupSnowEnvironment(player, world);
                         try {
                             if (player.getAbilities() != null) {
                                 player.getAbilities().invulnerable = true;
@@ -420,6 +428,10 @@ public final class KaraokeEngine {
         }
 
         if (!isPlaying() || player == null) {
+            return;
+        }
+
+        if (KaraokeConfig.get().isDemoMode() && !demoWorldStarted) {
             return;
         }
 
@@ -678,6 +690,93 @@ public final class KaraokeEngine {
         }
     }
 
+    private void setupSnowEnvironment(PlayerEntity player, World world) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var server = mc.getServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (var sw : server.getWorlds()) {
+                    sw.setTimeOfDay(6000L);
+                }
+            });
+        }
+        if (mc.getNetworkHandler() != null) {
+            try {
+                mc.getNetworkHandler().sendCommand("time set 6000");
+            } catch (Throwable ignored) {
+            }
+        }
+        if (world instanceof net.minecraft.client.world.ClientWorld cw) {
+            cw.setTimeOfDay(6000L); // Daytime (noon)
+        }
+        if (player == null || world == null) return;
+        try {
+            net.minecraft.util.math.BlockPos pPos = player.getBlockPos();
+            var snowState = net.minecraft.block.Blocks.SNOW_BLOCK.getDefaultState();
+            // Fast 35-block ground patch under words with flag 2 (NOTIFY_LISTENERS, 0 lag)
+            for (int dx = -3; dx <= 3; dx++) {
+                for (int dz = 2; dz <= 7; dz++) {
+                    world.setBlockState(pPos.add(dx, -1, dz), snowState, 2);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void setupForestEnvironment(PlayerEntity player, World world) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var server = mc.getServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (var sw : server.getWorlds()) {
+                    sw.setTimeOfDay(6000L);
+                }
+            });
+        }
+        if (mc.getNetworkHandler() != null) {
+            try {
+                mc.getNetworkHandler().sendCommand("time set 6000");
+            } catch (Throwable ignored) {
+            }
+        }
+        if (world instanceof net.minecraft.client.world.ClientWorld cw) {
+            cw.setTimeOfDay(6000L); // Daytime (noon)
+        }
+        if (player == null || world == null) return;
+        try {
+            net.minecraft.util.math.BlockPos pPos = player.getBlockPos();
+            var grassState = net.minecraft.block.Blocks.GRASS_BLOCK.getDefaultState();
+            // Fast 35-block ground patch under words with flag 2 (NOTIFY_LISTENERS, 0 lag)
+            for (int dx = -3; dx <= 3; dx++) {
+                for (int dz = 2; dz <= 7; dz++) {
+                    world.setBlockState(pPos.add(dx, -1, dz), grassState, 2);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private void setupNightEnvironment(PlayerEntity player, World world) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var server = mc.getServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (var sw : server.getWorlds()) {
+                    sw.setTimeOfDay(18000L);
+                }
+            });
+        }
+        if (mc.getNetworkHandler() != null) {
+            try {
+                mc.getNetworkHandler().sendCommand("time set 18000");
+            } catch (Throwable ignored) {
+            }
+        }
+        if (world instanceof net.minecraft.client.world.ClientWorld cw) {
+            cw.setTimeOfDay(18000L); // Midnight starlit sky
+        }
+    }
+
     private void captureProofFrame(MinecraftClient client, String phase) {
         try {
             Path proofDir = getProofDirectory(client);
@@ -691,11 +790,17 @@ public final class KaraokeEngine {
             java.util.concurrent.CompletableFuture.runAsync(() -> {
                 try (image) {
                     image.writeTo(targetVersioned);
-                    System.out.println("[AuraKaraoke] Saved versioned proof frame: " + targetVersioned + " (" + Files.size(targetVersioned) + " bytes)");
-                    Path localProof = client.runDirectory.toPath().resolve("proof").resolve("karaoke-" + phase + ".png");
-                    if (!localProof.equals(targetVersioned)) {
-                        Files.createDirectories(localProof.getParent());
-                        image.writeTo(localProof);
+                    System.out.println("[AuraKaraoke] Saved proof frame: " + targetVersioned + " (" + Files.size(targetVersioned) + " bytes)");
+
+// w6b-frames copied by runner
+
+                    // Backward compatibility copies
+                    if (phase.equals("snow-hold")) {
+                        image.writeTo(proofDir.resolve("karaoke-" + tag + "-hold.png"));
+                        // w6b hold
+                    } else if (phase.equals("snow-fall")) {
+                        image.writeTo(proofDir.resolve("karaoke-" + tag + "-fall.png"));
+                        // w6b fall
                     }
                 } catch (Throwable t) {
                     System.err.println("[AuraKaraoke] Error writing screenshot async: " + t);
@@ -708,31 +813,63 @@ public final class KaraokeEngine {
     }
 
     private void handleDemoScreenshots(MinecraftClient client, long playbackMs) {
-        if (!KaraokeConfig.get().isDemoMode()) return;
+        if (!KaraokeConfig.get().isDemoMode() || !demoWorldStarted) return;
 
-        // Appearance frame (scale rising, letter stagger, daytime)
+        // Line 1: Snow daytime
         if (!shotAppearTaken && playbackMs >= 1500L && !activeAnchors.isEmpty()) {
             shotAppearTaken = true;
             captureProofFrame(client, "appear");
         }
-
-        // Hold frame (words fully manifested in #64D2FF)
-        if (shotAppearTaken && !shotHoldTaken && playbackMs >= 2700L && !activeAnchors.isEmpty()) {
+        if (!shotSnowHoldTaken && playbackMs >= 2700L && !activeAnchors.isEmpty()) {
+            shotSnowHoldTaken = true;
             shotHoldTaken = true;
-            captureProofFrame(client, "hold");
+            captureProofFrame(client, "snow-hold");
+        }
+        if (shotSnowHoldTaken && !shotSnowFallTaken && playbackMs >= 4800L) {
+            shotSnowFallTaken = true;
+            shotFallTaken = true;
+            captureProofFrame(client, "snow-fall");
         }
 
-        // Fall frame (physical words falling and bouncing)
-        if (shotHoldTaken && !shotFallTaken && playbackMs >= 4800L) {
-            shotFallTaken = true;
-            captureProofFrame(client, "fall");
+        // Line 2: Forest daytime setup (t >= 5200)
+        if (!forestEnvApplied && playbackMs >= 5200L && client.world != null) {
+            forestEnvApplied = true;
+            setupForestEnvironment(client.player, client.world);
+        }
+        if (shotSnowFallTaken && !shotForestHoldTaken && playbackMs >= 7200L && !activeAnchors.isEmpty()) {
+            shotForestHoldTaken = true;
+            captureProofFrame(client, "forest-hold");
+        }
+        if (shotForestHoldTaken && !shotForestFallTaken && playbackMs >= 9300L) {
+            shotForestFallTaken = true;
+            captureProofFrame(client, "forest-fall");
+        }
+
+        // Line 4: Night setup (t >= 14200)
+        if (!nightEnvApplied && playbackMs >= 14200L && client.world != null) {
+            nightEnvApplied = true;
+            setupNightEnvironment(client.player, client.world);
+        }
+        if (nightEnvApplied && client.world != null) {
+            client.world.setTimeOfDay(18000L);
+        }
+        if (shotForestFallTaken && !shotNightHoldTaken && playbackMs >= 16200L && !activeAnchors.isEmpty()) {
+            shotNightHoldTaken = true;
+            captureProofFrame(client, "night-hold");
+        }
+        if (shotNightHoldTaken && !shotNightFallTaken && playbackMs >= 18300L) {
+            shotNightFallTaken = true;
+            captureProofFrame(client, "night-fall");
         }
 
         // Complete & Stop (after all 4 lines / 28 words finish so sampleCount >= 20)
-        if (!demoDone && playbackMs >= 18200L) {
-            if (!shotAppearTaken) captureProofFrame(client, "appear");
-            if (!shotHoldTaken) captureProofFrame(client, "hold");
-            if (!shotFallTaken) captureProofFrame(client, "fall");
+        if (!demoDone && playbackMs >= 19500L) {
+            if (!shotSnowHoldTaken) captureProofFrame(client, "snow-hold");
+            if (!shotSnowFallTaken) captureProofFrame(client, "snow-fall");
+            if (!shotForestHoldTaken) captureProofFrame(client, "forest-hold");
+            if (!shotForestFallTaken) captureProofFrame(client, "forest-fall");
+            if (!shotNightHoldTaken) captureProofFrame(client, "night-hold");
+            if (!shotNightFallTaken) captureProofFrame(client, "night-fall");
             demoDone = true;
             saveProofLogs(client);
             System.out.println("[AuraKaraoke] Demo QA complete! Stopping client after " + clock.getStats().sampleCount + " word samples.");
@@ -761,6 +898,7 @@ public final class KaraokeEngine {
                 onsetSb.append("  ").append(log).append("\n");
             }
             Files.writeString(proofDir.resolve("onset-errors-" + tag + ".log"), onsetSb.toString(), StandardCharsets.UTF_8);
+// w6b log copied by runner
             Files.writeString(client.runDirectory.toPath().resolve("proof/onset-errors.log"), onsetSb.toString(), StandardCharsets.UTF_8);
 
             // 2. Adaptiveness scenarios log
