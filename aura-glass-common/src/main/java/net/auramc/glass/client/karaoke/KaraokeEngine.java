@@ -255,9 +255,29 @@ public final class KaraokeEngine {
      * Headless ticking logic for testing without Minecraft world.
      */
     public synchronized void tickHeadless(long playbackMs) {
+        if (!KaraokeConfig.get().isEnabled()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
         physics.tick(null);
         if (!isPlaying()) return;
-        updateLyricsTimeline(playbackMs, null, null);
+        long effectiveMs = playbackMs + KaraokeConfig.get().getTimingOffsetMs();
+        updateLyricsTimeline(effectiveMs, null, null);
+    }
+
+    public synchronized void tickHeadless() {
+        if (!KaraokeConfig.get().isEnabled()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
+        physics.tick(null);
+        if (!isPlaying()) return;
+        long effectiveMs = clock.getEffectivePositionMs();
+        updateLyricsTimeline(effectiveMs, null, null);
     }
 
     /**
@@ -268,6 +288,12 @@ public final class KaraokeEngine {
         MusicKaraokeBridge.getInstance().update();
 
         if (client == null) return;
+        if (!KaraokeConfig.get().isEnabled()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
 
         if (client.world == null) {
             if (KaraokeConfig.get().isDemoMode()) {
@@ -417,6 +443,7 @@ public final class KaraokeEngine {
     }
 
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
+        if (!KaraokeConfig.get().isEnabled()) return;
         if (lyrics == null || lyrics.isEmpty()) return;
 
         // 1. Check and record word onsets on each tick
@@ -742,6 +769,7 @@ public final class KaraokeEngine {
      * In-world render call from WorldRenderer hook.
      */
     public synchronized void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
+        if (!KaraokeConfig.get().isEnabled()) return;
         boolean hasActive = !activeAnchors.isEmpty();
         boolean hasBodies = physics.getBodyCount() > 0;
         if (!hasActive && !hasBodies) {
