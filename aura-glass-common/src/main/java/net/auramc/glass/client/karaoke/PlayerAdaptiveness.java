@@ -222,8 +222,8 @@ public final class PlayerAdaptiveness {
         // Density modifier
         float mult = KaraokeConfig.get().getDensity().wordGroupMultiplier;
         max = Math.max(min, Math.round(max * mult));
-        // Comfort limit: maximum 4 words per group so text stays comfortably centered and legible
-        int limit = Math.min(max, 4);
+        // Comfort limit: in standing state support full phrases up to 8 words; in motion clamp to 4
+        int limit = (currentResult.state == ActivityState.STANDING) ? 8 : Math.min(max, 4);
         return Math.max(min, Math.min(limit, desiredWords));
     }
 

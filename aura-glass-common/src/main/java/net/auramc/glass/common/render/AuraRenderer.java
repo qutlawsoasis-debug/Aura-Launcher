@@ -22,6 +22,7 @@ public final class AuraRenderer {
     private static final FloatBuffer MODEL_BUFFER = BufferUtils.createFloatBuffer(16);
     private static final FloatBuffer PROJECTION_BUFFER = BufferUtils.createFloatBuffer(16);
     private static final Glyph[][] GLYPHS = new Glyph[4][65536];
+    private static final java.util.Map<Long, Float> KERNING = new java.util.HashMap<>();
     private static final Matrix4f MODEL = new Matrix4f();
     private static final Matrix4f PROJECTION = new Matrix4f();
     private static final Matrix4f CLIP_CHECK = new Matrix4f();
@@ -115,10 +116,27 @@ public final class AuraRenderer {
         return shader;
     }
 
-    private static void loadFont() throws Exception {
+    public static void loadFontMetrics(InputStream jsonStream) throws Exception {
         JsonObject root;
-        try (InputStreamReader in = new InputStreamReader(resource("msdf/onest.json"), StandardCharsets.UTF_8)) {
+        try (InputStreamReader in = new InputStreamReader(jsonStream, StandardCharsets.UTF_8)) {
             root = JsonParser.parseReader(in).getAsJsonObject();
+        }
+        KERNING.clear();
+        if (root.has("fonts")) {
+            for (var fontElem : root.getAsJsonArray("fonts")) {
+                JsonObject fontObj = fontElem.getAsJsonObject();
+                if (fontObj.has("kerning")) {
+                    for (var ke : fontObj.getAsJsonArray("kerning")) {
+                        JsonObject ko = ke.getAsJsonObject();
+                        int c1 = ko.get("first").getAsInt();
+                        int c2 = ko.get("second").getAsInt();
+                        float amt = ko.get("amount").getAsFloat();
+                        long k = (((long) c1) << 32) | (((long) c2) & 0xFFFFFFFFL);
+                        KERNING.put(k, amt);
+                    }
+                    break;
+                }
+            }
         }
         atlasWidth = root.has("width")?root.get("width").getAsFloat():1024;
         atlasHeight = root.has("height")?root.get("height").getAsFloat():1024;
@@ -146,6 +164,12 @@ public final class AuraRenderer {
             }
             GLYPHS[page][cp] = glyph;
         }
+        }
+    }
+
+    private static void loadFont() throws Exception {
+        try (InputStream in = resource("msdf/onest.json")) {
+            loadFontMetrics(in);
         }
         BufferedImage image;
         try (InputStream in = resource("msdf/onest.png")) { image = ImageIO.read(in); }
@@ -226,10 +250,19 @@ public final class AuraRenderer {
     }
 
     public static float textWidth(String text, float size, int weight) {
+        if (text == null || text.isEmpty()) return 0;
         float width = 0;
+        int w = weightIndex(weight);
         for (int i = 0; i < text.length(); i++) {
-            Glyph g = GLYPHS[weightIndex(weight)][text.charAt(i)];
-            if (g != null) width += g.advance * size;
+            char ch = text.charAt(i);
+            Glyph g = GLYPHS[w][ch];
+            if (g != null) {
+                width += g.advance * size;
+                if (i > 0) {
+                    width -= 0.01f * size; // Inter-letter spacing -0.01 em
+                    width += getKerning(text.charAt(i - 1), ch) * size; // Font kerning
+                }
+            }
         }
         return width;
     }
@@ -322,8 +355,14 @@ public final class AuraRenderer {
     public static float fontAscender() { return ascender; }
     public static float atlasWidth() { return atlasWidth; }
     public static float atlasHeight() { return atlasHeight; }
+    public static float getKerning(int cp1, int cp2) {
+        if (cp1 <= 0 || cp2 <= 0 || KERNING.isEmpty()) return 0.0f;
+        long key = (((long) cp1) << 32) | (((long) cp2) & 0xFFFFFFFFL);
+        Float k = KERNING.get(key);
+        return k != null ? k : 0.0f;
+    }
+
     public static Glyph getGlyph(int weight, int codePoint) {
-        if (!ready) return null;
         int w = weightIndex(weight);
         if (codePoint >= 0 && codePoint < GLYPHS[w].length) {
             return GLYPHS[w][codePoint];

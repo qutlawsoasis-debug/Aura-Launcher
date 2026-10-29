@@ -7,6 +7,8 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import net.auramc.glass.common.render.AuraRenderer;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -59,6 +61,22 @@ public final class KaraokeEngine {
     private boolean worldLaunchInitiated = false;
     private int autoWorldLoadTicks = 0;
     private int worldStabilizationTicks = 0;
+    // W6d Demo Screenshot Flags
+    private boolean shotAppear0Taken = false;
+    private boolean shotAppear1Taken = false;
+    private boolean shotAppear2Taken = false;
+    private boolean shotAppear3Taken = false;
+    private boolean shotAppear4Taken = false;
+    private boolean shotAppear5Taken = false;
+    private boolean shotFall0Taken = false;
+    private boolean shotFall1Taken = false;
+    private boolean shotFall2Taken = false;
+    private boolean shotFall3Taken = false;
+    private boolean shotFallGroundTaken = false;
+    private boolean shotSnowDayTaken = false;
+    private boolean shotNightTaken = false;
+
+    // Backward compatibility aliases
     private boolean shotAppearTaken = false;
     private boolean shotHoldTaken = false;
     private boolean shotFallTaken = false;
@@ -68,6 +86,10 @@ public final class KaraokeEngine {
     private boolean shotForestFallTaken = false;
     private boolean shotNightHoldTaken = false;
     private boolean shotNightFallTaken = false;
+
+    // FPS Telemetry
+    private final List<String> fpsRecords = new ArrayList<>();
+    private long lastFrameNano = -1L;
     private boolean forestEnvApplied = false;
     private boolean nightEnvApplied = false;
     private long lastTickWallTimeMs = -1L;
@@ -196,14 +218,28 @@ public final class KaraokeEngine {
     public synchronized void dissolveAll() {
         if (!activeAnchors.isEmpty()) {
             for (WordPlacement.WordAnchor anchor : activeAnchors) {
-                physics.spawnBody(
-                        anchor.word.w,
-                        anchor.position,
-                        anchor.width,
-                        anchor.height,
-                        anchor.yaw,
-                        anchor.pitch
-                );
+                KaraokeModel.KaraokeWord kw = anchor.word;
+                if (kw == null || kw.w == null) continue;
+                float fontScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+                float totalW = AuraRenderer.textWidth(kw.w, fontScale, 700);
+                if (totalW <= 0.001f) totalW = kw.w.length() * 0.5f * fontScale;
+                float penX = -totalW * 0.5f;
+                for (int i = 0; i < kw.w.length(); i++) {
+                    char ch = kw.w.charAt(i);
+                    var glyph = AuraRenderer.getGlyph(700, ch);
+                    float adv = glyph != null ? glyph.advance * fontScale : 0.5f * fontScale;
+                    if (i > 0) {
+                        penX -= 0.01f * fontScale;
+                        penX += AuraRenderer.getKerning(kw.w.charAt(i - 1), ch) * fontScale;
+                    }
+                    if (anchor.lettersDetached == null || !anchor.lettersDetached[i]) {
+                        if (anchor.lettersDetached != null) anchor.lettersDetached[i] = true;
+                        float charCenterOffsetX = penX + adv * 0.5f;
+                        Vec3d letPos = anchor.position.add(charCenterOffsetX, 0, 0);
+                        physics.spawnLetter(ch, letPos, null, null, fontScale, System.currentTimeMillis(), null);
+                    }
+                    penX += adv;
+                }
             }
             activeAnchors.clear();
             activeGroupWords.clear();
@@ -315,10 +351,24 @@ public final class KaraokeEngine {
                         groupHoldStartTime = -1L;
                         groupPhysicsSpawned = false;
                         lastActiveOnsetRecordedWordT = -1L;
+                        shotAppear0Taken = false;
+                        shotAppear1Taken = false;
+                        shotAppear2Taken = false;
+                        shotAppear3Taken = false;
+                        shotAppear4Taken = false;
+                        shotAppear5Taken = false;
+                        shotFall0Taken = false;
+                        shotFall1Taken = false;
+                        shotFall2Taken = false;
+                        shotFall3Taken = false;
+                        shotFallGroundTaken = false;
+                        shotSnowDayTaken = false;
+                        shotNightTaken = false;
                         shotAppearTaken = false;
                         shotHoldTaken = false;
                         shotFallTaken = false;
                         demoDone = false;
+                        fpsRecords.clear();
 
                         // Initial Snow daytime environment for line 1
                         setupSnowEnvironment(player, world);
@@ -453,46 +503,86 @@ public final class KaraokeEngine {
         }
     }
 
+    public synchronized void checkLetterDetachment(long playbackMs, World world, Vector3f billboardU, Vector3f billboardV) {
+        if (activeAnchors.isEmpty()) return;
+
+        if (billboardU == null) {
+            billboardU = new Vector3f(1, 0, 0);
+        }
+        if (billboardV == null) {
+            billboardV = new Vector3f(0, 1, 0);
+        }
+
+        boolean allAnchorsDetached = true;
+
+        for (WordPlacement.WordAnchor anchor : activeAnchors) {
+            KaraokeModel.KaraokeWord kw = anchor.word;
+            if (kw == null || kw.w == null || kw.w.isEmpty()) continue;
+
+            long wordEnd = kw.t + kw.d;
+            long detachBaseTime = wordEnd + WordAnimation.POST_WORD_HOLD_MS; // 350 ms
+
+            if (playbackMs >= detachBaseTime) {
+                float fontScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+                float totalW = AuraRenderer.textWidth(kw.w, fontScale, 700);
+                if (totalW <= 0.001f) totalW = kw.w.length() * 0.5f * fontScale;
+                float penX = -totalW * 0.5f;
+
+                for (int i = 0; i < kw.w.length(); i++) {
+                    char ch = kw.w.charAt(i);
+                    var glyph = AuraRenderer.getGlyph(700, ch);
+                    float adv = glyph != null ? glyph.advance * fontScale : 0.5f * fontScale;
+
+                    if (i > 0) {
+                        penX -= 0.01f * fontScale;
+                        penX += AuraRenderer.getKerning(kw.w.charAt(i - 1), ch) * fontScale;
+                    }
+
+                    if (anchor.lettersDetached != null && !anchor.lettersDetached[i]) {
+                        long jitter = anchor.detachJitters != null ? anchor.detachJitters[i] : 0L;
+                        if (playbackMs >= detachBaseTime + jitter) {
+                            anchor.lettersDetached[i] = true;
+
+                            float charCenterOffsetX = penX + adv * 0.5f;
+                            Vec3d letPos = anchor.position
+                                    .add(billboardU.x * charCenterOffsetX, billboardU.y * charCenterOffsetX, billboardU.z * charCenterOffsetX);
+
+                            physics.spawnLetter(ch, letPos, billboardU, billboardV, fontScale, playbackMs, world);
+                        }
+                    }
+
+                    penX += adv;
+                }
+            }
+
+            if (!anchor.allLettersDetached()) {
+                allAnchorsDetached = false;
+            }
+        }
+
+        if (allAnchorsDetached && !activeAnchors.isEmpty()) {
+            activeAnchors.clear();
+            activeGroupWords.clear();
+            groupHoldStartTime = -1L;
+            groupPhysicsSpawned = false;
+        }
+    }
+
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
         if (lyrics == null || lyrics.isEmpty()) return;
 
         // 1. Check and record word onsets on each tick
         checkWordOnsets(playbackMs);
 
-        // 2. If line finished and hold elapsed, transition active words into physics bodies
-        if (!activeGroupWords.isEmpty()) {
-            if (paused) {
-                // In pause: existing words remain hanging and do not fall
-                return;
-            }
+        // 2. Detach letters of ended words into physics
+        checkLetterDetachment(playbackMs, world, null, null);
 
-            KaraokeModel.KaraokeWord lastWord = activeGroupWords.get(activeGroupWords.size() - 1);
-            boolean isEndOfLine = (currentLineIndex >= lyrics.lines.size() || currentWordIndex >= lyrics.lines.get(currentLineIndex).words.size());
-            long holdMs = isEndOfLine ? WordAnimation.POST_PHRASE_HOLD_MS : 0L;
-            if (playbackMs >= lastWord.end()) {
-                if (groupHoldStartTime < 0L) {
-                    groupHoldStartTime = playbackMs;
-                }
-                if (!groupPhysicsSpawned && (holdMs == 0L || (playbackMs - groupHoldStartTime >= holdMs))) {
-                    groupPhysicsSpawned = true;
-                    // Spawn physics bodies for words at end of line
-                    if (isEndOfLine) {
-                        for (WordPlacement.WordAnchor anchor : activeAnchors) {
-                            physics.spawnBody(
-                                    anchor.word.w,
-                                    anchor.position,
-                                    anchor.width,
-                                    anchor.height,
-                                    anchor.yaw,
-                                    anchor.pitch
-                            );
-                        }
-                    }
-                    activeAnchors.clear();
-                    activeGroupWords.clear();
-                    groupHoldStartTime = -1L;
-                }
-            }
+        // Safety timeout if line ended and words all passed
+        if (!activeGroupWords.isEmpty() && playbackMs > activeGroupWords.get(activeGroupWords.size() - 1).end() + 2000L) {
+            activeAnchors.clear();
+            activeGroupWords.clear();
+            groupHoldStartTime = -1L;
+            groupPhysicsSpawned = false;
         }
 
         // 3. Check if we need to advance to next line
@@ -746,65 +836,112 @@ public final class KaraokeEngine {
     private void handleDemoScreenshots(MinecraftClient client, long playbackMs) {
         if (!KaraokeConfig.get().isDemoMode() || !demoWorldStarted) return;
 
-        // Line 1: Snow daytime
-        if (!shotAppearTaken && playbackMs >= 1500L && !activeAnchors.isEmpty()) {
-            shotAppearTaken = true;
-            captureProofFrame(client, "appear");
+        // 1. Appearance sequence: Word 1 "Bright" (t = 1000 ms, duration 400 ms)
+        // 6 frames spaced by 40 ms: 1000, 1040, 1080, 1120, 1160, 1200 ms
+        if (!shotAppear0Taken && playbackMs >= 1000L) {
+            shotAppear0Taken = true;
+            captureProofFrame(client, "appear-0");
         }
-        if (!shotSnowHoldTaken && playbackMs >= 2700L && !activeAnchors.isEmpty()) {
-            shotSnowHoldTaken = true;
-            shotHoldTaken = true;
-            captureProofFrame(client, "snow-hold");
+        if (!shotAppear1Taken && playbackMs >= 1040L) {
+            shotAppear1Taken = true;
+            captureProofFrame(client, "appear-1");
         }
-        if (shotSnowHoldTaken && !shotSnowFallTaken && playbackMs >= 4800L) {
-            shotSnowFallTaken = true;
-            shotFallTaken = true;
-            captureProofFrame(client, "snow-fall");
+        if (!shotAppear2Taken && playbackMs >= 1080L) {
+            shotAppear2Taken = true;
+            captureProofFrame(client, "appear-2");
         }
-
-        // Line 2: Forest daytime setup (t >= 5200)
-        if (!forestEnvApplied && playbackMs >= 5200L && client.world != null) {
-            forestEnvApplied = true;
-            setupForestEnvironment(client.player, client.world);
+        if (!shotAppear3Taken && playbackMs >= 1120L) {
+            shotAppear3Taken = true;
+            captureProofFrame(client, "appear-3");
         }
-        if (shotSnowFallTaken && !shotForestHoldTaken && playbackMs >= 7200L && !activeAnchors.isEmpty()) {
-            shotForestHoldTaken = true;
-            captureProofFrame(client, "forest-hold");
+        if (!shotAppear4Taken && playbackMs >= 1160L) {
+            shotAppear4Taken = true;
+            captureProofFrame(client, "appear-4");
         }
-        if (shotForestHoldTaken && !shotForestFallTaken && playbackMs >= 9300L) {
-            shotForestFallTaken = true;
-            captureProofFrame(client, "forest-fall");
+        if (!shotAppear5Taken && playbackMs >= 1200L) {
+            shotAppear5Taken = true;
+            captureProofFrame(client, "appear-5");
         }
 
-        // Line 4: Night setup (t >= 14200)
-        if (!nightEnvApplied && playbackMs >= 14200L && client.world != null) {
-            nightEnvApplied = true;
-            setupNightEnvironment(client.player, client.world);
+        // 2. Falling sequence: Word 1 letters detach at 1750..1810 ms
+        // 4 frames of falling (separate rotating letters, bounce off ground):
+        if (!shotFall0Taken && playbackMs >= 1850L) {
+            shotFall0Taken = true;
+            captureProofFrame(client, "fall-0");
         }
-        if (nightEnvApplied && client.world != null) {
-            client.world.setTimeOfDay(18000L);
+        if (!shotFall1Taken && playbackMs >= 2000L) {
+            shotFall1Taken = true;
+            captureProofFrame(client, "fall-1");
         }
-        if (shotForestFallTaken && !shotNightHoldTaken && playbackMs >= 16200L && !activeAnchors.isEmpty()) {
-            shotNightHoldTaken = true;
-            captureProofFrame(client, "night-hold");
+        if (!shotFall2Taken && playbackMs >= 2150L) {
+            shotFall2Taken = true;
+            captureProofFrame(client, "fall-2");
         }
-        if (shotNightHoldTaken && !shotNightFallTaken && playbackMs >= 18300L) {
-            shotNightFallTaken = true;
-            captureProofFrame(client, "night-fall");
+        if (!shotFall3Taken && playbackMs >= 2350L) {
+            shotFall3Taken = true;
+            captureProofFrame(client, "fall-3");
+        }
+
+        // 3. Resting letters on snow ground (rest for 1.2s before dissolving)
+        if (!shotFallGroundTaken && playbackMs >= 2600L) {
+            shotFallGroundTaken = true;
+            captureProofFrame(client, "fall-ground");
+        }
+
+        // 4. Snow daytime: active line in progress on snow daytime
+        if (!shotSnowDayTaken && playbackMs >= 3200L) {
+            shotSnowDayTaken = true;
+            captureProofFrame(client, "snow-day");
+        }
+
+        // 5. Night: midnight starlit sky, line 4 in progress (white text, active #64D2FF)
+        if (!shotNightTaken && playbackMs >= 16200L) {
+            shotNightTaken = true;
+            captureProofFrame(client, "night");
         }
 
         // Complete & Stop (after all 4 lines / 28 words finish so sampleCount >= 20)
         if (!demoDone && playbackMs >= 19500L) {
-            if (!shotSnowHoldTaken) captureProofFrame(client, "snow-hold");
-            if (!shotSnowFallTaken) captureProofFrame(client, "snow-fall");
-            if (!shotForestHoldTaken) captureProofFrame(client, "forest-hold");
-            if (!shotForestFallTaken) captureProofFrame(client, "forest-fall");
-            if (!shotNightHoldTaken) captureProofFrame(client, "night-hold");
-            if (!shotNightFallTaken) captureProofFrame(client, "night-fall");
             demoDone = true;
             saveProofLogs(client);
             System.out.println("[AuraKaraoke] Demo QA complete! Stopping client after " + clock.getStats().sampleCount + " word samples.");
             client.scheduleStop();
+        }
+    }
+
+    private void saveFpsBenchmarkCsv(MinecraftClient client, Path proofDir, String tag) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("timestamp_ms,frame_time_ms,fps,karaoke_active\n");
+            for (String row : fpsRecords) {
+                sb.append(row).append("\n");
+            }
+            Path targetCsv = proofDir.resolve("karaoke-fps-" + tag + ".csv");
+            Files.writeString(targetCsv, sb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(proofDir.resolve("karaoke-fps.csv"), sb.toString(), StandardCharsets.UTF_8);
+
+            List<Double> onFps = new ArrayList<>();
+            List<Double> offFps = new ArrayList<>();
+            for (String row : fpsRecords) {
+                String[] parts = row.split(",");
+                if (parts.length >= 4) {
+                    double fps = Double.parseDouble(parts[2]);
+                    boolean active = Boolean.parseBoolean(parts[3]);
+                    if (active) onFps.add(fps);
+                    else offFps.add(fps);
+                }
+            }
+
+            double meanOn = onFps.stream().mapToDouble(Double::doubleValue).average().orElse(60.0);
+            double minOn = onFps.stream().mapToDouble(Double::doubleValue).min().orElse(60.0);
+            double meanOff = offFps.stream().mapToDouble(Double::doubleValue).average().orElse(60.0);
+            double minOff = offFps.stream().mapToDouble(Double::doubleValue).min().orElse(60.0);
+
+            System.out.printf(java.util.Locale.ROOT,
+                    "[AuraKaraoke] FPS Benchmark: Karaoke ON: mean=%.1f FPS (min=%.1f, n=%d) | Karaoke OFF: mean=%.1f FPS (min=%.1f, n=%d)%n",
+                    meanOn, minOn, onFps.size(), meanOff, minOff, offFps.size());
+        } catch (Throwable t) {
+            System.err.println("[AuraKaraoke] Error saving FPS CSV: " + t);
         }
     }
 
@@ -829,7 +966,6 @@ public final class KaraokeEngine {
                 onsetSb.append("  ").append(log).append("\n");
             }
             Files.writeString(proofDir.resolve("onset-errors-" + tag + ".log"), onsetSb.toString(), StandardCharsets.UTF_8);
-// w6b log copied by runner
             Files.writeString(client.runDirectory.toPath().resolve("proof/onset-errors.log"), onsetSb.toString(), StandardCharsets.UTF_8);
 
             // 2. Adaptiveness scenarios log
@@ -897,7 +1033,10 @@ public final class KaraokeEngine {
             Files.writeString(proofDir.resolve("scenarios-" + tag + ".log"), scenSb.toString(), StandardCharsets.UTF_8);
             Files.writeString(client.runDirectory.toPath().resolve("proof/scenarios.log"), scenSb.toString(), StandardCharsets.UTF_8);
 
-            System.out.println("[AuraKaraoke] Saved onset-errors-" + tag + ".log and scenarios-" + tag + ".log to " + proofDir);
+            // 3. Save FPS benchmark CSV
+            saveFpsBenchmarkCsv(client, proofDir, tag);
+
+            System.out.println("[AuraKaraoke] Saved onset-errors-" + tag + ".log, scenarios-" + tag + ".log, and karaoke-fps-" + tag + ".csv to " + proofDir);
         } catch (Throwable t) {
             System.err.println("[AuraKaraoke] Error saving proof logs: " + t.getMessage());
             t.printStackTrace();
@@ -908,6 +1047,21 @@ public final class KaraokeEngine {
      * In-world render call from WorldRenderer hook.
      */
     public synchronized void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
+        long nowNano = System.nanoTime();
+        if (lastFrameNano > 0L) {
+            long frameDtNano = nowNano - lastFrameNano;
+            double frameDtMs = frameDtNano / 1_000_000.0;
+            if (frameDtMs > 0.05) {
+                double fps = 1000.0 / frameDtMs;
+                boolean isKaraokeActive = isPlaying() && (!activeAnchors.isEmpty() || physics.getBodyCount() > 0);
+                long wallMs = System.currentTimeMillis();
+                if (fpsRecords.size() < 5000) {
+                    fpsRecords.add(String.format(java.util.Locale.ROOT, "%d,%.3f,%.1f,%b", wallMs, frameDtMs, fps, isKaraokeActive));
+                }
+            }
+        }
+        lastFrameNano = nowNano;
+
         boolean hasActive = !activeAnchors.isEmpty();
         boolean hasBodies = physics.getBodyCount() > 0;
         if (!hasActive && !hasBodies) {
@@ -923,15 +1077,23 @@ public final class KaraokeEngine {
         // Frame-accurate onset recording
         checkWordOnsets(playbackMs);
 
+        // Frame-accurate letter detachment in camera space
+        Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
+        Vector3f billboardV = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
+        checkLetterDetachment(playbackMs, client.world, billboardU, billboardV);
+
         KaraokeWorldRenderer.renderBatch(
                 viewMatrix,
                 projMatrix,
                 camera,
                 activeAnchors,
-                physics.getBodies(),
+                physics,
                 playbackMs,
                 tickDelta,
                 client.world
         );
+
+        // QA Screenshot triggers right after rendering batch
+        handleDemoScreenshots(client, playbackMs);
     }
 }

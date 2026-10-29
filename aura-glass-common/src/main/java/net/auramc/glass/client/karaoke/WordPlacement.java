@@ -49,6 +49,8 @@ public final class WordPlacement {
         public final float height;
         public final float yaw;
         public final float pitch;
+        public final boolean[] lettersDetached;
+        public final long[] detachJitters;
 
         public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch) {
             this.word = word;
@@ -57,6 +59,21 @@ public final class WordPlacement {
             this.height = height;
             this.yaw = yaw;
             this.pitch = pitch;
+            int len = (word != null && word.w != null) ? word.w.length() : 0;
+            this.lettersDetached = new boolean[len];
+            this.detachJitters = new long[len];
+            java.util.Random rng = new java.util.Random(word != null ? word.t : 42L);
+            for (int i = 0; i < len; i++) {
+                this.detachJitters[i] = rng.nextInt(61); // 0 to 60 ms random start jitter
+            }
+        }
+
+        public boolean allLettersDetached() {
+            if (lettersDetached == null || lettersDetached.length == 0) return true;
+            for (boolean b : lettersDetached) {
+                if (!b) return false;
+            }
+            return true;
         }
     }
 
@@ -520,11 +537,60 @@ public final class WordPlacement {
         return new WordRect(minX, maxX, minY, maxY);
     }
 
+    public static WordRect projectBoxToScreen(Vec3d center, float halfWidth, float halfHeight, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
+        if (center == null || viewMatrix == null || projMatrix == null || camPos == null) return null;
+        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
+        Vector3f V = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
+
+        Vector3f relCenter = new Vector3f(
+                (float) (center.x - camPos.x),
+                (float) (center.y - camPos.y),
+                (float) (center.z - camPos.z)
+        );
+
+        float[] dxs = new float[]{-halfWidth, halfWidth, halfWidth, -halfWidth};
+        float[] dys = new float[]{-halfHeight, -halfHeight, halfHeight, halfHeight};
+
+        double minX = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+
+        int valid = 0;
+        for (int i = 0; i < 4; i++) {
+            Vector3f worldPt = new Vector3f(relCenter)
+                    .add(new Vector3f(U).mul(dxs[i]))
+                    .add(new Vector3f(V).mul(dys[i]));
+
+            Vector4f camPt = new Vector4f(worldPt.x, worldPt.y, worldPt.z, 1.0f);
+            viewMatrix.transform(camPt);
+
+            Vector4f clipPt = new Vector4f(camPt);
+            projMatrix.transform(clipPt);
+
+            if (clipPt.w <= 0.001f) continue;
+            float ndcX = clipPt.x / clipPt.w;
+            float ndcY = clipPt.y / clipPt.w;
+
+            double sx = (ndcX + 1.0) * 0.5 * screenWidth;
+            double sy = (1.0 - ndcY) * 0.5 * screenHeight;
+
+            minX = Math.min(minX, sx);
+            maxX = Math.max(maxX, sx);
+            minY = Math.min(minY, sy);
+            maxY = Math.max(maxY, sy);
+            valid++;
+        }
+
+        if (valid == 0) return null;
+        return new WordRect(minX, maxX, minY, maxY);
+    }
+
     public static float estimateWordWidth(String text) {
         if (text == null || text.isEmpty()) return 0.5f;
         try {
             if (net.auramc.glass.common.render.AuraRenderer.isReady()) {
-                float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f);
+                float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f, 700);
                 if (tw > 0.05f) return tw;
             }
         } catch (Throwable ignored) {
