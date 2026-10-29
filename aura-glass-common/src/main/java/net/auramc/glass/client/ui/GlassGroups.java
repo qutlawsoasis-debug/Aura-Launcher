@@ -114,6 +114,8 @@ public final class GlassGroups {
             if (child instanceof EntryListWidget<?> && !(child instanceof OptionListWidget)) continue;
             if (child instanceof ClickableWidget widget && !(child instanceof EntryListWidget<?>)) {
                 if (!widget.visible || widget instanceof PressableTextWidget || widget instanceof net.minecraft.client.gui.widget.AbstractTextWidget) continue;
+                String className = widget.getClass().getName();
+                if (className.contains("ConfigButton") || className.contains("supplementaries")) continue;
                 int left = Math.max(0, widget.getX());
                 int top = Math.max(clipTop, widget.getY());
                 int right = Math.min(width, widget.getX() + widget.getWidth());
@@ -174,7 +176,7 @@ public final class GlassGroups {
                 group.lastTimeNanos = now;
                 group.lightProgress = group.isLight ? 1.0f : 0.0f;
             } else {
-                float dt = (now - group.lastTimeNanos) / 1_000_000_000.0f;
+                float dt = Math.min(0.040f, (now - group.lastTimeNanos) / 1_000_000_000.0f);
                 group.lastTimeNanos = now;
                 float target = group.isLight ? 1.0f : 0.0f;
                 float step = dt / 0.200f;
@@ -249,6 +251,10 @@ public final class GlassGroups {
     public static int right(int index) { return GROUPS[index].right; }
     public static int top(int index) { return GROUPS[index].top; }
     public static int bottom(int index) { return GROUPS[index].bottom; }
+    public static Group get(int index) { return index >= 0 && index < groupCount ? GROUPS[index] : null; }
+    public static float ambient(int index) { return index >= 0 && index < groupCount ? GROUPS[index].ambient : 0.2f; }
+    public static float lightProgress(int index) { return index >= 0 && index < groupCount ? GROUPS[index].lightProgress : 0f; }
+    public static boolean isLight(int index) { return index >= 0 && index < groupCount && GROUPS[index].isLight; }
 
     public static boolean owns(Object widget) {
         if (screen != MinecraftClient.getInstance().currentScreen) return false;

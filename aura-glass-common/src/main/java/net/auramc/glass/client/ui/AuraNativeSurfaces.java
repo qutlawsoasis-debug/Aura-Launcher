@@ -12,6 +12,27 @@ public final class AuraNativeSurfaces {
     private static int lastPercent = -1;
     private static String progressText = "";
     private static final java.util.Set<String> PRIMARY=java.util.Set.of("menu.singleplayer","menu.returnToGame","gui.done","selectWorld.select","selectWorld.create","selectServer.select","addServer.add","addServer.save","selectServer.direct","mco.select");
+
+    public static boolean isPrimary(ClickableWidget widget) {
+        if (widget == null || widget.getMessage() == null) return false;
+        net.minecraft.text.Text msg = widget.getMessage();
+        if (msg.getContent() instanceof net.minecraft.text.TranslatableTextContent label) {
+            if (PRIMARY.contains(label.getKey())) return true;
+        }
+        String text = msg.getString();
+        if (text != null && !text.isEmpty()) {
+            String clean = text.trim().toLowerCase(java.util.Locale.ROOT);
+            if (clean.equals("одиночная игра") || clean.equals("singleplayer")
+                    || clean.equals("вернуться к игре") || clean.equals("back to game")
+                    || clean.equals("готово") || clean.equals("done")
+                    || clean.equals("создать новый мир") || clean.equals("create new world")
+                    || clean.equals("создать мир") || clean.equals("create world")
+                    || clean.equals("играть в выбранном мире") || clean.equals("play selected world")) {
+                return true;
+            }
+        }
+        return false;
+    }
     private static final NativeCommand[] COMMANDS=new NativeCommand[256];
     private static int cursor;
     static{for(int i=0;i<COMMANDS.length;i++)COMMANDS[i]=new NativeCommand();}
@@ -65,8 +86,7 @@ public final class AuraNativeSurfaces {
 
     public static int button(DrawContext context, ClickableWidget widget, boolean hovered, float alpha) {
         var client = net.minecraft.client.MinecraftClient.getInstance();
-        boolean primary = widget.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent label
-                && PRIMARY.contains(label.getKey());
+        boolean primary = isPrimary(widget);
         float hover = 0, press = 0;
         if (widget instanceof AuraMotionWidget motion) {
             long window = client.getWindow().getHandle();
@@ -95,8 +115,9 @@ public final class AuraNativeSurfaces {
             }
             if(primary){
                 style.asPrimary();
-                style.tintR = 100 / 255f;
-                style.tintG = 210 / 255f;
+                float h = widget.active ? hover : 0;
+                style.tintR = (100f + 42f * h) / 255.0f;
+                style.tintG = (210f + 12f * h) / 255.0f;
                 style.tintB = 1.0f;
                 style.tintA = 1.0f;
                 textColor = 0xFF00283A;
@@ -115,8 +136,8 @@ public final class AuraNativeSurfaces {
                 }
             }
         } else {
-            int rgb = primary ? 0x18232C : 0xF7F9FC;
-            textColor = ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
+            int rgb = primary ? 0x64D2FF : 0xF7F9FC;
+            textColor = primary ? 0xFF00283A : (((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb);
         }
         if(!GlassStyles.regular())net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
         GlassRenderer.drawWidget(widget, widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
