@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using AuraLauncher.Models;
@@ -14,7 +16,7 @@ namespace AuraLauncher.Tests;
 
 /// <summary>
 /// Сквозной интеграционный тест моста музыки (Лаунчер MusicBridgeService -> Игра aura-glass BridgeMusicSource).
-/// 
+///
 /// Примечание: Для сквозной проверки используется заглушка IEmbedMusicPlayer (StubEmbedMusicPlayer),
 /// которая эмулирует воспроизведение и тайминги без реального WebView2 и аудио-устройства.
 /// Реальный звук в рамках интеграционного теста не проверялся.
@@ -25,9 +27,16 @@ public class MusicBridgeIntegrationTests
     [Trait("Category", "Integration")]
     public async Task MusicBridge_LauncherToGameClient_EndToEnd_VerifiesControlsAndTracking()
     {
-        // 1. Создаем изолированную временную папку инстанса игры
         var tempInstanceDir = Path.Combine(Path.GetTempPath(), "AuraTest", "bridge-e2e-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempInstanceDir);
+
+        // Изолированный логгер моста в тестовой папке - исключает запись в %APPDATA%
+        var bridgeLogPath = Path.Combine(tempInstanceDir, "music-bridge.log");
+        Action<string> testLogger = msg =>
+        {
+            Trace.WriteLine(msg);
+            try { File.AppendAllText(bridgeLogPath, $"[{DateTime.UtcNow:O}] {msg}\n"); } catch { }
+        };
 
         var stubPlayer = new StubEmbedMusicPlayer();
         var track1 = new MusicBridgeTrack("track_rick1", "Rick Astley", "Never Gonna Give You Up", 213000, "https://example.com/cover1.jpg");
@@ -37,19 +46,22 @@ public class MusicBridgeIntegrationTests
         stubPlayer.SetCurrentIndex(0, playNow: true);
 
         using var dummyAudio = new DummyAudioService();
-        using var bridge = new MusicBridgeService(dummyAudio, embedPlayer: stubPlayer, port: 0);
+        using var bridge = new MusicBridgeService(dummyAudio, embedPlayer: stubPlayer, port: 0, logger: testLogger);
+
+        Process? javacProc = null;
+        Process? javaProc = null;
 
         try
         {
             bridge.Start();
             Assert.True(bridge.IsRunning, "MusicBridgeService must be running");
+            Assert.True(File.Exists(bridgeLogPath), "Bridge must write events to the isolated logger file");
 
-            // Записываем конфиг в тестовую папку config/aura-music-bridge.json
             bridge.WriteConfigFile(tempInstanceDir);
             var configPath = Path.Combine(tempInstanceDir, "config", "aura-music-bridge.json");
             Assert.True(File.Exists(configPath), "aura-music-bridge.json must exist");
 
-            // 2. Компилируем Java-клиент (BridgeMusicSource, MusicClock, MusicBridgeE2ERunner)
+            // Компиляция Java-клиента
             var rootDir = FindRepoRoot();
             var javaCommonDir = Path.Combine(rootDir, "aura-glass-common");
             var outClassDir = Path.Combine(tempInstanceDir, "java-classes");
@@ -61,40 +73,68 @@ public class MusicBridgeIntegrationTests
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gradle", "caches")
             };
             var gsonJar = FindJar(searchDirs, "gson-*.jar");
+            Assert.False(string.IsNullOrEmpty(gsonJar), "Gson JAR must be found in Gradle cache or temp directories");
 
             var javaFiles = Directory.GetFiles(Path.Combine(javaCommonDir, "src", "main", "java", "net", "auramc", "glass", "client", "music"), "*.java", SearchOption.AllDirectories)
                 .Concat(Directory.GetFiles(Path.Combine(javaCommonDir, "src", "test", "java", "net", "auramc", "glass", "client", "music"), "*.java", SearchOption.AllDirectories))
                 .ToList();
 
-            var cpList = new List<string> { outClassDir };
-            if (!string.IsNullOrEmpty(gsonJar)) cpList.Add(gsonJar);
+            var cpList = new List<string> { outClassDir, gsonJar };
             string classpath = string.Join(Path.PathSeparator.ToString(), cpList);
 
-            // Компиляция через javac
-            var javacArgs = $"-cp \"{classpath}\" -d \"{outClassDir}\" " + string.Join(" ", javaFiles.Select(f => $"\"{f}\""));
             var javacPsi = new ProcessStartInfo
             {
                 FileName = "javac",
-                Arguments = javacArgs,
+                Arguments = $"-cp \"{classpath}\" -d \"{outClassDir}\" " + string.Join(" ", javaFiles.Select(f => $"\"{f}\"")),
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
 
-            using (var javacProc = Process.Start(javacPsi))
+            try
             {
+                javacProc = Process.Start(javacPsi);
                 Assert.NotNull(javacProc);
-                await javacProc.WaitForExitAsync();
+                var javacOutTask = javacProc.StandardOutput.ReadToEndAsync();
+                var javacErrTask = javacProc.StandardError.ReadToEndAsync();
+
+                using var javacCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try
+                {
+                    await javacProc.WaitForExitAsync(javacCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    try { javacProc.Kill(entireProcessTree: true); } catch { }
+                    Assert.Fail("javac compilation timed out after 30 seconds");
+                }
+
+                await Task.WhenAny(Task.WhenAll(javacOutTask, javacErrTask), Task.Delay(2000));
+                var outMsg = javacOutTask.IsCompleted ? await javacOutTask : string.Empty;
+                var err = javacErrTask.IsCompleted ? await javacErrTask : string.Empty;
+
                 if (javacProc.ExitCode != 0)
                 {
-                    var err = await javacProc.StandardError.ReadToEndAsync();
-                    var outMsg = await javacProc.StandardOutput.ReadToEndAsync();
                     Assert.Fail($"javac compilation failed with code {javacProc.ExitCode}:\n{err}\n{outMsg}");
                 }
             }
+            finally
+            {
+                try
+                {
+                    if (javacProc != null && !javacProc.HasExited)
+                    {
+                        javacProc.Kill(entireProcessTree: true);
+                        javacProc.WaitForExit(1000);
+                    }
+                }
+                catch { }
+                javacProc?.Dispose();
+                javacProc = null;
+            }
 
-            // 3. Запуск Java E2E теста (прогон сценария 60 секунд)
+            // Запуск Java E2E теста (60 секунд трекинга)
             int testSeconds = 60;
             var javaPsi = new ProcessStartInfo
             {
@@ -106,16 +146,24 @@ public class MusicBridgeIntegrationTests
                 RedirectStandardError = true
             };
 
-            var outputLines = new System.Collections.Concurrent.ConcurrentBag<string>();
+            var outputLines = new ConcurrentBag<string>();
+            var trackingSamples = new ConcurrentBag<(long timeMs, long clockPos, long serverNow)>();
             var tcsReadyToClose = new TaskCompletionSource<bool>();
 
-            using var javaProc = new Process { StartInfo = javaPsi };
+            javaProc = new Process { StartInfo = javaPsi };
             javaProc.OutputDataReceived += (s, e) =>
             {
                 if (e.Data != null)
                 {
                     outputLines.Add(e.Data);
                     Trace.WriteLine("[JAVA-E2E] " + e.Data);
+
+                    var m = Regex.Match(e.Data, @"TRACKING_SAMPLE:\s+time=(\d+)\s+clock=(\d+)\s+serverNow=(\d+)");
+                    if (m.Success)
+                    {
+                        trackingSamples.Add((long.Parse(m.Groups[1].Value), long.Parse(m.Groups[2].Value), long.Parse(m.Groups[3].Value)));
+                    }
+
                     if (e.Data.Contains("SIGNAL:READY_FOR_BRIDGE_CLOSE"))
                     {
                         tcsReadyToClose.TrySetResult(true);
@@ -135,20 +183,27 @@ public class MusicBridgeIntegrationTests
             javaProc.BeginOutputReadLine();
             javaProc.BeginErrorReadLine();
 
-            // Ждем сигнала готовности к закрытию моста (после всех шагов play/pause/seek/next/60s tracking)
             var readyTask = await Task.WhenAny(tcsReadyToClose.Task, Task.Delay(TimeSpan.FromSeconds(120)));
             if (readyTask != tcsReadyToClose.Task)
             {
-                javaProc.Kill(true);
+                try { javaProc.Kill(entireProcessTree: true); } catch { }
                 var fullLog = string.Join(Environment.NewLine, outputLines);
                 Assert.Fail($"Timed out waiting for SIGNAL:READY_FOR_BRIDGE_CLOSE. Process output:\n{fullLog}");
             }
 
-            // Имитируем закрытие моста: останавливаем сервер и удаляем конфиг
+            // Сравнение позиции MusicClock с независимым состоянием C# stub-плеера
+            Assert.NotEmpty(trackingSamples);
+            foreach (var sample in trackingSamples)
+            {
+                long stubPos = stubPlayer.GetExactPositionAtTimestamp(sample.timeMs);
+                long driftFromStub = Math.Abs(sample.clockPos - stubPos);
+                Assert.True(driftFromStub <= 150, $"MusicClock drift from C# stub player exceeded 150 ms: drift={driftFromStub}ms (clock={sample.clockPos}, stub={stubPos})");
+            }
+
+            // Закрытие моста
             bridge.Stop();
             Assert.False(File.Exists(configPath), "Stop() must delete the bridge config file");
 
-            // Ожидаем завершения Java-процесса
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             await javaProc.WaitForExitAsync(cts.Token);
 
@@ -164,6 +219,17 @@ public class MusicBridgeIntegrationTests
         {
             try
             {
+                if (javaProc != null && !javaProc.HasExited)
+                {
+                    javaProc.Kill(entireProcessTree: true);
+                    javaProc.WaitForExit(3000);
+                }
+            }
+            catch { }
+            javaProc?.Dispose();
+
+            try
+            {
                 bridge.Dispose();
                 if (Directory.Exists(tempInstanceDir))
                 {
@@ -174,18 +240,179 @@ public class MusicBridgeIntegrationTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task MusicBridge_IgnoredSeek_FailsConvergenceVerification()
+    {
+        var tempInstanceDir = Path.Combine(Path.GetTempPath(), "AuraTest", "bridge-failseek-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempInstanceDir);
+
+        var bridgeLogPath = Path.Combine(tempInstanceDir, "music-bridge.log");
+        Action<string> testLogger = msg => { try { File.AppendAllText(bridgeLogPath, msg + "\n"); } catch { } };
+
+        // Имитируем плеер, который игнорирует команду перемотки
+        var stubPlayer = new StubEmbedMusicPlayer { IgnoreSeek = true };
+        var track1 = new MusicBridgeTrack("track_rick1", "Rick Astley", "Never Gonna Give You Up", 213000, "https://example.com/cover1.jpg");
+        stubPlayer.AddTrack(track1);
+        stubPlayer.SetCurrentIndex(0, playNow: true);
+
+        using var dummyAudio = new DummyAudioService();
+        using var bridge = new MusicBridgeService(dummyAudio, embedPlayer: stubPlayer, port: 0, logger: testLogger);
+
+        Process? javacProc = null;
+        Process? javaProc = null;
+        try
+        {
+            bridge.Start();
+            bridge.WriteConfigFile(tempInstanceDir);
+            var configPath = Path.Combine(tempInstanceDir, "config", "aura-music-bridge.json");
+
+            var rootDir = FindRepoRoot();
+            var javaCommonDir = Path.Combine(rootDir, "aura-glass-common");
+            var outClassDir = Path.Combine(tempInstanceDir, "java-classes");
+            Directory.CreateDirectory(outClassDir);
+
+            var searchDirs = new[]
+            {
+                Path.Combine(Path.GetTempPath(), "AuraTest"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gradle", "caches")
+            };
+            var gsonJar = FindJar(searchDirs, "gson-*.jar");
+            Assert.False(string.IsNullOrEmpty(gsonJar));
+
+            var javaFiles = Directory.GetFiles(Path.Combine(javaCommonDir, "src", "main", "java", "net", "auramc", "glass", "client", "music"), "*.java", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles(Path.Combine(javaCommonDir, "src", "test", "java", "net", "auramc", "glass", "client", "music"), "*.java", SearchOption.AllDirectories))
+                .ToList();
+
+            var cpList = new List<string> { outClassDir, gsonJar };
+            string classpath = string.Join(Path.PathSeparator.ToString(), cpList);
+
+            // Компиляция
+            var javacPsi = new ProcessStartInfo
+            {
+                FileName = "javac",
+                Arguments = $"-cp \"{classpath}\" -d \"{outClassDir}\" " + string.Join(" ", javaFiles.Select(f => $"\"{f}\"")),
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            try
+            {
+                javacProc = Process.Start(javacPsi);
+                Assert.NotNull(javacProc);
+                var javacOutTask = javacProc.StandardOutput.ReadToEndAsync();
+                var javacErrTask = javacProc.StandardError.ReadToEndAsync();
+
+                using var javacCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                try
+                {
+                    await javacProc.WaitForExitAsync(javacCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    try { javacProc.Kill(entireProcessTree: true); } catch { }
+                    Assert.Fail("javac compilation timed out after 30 seconds");
+                }
+
+                await Task.WhenAny(Task.WhenAll(javacOutTask, javacErrTask), Task.Delay(2000));
+                var outMsg = javacOutTask.IsCompleted ? await javacOutTask : string.Empty;
+                var err = javacErrTask.IsCompleted ? await javacErrTask : string.Empty;
+                if (javacProc.ExitCode != 0)
+                {
+                    Assert.Fail($"javac failed with code {javacProc.ExitCode}:\n{err}\n{outMsg}");
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (javacProc != null && !javacProc.HasExited)
+                    {
+                        javacProc.Kill(entireProcessTree: true);
+                        javacProc.WaitForExit(1000);
+                    }
+                }
+                catch { }
+                javacProc?.Dispose();
+                javacProc = null;
+            }
+
+            // Запуск с флагом --seek-only
+            var javaPsi = new ProcessStartInfo
+            {
+                FileName = "java",
+                Arguments = $"-cp \"{classpath}\" net.auramc.glass.client.music.MusicBridgeE2ERunner \"{configPath}\" 1 --seek-only",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            var outputLines = new ConcurrentBag<string>();
+            javaProc = new Process { StartInfo = javaPsi };
+            javaProc.OutputDataReceived += (s, e) => { if (e.Data != null) outputLines.Add(e.Data); };
+            javaProc.ErrorDataReceived += (s, e) => { if (e.Data != null) outputLines.Add("[ERR] " + e.Data); };
+
+            javaProc.Start();
+            javaProc.BeginOutputReadLine();
+            javaProc.BeginErrorReadLine();
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            await javaProc.WaitForExitAsync(cts.Token);
+
+            var combinedOutput = string.Join(Environment.NewLine, outputLines);
+
+            // Тест ОБЯЗАН завершиться с ошибкой, если плеер проигнорировал команду seek
+            Assert.NotEqual(0, javaProc.ExitCode);
+            Assert.Contains("Server position failed to converge to seek target", combinedOutput);
+        }
+        finally
+        {
+            try
+            {
+                if (javaProc != null && !javaProc.HasExited)
+                {
+                    javaProc.Kill(entireProcessTree: true);
+                    javaProc.WaitForExit(3000);
+                }
+            }
+            catch { }
+            javaProc?.Dispose();
+
+            try
+            {
+                bridge.Dispose();
+                if (Directory.Exists(tempInstanceDir)) Directory.Delete(tempInstanceDir, true);
+            }
+            catch { }
+        }
+    }
+
     private static string FindRepoRoot()
     {
-        var current = AppDomain.CurrentDomain.BaseDirectory;
-        while (!string.IsNullOrEmpty(current))
+        var dirsToSearch = new[]
         {
-            if (Directory.Exists(Path.Combine(current, "aura-glass-common")))
+            AppDomain.CurrentDomain.BaseDirectory,
+            Directory.GetCurrentDirectory()
+        };
+
+        foreach (var startDir in dirsToSearch)
+        {
+            var dir = startDir;
+            while (!string.IsNullOrEmpty(dir))
             {
-                return current;
+                if (Directory.Exists(Path.Combine(dir, "aura-glass-common")) &&
+                    File.Exists(Path.Combine(dir, "AuraLauncher.csproj")))
+                {
+                    return dir;
+                }
+                dir = Path.GetDirectoryName(dir);
             }
-            current = Path.GetDirectoryName(current);
         }
-        return @"C:\Users\magne\Documents\AuraDev\.agent-state\agy\w4";
+
+        throw new DirectoryNotFoundException(
+            $"Could not find repository root containing 'aura-glass-common' and 'AuraLauncher.csproj' by searching up from '{AppDomain.CurrentDomain.BaseDirectory}' or '{Directory.GetCurrentDirectory()}'.");
     }
 
     private static string? FindJar(string[] searchDirs, string filter)
@@ -216,6 +443,8 @@ public class MusicBridgeIntegrationTests
         private long _basePositionMs = 0;
         private long _lastUpdatedAtUnixMs = 0;
         private double _volume = 1.0;
+
+        public bool IgnoreSeek { get; set; } = false;
 
         public bool IsActive => CurrentTrack != null;
         public bool HasTransport => true;
@@ -291,6 +520,31 @@ public class MusicBridgeIntegrationTests
             }
         }
 
+        private class PlaybackSegment
+        {
+            public long StartUnixMs { get; set; }
+            public long? EndUnixMs { get; set; }
+            public long BasePositionMs { get; set; }
+            public bool IsPlaying { get; set; }
+        }
+
+        private readonly List<PlaybackSegment> _segments = new();
+
+        private void RecordSegmentLocked(long basePositionMs, bool isPlaying)
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (_segments.Count > 0 && _segments[^1].EndUnixMs == null)
+            {
+                _segments[^1].EndUnixMs = now;
+            }
+            _segments.Add(new PlaybackSegment
+            {
+                StartUnixMs = now,
+                BasePositionMs = basePositionMs,
+                IsPlaying = isPlaying
+            });
+        }
+
         public void SetCurrentIndex(int idx, bool playNow = false)
         {
             lock (_lock)
@@ -300,17 +554,76 @@ public class MusicBridgeIntegrationTests
                     _currentIndex = idx;
                     _basePositionMs = 0;
                     _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    RecordSegmentLocked(_basePositionMs, playNow);
+                    TrackChanged?.Invoke(CurrentTrack);
                     if (playNow)
                     {
-                        _state = "playing";
+                        State = "playing";
                         _stopwatch.Restart();
+                    }
+                }
+            }
+        }
+
+        public long GetExactPositionMs(out long updatedAtUnixMs)
+        {
+            lock (_lock)
+            {
+                return GetExactPositionMsLocked(out updatedAtUnixMs);
+            }
+        }
+
+        public long GetExactPositionAtTimestamp(long targetUnixMs)
+        {
+            lock (_lock)
+            {
+                if (_segments.Count == 0) return _basePositionMs;
+
+                var segment = _segments.FirstOrDefault(s => targetUnixMs >= s.StartUnixMs && (s.EndUnixMs == null || targetUnixMs <= s.EndUnixMs.Value));
+                if (segment == null)
+                {
+                    if (targetUnixMs >= _segments[^1].StartUnixMs)
+                    {
+                        segment = _segments[^1];
                     }
                     else
                     {
-                        _state = "stopped";
-                        _stopwatch.Reset();
+                        segment = _segments.OrderBy(s => Math.Abs(s.StartUnixMs - targetUnixMs)).First();
                     }
                 }
+
+                if (!segment.IsPlaying)
+                {
+                    return segment.BasePositionMs;
+                }
+
+                long elapsed = Math.Max(0, targetUnixMs - segment.StartUnixMs);
+                long pos = segment.BasePositionMs + elapsed;
+                if (CurrentTrack != null && CurrentTrack.DurationMs > 0 && pos > CurrentTrack.DurationMs)
+                {
+                    pos = CurrentTrack.DurationMs;
+                }
+                return pos;
+            }
+        }
+
+        private long GetExactPositionMsLocked(out long updatedAtUnixMs)
+        {
+            if (_state == "playing" && _stopwatch.IsRunning)
+            {
+                long elapsed = _stopwatch.ElapsedMilliseconds;
+                long pos = _basePositionMs + elapsed;
+                if (CurrentTrack != null && CurrentTrack.DurationMs > 0 && pos > CurrentTrack.DurationMs)
+                {
+                    pos = CurrentTrack.DurationMs;
+                }
+                updatedAtUnixMs = _lastUpdatedAtUnixMs + elapsed;
+                return Math.Max(0, pos);
+            }
+            else
+            {
+                updatedAtUnixMs = _lastUpdatedAtUnixMs > 0 ? _lastUpdatedAtUnixMs : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                return Math.Max(0, _basePositionMs);
             }
         }
 
@@ -318,71 +631,48 @@ public class MusicBridgeIntegrationTests
         {
             lock (_lock)
             {
+                if (CurrentTrack == null) return Task.FromResult(false);
                 if (_state != "playing")
                 {
-                    _state = "playing";
-                    _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    State = "playing";
                     _stopwatch.Restart();
-                    StateChanged?.Invoke(_state);
+                    _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                    RecordSegmentLocked(_basePositionMs, true);
                 }
+                CommandDispatched?.Invoke("play", null);
+                return Task.FromResult(true);
             }
-            return Task.FromResult(true);
         }
 
         public Task<bool> PauseAsync()
         {
             lock (_lock)
             {
+                if (CurrentTrack == null) return Task.FromResult(false);
                 if (_state == "playing")
                 {
                     _basePositionMs += _stopwatch.ElapsedMilliseconds;
                     _stopwatch.Reset();
-                    _state = "paused";
                     _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    StateChanged?.Invoke(_state);
+                    State = "paused";
+                    RecordSegmentLocked(_basePositionMs, false);
                 }
+                CommandDispatched?.Invoke("pause", null);
+                return Task.FromResult(true);
             }
-            return Task.FromResult(true);
-        }
-
-        public Task<bool> NextAsync()
-        {
-            lock (_lock)
-            {
-                if (_currentIndex + 1 < _queue.Count)
-                {
-                    _currentIndex++;
-                    _basePositionMs = 0;
-                    _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    if (_state == "playing") _stopwatch.Restart();
-                    TrackChanged?.Invoke(CurrentTrack);
-                    return Task.FromResult(true);
-                }
-            }
-            return Task.FromResult(false);
-        }
-
-        public Task<bool> PreviousAsync()
-        {
-            lock (_lock)
-            {
-                if (_currentIndex > 0)
-                {
-                    _currentIndex--;
-                    _basePositionMs = 0;
-                    _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                    if (_state == "playing") _stopwatch.Restart();
-                    TrackChanged?.Invoke(CurrentTrack);
-                    return Task.FromResult(true);
-                }
-            }
-            return Task.FromResult(false);
         }
 
         public Task<bool> SeekAsync(long positionMs)
         {
             lock (_lock)
             {
+                CommandDispatched?.Invoke("seek", positionMs);
+                if (IgnoreSeek)
+                {
+                    // Имитируем баг игнорирования команды перемотки
+                    return Task.FromResult(true);
+                }
+
                 _basePositionMs = Math.Max(0, positionMs);
                 _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 if (_state == "playing")
@@ -393,8 +683,9 @@ public class MusicBridgeIntegrationTests
                 {
                     _stopwatch.Reset();
                 }
+                RecordSegmentLocked(_basePositionMs, _state == "playing");
+                return Task.FromResult(true);
             }
-            return Task.FromResult(true);
         }
 
         public Task<bool> SetVolumeAsync(double volume)
@@ -402,8 +693,37 @@ public class MusicBridgeIntegrationTests
             lock (_lock)
             {
                 _volume = Math.Clamp(volume, 0.0, 1.0);
+                CommandDispatched?.Invoke("volume", _volume);
+                return Task.FromResult(true);
             }
-            return Task.FromResult(true);
+        }
+
+        public Task<bool> NextAsync()
+        {
+            lock (_lock)
+            {
+                if (_currentIndex + 1 < _queue.Count)
+                {
+                    SetCurrentIndex(_currentIndex + 1, playNow: _state == "playing");
+                    CommandDispatched?.Invoke("next", null);
+                    return Task.FromResult(true);
+                }
+                return Task.FromResult(false);
+            }
+        }
+
+        public Task<bool> PreviousAsync()
+        {
+            lock (_lock)
+            {
+                if (_currentIndex - 1 >= 0)
+                {
+                    SetCurrentIndex(_currentIndex - 1, playNow: _state == "playing");
+                    CommandDispatched?.Invoke("prev", null);
+                    return Task.FromResult(true);
+                }
+                return Task.FromResult(false);
+            }
         }
 
         public Task<bool> LoadVideoAsync(string videoId, string? title = null, string? artist = null, string? coverUrl = null, long durationMs = 0)
@@ -424,7 +744,7 @@ public class MusicBridgeIntegrationTests
                     _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                     if (playNow)
                     {
-                        _state = "playing";
+                        State = "playing";
                         _stopwatch.Restart();
                     }
                     TrackChanged?.Invoke(track);
@@ -434,34 +754,8 @@ public class MusicBridgeIntegrationTests
             return Task.FromResult(true);
         }
 
-        public long GetExactPositionMs(out long updatedAtUnixMs)
-        {
-            lock (_lock)
-            {
-                return GetExactPositionMsLocked(out updatedAtUnixMs);
-            }
-        }
-
-        private long GetExactPositionMsLocked(out long updatedAtUnixMs)
-        {
-            if (_state == "playing" && _stopwatch.IsRunning)
-            {
-                long elapsed = _stopwatch.ElapsedMilliseconds;
-                long pos = _basePositionMs + elapsed;
-                long dur = CurrentTrack?.DurationMs ?? 0;
-                if (dur > 0 && pos > dur) pos = dur;
-                updatedAtUnixMs = _lastUpdatedAtUnixMs + elapsed;
-                return Math.Max(0, pos);
-            }
-            else
-            {
-                updatedAtUnixMs = _lastUpdatedAtUnixMs > 0 ? _lastUpdatedAtUnixMs : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                return Math.Max(0, _basePositionMs);
-            }
-        }
-
-        public void HandleEmbedMessage(string rawJson) { }
         public void AttachWebView(object? coreWebView2) { }
+        public void HandleEmbedMessage(string rawJson) { }
         public void Dispose()
         {
             lock (_lock)
