@@ -7,7 +7,7 @@ public final class GlassSpring {
     private long previous;
 
     public GlassSpring() {
-        this(0.35f, 0.85f);
+        this(0.35f, 0.825f);
     }
 
     public GlassSpring(float response, float damping) {

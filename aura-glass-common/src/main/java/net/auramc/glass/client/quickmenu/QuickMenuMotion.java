@@ -14,7 +14,7 @@ public final class QuickMenuMotion {
     private final GlassSpring widthSpring = new GlassSpring(0.35f, 0.85f);
     private long lastTime = Long.MIN_VALUE, changedAt;
     private long heightClock = 1, widthClock = 1;
-    private boolean open, initialized, positionSet, openingFromClosed;
+    private boolean open, initialized, positionSet, openingFromClosed, coldOpen = true;
     private long contentElapsed, closeFadeDuration;
     private double center = .5, bottom = Double.NaN;
     private double displayCenter, displayBottom, startCenter, startBottom;
@@ -38,7 +38,9 @@ public final class QuickMenuMotion {
 
     public void setOpen(boolean value, long now) {
         if (open == value) return;
-        openingFromClosed = value && settledClosed();
+        boolean closed = settledClosed() || !initialized;
+        openingFromClosed = value && closed;
+        if (value) coldOpen = closed;
         if (!value) closeFadeDuration = (long) Math.ceil(contentElapsed / 2.5);
         open = value;
         changedAt = now;
@@ -92,7 +94,7 @@ public final class QuickMenuMotion {
         long dt = lastTime == Long.MIN_VALUE ? 0 : Math.max(0, Math.min(50_000_000L, now - lastTime));
         lastTime = now;
         boolean heightMoving = open || elapsed >= closeFadeDuration + AXIS_DELAY;
-        boolean widthMoving = open ? elapsed >= AXIS_DELAY : elapsed >= closeFadeDuration;
+        boolean widthMoving = open ? (!coldOpen || elapsed >= AXIS_DELAY) : elapsed >= closeFadeDuration;
         if (heightMoving) heightClock += (long) (dt * (open ? 1.55 : 2.8));
         if (widthMoving) widthClock += (long) (dt * (open ? 1.2 : 2.3));
         heightProgress = unit(heightSpring.approach(open ? 1 : 0, heightClock));
