@@ -52,8 +52,10 @@ public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui
 
         if (!((Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget)
                 && !this.getClass().getName().contains("Keybind")) {
-            if (self.getSelectedOrNull() == null && !self.children().isEmpty()) {
-                self.setSelected(self.children().get(0));
+            @SuppressWarnings({"rawtypes", "unchecked"})
+            EntryListWidget raw = (EntryListWidget) (Object) this;
+            if (raw.getSelectedOrNull() == null && !raw.children().isEmpty()) {
+                raw.setSelected((net.minecraft.client.gui.widget.EntryListWidget.Entry) raw.children().get(0));
             }
             float listX = self.getRowLeft() - 8;
             float listW = self.getRowWidth() + 16;

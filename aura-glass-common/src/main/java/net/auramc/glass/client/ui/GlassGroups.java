@@ -48,7 +48,75 @@ public final class GlassGroups {
         height = client.getWindow().getScaledHeight();
         screen = root;
         lastChildrenCount = root != null ? root.children().size() : 0;
+        alignOptionsDoneButton(root);
         collect(root, 0, 0, height);
+        layoutPreparedWidgets(hasScreenTitle(root), hasTabs(root), isAlertOrExperimentalScreen(root));
+    }
+
+    public static void computeLayoutForTest(int scrWidth, int scrHeight, ClickableWidget[] widgets, int count,
+                                           boolean hasTitle, boolean hasTabs, boolean isAlert, boolean isMainOptions) {
+        for (int i = 0; i < widgetCount; i++) WIDGETS[i] = null;
+        widgetCount = 0;
+        groupCount = 0;
+        screen = null;
+        width = scrWidth;
+        height = scrHeight;
+
+        if (isMainOptions) {
+            ClickableWidget doneBtn = null;
+            int maxOptionY = 0;
+            for (int i = 0; i < count; i++) {
+                ClickableWidget w = widgets[i];
+                if (w != null && w.visible) {
+                    if (isDoneButton(w)) {
+                        doneBtn = w;
+                    } else {
+                        maxOptionY = Math.max(maxOptionY, w.getY() + w.getHeight());
+                    }
+                }
+            }
+            if (doneBtn != null && maxOptionY > 0 && doneBtn.getY() > maxOptionY + 16) {
+                doneBtn.setY(maxOptionY + 12);
+                doneBtn.setX((width - doneBtn.getWidth()) / 2);
+            }
+        }
+
+        if (isAlert) {
+            int textW = Math.min(320, width - 40);
+            int textLeft = (width - textW) / 2;
+            int textRight = (width + textW) / 2;
+            int textTop = 60;
+            int textBottom = 115;
+            if (widgetCount < MAX_WIDGETS) {
+                int index = widgetCount++;
+                WIDGETS[index] = null;
+                LEFT[index] = textLeft;
+                TOP[index] = textTop;
+                RIGHT[index] = textRight;
+                BOTTOM[index] = textBottom;
+                PARENT[index] = index;
+            }
+        }
+
+        for (int i = 0; i < count; i++) {
+            ClickableWidget w = widgets[i];
+            if (w == null || !w.visible) continue;
+            if (w instanceof net.minecraft.client.gui.widget.TabButtonWidget) {
+                w.setY(6);
+            }
+            int index = widgetCount++;
+            WIDGETS[index] = w;
+            LEFT[index] = w.getX();
+            TOP[index] = w.getY();
+            RIGHT[index] = w.getX() + w.getWidth();
+            BOTTOM[index] = w.getY() + w.getHeight();
+            PARENT[index] = index;
+        }
+
+        layoutPreparedWidgets(hasTitle, hasTabs, isAlert);
+    }
+
+    private static void layoutPreparedWidgets(boolean hasTitle, boolean hasTabs, boolean isAlert) {
         for (int i = 0; i < widgetCount; i++) {
             for (int j = 0; j < i; j++) {
                 if (near(i, j)) PARENT[find(i)] = find(j);
@@ -116,7 +184,7 @@ public final class GlassGroups {
                     for (int k = 0; k < widgetCount; k++) {
                         if (find(k) == group.root) {
                             ClickableWidget w = WIDGETS[k];
-                            w.setY(w.getY() + shiftBottomY);
+                            if (w != null) w.setY(w.getY() + shiftBottomY);
                             TOP[k] += shiftBottomY;
                             BOTTOM[k] += shiftBottomY;
                         }
@@ -143,11 +211,11 @@ public final class GlassGroups {
 
             // Return 1, point 1: Title clearance >= 10 GUI above group.
             // Title is at y=8, h=13.5 (bottom=21.5). Minimum group top must be >= 32 GUI.
-            if (hasScreenTitle(screen) && gTop < 32 && !isAlertOrExperimentalScreen(screen)) {
+            if (hasTitle && gTop < 32 && !isAlert) {
                 int shiftTitle = 32 - gTop;
                 shiftY = Math.max(shiftY, shiftTitle);
             }
-            if (hasTabs(screen) && gTop < 38) {
+            if (hasTabs && gTop < 38) {
                 int shiftTabs = 38 - gTop;
                 shiftY = Math.max(shiftY, shiftTabs);
             }
@@ -172,10 +240,10 @@ public final class GlassGroups {
                 gBottom += shiftY;
             }
 
-            group.left = Math.max(MARGIN, gLeft);
-            group.top = Math.max(MARGIN, gTop);
-            group.right = Math.min(width - MARGIN, gRight);
-            group.bottom = Math.min(height - MARGIN, gBottom);
+            group.left = gLeft;
+            group.top = gTop;
+            group.right = gRight;
+            group.bottom = gBottom;
         }
 
         // Requirement 2: зазор между группами минимум 8 GUI.
@@ -258,9 +326,9 @@ public final class GlassGroups {
                     widget.setY(6);
                 }
 
-                int left = Math.max(0, widget.getX());
+                int left = widget.getX();
                 int top = Math.max(clipTop, widget.getY());
-                int right = Math.min(width, widget.getX() + widget.getWidth());
+                int right = widget.getX() + widget.getWidth();
                 int bottom = Math.min(clipBottom, widget.getY() + widget.getHeight());
 
                 // Requirement 3: Подписи над полями («Название мира», «Ключ для генератора мира»)
@@ -305,15 +373,31 @@ public final class GlassGroups {
         return null;
     }
 
+    public static boolean isDoneButton(ClickableWidget w) {
+        if (w == null || w.getMessage() == null) return false;
+        String str = w.getMessage().getString();
+        if ("Готово".equals(str) || "Done".equalsIgnoreCase(str)) return true;
+        if (w.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent t) {
+            return "gui.done".equals(t.getKey());
+        }
+        return false;
+    }
+
+    public static boolean isMainOptionsScreen(ParentElement root) {
+        if (root == null) return false;
+        String name = root.getClass().getName();
+        return name.endsWith(".OptionsScreen") || name.endsWith(".class_429");
+    }
+
     private static void alignOptionsDoneButton(ParentElement root) {
+        if (!isMainOptionsScreen(root)) return;
         var children = root.children();
         ClickableWidget doneBtn = null;
         int maxOptionY = 0;
         for (int i = 0; i < children.size(); i++) {
             Element c = children.get(i);
             if (c instanceof ClickableWidget w && w.visible) {
-                if (w.getMessage() != null && w.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent t
-                        && "gui.done".equals(t.getKey())) {
+                if (isDoneButton(w)) {
                     doneBtn = w;
                 } else if (!(c instanceof EntryListWidget<?>)) {
                     maxOptionY = Math.max(maxOptionY, w.getY() + w.getHeight());
@@ -330,7 +414,8 @@ public final class GlassGroups {
         if (root == null) return false;
         String name = root.getClass().getName();
         return name.contains("Experimental") || name.contains("Warning") || name.contains("Notice")
-                || name.contains("Backup") || name.contains("Confirm");
+                || name.contains("Backup") || name.contains("Confirm")
+                || name.endsWith(".class_403") || name.endsWith(".class_410");
     }
 
     private static boolean hasScreenTitle(ParentElement root) {
@@ -423,6 +508,8 @@ public final class GlassGroups {
     public static int right(int index) { return GROUPS[index].right; }
     public static int top(int index) { return GROUPS[index].top; }
     public static int bottom(int index) { return GROUPS[index].bottom; }
+    public static float lightProgress(int index) { return 0.0f; }
+    public static float lightProgress() { return 0.0f; }
 
     public static boolean owns(Object widget) {
         if (screen != MinecraftClient.getInstance().currentScreen) return false;

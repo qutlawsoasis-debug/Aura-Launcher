@@ -3,8 +3,40 @@ package net.auramc.glass.client.ui;
 import net.auramc.glass.common.style.GlassPreset;
 import net.auramc.glass.common.style.GlassStyle;
 import net.auramc.glass.common.style.GlassStyles;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.gui.widget.TabButtonWidget;
+import net.minecraft.client.gui.tab.Tab;
+import net.minecraft.client.gui.tab.TabManager;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.text.Text;
 
 public final class GlassLayoutTest {
+
+    private static class DummyWidget extends ClickableWidget {
+        DummyWidget(int x, int y, int width, int height, String text) {
+            super(x, y, width, height, text != null ? Text.literal(text) : Text.empty());
+        }
+
+        protected void renderButton(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {}
+        protected void renderWidget(net.minecraft.client.gui.DrawContext context, int mouseX, int mouseY, float delta) {}
+
+        @Override
+        protected void appendClickableNarrations(net.minecraft.client.gui.screen.narration.NarrationMessageBuilder builder) {}
+    }
+
+    private static class DummyTabButton extends TabButtonWidget {
+        DummyTabButton(int x, int y, int width, int height, String text) {
+            super(new TabManager(w -> {}, w -> {}),
+                  new Tab() {
+                      public Text getTitle() { return Text.literal(text); }
+                      public void forEachChild(java.util.function.Consumer<ClickableWidget> consumer) {}
+                      public void refreshGrid(ScreenRect rect) {}
+                  },
+                  width, height);
+            setX(x);
+            setY(y);
+        }
+    }
 
     public static void main(String[] args) throws Exception {
         System.out.println("=== Starting Glass Screen Layout Unit Tests (W3e) ===");
@@ -58,85 +90,63 @@ public final class GlassLayoutTest {
     // 1. Поля экрана: ни одна группа не прижата к краю. Минимальный отступ группы от любого края 6 GUI.
     // Если группа не влезает — сдвинуть сам блок виджетов, а не обрезать стекло.
     private static void testRequirement1_ScreenMarginsAndWidgetBlockShift() {
-        int screenWidth = 400;
-        int screenHeight = 300;
-        int margin = 6;
-        int pad = 8;
+        // Widget placed dangerously close to left/top edge: (2, 4)
+        DummyWidget w1 = new DummyWidget(2, 4, 100, 20, "W1");
+        ClickableWidget[] widgets = new ClickableWidget[]{w1};
 
-        // Widget placed dangerously close to left/top edge
-        int rawX = 2;
-        int rawY = 4;
-        int rawW = 100;
-        int rawH = 20;
+        GlassGroups.computeLayoutForTest(400, 300, widgets, 1, false, false, false, false);
 
-        int rawLeft = rawX - pad; // -6
-        int rawTop = rawY - pad;  // -4
-        int rawRight = rawX + rawW + pad;
-        int rawBottom = rawY + rawH + pad;
+        assertEquals(1, GlassGroups.count(), "One group formed");
+        int groupLeft = GlassGroups.left(0);
+        int groupTop = GlassGroups.top(0);
 
-        int shiftX = 0;
-        int shiftY = 0;
-        if (rawLeft < margin) shiftX = margin - rawLeft; // 6 - (-6) = 12
-        if (rawTop < margin) shiftY = margin - rawTop;   // 6 - (-4) = 10
+        assertTrue(groupLeft >= 6, "Group left edge must be >= 6 GUI margin (got " + groupLeft + ")");
+        assertTrue(groupTop >= 6, "Group top edge must be >= 6 GUI margin (got " + groupTop + ")");
+        assertEquals(6, groupLeft, "Group left shifted to 6 GUI");
+        assertEquals(6, groupTop, "Group top shifted to 6 GUI");
 
-        int shiftedX = rawX + shiftX; // 14
-        int shiftedY = rawY + shiftY; // 14
+        // Verify widget's actual coordinates were shifted:
+        assertEquals(14, w1.getX(), "Widget X shifted from 2 to 14 (groupLeft = 14 - 8 = 6)");
+        assertEquals(14, w1.getY(), "Widget Y shifted from 4 to 14 (groupTop = 14 - 8 = 6)");
 
-        int shiftedGroupLeft = shiftedX - pad; // 6
-        int shiftedGroupTop = shiftedY - pad;  // 6
+        // Widget placed dangerously close to right/bottom edge: (350, 280) on 400x300
+        DummyWidget w2 = new DummyWidget(350, 280, 100, 20, "W2");
+        ClickableWidget[] widgets2 = new ClickableWidget[]{w2};
 
-        assertTrue(shiftedGroupLeft >= margin, "Group left edge must be >= 6 GUI margin");
-        assertTrue(shiftedGroupTop >= margin, "Group top edge must be >= 6 GUI margin");
-        assertEquals(margin, shiftedGroupLeft, "Group left edge perfectly matches 6 GUI margin after shift");
-        assertEquals(margin, shiftedGroupTop, "Group top edge perfectly matches 6 GUI margin after shift");
+        GlassGroups.computeLayoutForTest(400, 300, widgets2, 1, false, false, false, false);
 
-        // Verify hitbox is shifted along with widget:
-        // Hitbox click at center of shifted widget:
-        int clickX = shiftedX + rawW / 2;
-        int clickY = shiftedY + rawH / 2;
-        boolean hitboxHit = clickX >= shiftedX && clickX < shiftedX + rawW
-                && clickY >= shiftedY && clickY < shiftedY + rawH;
-        assertTrue(hitboxHit, "Widget hitbox matches shifted coordinates");
+        int groupRight = GlassGroups.right(0);
+        int groupBottom = GlassGroups.bottom(0);
 
-        // Widget placed near right/bottom edge
-        rawX = 350;
-        rawY = 280;
-        rawLeft = rawX - pad;
-        rawTop = rawY - pad;
-        rawRight = rawX + rawW + pad;   // 458 > 394
-        rawBottom = rawY + rawH + pad; // 308 > 294
-
-        shiftX = 0; shiftY = 0;
-        if (rawRight > screenWidth - margin) shiftX = (screenWidth - margin) - rawRight;
-        if (rawBottom > screenHeight - margin) shiftY = (screenHeight - margin) - rawBottom;
-
-        shiftedX = rawX + shiftX;
-        shiftedY = rawY + shiftY;
-        int shiftedGroupRight = shiftedX + rawW + pad;
-        int shiftedGroupBottom = shiftedY + rawH + pad;
-
-        assertTrue(shiftedGroupRight <= screenWidth - margin, "Group right edge must be <= width - 6 GUI");
-        assertTrue(shiftedGroupBottom <= screenHeight - margin, "Group bottom edge must be <= height - 6 GUI");
+        assertTrue(groupRight <= 400 - 6, "Group right edge must be <= width - 6 GUI (got " + groupRight + ")");
+        assertTrue(groupBottom <= 300 - 6, "Group bottom edge must be <= height - 6 GUI (got " + groupBottom + ")");
+        assertTrue(w2.getX() + w2.getWidth() + 8 <= 400 - 6, "Widget hitbox right edge matches shifted coordinates");
     }
 
     // 2. Внутренний отступ группы PAD: 8 GUI; зазор между группами минимум 8 GUI.
     private static void testRequirement2_GroupPaddingAndMinimumGap() {
-        int pad = 8;
-        int widgetX = 100, widgetY = 100, widgetW = 100, widgetH = 20;
-        int gLeft = widgetX - pad;
-        int gTop = widgetY - pad;
-        int gRight = widgetX + widgetW + pad;
-        int gBottom = widgetY + widgetH + pad;
+        DummyWidget w1 = new DummyWidget(50, 50, 80, 20, "G1");
+        // Place w2 far enough (y = 120, gap = 120 - 70 = 50 > GAP 28)
+        DummyWidget w2 = new DummyWidget(50, 120, 80, 20, "G2");
+        ClickableWidget[] widgets = new ClickableWidget[]{w1, w2};
 
-        assertEquals(8, widgetX - gLeft, "Left PAD must be exactly 8 GUI");
-        assertEquals(8, gRight - (widgetX + widgetW), "Right PAD must be exactly 8 GUI");
-        assertEquals(8, widgetY - gTop, "Top PAD must be exactly 8 GUI");
-        assertEquals(8, gBottom - (widgetY + widgetH), "Bottom PAD must be exactly 8 GUI");
+        GlassGroups.computeLayoutForTest(400, 300, widgets, 2, false, false, false, false);
 
-        // Check gap between two separate groups
-        int g2Top = gBottom + 8; // exactly 8 GUI minimum gap
-        int gap = g2Top - gBottom;
-        assertTrue(gap >= 8, "Inter-group gap must be at least 8 GUI");
+        assertEquals(2, GlassGroups.count(), "Two separate groups formed");
+
+        int g1Left = GlassGroups.left(0);
+        int g1Right = GlassGroups.right(0);
+        int g1Top = GlassGroups.top(0);
+        int g1Bottom = GlassGroups.bottom(0);
+
+        assertEquals(8, w1.getX() - g1Left, "Left PAD must be exactly 8 GUI");
+        assertEquals(8, g1Right - (w1.getX() + w1.getWidth()), "Right PAD must be exactly 8 GUI");
+        assertEquals(8, w1.getY() - g1Top, "Top PAD must be exactly 8 GUI");
+        assertEquals(8, g1Bottom - (w1.getY() + w1.getHeight()), "Bottom PAD must be exactly 8 GUI");
+
+        int g2Top = GlassGroups.top(1);
+        int gap = g2Top - g1Bottom;
+        assertTrue(gap >= 8, "Inter-group gap must be at least 8 GUI (got " + gap + ")");
     }
 
     // 3. Подписи над полями: подпись входит В группу своего поля — верх группы = верх подписи − 8 GUI.
@@ -171,21 +181,20 @@ public final class GlassLayoutTest {
     // высота 24 GUI, радиус 12; активная вкладка — заливка rgba(118,118,128,0.36), без голубой полоски сверху;
     // контент под вкладками сдвинуть вниз на те же +6.
     private static void testRequirement4_TabNavigationCapsuleAndOffsets() {
-        int tabY = 6;
-        int tabHeight = 24;
-        int tabBottom = tabY + tabHeight; // 30
-        int radius = 12;
+        DummyTabButton tab1 = new DummyTabButton(100, 10, 60, 20, "Tab1");
+        DummyTabButton tab2 = new DummyTabButton(165, 10, 60, 20, "Tab2");
+        DummyWidget contentBtn = new DummyWidget(100, 25, 200, 20, "Content");
+        ClickableWidget[] widgets = new ClickableWidget[]{tab1, tab2, contentBtn};
 
-        assertEquals(6, tabY, "Tab capsule top must be at y = 6 GUI");
-        assertEquals(24, tabHeight, "Tab capsule height must be 24 GUI");
-        assertEquals(30, tabBottom, "Tab capsule bottom must be 30 GUI");
-        assertEquals(12, radius, "Tab capsule radius must be 12");
+        GlassGroups.computeLayoutForTest(400, 300, widgets, 3, false, true, false, false);
 
-        // Shift of content below tabs:
-        int vanillaFocusBottom = 24;
-        int auraFocusBottom = tabBottom; // 30
-        int contentShift = auraFocusBottom - vanillaFocusBottom;
-        assertEquals(6, contentShift, "Content below tabs shifted down by exactly +6 GUI");
+        assertEquals(6, GlassGroups.top(0), "Tab capsule top must be at y = 6 GUI");
+        assertEquals(30, GlassGroups.bottom(0), "Tab capsule bottom must be at y = 30 GUI");
+        assertEquals(24, GlassGroups.bottom(0) - GlassGroups.top(0), "Tab capsule height must be 24 GUI");
+
+        int contentGroupTop = GlassGroups.top(1);
+        assertTrue(contentGroupTop >= 38, "Content group below tabs must be shifted to top >= 38 GUI (got " + contentGroupTop + ")");
+        assertTrue(contentGroupTop - GlassGroups.bottom(0) >= 8, "Gap between tab capsule and content must be >= 8 GUI");
 
         // Active tab style:
         var style = GlassStyles.frame(GlassPreset.PILL_THICK);
@@ -211,18 +220,24 @@ public final class GlassLayoutTest {
         assertEquals(13.5f, titleSize, 0.001f, "Title size is 13.5 GUI (1.5x of 9)");
 
         int screenWidth = 400;
-        float measuredTitleWidth = 80.0f; // at 13.5 size
+        float measuredTitleWidth = 80.0f;
         float titleX = (screenWidth - measuredTitleWidth) * 0.5f;
         assertEquals(160.0f, titleX, 0.001f, "Title is centered horizontally");
 
-        int topGroupY = 60;
-        float titleY = Math.max(6f, (float)(topGroupY - 10) - titleSize);
-        float titleBottom = titleY + titleSize;
+        // Widget placed near top (y = 20, raw group top = 12 GUI)
+        DummyWidget w = new DummyWidget(100, 20, 200, 20, "TopButton");
+        ClickableWidget[] widgets = new ClickableWidget[]{w};
 
-        assertEquals(36.5f, titleY, 0.001f, "Title Y position calculated correctly");
-        assertEquals(50.0f, titleBottom, 0.001f, "Title bottom edge is 50 GUI");
-        assertEquals(10.0f, topGroupY - titleBottom, 0.001f, "Title bottom edge is exactly 10 GUI above top group");
-        assertTrue(titleBottom < topGroupY, "Title does not overlap with top group");
+        // When screen has title (hasTitle = true):
+        GlassGroups.computeLayoutForTest(400, 300, widgets, 1, true, false, false, false);
+
+        int groupTop = GlassGroups.top(0);
+        assertTrue(groupTop >= 32, "Top group must be shifted to top >= 32 GUI to provide clearance under title (got " + groupTop + ")");
+        assertEquals(40, w.getY(), "Widget Y shifted down to 40 GUI (groupTop = 40 - 8 = 32)");
+
+        float titleBottom = 8.0f + 13.5f; // title at y=8, h=13.5 -> 21.5 GUI
+        float clearance = groupTop - titleBottom;
+        assertTrue(clearance >= 10.0f, "Clearance between title bottom and group top must be >= 10 GUI (got " + clearance + ")");
 
         // Color check: white 0.92
         int alpha092 = Math.round(255 * 0.92f); // 235 -> 0xEB
@@ -233,13 +248,20 @@ public final class GlassLayoutTest {
     // 6. Длинный текст вне кнопок (экран «Экспериментальные настройки», предупреждения, ошибки):
     // кладётся в одну стеклянную группу вместе с кнопками этого экрана, ширина текста максимум 320 GUI, межстрочный 11 GUI.
     private static void testRequirement6_AlertAndExperimentalLongText() {
-        int maxWidth = 320;
-        int lineHeight = 11;
+        DummyWidget alertBtn = new DummyWidget(150, 130, 100, 20, "Back");
+        ClickableWidget[] widgets = new ClickableWidget[]{alertBtn};
 
-        int sampleTextWidth = 450;
-        int clampedTextWidth = Math.min(sampleTextWidth, maxWidth);
-        assertEquals(320, clampedTextWidth, "Alert text width clamped to maximum 320 GUI");
-        assertEquals(11, lineHeight, "Alert text line height is 11 GUI");
+        GlassGroups.computeLayoutForTest(400, 300, widgets, 1, false, false, true, false);
+
+        assertEquals(1, GlassGroups.count(), "Alert text anchor and Back button form ONE group");
+        int groupTop = GlassGroups.top(0);
+        int groupBottom = GlassGroups.bottom(0);
+        int groupLeft = GlassGroups.left(0);
+        int groupRight = GlassGroups.right(0);
+
+        assertTrue(groupTop <= 60 - 8, "Group top includes the alert text block at y=60");
+        assertTrue(groupBottom >= 130 + 20 + 8, "Group bottom includes the button at y=130");
+        assertTrue(groupRight - groupLeft <= 320 + 16, "Group width fits within maximum 320 GUI + PAD");
     }
 
     // 7. Список миров/серверов: весь список — ОДНА стеклянная поверхность (ширина как у списка + PAD),
@@ -280,15 +302,35 @@ public final class GlassLayoutTest {
     // 8. Нижняя группа кнопок: низ группы на 8 GUI выше нижнего края экрана.
     // 1.21.1 «Настройки»: «Готово» должно стоять как в 1.20.1 — внутри основной группы последним рядом, не отдельной капсулой у края.
     private static void testRequirement8_BottomButtonGroupAlignmentAndOptionsDone() {
-        int screenHeight = 300;
-        int targetBottom = screenHeight - 8; // 292
-        assertEquals(292, targetBottom, "Bottom button group bottom is screen height - 8 GUI");
+        // Case A: Bottom button group on normal screen (e.g. SelectWorldScreen, height = 300)
+        // Widget at y = 240, h = 20 (raw group bottom = 268)
+        DummyWidget bottomBtn = new DummyWidget(100, 240, 200, 20, "BottomAction");
+        ClickableWidget[] listWidgets = new ClickableWidget[]{bottomBtn};
+        GlassGroups.computeLayoutForTest(400, 300, listWidgets, 1, false, false, false, false);
 
-        // 1.21.1 OptionsScreen "Done" button alignment:
-        int maxOptionY = 200; // bottom of options list
-        int doneButtonY = maxOptionY + 12; // aligned inside options group
-        int gapToOptions = doneButtonY - maxOptionY;
-        assertEquals(12, gapToOptions, "Done button placed with GAP <= 12 GUI, merging it into options group");
+        int groupBottom = GlassGroups.bottom(0);
+        assertEquals(292, groupBottom, "Bottom button group aligned to height - 8 GUI (300 - 8 = 292)");
+        assertEquals(264, bottomBtn.getY(), "Bottom button Y shifted so button bottom + PAD = 292 (264 + 20 + 8 = 292)");
+
+        // Case B: OptionsScreen with Done button (merged in main group, NOT forced to screen bottom)
+        DummyWidget opt1 = new DummyWidget(50, 90, 140, 20, "Option 1");
+        DummyWidget opt2 = new DummyWidget(210, 90, 140, 20, "Option 2");
+        DummyWidget opt3 = new DummyWidget(50, 114, 140, 20, "Option 3");
+        DummyWidget opt4 = new DummyWidget(210, 114, 140, 20, "Option 4");
+        // In 1.21.1, Done button initially at footer position (y = 268 near bottom)
+        DummyWidget doneBtn = new DummyWidget(100, 268, 200, 20, "Готово");
+        ClickableWidget[] optionsWidgets = new ClickableWidget[]{opt1, opt2, opt3, opt4, doneBtn};
+
+        GlassGroups.computeLayoutForTest(400, 300, optionsWidgets, 5, true, false, false, true);
+
+        // Verify doneBtn was moved into the options group (maxOptionY = 134, doneBtn.y = 134 + 12 = 146)
+        assertEquals(146, doneBtn.getY(), "Done button moved to maxOptionY + 12 (134 + 12 = 146), merging it into main options group");
+        assertEquals(1, GlassGroups.count(), "All options + Done button form exactly ONE group");
+        int optionsGroupBottom = GlassGroups.bottom(0);
+        assertEquals(174, optionsGroupBottom, "Options group bottom is 146 + 20 + 8 = 174 GUI");
+
+        int bottomMargin = 300 - optionsGroupBottom;
+        assertTrue(bottomMargin > 100, "Options group is centered, bottom margin is " + bottomMargin + " GUI (not forced to 8 GUI)");
     }
 
     // 9. Иконки титульного экрана (язык, спец. возможности) в 1.21.1 — монохромные белые 0.92 как в 1.20.1, 16 GUI.
