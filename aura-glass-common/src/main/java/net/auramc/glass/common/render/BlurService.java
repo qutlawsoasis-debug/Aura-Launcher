@@ -86,7 +86,10 @@ public final class BlurService {
             com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0);
             glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
             GuiRenderState.clearSampler(0);
-            if (width != w || height != h || program == 0) return fail("blur resources not prepared for framebuffer");
+            if (width != w || height != h || program == 0) {
+                prepare(mainFbo, w, h);
+                if (width != w || height != h || program == 0) return fail("blur resources not prepared for framebuffer");
+            }
             glDisable(GL_SCISSOR_TEST);
             glDisable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_STENCIL_TEST);
             glColorMask(true, true, true, true);
@@ -161,10 +164,12 @@ public final class BlurService {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, widths[i], heights[i], 0, GL_RGBA, GL_UNSIGNED_BYTE, 0L);
-            fbos[i] = glGenFramebuffers(); glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[i]);
-            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures[i], 0);
-            int status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
-            if (status != GL_FRAMEBUFFER_COMPLETE) throw new IllegalStateException("blur framebuffer level " + i + " incomplete: 0x" + Integer.toHexString(status));
+            if (i > 0) {
+                fbos[i] = glGenFramebuffers(); glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[i]);
+                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textures[i], 0);
+                int status = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+                if (status != GL_FRAMEBUFFER_COMPLETE) throw new IllegalStateException("blur framebuffer level " + i + " incomplete: 0x" + Integer.toHexString(status));
+            }
             if(i>0) {
                 scratchTextures[i]=glGenTextures();com.mojang.blaze3d.platform.GlStateManager._bindTexture(scratchTextures[i]);
                 glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
@@ -187,6 +192,10 @@ public final class BlurService {
     }
     private static void clearErrors() { GlassDiagnostics.drainErrors("before blur capture"); }
     private static void check(String operation) { int error = glGetError(); if (error != GL_NO_ERROR) throw new IllegalStateException(operation + " GL error 0x" + Integer.toHexString(error) + " (" + error + ")"); }
+    public int fbo(int level) { return fbos[Math.max(0, Math.min(LEVELS, level))]; }
+    public int fboWidth(int level) { return widths[Math.max(0, Math.min(LEVELS, level))]; }
+    public int fboHeight(int level) { return heights[Math.max(0, Math.min(LEVELS, level))]; }
+    public int levels() { return LEVELS; }
     public boolean captured() { return captured; }
     public int texture(int level) { return textures[Math.max(0, Math.min(3, level))]; }
     public int sharpTexture() { return textures[0]; }
