@@ -358,15 +358,10 @@ public class MusicBridgeService : IMusicBridgeService
         var request = context.Request;
         var response = context.Response;
 
-        // CORS headers for local loopback in-game web views or browser controls
-        response.Headers["Access-Control-Allow-Origin"] = "*";
-        response.Headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
-        response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
-
-        if (string.Equals(request.HttpMethod, "OPTIONS", StringComparison.OrdinalIgnoreCase))
+        // Reject browser requests containing Origin header (bridge is only for in-game HTTP client)
+        if (!string.IsNullOrWhiteSpace(request.Headers["Origin"]))
         {
-            response.StatusCode = 204;
-            response.Close();
+            await SendJsonAsync(response, 403, new { error = "forbidden", message = "Origin header not allowed" });
             return;
         }
 

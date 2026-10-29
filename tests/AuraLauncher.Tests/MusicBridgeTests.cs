@@ -80,13 +80,28 @@ public class MusicBridgeTests : IDisposable
     }
 
     [Fact]
-    public async Task OptionsPreflight_WithoutAuthorization_Returns204()
+    public async Task Request_WithOriginHeader_Returns403()
     {
-        var request = new HttpRequestMessage(HttpMethod.Options, "/now");
+        SetAuthToken(_bridge.Token);
+        var request = new HttpRequestMessage(HttpMethod.Get, "/now");
+        request.Headers.Add("Origin", "http://localhost:3000");
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        Assert.True(response.Headers.Contains("Access-Control-Allow-Origin"));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Origin header not allowed", content);
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    [Fact]
+    public async Task Request_WithoutOrigin_WithValidToken_Returns200()
+    {
+        SetAuthToken(_bridge.Token);
+        var request = new HttpRequestMessage(HttpMethod.Get, "/now");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
     }
 
     #endregion
