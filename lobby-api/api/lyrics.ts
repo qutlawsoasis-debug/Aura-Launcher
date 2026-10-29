@@ -1,47 +1,123 @@
-import { createHash } from 'node:crypto';
 import { getStore } from '../src/store.js';
-import { sendJson, getClientIp, redisGet, redisSet } from './_utils.js';
+import { sendJson, getClientIp, redisGet, redisSet, cleanArtist, cleanTitle } from './_utils.js';
+import { parseLrc, ParsedLyrics } from '../src/lyricsParser.js';
+import { fetchLyricsFromLrclib } from '../src/lrclib.js';
+
+export function normalizeLyricsCacheKey(artist: string, title: string): string {
+  const normArtist = cleanArtist(artist)
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+  const normTitle = cleanTitle(title)
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+  return `lyrics:v1:${normArtist}|${normTitle}`;
+}
 
 export default async function handler(req: any, res: any) {
-  if (req.method === 'OPTIONS') return sendJson(res, 200, {});
-  if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' });
-  const input = new URL(req.url, 'https://lobby-api.vercel.app');
-  const artist = (input.searchParams.get('artist') || '').trim();
-  const title = (input.searchParams.get('title') || '').trim();
-  const duration = Number(input.searchParams.get('duration'));
-  if (!artist || !title || artist.length > 200 || title.length > 300 || !Number.isFinite(duration) || duration < 1 || duration > 3600) {
-    return sendJson(res, 400, { error: 'invalid_track_signature' });
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Aura-Client');
+    return res.status ? res.status(204).end() : (res.writeHead(204), res.end());
   }
+
+  if (req.method !== 'GET') {
+    return sendJson(res, 405, { error: 'Method Not Allowed' });
+  }
+
   try {
-    if (!await getStore().checkRateLimit(`lyrics:${getClientIp(req)}`, 30, 60)) return sendJson(res, 429, { error: 'rate_limited' });
-    const signature = JSON.stringify([artist.toLocaleLowerCase('en-US'), title.toLocaleLowerCase('en-US'), Math.round(duration)]);
-    const key = `lyrics:synced:v1:${createHash('sha256').update(signature).digest('hex')}`;
-    const cached = await redisGet(key);
+    const store = getStore();
+    const clientIp = getClientIp(req);
+
+    // Rate limit: 60 requests per minute per IP
+    const allowed = await store.checkRateLimit(`lyrics:${clientIp}`, 60, 60);
+    if (!allowed) {
+      return sendJson(res, 429, { error: 'rate_limited', message: 'Too many requests' });
+    }
+
+    const url = new URL(req.url, 'http://localhost');
+    const artist = (url.searchParams.get('artist') || '').trim();
+    const title = (url.searchParams.get('title') || '').trim();
+    const durationParam = url.searchParams.get('duration');
+    const durationSec = durationParam ? parseFloat(durationParam) : 0;
+
+    if (!artist || !title) {
+      return sendJson(res, 400, {
+        error: 'missing_parameters',
+        message: 'artist and title are required'
+      });
+    }
+
+    const cacheKey = normalizeLyricsCacheKey(artist, title);
+
+    // 1. Check Redis cache
+    const cached = await redisGet(cacheKey);
     if (cached) {
-      try { return sendJson(res, 200, JSON.parse(cached)); } catch { /* Fetch a valid record again. */ }
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed.notFound) {
+          res.setHeader('Cache-Control', 's-maxage=86400, max-age=3600');
+          return sendJson(res, 404, { error: 'not_found', message: 'Lyrics not found' });
+        }
+        res.setHeader('Cache-Control', 's-maxage=86400, max-age=3600');
+        return sendJson(res, 200, parsed);
+      } catch {
+        // Fallback to fetch if cached JSON is invalid
+      }
     }
-    const upstream = new URL('https://lrclib.net/api/get');
-    upstream.searchParams.set('artist_name', artist);
-    upstream.searchParams.set('track_name', title);
-    upstream.searchParams.set('duration', String(duration));
-    const response = await fetch(upstream, { signal: AbortSignal.timeout(12000), headers: { 'User-Agent': 'Aura/1.0 (synced lyrics; https://github.com/qutlawsoasis-debug/Aura-Launcher)' } });
-    if (response.status === 404) return sendJson(res, 404, { error: 'lyrics_not_found' });
-    if (response.status === 429) {
-      res.setHeader('Retry-After', response.headers.get('retry-after') || '60');
-      return sendJson(res, 429, { error: 'lyrics_provider_rate_limited' });
+
+    // 2. Fetch from LRCLIB
+    let lrclibRecord;
+    try {
+      lrclibRecord = await fetchLyricsFromLrclib(artist, title, durationSec);
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
+        return sendJson(res, 504, { error: 'upstream_timeout', message: 'LRCLIB request timed out' });
+      }
+      throw err;
     }
-    if (!response.ok) return sendJson(res, 502, { error: 'lyrics_provider_unavailable' });
-    const text = await response.text();
-    if (text.length > 262144) return sendJson(res, 502, { error: 'lyrics_response_too_large' });
-    const record = JSON.parse(text);
-    const synced = typeof record.syncedLyrics === 'string' ? record.syncedLyrics : '';
-    if (!synced && !record.instrumental) return sendJson(res, 404, { error: 'synced_lyrics_not_found' });
-    const payload = { source: 'LRCLIB', id: record.id, artist, title, duration, instrumental: !!record.instrumental, syncedLyrics: synced };
-    await redisSet(key, JSON.stringify(payload));
-    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
-    return sendJson(res, 200, payload);
-  } catch (error) {
-    console.error('[lyrics] request failed', error instanceof Error ? error.name : 'unknown');
-    return sendJson(res, 502, { error: 'lyrics_unavailable' });
+
+    if (!lrclibRecord) {
+      // Negative cache: 24 hours (86400 seconds)
+      await redisSet(cacheKey, JSON.stringify({ notFound: true }), 86400);
+      return sendJson(res, 404, { error: 'not_found', message: 'Lyrics not found' });
+    }
+
+    let result: ParsedLyrics;
+
+    if (lrclibRecord.syncedLyrics) {
+      const songDurationMs = durationSec > 0 ? durationSec * 1000 : undefined;
+      result = parseLrc(lrclibRecord.syncedLyrics, songDurationMs);
+    } else if (lrclibRecord.plainLyrics) {
+      const plainLines = lrclibRecord.plainLyrics
+        .split(/\r?\n/)
+        .map(l => l.trim())
+        .filter(l => l.length > 0);
+
+      result = {
+        source: 'lrclib',
+        synced: false,
+        lines: plainLines.map(text => ({
+          t: 0,
+          text,
+          words: []
+        }))
+      };
+    } else {
+      // Negative cache: 24 hours
+      await redisSet(cacheKey, JSON.stringify({ notFound: true }), 86400);
+      return sendJson(res, 404, { error: 'not_found', message: 'Lyrics not found' });
+    }
+
+    // Positive cache in Redis permanently (no TTL)
+    await redisSet(cacheKey, JSON.stringify(result));
+
+    res.setHeader('Cache-Control', 's-maxage=86400, max-age=3600');
+    return sendJson(res, 200, result);
+  } catch (err: any) {
+    console.error('[Lyrics handler error]', err);
+    return sendJson(res, 502, { error: 'upstream_error', message: 'Failed to process lyrics' });
   }
 }
