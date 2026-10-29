@@ -13,8 +13,12 @@ public final class MusicClock {
     private String lastTrackId = "";
     private PlaybackState lastState = PlaybackState.STOPPED;
 
-    private volatile boolean seekFlag = false;
+    private volatile boolean seekPending = false;
+    private volatile boolean seekFirstFrame = false;
     private volatile long seekTargetMs = 0L;
+    private volatile long seekBaseUpdatedAt = -1L;
+    private volatile long seekStartTimeMs = -1L;
+
     private long epoch = 0L;
 
     public MusicClock() {
@@ -47,9 +51,18 @@ public final class MusicClock {
     }
 
     public synchronized void seek(long ms) {
-        this.seekTargetMs = Math.max(0L, ms);
-        this.seekFlag = true;
+        NowPlaying current = (source != null) ? source.now() : manualSnapshot;
+        Track track = (current != null) ? current.track() : null;
+        long duration = (track != null && track.durationMs() > 0) ? track.durationMs() : Long.MAX_VALUE;
+
+        this.seekTargetMs = Math.round(clamp(ms, duration));
+        this.renderedPositionMs = seekTargetMs;
+        this.seekBaseUpdatedAt = (current != null) ? current.updatedAtUnixMs() : -1L;
+        this.seekStartTimeMs = -1L;
+        this.seekPending = true;
+        this.seekFirstFrame = true;
         this.epoch++;
+
         if (source != null) {
             source.seek(ms);
         }
@@ -60,8 +73,11 @@ public final class MusicClock {
         this.lastFrameTimeMs = -1L;
         this.lastTrackId = "";
         this.lastState = PlaybackState.STOPPED;
-        this.seekFlag = false;
+        this.seekPending = false;
+        this.seekFirstFrame = false;
         this.seekTargetMs = 0L;
+        this.seekBaseUpdatedAt = -1L;
+        this.seekStartTimeMs = -1L;
         this.epoch++;
     }
 
@@ -76,6 +92,7 @@ public final class MusicClock {
             lastFrameTimeMs = nowTimeMs;
             lastTrackId = "";
             lastState = PlaybackState.STOPPED;
+            seekPending = false;
             return 0L;
         }
 
@@ -83,23 +100,43 @@ public final class MusicClock {
         String trackId = (track != null) ? track.id() : "";
         long durationMs = (track != null && track.durationMs() > 0) ? track.durationMs() : Long.MAX_VALUE;
 
-        // 1. Hard resynchronization after seek
-        if (seekFlag) {
-            seekFlag = false;
-            renderedPositionMs = clamp(seekTargetMs, durationMs);
-            lastFrameTimeMs = nowTimeMs;
-            return Math.round(renderedPositionMs);
-        }
-
-        // 2. Track change: increment epoch and snap to target
+        // 1. Track change: clears seek, increments epoch, snaps to target
         if (!trackId.equals(lastTrackId)) {
             lastTrackId = trackId;
             lastState = np.state();
+            seekPending = false;
             epoch++;
             long elapsedSinceUpdate = Math.max(0L, nowTimeMs - np.updatedAtUnixMs());
             renderedPositionMs = clamp(np.positionMs() + (np.isPlaying() ? elapsedSinceUpdate : 0L), durationMs);
             lastFrameTimeMs = nowTimeMs;
             return Math.round(renderedPositionMs);
+        }
+
+        // 2. Pending seek handling (survives stale snapshots until fresh confirmed snapshot)
+        if (seekPending) {
+            if (seekFirstFrame) {
+                seekFirstFrame = false;
+                seekStartTimeMs = nowTimeMs;
+                lastFrameTimeMs = nowTimeMs;
+                return Math.round(renderedPositionMs);
+            }
+
+            boolean freshSnapshot = np.updatedAtUnixMs() > seekBaseUpdatedAt;
+            boolean timedOut = (seekStartTimeMs >= 0 && Math.abs(nowTimeMs - seekStartTimeMs) > 3000L);
+
+            if (freshSnapshot || timedOut) {
+                // Seek confirmed by fresh server snapshot (or safety timeout reached)
+                seekPending = false;
+            } else {
+                // Stale snapshot: keep local seek timeline progressing smoothly
+                long dt = (lastFrameTimeMs >= 0) ? Math.max(0L, nowTimeMs - lastFrameTimeMs) : 0L;
+                lastFrameTimeMs = nowTimeMs;
+
+                if (np.isPlaying()) {
+                    renderedPositionMs = clamp(renderedPositionMs + dt, durationMs);
+                }
+                return Math.round(renderedPositionMs);
+            }
         }
 
         // 3. Paused state: position does not advance with time
@@ -110,7 +147,7 @@ public final class MusicClock {
             return Math.round(renderedPositionMs);
         }
 
-        // 4. Playing state
+        // 4. Playing state: calculate extrapolated target from server
         long elapsedSinceUpdate = Math.max(0L, nowTimeMs - np.updatedAtUnixMs());
         double targetMs = clamp(np.positionMs() + elapsedSinceUpdate, durationMs);
 
@@ -125,7 +162,8 @@ public final class MusicClock {
         long dt = (lastFrameTimeMs >= 0) ? Math.max(0L, nowTimeMs - lastFrameTimeMs) : 0L;
         lastFrameTimeMs = nowTimeMs;
 
-        double discrepancy = targetMs - renderedPositionMs;
+        double predicted = clamp(renderedPositionMs + dt, durationMs);
+        double discrepancy = targetMs - predicted;
 
         if (Math.abs(discrepancy) > 250.0) {
             // Hard resynchronization on large deviation (> 250 ms)
@@ -139,19 +177,17 @@ public final class MusicClock {
         } else if (discrepancy <= 40.0) {
             // Small positive jump <= 40 ms: smooth catch-up
             double smoothFactor = Math.min(1.0, Math.max(0.05, dt / 200.0));
-            double advanced = renderedPositionMs + dt + discrepancy * smoothFactor;
-            renderedPositionMs = clamp(advanced, durationMs);
+            renderedPositionMs = clamp(predicted + discrepancy * smoothFactor, durationMs);
         } else {
             // Moderate positive drift (40 < discrepancy <= 250): smooth convergence over ~100 ms
             double moderateFactor = Math.min(1.0, Math.max(0.2, dt / 100.0));
-            double advanced = renderedPositionMs + dt + discrepancy * moderateFactor;
-            renderedPositionMs = clamp(advanced, durationMs);
+            renderedPositionMs = clamp(predicted + discrepancy * moderateFactor, durationMs);
         }
 
         return Math.round(renderedPositionMs);
     }
 
-    private static double clamp(double value, long max) {
+    private static double clamp(double value, double max) {
         if (value < 0.0) return 0.0;
         if (value > max) return max;
         return value;

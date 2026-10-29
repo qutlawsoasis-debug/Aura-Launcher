@@ -26,17 +26,20 @@ public final class MusicClientTest {
         testResynchronization();
         System.out.println("2. Resynchronization and smoothing PASS");
 
+        testSeekSurvivesStaleSnapshots();
+        System.out.println("3. Seek survives stale /now snapshots with stable epoch PASS");
+
         testMonotonicityWithJitter();
-        System.out.println("3. Monotonicity on 1000 frames with ±60ms jitter PASS");
+        System.out.println("4. Monotonicity on 1000 frames with ±60ms jitter PASS");
 
         testEpochCounter();
-        System.out.println("4. Epoch counter on seek, track change and hard resync PASS");
+        System.out.println("5. Epoch counter on seek, track change and hard resync PASS");
 
         testJsonParsing();
-        System.out.println("5. JSON parsing PASS");
+        System.out.println("6. JSON parsing PASS");
 
         testUnavailableBridge();
-        System.out.println("6. Unavailable bridge and HTTP integration PASS");
+        System.out.println("7. Unavailable bridge and HTTP integration PASS");
 
         System.out.println("All Aura Music Client tests PASSED successfully!");
     }
@@ -117,6 +120,53 @@ public final class MusicClientTest {
         clock.seek(85_000L);
         long posAfterSeek = clock.positionMs();
         check(posAfterSeek == 85_000L, "Immediate hard resync after seek to 85_000");
+    }
+
+    private static void testSeekSurvivesStaleSnapshots() {
+        AtomicLong mockTime = new AtomicLong(10_000L);
+        MusicClock clock = new MusicClock(mockTime::get);
+
+        Track track = new Track("seek_stale", "Artist", "Song", 300_000L, "");
+        NowPlaying oldSnapshot = new NowPlaying(PlaybackState.PLAYING, track, 20_000L, 10_000L, 1.0f);
+        clock.update(oldSnapshot);
+
+        long pos0 = clock.positionMs(10_000L);
+        check(pos0 == 20_000L, "Initial position 20_000 at t=10_000");
+
+        long epochBeforeSeek = clock.epoch();
+        clock.seek(85_000L);
+        long epochAfterSeek = clock.epoch();
+        check(epochAfterSeek == epochBeforeSeek + 1, "Epoch incremented exactly once upon seek");
+
+        // Frame 1 (16 ms later at t=10_016, snapshot NOT updated yet)
+        long pos1 = clock.positionMs(10_016L);
+        check(pos1 == 85_000L, "Frame 1 after seek returns exact seek target 85_000 (got " + pos1 + ")");
+
+        // Frame 2 (32 ms later at t=10_032, snapshot STILL stale at t=10_000)
+        long pos2 = clock.positionMs(10_032L);
+        check(pos2 == 85_016L, "Frame 2 after seek advances smoothly to 85_016 despite stale snapshot (got " + pos2 + ")");
+
+        // Frame 3 (48 ms later at t=10_048, snapshot STILL stale)
+        long pos3 = clock.positionMs(10_048L);
+        check(pos3 == 85_032L, "Frame 3 after seek advances smoothly to 85_032 despite stale snapshot (got " + pos3 + ")");
+
+        // Frame 4 (100 ms later at t=10_100, snapshot STILL stale)
+        long pos4 = clock.positionMs(10_100L);
+        check(pos4 == 85_084L, "Frame 4 advances to 85_084 on local timeline (got " + pos4 + ")");
+
+        // Epoch should NOT have jumped during stale frames
+        check(clock.epoch() == epochAfterSeek, "Epoch remains stable across stale frames");
+
+        // Now fresh server confirmation arrives at t=10_500:
+        // Server reports position 85_484 (85_000 + 484 ms elapsed) with updatedAt = 10_500
+        NowPlaying freshSnapshot = new NowPlaying(PlaybackState.PLAYING, track, 85_484L, 10_500L, 1.0f);
+        clock.update(freshSnapshot);
+
+        long posConfirmed = clock.positionMs(10_500L);
+        check(Math.abs(posConfirmed - 85_484L) <= 5L, "Position smoothly synchronizes with fresh confirmed snapshot (got " + posConfirmed + ")");
+
+        // Epoch MUST NOT jump on confirmation!
+        check(clock.epoch() == epochAfterSeek, "Epoch unchanged when fresh confirmation snapshot arrives");
     }
 
     private static void testMonotonicityWithJitter() {
