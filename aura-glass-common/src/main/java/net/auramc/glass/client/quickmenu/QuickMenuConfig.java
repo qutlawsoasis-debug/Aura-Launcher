@@ -21,7 +21,8 @@ public final class QuickMenuConfig {
     public boolean karaoke = true, karaokePhysics = true, karaokeOnlyStanding = false;
     public double karaokeSize = 1.0, karaokeDistance = 5, musicVolume = .5;
     public int karaokeDensity = 1, lyricsOffsetMs = 0, karaokeMaxWords = 4;
-
+    public boolean maxFps;
+    public QuickMenuMaxFps.SavedState maxFpsSavedState;
 
     public static QuickMenuConfig get() { return value; }
     public static void initialize() {
