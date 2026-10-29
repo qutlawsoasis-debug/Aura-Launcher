@@ -1,0 +1,58 @@
+{
+  "source": "lrclib",
+  "synced": true,
+  "lines": [
+    {
+      "t": 1000,
+      "text": "Bright horizon shining through the silent mist",
+      "words": [
+        { "t": 1000, "d": 400, "w": "Bright" },
+        { "t": 1450, "d": 500, "w": "horizon" },
+        { "t": 2000, "d": 450, "w": "shining" },
+        { "t": 2500, "d": 350, "w": "through" },
+        { "t": 2900, "d": 250, "w": "the" },
+        { "t": 3200, "d": 450, "w": "silent" },
+        { "t": 3700, "d": 500, "w": "mist" }
+      ]
+    },
+    {
+      "t": 5500,
+      "text": "We are wandering beneath the golden glow",
+      "words": [
+        { "t": 5500, "d": 300, "w": "We" },
+        { "t": 5850, "d": 300, "w": "are" },
+        { "t": 6200, "d": 600, "w": "wandering" },
+        { "t": 6900, "d": 450, "w": "beneath" },
+        { "t": 7400, "d": 250, "w": "the" },
+        { "t": 7700, "d": 450, "w": "golden" },
+        { "t": 8200, "d": 550, "w": "glow" }
+      ]
+    },
+    {
+      "t": 10000,
+      "text": "Gentle echoes dancing in the open breeze",
+      "words": [
+        { "t": 10000, "d": 450, "w": "Gentle" },
+        { "t": 10500, "d": 450, "w": "echoes" },
+        { "t": 11000, "d": 500, "w": "dancing" },
+        { "t": 11550, "d": 250, "w": "in" },
+        { "t": 11850, "d": 250, "w": "the" },
+        { "t": 12150, "d": 400, "w": "open" },
+        { "t": 12600, "d": 550, "w": "breeze" }
+      ]
+    },
+    {
+      "t": 14500,
+      "text": "Endless dreams awake within the starlit sky",
+      "words": [
+        { "t": 14500, "d": 450, "w": "Endless" },
+        { "t": 15000, "d": 450, "w": "dreams" },
+        { "t": 15500, "d": 450, "w": "awake" },
+        { "t": 16000, "d": 400, "w": "within" },
+        { "t": 16450, "d": 250, "w": "the" },
+        { "t": 16750, "d": 500, "w": "starlit" },
+        { "t": 17300, "d": 600, "w": "sky" }
+      ]
+    }
+  ]
+}
