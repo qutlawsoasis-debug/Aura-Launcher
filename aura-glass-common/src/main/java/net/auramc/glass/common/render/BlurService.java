@@ -33,6 +33,7 @@ public final class BlurService {
     private final int[] scratchTextures = new int[5], scratchFbos = new int[5];
     private final int[] widths = new int[5];
     private final int[] heights = new int[5];
+    private final java.nio.ByteBuffer ambientPixel = java.nio.ByteBuffer.allocateDirect(4);
     private int program, vao, width, height, sourceLocation, texelLocation, kernelLocation;
     private boolean captured, attempted, failedForScreen, activeLogged, inactiveLogged;
     private static final int LEVELS = 3;
@@ -187,6 +188,23 @@ public final class BlurService {
     }
     private static void clearErrors() { GlassDiagnostics.drainErrors("before blur capture"); }
     private static void check(String operation) { int error = glGetError(); if (error != GL_NO_ERROR) throw new IllegalStateException(operation + " GL error 0x" + Integer.toHexString(error) + " (" + error + ")"); }
+    public float sampleAmbient(float u, float v) {
+        if (!captured || program == 0 || fbos[LEVELS] == 0 || widths[LEVELS] <= 0 || heights[LEVELS] <= 0) return 0.2f;
+        int px = Math.max(0, Math.min(widths[LEVELS] - 1, (int)(u * widths[LEVELS])));
+        int py = Math.max(0, Math.min(heights[LEVELS] - 1, (int)((1.0f - v) * heights[LEVELS])));
+        int prevFbo = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbos[LEVELS]);
+        ambientPixel.clear();
+        glReadPixels(px, py, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, ambientPixel);
+        if (prevFbo != fbos[LEVELS]) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, prevFbo);
+        }
+        int r = ambientPixel.get(0) & 0xFF;
+        int g = ambientPixel.get(1) & 0xFF;
+        int b = ambientPixel.get(2) & 0xFF;
+        return (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255.0f;
+    }
+
     public boolean captured() { return captured; }
     public int texture(int level) { return textures[Math.max(0, Math.min(3, level))]; }
     public int sharpTexture() { return textures[0]; }

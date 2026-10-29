@@ -82,17 +82,45 @@ public final class AuraNativeSurfaces {
         boolean selectedTab=widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab && tab.isCurrentTab();
         var base=selectedTab?GlassStyles.frameSelected():GlassStyles.frame(primary?GlassPreset.BUTTON_FILLED:GlassPreset.PILL_THICK);
         var style=GlassStyles.frameResolve(base,state,amount);
+        int textColor;
         if(GlassStyles.regular()){
-            style.radius=6;style.rimOuter=.10f;
-            style.scale=GlassStyles.quality()==GlassQuality.OFF?1:1+.012f*hover-.025f*press;
-            if(widget.active&&hovered&&GlassStyles.quality()!=GlassQuality.OFF)style.pointer((float)(client.mouse.getX()/client.getWindow().getScaleFactor()-widget.getX()),(float)(client.mouse.getY()/client.getWindow().getScaleFactor()-widget.getY()));
-            if(primary){style.asPrimary();style.tintR=style.tintG=style.tintB=1;style.tintA=.92f;}
-            else{style.asFill();style.tintR=style.tintG=118/255f;style.tintB=128/255f;style.tintA=!widget.active?.12f:selectedTab?.50f:.24f+.12f*hover+.14f*press;}
+            GlassGroups.Group g = GlassGroups.groupForWidget(widget);
+            boolean isLight = g != null && g.isLight;
+            style.radius = 6;
+            style.rimOuter = .10f;
+            style.rimInner = isLight ? -1.0f : 1.0f;
+            style.scale = GlassStyles.quality() == GlassQuality.OFF ? 1 : 1 + .012f * hover - .025f * press;
+            if(widget.active && hovered && GlassStyles.quality() != GlassQuality.OFF) {
+                style.pointer((float)(client.mouse.getX()/client.getWindow().getScaleFactor()-widget.getX()),(float)(client.mouse.getY()/client.getWindow().getScaleFactor()-widget.getY()));
+            }
+            if(primary){
+                style.asPrimary();
+                style.tintR = 100 / 255f;
+                style.tintG = 210 / 255f;
+                style.tintB = 1.0f;
+                style.tintA = 1.0f;
+                textColor = 0xFF00283A;
+            } else {
+                style.asFill();
+                style.tintR = 118 / 255f;
+                style.tintG = 118 / 255f;
+                style.tintB = 128 / 255f;
+                style.tintA = !widget.active ? .12f : selectedTab ? .50f : (.24f + .12f * hover + .14f * press);
+                if (!widget.active) {
+                    int modeColor = GlassGroups.textColorForGroup(g);
+                    int modeAlpha = (modeColor >>> 24);
+                    textColor = (Math.round(modeAlpha * 0.30f) << 24) | (modeColor & 0xFFFFFF);
+                } else {
+                    textColor = GlassGroups.textColorForGroup(g);
+                }
+            }
+        } else {
+            int rgb = primary ? 0x18232C : 0xF7F9FC;
+            textColor = ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
         }
         if(!GlassStyles.regular())net.auramc.glass.common.render.AdaptiveText.request(widget, widget.getX()+widget.getWidth()*.5f, widget.getY()+widget.getHeight()*.5f, style);
         GlassRenderer.drawWidget(widget, widget.getX(), widget.getY(), widget.getWidth(), widget.getHeight(), style, alpha);
-        int rgb = primary ? 0x18232C : 0xF7F9FC;
-        return ((int) (255 * Math.max(0, Math.min(1, alpha)) * (widget.active ? 1 : .5f)) << 24) | rgb;
+        return textColor;
     }
     public static void text(DrawContext context,String text,float x,float y,float size,int color) {
         NativeCommand command=command(context,0,color);if(command==null)return;
