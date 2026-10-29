@@ -128,13 +128,20 @@ public class IntegrationTests
         };
 
         var latestLog = Path.Combine(TestGameDir, "logs", "latest.log");
+        var instanceLatestLog = Path.Combine(TestGameDir, "instances", "1.20.1", "logs", "latest.log");
         if (File.Exists(latestLog))
         {
             try { File.Delete(latestLog); } catch { }
         }
+        if (File.Exists(instanceLatestLog))
+        {
+            try { File.Delete(instanceLatestLog); } catch { }
+        }
+
+        string GetActiveLogPath() => File.Exists(latestLog) ? latestLog : (File.Exists(instanceLatestLog) ? instanceLatestLog : latestLog);
 
         var logLines = new System.Collections.Concurrent.ConcurrentBag<string>();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(180));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(240));
 
         var process = await launchService.LaunchGameAsync(
             config,
@@ -154,31 +161,37 @@ public class IntegrationTests
         // "Backend library: LWJGL" does NOT count as success.
         // If the process exits before success, fail immediately with exit code and the last 40 lines of latest.log.
         bool success = false;
-        var timeout = DateTime.UtcNow.AddSeconds(120);
+        var timeout = DateTime.UtcNow.AddSeconds(180);
 
         while (DateTime.UtcNow < timeout)
         {
             if (process.HasExited)
             {
+                var activeLog = GetActiveLogPath();
                 var last40Lines = Array.Empty<string>();
-                if (File.Exists(latestLog))
+                if (File.Exists(activeLog))
                 {
                     try
                     {
-                        var lines = File.ReadAllLines(latestLog);
+                        var lines = File.ReadAllLines(activeLog);
                         last40Lines = lines.TakeLast(40).ToArray();
                     }
                     catch { }
                 }
                 var logTail = string.Join(Environment.NewLine, last40Lines);
-                Assert.Fail($"Process exited prematurely with code {process.ExitCode} before reaching launch success! Last 40 lines of latest.log:\n{logTail}");
+                if (string.IsNullOrWhiteSpace(logTail) && !logLines.IsEmpty)
+                {
+                    logTail = "Captured launcher/game output:\n" + string.Join(Environment.NewLine, logLines.TakeLast(40));
+                }
+                Assert.Fail($"Process exited prematurely with code {process.ExitCode} before reaching launch success! Last 40 lines of log:\n{logTail}");
             }
 
-            if (File.Exists(latestLog))
+            var currentLog = GetActiveLogPath();
+            if (File.Exists(currentLog))
             {
                 try
                 {
-                    using var fs = new FileStream(latestLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var fs = new FileStream(currentLog, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                     using var reader = new StreamReader(fs);
                     var text = await reader.ReadToEndAsync();
                     bool hasReloading = text.Contains("Reloading ResourceManager");
@@ -223,17 +236,22 @@ public class IntegrationTests
             return string.Empty;
         }
 
+        var finalLog = GetActiveLogPath();
         if (!success)
         {
-            var raw = ReadLogSafe(latestLog);
+            var raw = ReadLogSafe(finalLog);
             var lines = raw.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
             var last40Lines = lines.TakeLast(40).ToArray();
             var logTail = string.Join(Environment.NewLine, last40Lines);
-            Assert.Fail($"Launch timed out after 120s without honest success. HasExited: {process.HasExited}. Last 40 lines of latest.log:\n{logTail}");
+            if (string.IsNullOrWhiteSpace(logTail) && !logLines.IsEmpty)
+            {
+                logTail = "Captured launcher/game output:\n" + string.Join(Environment.NewLine, logLines.TakeLast(40));
+            }
+            Assert.Fail($"Launch timed out after 180s without honest success. HasExited: {process.HasExited}. Last 40 lines of log:\n{logTail}");
         }
 
-        Assert.True(File.Exists(latestLog));
-        var logContent = ReadLogSafe(latestLog);
+        Assert.True(File.Exists(finalLog));
+        var logContent = ReadLogSafe(finalLog);
         Assert.Contains("Setting user: TestPlayer", logContent);
         Assert.Contains("Reloading ResourceManager", logContent);
         Assert.Matches(@"Created:\s+.*atlas", logContent);

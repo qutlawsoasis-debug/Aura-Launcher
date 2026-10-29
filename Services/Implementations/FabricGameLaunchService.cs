@@ -1406,7 +1406,7 @@ public class FabricGameLaunchService : IGameLaunchService
             {
                 UserType = "legacy"
             },
-            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir)
+            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir, javaPath)
         };
 
         LogGameLaunchEvent(targetInstanceDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
@@ -1711,7 +1711,63 @@ public class FabricGameLaunchService : IGameLaunchService
         }
     }
 
-    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir)
+    private static bool EnsureBaseCdsArchive(string? javaPath)
+    {
+        if (string.IsNullOrWhiteSpace(javaPath) || !File.Exists(javaPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var binDir = Path.GetDirectoryName(javaPath);
+            if (string.IsNullOrEmpty(binDir)) return false;
+
+            string[] possiblePaths =
+            {
+                Path.Combine(binDir, "server", "classes.jsa"),
+                Path.Combine(binDir, "..", "lib", "server", "classes.jsa"),
+                Path.Combine(binDir, "client", "classes.jsa")
+            };
+
+            if (possiblePaths.Any(File.Exists))
+            {
+                return true;
+            }
+
+            // If base archive is missing, attempt to generate it with java.exe -Xshare:dump
+            string dumpExe = Path.Combine(binDir, "java.exe");
+            if (!File.Exists(dumpExe)) dumpExe = javaPath;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = dumpExe,
+                Arguments = "-Xshare:dump",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            using var proc = Process.Start(psi);
+            if (proc != null)
+            {
+                proc.WaitForExit(20000);
+                if (possiblePaths.Any(File.Exists))
+                {
+                    LogLauncherEvent("[LAUNCH: CDS] Успешно сгенерирован базовый архив CDS classes.jsa");
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[LAUNCH: CDS: WARN] Не удалось проверить/сгенерировать базовый архив CDS: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir, string? javaPath = null)
     {
         var list = new List<MArgument>
         {
@@ -1722,14 +1778,22 @@ public class FabricGameLaunchService : IGameLaunchService
 
         try
         {
-            string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
-            if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
+            bool hasBaseCds = EnsureBaseCdsArchive(javaPath);
+            if (hasBaseCds)
             {
-                list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
+                string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
+                if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
+                {
+                    list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
+                }
+                else
+                {
+                    list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
+                }
             }
             else
             {
-                list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
+                LogLauncherEvent("[LAUNCH: CDS] Base CDS archive not available, skipping AppCDS arguments");
             }
         }
         catch { }
