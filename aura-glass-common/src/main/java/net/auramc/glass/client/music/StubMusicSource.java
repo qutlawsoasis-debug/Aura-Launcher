@@ -95,6 +95,12 @@ public final class StubMusicSource implements MusicSource {
         }
     }
 
+    public synchronized void stop() {
+        state = PlaybackState.STOPPED;
+        basePositionMs = 0L;
+        lastStateChangeTimeMs = timeSupplier.getAsLong();
+    }
+
     @Override
     public synchronized void next() {
         if (playlist.isEmpty()) return;
