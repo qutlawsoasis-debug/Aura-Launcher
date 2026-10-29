@@ -16,6 +16,12 @@ tasks.register('runAutoCompleteTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.ui.AutoCompleteGlassTest'
 }
 
+tasks.register('runGlassLayoutTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.ui.GlassLayoutTest'
+}
+
 tasks.register('runKaraokeTest', JavaExec) {
     dependsOn tasks.named('compileTestJava')
     classpath = sourceSets.test.runtimeClasspath
@@ -55,6 +61,7 @@ tasks.register('runQuickMenuMusicRegressionTest', JavaExec) {
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
+    dependsOn 'runGlassLayoutTest'
     dependsOn 'runKaraokeTest'
     dependsOn 'runMusicKaraokeIntegrationTest'
     dependsOn 'runKaraokeSettingsTest'

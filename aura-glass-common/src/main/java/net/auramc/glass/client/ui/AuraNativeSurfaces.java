@@ -106,7 +106,7 @@ public final class AuraNativeSurfaces {
         if(GlassStyles.regular()){
             GlassGroups.Group g = GlassGroups.groupForWidget(widget);
             boolean isLight = g != null && g.isLight;
-            style.radius = 6;
+            style.radius = selectedTab ? 12 : 6;
             style.rimOuter = .10f;
             style.rimInner = isLight ? -1.0f : 1.0f;
             style.scale = GlassStyles.quality() == GlassQuality.OFF ? 1 : 1 + .012f * hover - .025f * press;
@@ -121,12 +121,21 @@ public final class AuraNativeSurfaces {
                 style.tintB = 1.0f;
                 style.tintA = 1.0f;
                 textColor = 0xFF00283A;
+            } else if(widget instanceof net.minecraft.client.gui.widget.TabButtonWidget tab) {
+                style.asFill();
+                style.radius = 12;
+                style.rimOuter = 0;
+                style.tintR = 118 / 255f;
+                style.tintG = 118 / 255f;
+                style.tintB = 128 / 255f;
+                style.tintA = tab.isCurrentTab() ? 0.36f : (hovered ? 0.12f : 0.0f);
+                textColor = GlassGroups.textColorForGroup(g);
             } else {
                 style.asFill();
                 style.tintR = 118 / 255f;
                 style.tintG = 118 / 255f;
                 style.tintB = 128 / 255f;
-                style.tintA = !widget.active ? .12f : selectedTab ? .50f : (.24f + .12f * hover + .14f * press);
+                style.tintA = !widget.active ? .12f : (.24f + .12f * hover + .14f * press);
                 if (!widget.active) {
                     int modeColor = GlassGroups.textColorForGroup(g);
                     int modeAlpha = (modeColor >>> 24);
@@ -179,13 +188,16 @@ public final class AuraNativeSurfaces {
         if (!AuraRenderer.isReady() || !(widget.getMessage().getContent() instanceof net.minecraft.text.TranslatableTextContent text)) return false;
         String key = text.getKey();
         boolean language = key.equals("narrator.button.language") || key.equals("options.language");
-        boolean accessibility = key.equals("narrator.button.accessibility") || key.equals("options.accessibility");
+        boolean accessibility = key.equals("narrator.button.accessibility") || key.equals("options.accessibility")
+                || key.equals("accessibility.onboarding.accessibility.button");
         if (!language && !accessibility) return false;
-        int color = button(context, widget, hovered, alpha);
-        float size = Math.min(widget.getWidth(), widget.getHeight()) * .62f;
+        button(context, widget, hovered, alpha);
+        // Requirement 9: монохромные белые 0.92 как в 1.20.1, 16 GUI
+        float size = 16.0f;
         float x = widget.getX() + (widget.getWidth() - size) * .5f;
         float y = widget.getY() + (widget.getHeight() - size) * .5f;
-        NativeCommand command=command(context,language?2:3,color);if(command==null)return false;
+        int iconColor = 0xEBFFFFFF; // 255 * 0.92 = 235 (0xEB)
+        NativeCommand command=command(context,language?2:3,iconColor);if(command==null)return false;
         command.size=size;command.x=x;command.y=y;GlassRenderer.foreground(command);return true;
     }
     private static final class NativeCommand implements Runnable {

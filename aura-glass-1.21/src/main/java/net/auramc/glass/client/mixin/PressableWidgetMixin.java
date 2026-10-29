@@ -1,7 +1,9 @@
 package net.auramc.glass.client.mixin;
+
 import net.auramc.glass.client.ui.AuraNativeSurfaces;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.TitleScreen;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.PressableWidget;
 import net.minecraft.text.Text;
@@ -24,6 +26,11 @@ public abstract class PressableWidgetMixin extends ClickableWidget {
     private void aura_renderButton(DrawContext context, int mouseX, int mouseY, float delta, CallbackInfo ci) {
         if (!net.auramc.glass.client.ui.GlassFrameHooks.styledScreen()) return;
         if ((Object)this instanceof net.minecraft.client.gui.widget.PressableTextWidget) return;
+        if (MinecraftClient.getInstance().currentScreen instanceof TitleScreen
+                && AuraNativeSurfaces.menuIcon(context, this, this.isHovered(), this.alpha)) {
+            ci.cancel();
+            return;
+        }
         String className = this.getClass().getName();
         if ((className.contains("ConfigButton") || className.contains("supplementaries")) && !(net.minecraft.client.MinecraftClient.getInstance().currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen)) return;
         int color = AuraNativeSurfaces.button(context, this, this.isHovered(), this.alpha);

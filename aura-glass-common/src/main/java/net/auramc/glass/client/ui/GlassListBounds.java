@@ -3,14 +3,17 @@ import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.ParentElement;
 import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.EntryListWidget;
+
 public final class GlassListBounds {
     private GlassListBounds(){}
+
     public static net.auramc.glass.common.style.GlassStyle rowStyle(boolean selected){
         var style=net.auramc.glass.common.style.GlassStyles.frame(net.auramc.glass.common.style.GlassPreset.PANEL);
-        style.tintR=style.tintG=118/255f;style.tintB=128/255f;style.tintA=selected?.36f:.18f;
-        style.refraction=0;style.frost=0;style.radius=5;style.light=0;style.rimOuter=0;style.asFill();
+        style.tintR=style.tintG=118/255f;style.tintB=128/255f;style.tintA=selected?.36f:0f;
+        style.refraction=0;style.frost=0;style.radius=6;style.light=0;style.rimOuter=0;style.asFill();
         return style;
     }
+
     public static int[] widgets(EntryListWidget<?> list,int[] bounds){
         bounds[0]=Integer.MAX_VALUE;bounds[1]=Integer.MIN_VALUE;
         var entries=list.children();
