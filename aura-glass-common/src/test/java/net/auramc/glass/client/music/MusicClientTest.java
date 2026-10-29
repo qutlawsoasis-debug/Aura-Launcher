@@ -41,6 +41,12 @@ public final class MusicClientTest {
         testUnavailableBridge();
         System.out.println("7. Unavailable bridge and HTTP integration PASS");
 
+        testServerCrashWithConfigRemaining();
+        System.out.println("8. Server crash with config remaining and recovery PASS");
+
+        testLateResponseAfterCloseDropped();
+        System.out.println("9. Late response dropped after close PASS");
+
         System.out.println("All Aura Music Client tests PASSED successfully!");
     }
 
@@ -467,6 +473,154 @@ public final class MusicClientTest {
         stub.seek(60_000L);
         check(stub.now().positionMs() >= 60_000L, "Stub seeks to 60_000");
         check(!stub.search("Odyssey").isEmpty(), "Stub search finds track");
+    }
+
+    private static void testServerCrashWithConfigRemaining() throws Exception {
+        Path tempDir = Files.createTempDirectory("aura-crash-test-");
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        int port = server.getAddress().getPort();
+        String token = "crash-test-token";
+
+        server.createContext("/now", exchange -> {
+            String resp = "{\n" +
+                    "  \"state\": \"playing\",\n" +
+                    "  \"track\": {\"id\": \"crash_trk\", \"artist\": \"Artist\", \"title\": \"Crash Song\", \"durationMs\": 200000},\n" +
+                    "  \"positionMs\": 15000,\n" +
+                    "  \"updatedAtUnixMs\": " + System.currentTimeMillis() + ",\n" +
+                    "  \"volume\": 0.8\n" +
+                    "}";
+            byte[] bytes = resp.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        try {
+            Path configPath = tempDir.resolve("aura-music-bridge.json");
+            Files.writeString(configPath, "{\"port\": " + port + ", \"token\": \"" + token + "\"}", StandardCharsets.UTF_8);
+
+            try (BridgeMusicSource source = new BridgeMusicSource(configPath, java.net.http.HttpClient.newHttpClient(), false)) {
+                // 1. Initial healthy poll
+                source.pollOnce();
+                check(source.available(), "Bridge should be available on healthy server");
+                check(source.now().isPlaying(), "Bridge should be playing on healthy server");
+
+                // 2. Server disappears / crashes while config file remains on disk
+                server.stop(0);
+
+                // Poll failure 1: within grace period (< 3 failures, < 2000 ms)
+                source.pollOnce();
+                check(source.available(), "Bridge remains available during grace period (failure 1)");
+                check(source.now().isPlaying(), "Bridge remains playing during grace period (failure 1)");
+
+                // Poll failure 2: still within grace period (< 3 failures, < 2000 ms)
+                source.pollOnce();
+                check(source.available(), "Bridge remains available during grace period (failure 2)");
+                check(source.now().isPlaying(), "Bridge remains playing during grace period (failure 2)");
+
+                // Poll failure 3: 3rd consecutive failure triggers unavailable & STOPPED
+                source.pollOnce();
+                check(!source.available(), "Bridge must become unavailable after 3 consecutive failed polls");
+                check(source.now().isStopped(), "State must be STOPPED after 3 consecutive failed polls");
+
+                // 3. Server recovers on the same port -> verify recovery
+                HttpServer recoveredServer = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
+                recoveredServer.createContext("/now", exchange -> {
+                    String resp = "{\n" +
+                            "  \"state\": \"playing\",\n" +
+                            "  \"track\": {\"id\": \"recovered_trk\", \"artist\": \"Artist\", \"title\": \"Recovered Song\", \"durationMs\": 200000},\n" +
+                            "  \"positionMs\": 1000,\n" +
+                            "  \"updatedAtUnixMs\": " + System.currentTimeMillis() + ",\n" +
+                            "  \"volume\": 0.8\n" +
+                            "}";
+                    byte[] bytes = resp.getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json");
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(bytes);
+                    }
+                });
+                recoveredServer.start();
+
+                try {
+                    source.pollOnce();
+                    check(source.available(), "Bridge must restore available = true when server recovers");
+                    check(source.now().isPlaying(), "Bridge must restore playing state when server recovers");
+                    check("recovered_trk".equals(source.now().track().id()), "Bridge should have fresh snapshot from recovered server");
+
+                    // 4. Test 2-second grace period expiration
+                    recoveredServer.stop(0);
+                    Thread.sleep(2050L);
+                    // Even after only 1 failure, 2 seconds have passed since last success
+                    source.pollOnce();
+                    check(!source.available(), "Bridge must become unavailable after 2 seconds without successful poll");
+                    check(source.now().isStopped(), "State must be STOPPED after 2 seconds timeout");
+                } finally {
+                    recoveredServer.stop(0);
+                }
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static void testLateResponseAfterCloseDropped() throws Exception {
+        Path tempDir = Files.createTempDirectory("aura-late-resp-test-");
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        int port = server.getAddress().getPort();
+        String token = "late-token";
+
+        java.util.concurrent.CountDownLatch requestReceived = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch allowResponse = new java.util.concurrent.CountDownLatch(1);
+
+        server.createContext("/now", exchange -> {
+            requestReceived.countDown();
+            try {
+                allowResponse.await(5, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            String resp = "{\n" +
+                    "  \"state\": \"playing\",\n" +
+                    "  \"track\": {\"id\": \"late_trk\", \"artist\": \"Late\", \"title\": \"Late Song\", \"durationMs\": 120000},\n" +
+                    "  \"positionMs\": 30000,\n" +
+                    "  \"updatedAtUnixMs\": " + System.currentTimeMillis() + ",\n" +
+                    "  \"volume\": 1.0\n" +
+                    "}";
+            byte[] bytes = resp.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        try {
+            Path configPath = tempDir.resolve("aura-music-bridge.json");
+            Files.writeString(configPath, "{\"port\": " + port + ", \"token\": \"" + token + "\"}", StandardCharsets.UTF_8);
+
+            BridgeMusicSource source = new BridgeMusicSource(configPath, java.net.http.HttpClient.newHttpClient(), false);
+            java.util.concurrent.CompletableFuture<Void> pollFuture = java.util.concurrent.CompletableFuture.runAsync(source::pollOnce);
+
+            check(requestReceived.await(3, java.util.concurrent.TimeUnit.SECONDS), "Server did not receive /now request in time");
+
+            source.close();
+            check(!source.available(), "Source must be unavailable immediately after close()");
+            check(source.now().isStopped(), "Source state must be STOPPED immediately after close()");
+
+            allowResponse.countDown();
+            pollFuture.get(3, java.util.concurrent.TimeUnit.SECONDS);
+
+            check(!source.available(), "Late response must NOT revive available state after close()");
+            check(source.now().isStopped(), "Late response must NOT revive playing state after close()");
+            check(!source.now().isPlaying(), "State must remain STOPPED, not PLAYING");
+        } finally {
+            server.stop(0);
+        }
     }
 
     private static void check(boolean condition, String message) {
