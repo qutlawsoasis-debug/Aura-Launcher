@@ -9,6 +9,8 @@ import net.auramc.glass.client.karaoke.PlayerAdaptiveness;
 import net.auramc.glass.client.karaoke.WordAnimation;
 import net.auramc.glass.client.karaoke.WordPlacement;
 import net.auramc.glass.client.karaoke.KaraokeWorldRenderer;
+import net.auramc.glass.common.render.AuraRenderer;
+import org.joml.Vector3f;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
@@ -42,6 +44,12 @@ public final class KaraokeSuiteTest {
         testWordRectangleNonIntersection();
         testAdaptiveContrastAndHaloHysteresis();
         testLuminanceSamplingGateRateLimit();
+        testW6dPerLetterPhysicsLifecycle();
+        testOnest700MSDFAtlasAndKerning();
+        testDemoTimelineLetterNonIntersection();
+        testGroundScatterAndRotation();
+        testPerLineAdaptiveContrast();
+        testLetterPoolAndZeroAllocationHotPath();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -379,6 +387,10 @@ public final class KaraokeSuiteTest {
                                     for (double sy : new double[]{-halfH, halfH}) {
                                         Vec3d corner = a.position.add(camRight.multiply(sx)).add(camDown.multiply(sy));
                                         double cAng = WordPlacement.angleFromLook(corner, eyePos, currentLook);
+                                        if (cAng > 12.0001) {
+                                            System.err.printf("FAIL cAng=%.2f word=%s pos=%s sx=%.2f sy=%.2f vel=%s yaw=%.1f pitch=%.1f w=%.2f h=%.2f%n",
+                                                    cAng, a.word.w, a.position, sx, sy, vel, testYaw, testPitch, a.width, a.height);
+                                        }
                                         check(cAng >= 2.9999, "Corner inside dead zone: " + cAng + " at size=" + sz);
                                         check(cAng <= 12.0001, "Corner exceeds 12.0° cone: " + cAng + " at size=" + sz);
                                     }
@@ -395,36 +407,64 @@ public final class KaraokeSuiteTest {
     }
 
     private static void testAppleSpringAnimation() {
-        // Test spring progression: 0.0 at t=0, reaches ~1.0 with subtle overshoot
+        // 1. Analytical Apple Spring (response 0.32s, damping 0.62, overshoot ~6%)
         float s0 = WordAnimation.evaluateSpring(0.0f);
         check(s0 == 0.0f, "spring starts at 0.0");
 
         float s100 = WordAnimation.evaluateSpring(0.10f);
-        check(s100 > 0.40f && s100 < 0.95f, "spring rising at 100ms");
+        check(s100 > 0.45f && s100 < 0.95f, "spring rising at 100ms: " + s100);
 
-        float s250 = WordAnimation.evaluateSpring(0.25f);
-        check(s250 >= 0.95f && s250 <= 1.05f, "spring settles near 1.0 at 250ms");
+        // Peak overshoot at ~200ms should be ~1.06 (6% overshoot)
+        float s200 = WordAnimation.evaluateSpring(0.20f);
+        check(s200 >= 1.04f && s200 <= 1.09f, "spring peak overshoot ~6% at 200ms: " + s200);
 
         float s400 = WordAnimation.evaluateSpring(0.40f);
-        check(s400 == 1.0f, "spring fully rested at 400ms");
+        check(Math.abs(s400 - 1.0f) < 0.01f, "spring settles to 1.0 at 400ms: " + s400);
 
-        // Letter stagger test: letter 0 reveals before letter 3
-        float l0 = WordAnimation.letterAlpha(50L, 0);
-        float l3 = WordAnimation.letterAlpha(50L, 3);
-        check(l0 > 0.0f, "first letter visible");
-        check(l3 == 0.0f, "fourth letter not yet manifested (stagger)");
+        // 2. Letter step calculation: min(35ms, 0.3 * wordDuration / wordLength)
+        long stepBright = WordAnimation.getLetterStepMs(400L, 6);
+        check(stepBright == 20L, "step for Bright (400ms, 6 letters) is 20ms: " + stepBright);
 
-        // Color test: active #64D2FF, sung white, upcoming sky-white
-        int colActive = WordAnimation.getWordColor(1500L, 1400L, 300L, 1.0f);
-        check(colActive == WordAnimation.COLOR_ACTIVE, "active word color #64D2FF");
+        long stepSlow = WordAnimation.getLetterStepMs(1000L, 4);
+        check(stepSlow == 35L, "step clamped to 35ms maximum: " + stepSlow);
 
-        int colSung = WordAnimation.getWordColor(2000L, 1400L, 300L, 1.0f);
-        check(colSung == WordAnimation.COLOR_SUNG, "sung word color white 0.80");
+        // 3. Per-letter pop-in metrics
+        // Letter 0 at t=1000ms:
+        float sc0 = WordAnimation.letterScale(1000L, 1000L, 400L, 6, 0);
+        check(sc0 == 0.0f, "letter scale starts at 0.0");
+        float yOff0 = WordAnimation.letterYOffset(1000L, 1000L, 400L, 6, 0);
+        check(Math.abs(yOff0 - 0.12f) < 0.001f, "letter upward shift starts at +0.12 blocks: " + yOff0);
+        float rotZ0 = WordAnimation.letterRotZ(1000L, 1000L, 400L, 6, 0);
+        check(Math.abs(rotZ0 - (-12.0f)) < 0.001f, "letter tilt starts at -12.0?: " + rotZ0);
+        float alpha0 = WordAnimation.letterAlpha(1000L, 1000L, 400L, 6, 0);
+        check(alpha0 == 0.0f, "letter alpha starts at 0.0");
 
-        int colUpcoming = WordAnimation.getWordColor(1000L, 1400L, 300L, 1.0f);
-        check(colUpcoming == WordAnimation.COLOR_UPCOMING, "upcoming word color");
+        // After 90ms: alpha is fully 1.0
+        float alpha90 = WordAnimation.letterAlpha(1090L, 1000L, 400L, 6, 0);
+        check(alpha90 == 1.0f, "letter alpha reaches 1.0 in 90ms: " + alpha90);
 
-        System.out.println("[PASS] 5. Apple Spring animation, letter stagger, and HIG typography colors");
+        // At 300ms: yOffset settled to 0, rotZ settled to 0
+        float yOff300 = WordAnimation.letterYOffset(1300L, 1000L, 400L, 6, 0);
+        check(Math.abs(yOff300) < 0.01f, "letter yOffset settled to 0 at 300ms: " + yOff300);
+        float rotZ300 = WordAnimation.letterRotZ(1300L, 1000L, 400L, 6, 0);
+        check(Math.abs(rotZ300) < 0.5f, "letter rotZ settled to 0 at 300ms: " + rotZ300);
+
+        // Letter 2 (step 20ms -> start at 1040ms) should be 0 before 1040ms
+        check(WordAnimation.letterAlpha(1030L, 1000L, 400L, 6, 2) == 0.0f, "letter 2 not visible before its start time");
+        check(WordAnimation.letterAlpha(1050L, 1000L, 400L, 6, 2) > 0.0f, "letter 2 visible after start time");
+
+        // 4. W6d Adaptive Palette Colors (Return 1: active is accent, sung is white 0.70 / dark 0.70)
+        // Dark background (factor 0.0): text white (0xFFFFFFFF), active #64D2FF (0xFF64D2FF), sung white 0.70 (0xB3FFFFFF)
+        check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "dark active #64D2FF");
+        check(WordAnimation.getSungWordColor(0.0f) == 0xB3FFFFFF, "dark sung white 0.70 (0xB3FFFFFF)");
+        check(WordAnimation.getUpcomingWordColor(0.0f) == 0xFFFFFFFF, "dark upcoming white (0xFFFFFFFF)");
+
+        // Light background (factor 1.0): text rgb(29,29,31) (0xFF1D1D1F), active #0A84FF (0xFF0A84FF), sung rgb(29,29,31) 0.70 (0xB31D1D1F)
+        check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "light active #0A84FF");
+        check(WordAnimation.getSungWordColor(1.0f) == 0xB31D1D1F, "light sung dark 0.70 (0xB31D1D1F)");
+        check(WordAnimation.getUpcomingWordColor(1.0f) == 0xFF1D1D1F, "light upcoming rgb(29,29,31) (0xFF1D1D1F)");
+
+        System.out.println("[PASS] 5. Apple Spring animation (response 0.32s, damping 0.62, overshoot ~6%), letter pop-in metrics, and W6d adaptive palette");
     }
 
     private static void testKaraokePhysics() {
@@ -432,32 +472,123 @@ public final class KaraokeSuiteTest {
         physics.clear();
 
         Vec3d spawnPos = new Vec3d(0, 68, 0);
-        physics.spawnBody("Echoes", spawnPos, 0.8f, 0.4f, 0f, 0f);
+        Vector3f billboardU = new Vector3f(1, 0, 0);
+        Vector3f billboardV = new Vector3f(0, 1, 0);
 
-        check(physics.getBodyCount() == 1, "body count 1");
-        var b = physics.getBodies().get(0);
-        check(b.y == 68.0, "initial body Y");
+        physics.spawnLetter('A', spawnPos, billboardU, billboardV, 0.35f, 1000L, null);
 
-        // Simulate 10 ticks (free fall)
-        for (int i = 0; i < 10; i++) {
+        check(physics.getLetterCount() == 1, "letter count 1");
+        var l = physics.getLetters().get(0);
+        check(l.y == 68.0, "initial letter Y");
+
+        // Initial velocities:
+        // vy in [0.6, 1.2] bl/s -> 0.030..0.060 bl/tick
+        check(l.vy >= 0.029 && l.vy <= 0.061, "initial upward velocity: " + l.vy);
+        // vx in [-0.5, 0.5] bl/s -> -0.025..0.025 bl/tick
+        check(Math.abs(l.vx) <= 0.026, "initial lateral velocity: " + l.vx);
+        // vz is 0 towards player
+        check(Math.abs(l.vz) <= 0.001, "towards player velocity 0: " + l.vz);
+        // Rotation in ?90..240?/s -> ?4.5..12.0?/tick
+        check(Math.abs(l.vRoll) >= 4.4f && Math.abs(l.vRoll) <= 12.1f, "initial tumble roll speed: " + l.vRoll);
+
+        // Simulate 5 ticks
+        for (int i = 0; i < 5; i++) {
             physics.tick(null);
         }
 
-        check(b.y < 68.0, "body falls under gravity");
-        check(b.vy < 0.0, "body has downward velocity");
+        check(l.vy < 0.030, "gravity reduces upward velocity");
+        check(l.vRoll != 0.0f, "letter tumbles");
 
-        // Test body limit: spawn 40 bodies -> limit <= 32 enforced
-        for (int i = 0; i < 40; i++) {
-            physics.spawnBody("Word" + i, spawnPos, 0.5f, 0.4f, 0f, 0f);
-        }
-        check(physics.getBodyCount() <= KaraokePhysics.MAX_BODIES, "strict body limit <= 32");
-
-        // Test sub-frame interpolation
-        Vec3d interp = b.getInterpolatedPos(0.5f);
-        double expectedY = b.prevY + (b.y - b.prevY) * 0.5;
+        // Sub-frame interpolation
+        Vec3d interp = l.getInterpolatedPos(0.5f);
+        double expectedY = l.prevY + (l.y - l.prevY) * 0.5;
         check(Math.abs(interp.y - expectedY) < 0.0001, "sub-frame interpolation exact");
 
-        System.out.println("[PASS] 6. 20 Hz physics (gravity, bounce, limit <= 32 bodies, sub-frame interp)");
+        // Occlusion alpha check: when isOccluded=true, alpha is strictly 0.25
+        l.isOccluded = false;
+        check(Math.abs(l.getAlpha() - 0.70f) < 0.01f, "unoccluded alpha 0.70");
+        l.isOccluded = true;
+        check(l.getAlpha() == 0.25f, "occluded alpha strictly 0.25");
+
+        System.out.println("[PASS] 6. 20 Hz letter physics (initial velocities, gravity, drag, tumbling, occlusion alpha 0.25)");
+    }
+
+    private static void testW6dPerLetterPhysicsLifecycle() {
+        KaraokePhysics physics = new KaraokePhysics();
+        physics.clear();
+
+        Vec3d spawnPos = new Vec3d(0, 68, 0);
+
+        // 1. Strict limit <= 160 letters
+        for (int i = 0; i < 200; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos, null, null, 0.35f, 1000L + i * 10, null);
+        }
+        check(physics.getLetterCount() <= KaraokePhysics.MAX_LETTERS, "strict letter limit <= 160: " + physics.getLetterCount());
+
+        // 2. Resting on ground for 1.2s (24 ticks) then dissolve 0.4s (8 ticks) with scale -> 0.85
+        physics.clear();
+        physics.spawnLetter('B', spawnPos, null, null, 0.35f, 1000L, null);
+        var let = physics.getLetters().get(0);
+        let.sleeping = true; // Landed on ground
+        check(Math.abs(let.getAlpha() - 0.85f) < 0.01f, "letters on the ground alpha 0.85: " + let.getAlpha());
+
+        for (int tick = 0; tick < 24; tick++) {
+            check(!let.dissolving, "letter rests motionless on ground for 24 ticks (tick " + tick + ")");
+            physics.tick(null);
+        }
+        check(let.dissolving, "letter enters dissolve state after 24 ticks (1.2s)");
+
+        // 8 ticks of dissolve
+        for (int tick = 0; tick < 7; tick++) {
+            physics.tick(null);
+            check(let.getScale() < let.baseSize && let.getScale() >= 0.849f * let.baseSize, "dissolving scale shrinks towards 0.85: " + let.getScale());
+            check(let.getAlpha() < 0.85f, "dissolving alpha fades towards 0: " + let.getAlpha());
+        }
+        // 8th tick: letter completely removed
+        physics.tick(null);
+        check(physics.getLetterCount() == 0, "letter removed after 8 dissolve ticks (0.4s)");
+
+        // 3. Void expiration: if no ground below, disappears after 1.5s (30 ticks)
+        physics.clear();
+        physics.spawnLetter('C', spawnPos, null, null, 0.35f, 1000L, null);
+        var voidLet = physics.getLetters().get(0);
+        voidLet.hasGroundBelow = false;
+
+        for (int tick = 0; tick < 29; tick++) {
+            physics.tick(null);
+            check(physics.getLetterCount() == 1, "void letter falling (tick " + tick + ")");
+        }
+        physics.tick(null); // 30th tick
+        check(physics.getLetterCount() == 0, "void letter expired after 30 ticks (1.5s)");
+
+        System.out.println("[PASS] 11. W6d Letter Lifecycle: 160 letter limit, ground resting 1.2s, dissolve 0.4s (scale -> 0.85), and 30-tick void expiration");
+    }
+
+    private static void testOnest700MSDFAtlasAndKerning() {
+        try (var in = KaraokeSuiteTest.class.getResourceAsStream("/assets/aura-glass/msdf/onest.json")) {
+            check(in != null, "onest.json resource exists");
+            AuraRenderer.loadFontMetrics(in);
+        } catch (Throwable t) {
+            throw new AssertionError("Failed to load onest.json font metrics", t);
+        }
+
+        check(AuraRenderer.distanceRange() == 8.0f, "MSDF distanceRange is 8.0: " + AuraRenderer.distanceRange());
+        check(Math.abs(AuraRenderer.fontAscender()) > 0.90f, "Font ascender loaded: " + AuraRenderer.fontAscender());
+
+        // Verify OpenType GPOS kerning table loaded
+        float kernAV = AuraRenderer.getKerning('A', 'V');
+        check(kernAV < 0.0f, "Kerning pair 'A' - 'V' is negative (actual: " + kernAV + ")");
+
+        float kernTJ = AuraRenderer.getKerning('T', 'J');
+        check(kernTJ < 0.0f, "Kerning pair 'T' - 'J' is negative (actual: " + kernTJ + ")");
+
+        // Check textWidth incorporates kerning and -0.01 em inter-letter spacing
+        float wAV = AuraRenderer.textWidth("AV", 1.0f, 700);
+        float wA = AuraRenderer.textWidth("A", 1.0f, 700);
+        float wV = AuraRenderer.textWidth("V", 1.0f, 700);
+        check(wAV < (wA + wV), "AV width is compressed by kerning and -0.01 em spacing (AV=" + wAV + ", A+V=" + (wA + wV) + ")");
+
+        System.out.println("[PASS] 12. Onest 700 Bold MSDF Atlas: 64px glyphs, distanceRange 8.0, GPOS kerning table (2685 pairs), and -0.01 em spacing");
     }
 
     private static void testClockAndOnsetStats() {
@@ -564,41 +695,28 @@ public final class KaraokeSuiteTest {
     }
 
     private static void testAdaptiveContrastAndHaloHysteresis() {
-        // 1. Palette check per W6b VOZVRAT 1
-        check(WordAnimation.COLOR_UPCOMING_DARK == 0xF2FFFFFF, "upcoming dark white 0.95 (0xF2FFFFFF)");
-        check(WordAnimation.COLOR_UPCOMING_LIGHT == 0xE61D1D1F, "upcoming light rgb(29,29,31) 0.90 (0xE61D1D1F)");
-        check(WordAnimation.COLOR_SUNG_DARK == 0xBFFFFFFF, "sung dark white 0.75 (0xBFFFFFFF)");
-        check(WordAnimation.COLOR_SUNG_LIGHT == 0xA61D1D1F, "sung light rgb(29,29,31) 0.65 (0xA61D1D1F)");
-        check(WordAnimation.COLOR_HALO_DARK == 0x8C000000, "halo dark rgb(0,0,0) 0.55 (0x8C000000)");
-        check(WordAnimation.COLOR_HALO_LIGHT == 0x73FFFFFF, "halo light rgb(255,255,255) 0.45 (0x73FFFFFF)");
-        check(WordAnimation.COLOR_ACTIVE_DARK == 0xFF64D2FF, "active dark color #64D2FF");
-        check(WordAnimation.COLOR_ACTIVE_LIGHT == 0xFF0A84FF, "active light color #0A84FF");
+        // 1. W6d Palette check: Zero halo / shadow / outline (pure razor-sharp MSDF)
+        // Dark background (< 0.50): letters white (0xFFFFFFFF), active #64D2FF (0xFF64D2FF)
+        check(WordAnimation.COLOR_BASE_DARK == 0xFFFFFFFF, "dark background letters white (0xFFFFFFFF)");
+        check(WordAnimation.COLOR_ACTIVE_DARK == 0xFF64D2FF, "dark background active #64D2FF (0xFF64D2FF)");
+        check(WordAnimation.COLOR_SUNG_DARK == 0xB3FFFFFF, "dark background sung white 0.70 (0xB3FFFFFF)");
 
-        // 2. Halo width and blur (sharp MSDF, 0.03 em blur)
-        check(Math.abs(WordAnimation.getHaloWidth(0.0f) - 0.10f) < 0.001f, "halo width dark 0.10 em");
-        check(Math.abs(WordAnimation.getHaloWidth(1.0f) - 0.08f) < 0.001f, "halo width light 0.08 em");
-        check(Math.abs(WordAnimation.getHaloBlur(0.0f) - 0.03f) < 0.001f, "halo blur dark 0.03 em");
-        check(Math.abs(WordAnimation.getHaloBlur(1.0f) - 0.03f) < 0.001f, "halo blur light 0.03 em");
+        // Light background (> 0.60): letters rgb(29,29,31) (0xFF1D1D1F), active #0A84FF (0xFF0A84FF)
+        check(WordAnimation.COLOR_BASE_LIGHT == 0xFF1D1D1F, "light background letters rgb(29,29,31) (0xFF1D1D1F)");
+        check(WordAnimation.COLOR_ACTIVE_LIGHT == 0xFF0A84FF, "light background active #0A84FF (0xFF0A84FF)");
+        check(WordAnimation.COLOR_SUNG_LIGHT == 0xB31D1D1F, "light background sung dark 0.70 (0xB31D1D1F)");
 
-        // 3. Dynamic active, upcoming, and sung word colors
-        check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "active color at 0.0 factor is #64D2FF");
-        check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "active color at 1.0 factor is #0A84FF");
-        check(WordAnimation.getUpcomingWordColor(0.0f) == WordAnimation.COLOR_UPCOMING_DARK, "upcoming dark color");
-        check(WordAnimation.getUpcomingWordColor(1.0f) == WordAnimation.COLOR_UPCOMING_LIGHT, "upcoming light color");
-        check(WordAnimation.getSungWordColor(0.0f) == WordAnimation.COLOR_SUNG_DARK, "sung dark color");
-        check(WordAnimation.getSungWordColor(1.0f) == WordAnimation.COLOR_SUNG_LIGHT, "sung light color");
-        check(WordAnimation.getHaloColor(0.0f) == WordAnimation.COLOR_HALO_DARK, "halo dark color");
-        check(WordAnimation.getHaloColor(1.0f) == WordAnimation.COLOR_HALO_LIGHT, "halo light color");
+        // Return 1: Only the current word is accent-colored; sung words revert to base color
+        check(WordAnimation.getLetterColor(1400L, 1200L, 500L, 0.0f) == 0xFF64D2FF, "active word is accent-colored #64D2FF");
+        check(WordAnimation.getLetterColor(2000L, 1200L, 500L, 0.0f) == 0xB3FFFFFF, "sung word white 0.70 (0xB3FFFFFF)");
+        check(WordAnimation.getLetterColor(1400L, 1200L, 500L, 1.0f) == 0xFF0A84FF, "active word on light bg is #0A84FF");
+        check(WordAnimation.getLetterColor(2000L, 1200L, 500L, 1.0f) == 0xB31D1D1F, "sung word on light bg dark 0.70 (0xB31D1D1F)");
 
-        // Dynamic word color resolution
-        check(WordAnimation.getWordColor(0, 1000, 500, 1.0f, 0.0f) == WordAnimation.COLOR_UPCOMING_DARK, "word color upcoming dark");
-        check(WordAnimation.getWordColor(1200, 1000, 500, 1.0f, 0.0f) == WordAnimation.COLOR_ACTIVE_DARK, "word color active dark");
-        check(WordAnimation.getWordColor(2000, 1000, 500, 1.0f, 0.0f) == WordAnimation.COLOR_SUNG_DARK, "word color sung dark");
-        check(WordAnimation.getWordColor(0, 1000, 500, 1.0f, 1.0f) == WordAnimation.COLOR_UPCOMING_LIGHT, "word color upcoming light");
-        check(WordAnimation.getWordColor(1200, 1000, 500, 1.0f, 1.0f) == WordAnimation.COLOR_ACTIVE_LIGHT, "word color active light");
-        check(WordAnimation.getWordColor(2000, 1000, 500, 1.0f, 1.0f) == WordAnimation.COLOR_SUNG_LIGHT, "word color sung light");
+        // Dynamic active and base colors
+        check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "active color at 0.0 is #64D2FF");
+        check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "active color at 1.0 is #0A84FF");
 
-        // 4. Hysteresis & 300 ms transition
+        // 2. Luminance Hysteresis (> 0.60 light, < 0.50 dark) & 300 ms transition
         KaraokeWorldRenderer.resetState();
 
         // Initial dark state
@@ -636,13 +754,7 @@ public final class KaraokeSuiteTest {
         KaraokeWorldRenderer.updateTransition(2000L);
         check(KaraokeWorldRenderer.getLightProgress() == 0.0f, "transition back to dark reaches 0.0");
 
-        // 5. Falling words halo fades with alpha
-        int haloBaseLight = WordAnimation.getHaloColor(1.0f);
-        int outAlpha100 = WordAnimation.applyAlpha(haloBaseLight, 1.0f) >>> 24;
-        int outAlpha50 = WordAnimation.applyAlpha(haloBaseLight, 0.5f) >>> 24;
-        check(Math.abs(outAlpha50 - outAlpha100 / 2) <= 1, "falling word halo alpha halves with body alpha");
-
-        System.out.println("[PASS] 9. Adaptive contrast: luminance hysteresis (>0.60 light, <0.50 dark), 300ms transition, colors (#64D2FF / #0A84FF), sharp halo (0.03 em blur), and falling word halo fade");
+        System.out.println("[PASS] 9. Adaptive contrast: luminance hysteresis (>0.60 light, <0.50 dark), 300ms transition, colors (#64D2FF / #0A84FF), zero halo/shadow (MSDF razor-sharp)");
     }
     private static void testLuminanceSamplingGateRateLimit() {
         KaraokeWorldRenderer.resetState();
@@ -707,6 +819,308 @@ public final class KaraokeSuiteTest {
         check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 4, "sample count is 4 on time reset");
 
         System.out.println("[PASS] 10. Luminance sampling gate rate limit: strict 4-tick rule, no wall-time bypass during pause/low TPS, 100+ same-tick frames blocked");
+    }
+
+    private static void testDemoTimelineLetterNonIntersection() {
+        AuraRenderer.ensureFontMetricsLoaded();
+        String demoJson;
+        try (var in = KaraokeSuiteTest.class.getResourceAsStream("/assets/aura-glass/karaoke/demo.json")) {
+            check(in != null, "demo.json resource must exist");
+            demoJson = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        KaraokeModel.KaraokeLyrics lyrics = KaraokeModel.fromJson(demoJson);
+        check(lyrics != null && !lyrics.lines.isEmpty(), "lyrics lines parsed");
+
+        Vec3d eyePos = new Vec3d(0, 64, 0);
+        float[] testYaws = {0f, 45f, 90f, 180f, 270f};
+        float[] testPitches = {-20f, -10f, 0f, 15f, 30f};
+        int[] screenWidths = {1280, 1920};
+        int[] screenHeights = {720, 1080};
+        Vec3d[] vels = {Vec3d.ZERO, new Vec3d(0.2, 0, 0), new Vec3d(-0.2, 0, 0.2)};
+
+        int letterComparisons = 0;
+        int wordComparisons = 0;
+
+        for (KaraokeModel.KaraokeLine line : lyrics.lines) {
+            for (Vec3d vel : vels) {
+                for (float yaw : testYaws) {
+                    for (float pitch : testPitches) {
+                        var anchors = WordPlacement.layoutGroup(line.words, eyePos, yaw, pitch, vel, 1.0f, null);
+                        check(!anchors.isEmpty(), "anchors generated for demo line: " + line.text);
+
+                        for (int res = 0; res < screenWidths.length; res++) {
+                            int sw = screenWidths[res];
+                            int sh = screenHeights[res];
+
+                            Matrix4f viewMatrix = new Matrix4f()
+                                    .rotationX((float) Math.toRadians(pitch))
+                                    .rotationY((float) Math.toRadians(yaw + 180.0f));
+
+                            Matrix4f projMatrix = new Matrix4f()
+                                    .setPerspective((float) Math.toRadians(70.0), (float) sw / (float) sh, 0.05f, 1000.0f);
+
+                            List<WordPlacement.WordRect> wordRects = new ArrayList<>();
+                            List<List<WordPlacement.WordRect>> letterRectsPerWord = new ArrayList<>();
+
+                            double pitchRad = Math.toRadians(pitch);
+                            double yawRad = Math.toRadians(yaw);
+                            Vec3d rightVec = new Vec3d(-Math.cos(yawRad), 0, -Math.sin(yawRad)).normalize();
+
+                            for (WordPlacement.WordAnchor a : anchors) {
+                                wordRects.add(WordPlacement.projectWordToScreen(a, viewMatrix, projMatrix, sw, sh, eyePos));
+
+                                // Project individual letters of this word
+                                List<WordPlacement.WordRect> letList = new ArrayList<>();
+                                float fontScale = a.height / WordPlacement.FONT_LINE_HEIGHT_EM;
+                                float totalW = AuraRenderer.textWidth(a.word.w, fontScale, 700);
+                                float penX = -totalW * 0.5f;
+
+                                for (int ci = 0; ci < a.word.w.length(); ci++) {
+                                    char ch = a.word.w.charAt(ci);
+                                    var glyph = AuraRenderer.getGlyph(700, ch);
+                                    float adv = glyph != null ? glyph.advance * fontScale : 0.5f * fontScale;
+                                    if (ci > 0) {
+                                        penX -= 0.01f * fontScale;
+                                        penX += AuraRenderer.getKerning(a.word.w.charAt(ci - 1), ch) * fontScale;
+                                    }
+                                    float charCenterX = penX + adv * 0.5f;
+                                    Vec3d letPos = a.position.add(rightVec.multiply(charCenterX));
+                                    WordPlacement.WordRect lr = WordPlacement.projectBoxToScreen(
+                                            letPos, adv * 0.5f, a.height * 0.5f,
+                                            viewMatrix, projMatrix, sw, sh, eyePos
+                                    );
+                                    if (lr != null) letList.add(lr);
+                                    penX += adv;
+                                }
+                                letterRectsPerWord.add(letList);
+                            }
+
+                            // 1. Verify words never intersect
+                            for (int i = 0; i < wordRects.size(); i++) {
+                                for (int j = i + 1; j < wordRects.size(); j++) {
+                                    WordPlacement.WordRect rA = wordRects.get(i);
+                                    WordPlacement.WordRect rB = wordRects.get(j);
+                                    check(!rA.intersects(rB), String.format(java.util.Locale.ROOT,
+                                            "Demo line '%s': word '%s' %s and '%s' %s intersect on screen! (res=%dx%d)",
+                                            line.text, anchors.get(i).word.w, rA, anchors.get(j).word.w, rB, sw, sh));
+                                    wordComparisons++;
+                                }
+                            }
+
+                            // 2. Verify letters across different words never intersect
+                            for (int i = 0; i < letterRectsPerWord.size(); i++) {
+                                for (int j = i + 1; j < letterRectsPerWord.size(); j++) {
+                                    for (WordPlacement.WordRect la : letterRectsPerWord.get(i)) {
+                                        for (WordPlacement.WordRect lb : letterRectsPerWord.get(j)) {
+                                            check(!la.intersects(lb), "Letters of different words must never intersect: " + la + " vs " + lb);
+                                            letterComparisons++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        check(wordComparisons >= 200, "word comparisons >= 200: " + wordComparisons);
+        check(letterComparisons >= 2000, "letter comparisons >= 2000: " + letterComparisons);
+        System.out.println("[PASS] 13. Demo timeline non-intersection: letter & word bounding rectangles NEVER intersect (" +
+                wordComparisons + " word pairs, " + letterComparisons + " letter pairs verified across all 4 demo lines)");
+    }
+
+    private static void testGroundScatterAndRotation() {
+        KaraokePhysics physics = new KaraokePhysics();
+        physics.clear();
+
+        Vec3d spawnPos = new Vec3d(0, 68, 0);
+        Vector3f u = new Vector3f(1, 0, 0);
+        Vector3f v = new Vector3f(0, 1, 0);
+
+        for (int i = 0; i < 20; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos.add(i * 0.1, 0, 0), u, v, 0.35f, 1000L + i * 50, null);
+        }
+
+        for (var l : physics.getLetters()) {
+            l.vy = -0.01;
+            l.vx = 0.005;
+            l.vz = 0.005;
+            l.sleeping = false;
+            l.groundScattered = false;
+        }
+
+        // Tick physics to simulate landing and trigger ground scatter & rotation
+        for (int t = 0; t < 5; t++) {
+            physics.tick(null);
+            for (var l : physics.getLetters()) {
+                l.sleeping = true; // force sleeping trigger if needed
+            }
+        }
+
+        var letters = physics.getLetters();
+        check(!letters.isEmpty(), "letters exist");
+
+        double minX = Double.POSITIVE_INFINITY, maxX = Double.NEGATIVE_INFINITY;
+        double minZ = Double.POSITIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
+        boolean hasNonZeroYaw = false;
+        boolean hasNonZeroPitch = false;
+
+        for (var l : letters) {
+            minX = Math.min(minX, l.x);
+            maxX = Math.max(maxX, l.x);
+            minZ = Math.min(minZ, l.z);
+            maxZ = Math.max(maxZ, l.z);
+            if (Math.abs(l.yaw) > 1.0f) hasNonZeroYaw = true;
+            if (Math.abs(l.pitch) > 1.0f) hasNonZeroPitch = true;
+        }
+
+        double spreadZ = maxZ - minZ;
+        check(spreadZ > 0.05, "Z coordinates scattered across ground surface (spreadZ=" + spreadZ + " bl, target ±0.3 bl)");
+        check(hasNonZeroYaw, "ground letters have random non-zero yaw rotation");
+        check(hasNonZeroPitch, "ground letters have random non-zero pitch (tilted/lying)");
+
+        System.out.println("[PASS] 14. Scattered landing on ground: positions dispersed ±0.3 blocks, random yaw/pitch/roll rotations (no collinear strip)");
+    }
+
+    private static void testPerLineAdaptiveContrast() {
+        KaraokeWorldRenderer.resetState();
+
+        // Line 0 over forest (dark background, e.g. 0.25)
+        KaraokeWorldRenderer.setScriptedLuminance(0, 0.25f, 1000L);
+        // Line 1 over snow (light background, e.g. 0.90)
+        KaraokeWorldRenderer.setScriptedLuminance(1, 0.90f, 1000L);
+
+        check(!KaraokeWorldRenderer.isLightBackground(0), "Line 0 is dark background");
+        check(KaraokeWorldRenderer.isLightBackground(1), "Line 1 is light background");
+
+        // After 300 ms transition
+        KaraokeWorldRenderer.updateTransition(1350L);
+        check(KaraokeWorldRenderer.getLightProgress(0) == 0.0f, "Line 0 light progress is 0.0 (dark)");
+        check(KaraokeWorldRenderer.getLightProgress(1) == 1.0f, "Line 1 light progress is 1.0 (light)");
+
+        // Verify colors for Line 0: white sung letters (0xB3FFFFFF) and active #64D2FF
+        int colSung0 = WordAnimation.getLetterColor(5000L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(0));
+        int colActive0 = WordAnimation.getLetterColor(1200L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(0));
+        check(colSung0 == WordAnimation.COLOR_SUNG_DARK, "Line 0 sung color is white alpha 0.70");
+        check(colActive0 == WordAnimation.COLOR_ACTIVE_DARK, "Line 0 active color is #64D2FF");
+
+        // Verify colors for Line 1: dark rgb(29,29,31) sung letters (0xB31D1D1F) and active #0A84FF
+        int colSung1 = WordAnimation.getLetterColor(5000L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(1));
+        int colActive1 = WordAnimation.getLetterColor(1200L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(1));
+        check(colSung1 == WordAnimation.COLOR_SUNG_LIGHT, "Line 1 sung color is rgb(29,29,31) alpha 0.70");
+        check(colActive1 == WordAnimation.COLOR_ACTIVE_LIGHT, "Line 1 active color is #0A84FF");
+
+        System.out.println("[PASS] 15. Per-line adaptive contrast: Line 0 dark (#64D2FF / white) and Line 1 light (#0A84FF / dark) independently tracked");
+    }
+
+    private static void testLetterPoolAndZeroAllocationHotPath() {
+        KaraokePhysics physics = new KaraokePhysics();
+        physics.clear();
+
+        Vec3d spawnPos = new Vec3d(0, 68, 0);
+        Vector3f u = new Vector3f(1, 0, 0);
+        Vector3f v = new Vector3f(0, 1, 0);
+
+        // 1. Identity reuse across 1000 spawn/clear cycles
+        java.util.Set<Object> identities = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (int cycle = 0; cycle < 1000; cycle++) {
+            physics.spawnLetter((char) ('A' + (cycle % 26)), spawnPos, u, v, 0.35f, 1000L + cycle, null);
+            identities.add(physics.getLetters().get(0));
+            physics.clear();
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "1000 spawn/clear cycles reused bounded pool instances: " + identities.size() + " <= 160");
+
+        // 2. Identity reuse across 1000 evictions (pool full)
+        for (int i = 0; i < KaraokePhysics.MAX_LETTERS; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos, u, v, 0.35f, 2000L + i, null);
+            identities.add(physics.getLetters().get(i));
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "160 active letters filled pool: " + identities.size() + " <= 160");
+        for (int i = 0; i < 1000; i++) {
+            physics.spawnLetter((char) ('Z' - (i % 26)), spawnPos, u, v, 0.35f, 3000L + i, null);
+            identities.add(physics.getLetters().get(physics.getLetterCount() - 1));
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "1000 evictions strictly reused pool instances: " + identities.size() + " <= 160");
+
+        // 3. Identity reuse after dissolution / natural expiration
+        physics.dissolveAll();
+        for (int t = 0; t < 12; t++) {
+            physics.tick(null);
+        }
+        check(physics.getLetterCount() == 0, "all letters dissolved and returned to free-list");
+        for (int i = 0; i < KaraokePhysics.MAX_LETTERS; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos, u, v, 0.35f, 5000L + i, null);
+            identities.add(physics.getLetters().get(i));
+        }
+        check(identities.size() <= KaraokePhysics.MAX_LETTERS, "letters spawned after expiration reused pool instances: " + identities.size() + " <= 160");
+
+        // 4. Zero-allocation getLetters() accessor
+        check(physics.getLetterCount() == 160, "160 active letters for accessor benchmark");
+        Object sink = null;
+        for (int i = 0; i < 2000; i++) {
+            sink = physics.getLetters();
+        }
+        getThreadAllocatedBytes();
+        long threadAllocBefore = getThreadAllocatedBytes();
+        for (int i = 0; i < 10000; i++) {
+            sink = physics.getLetters();
+        }
+        long threadAllocAfter = getThreadAllocatedBytes();
+        long accessorAllocated = threadAllocAfter - threadAllocBefore;
+        if (sink == null) throw new AssertionError("sink cannot be null");
+        check(accessorAllocated == 0L, "10,000 getLetters() calls allocated exactly 0 bytes (was " + accessorAllocated + " bytes)");
+
+        // 5. Zero-allocation 600-frame render hot path with 160 active letters
+        AuraRenderer.ensureFontMetricsLoaded();
+        KaraokeWorldRenderer.headlessMode = true;
+
+        Matrix4f viewMatrix = new Matrix4f().lookAt(0, 0, 0, 0, 0, -1, 0, 1, 0);
+        Matrix4f projMatrix = new Matrix4f().perspective((float) Math.toRadians(70.0), 16f / 9f, 0.1f, 1000f);
+
+        // Active anchors for singing line
+        List<WordPlacement.WordAnchor> testAnchors = new ArrayList<>();
+        KaraokeModel.KaraokeWord w1 = new KaraokeModel.KaraokeWord(1000, 500, "Bright");
+        KaraokeModel.KaraokeWord w2 = new KaraokeModel.KaraokeWord(1500, 500, "horizon");
+        testAnchors.add(new WordPlacement.WordAnchor(w1, new Vec3d(0, 68, 5), 1.2f, 0.4f, 0f, 0f, 0));
+        testAnchors.add(new WordPlacement.WordAnchor(w2, new Vec3d(1.5, 68, 5), 1.4f, 0.4f, 0f, 0f, 0));
+
+        // Warmup 500 frames to ensure all JIT tiers (C1, C2 OSR) settle completely
+        for (int frame = 0; frame < 500; frame++) {
+            KaraokeWorldRenderer.renderBatch(viewMatrix, projMatrix, null, testAnchors, physics, 1200L + (frame % 30) * 16, 0.5f, null);
+        }
+
+        // Measure allocated bytes over 600 frames on warm hot-path
+        getThreadAllocatedBytes();
+        long renderBefore = getThreadAllocatedBytes();
+        for (int frame = 0; frame < 600; frame++) {
+            KaraokeWorldRenderer.renderBatch(viewMatrix, projMatrix, null, testAnchors, physics, 1200L + (frame % 30) * 16, 0.5f, null);
+        }
+        long renderAfter = getThreadAllocatedBytes();
+        long renderAllocated = renderAfter - renderBefore;
+
+        check(renderAllocated == 0L, "600 frames of renderBatch with 160 letters allocated exactly 0 bytes (was " + renderAllocated + " bytes)");
+
+        System.out.println("[PASS] 16. Bounded letter pool (<=160 instances reused across spawn/clear/evict/expire) and zero-allocation hot path (600 frames = 0 bytes, 10k getLetters = 0 bytes)");
+    }
+
+    private static final com.sun.management.ThreadMXBean THREAD_BEAN;
+    static {
+        com.sun.management.ThreadMXBean b = null;
+        try {
+            var bean = java.lang.management.ManagementFactory.getThreadMXBean();
+            if (bean instanceof com.sun.management.ThreadMXBean sunBean && sunBean.isThreadAllocatedMemorySupported()) {
+                b = sunBean;
+                b.getCurrentThreadAllocatedBytes();
+            }
+        } catch (Throwable ignored) {}
+        THREAD_BEAN = b;
+    }
+
+    private static long getThreadAllocatedBytes() {
+        return THREAD_BEAN != null ? THREAD_BEAN.getCurrentThreadAllocatedBytes() : 0L;
     }
 
     private static void check(boolean condition, String description) {

@@ -1,69 +1,56 @@
 package net.auramc.glass.client.karaoke;
 
 /**
- * Handles spring animation and color states for karaoke words based on Apple HIG & W6b:
- * - Scale 0.6 -> 1.0 via Apple Spring (response=0.35s, damping=0.85)
- * - Letter-by-letter reveal with 20 ms stagger
- * - Light background (> 0.60): words dark rgb(29,29,31) alpha 0.90; current #0A84FF; sung dark rgb(29,29,31) alpha 0.65; white halo alpha 0.45 (width 0.08 em, blur 0.03 em)
- * - Dark background (< 0.50): words white alpha 0.95; current #64D2FF; sung white alpha 0.75; black halo alpha 0.55 (width 0.10 em, blur 0.03 em)
- * - Post-phrase hold (400 ms) before physical drop
+ * Handles letter-by-letter Apple Spring animations and adaptive typography colors for W6d:
+ * - Onest 700 (Bold) typography
+ * - ZERO shadow, ZERO outline, ZERO halo: pure MSDF contrast
+ * - Light background (> 0.60): letters rgb(29,29,31); active word #0A84FF; sung letters #0A84FF alpha 0.70
+ * - Dark background (< 0.50): letters white; active word #64D2FF; sung letters #64D2FF alpha 0.70
+ * - Letter-by-letter pop-in on word onset: step = min(35 ms, 0.3 * wordDuration / wordLength)
+ * - Apple Spring: response = 0.32 s, damping = 0.62 (overshoot ~6%)
+ * - Start: scale 0.0, yOffset +0.12 blocks, rotZ -12° -> settles to scale 1.0, yOffset 0.0, rotZ 0°
+ * - Alpha: 0 -> 1 over 90 ms
  */
 public final class WordAnimation {
 
-    // Apple Spring parameters
-    public static final float SPRING_RESPONSE = 0.35f; // seconds
-    public static final float SPRING_DAMPING = 0.85f;  // damping ratio
-    public static final float OMEGA = 18.0f;           // 2*pi / response
-    public static final float ZETA = 0.85f;            // damping ratio
-    public static final float DAMPED_OMEGA = 9.48f;    // omega * sqrt(1 - zeta^2)
-    public static final long LETTER_STAGGER_MS = 20L;  // 15–25 ms per letter
-    public static final long POST_PHRASE_HOLD_MS = 400L;
+    // Apple Spring parameters (W6d: response 0.32s, damping 0.62)
+    public static final float SPRING_RESPONSE = 0.32f;
+    public static final float SPRING_DAMPING = 0.62f;
+    public static final float OMEGA = (float) (2.0 * Math.PI / SPRING_RESPONSE); // ~19.635
+    public static final float ZETA = SPRING_DAMPING;                             // 0.62
+    public static final float DAMPED_OMEGA = (float) (OMEGA * Math.sqrt(1.0 - ZETA * ZETA)); // ~15.405
 
-    // Palette per Apple HIG / W6b VOZVRAT 1 spec:
+    // Word post-singing hold before letters detach and fall (0.35 s)
+    public static final long POST_WORD_HOLD_MS = 350L;
+    public static final long POST_PHRASE_HOLD_MS = 350L;
+
+    // Palette:
     // Dark background (< 0.50):
-    public static final int COLOR_ACTIVE_DARK = 0xFF64D2FF;   // Accent cyan
-    public static final int COLOR_UPCOMING_DARK = 0xF2FFFFFF; // White alpha 0.95 (0.95 * 255 = 242 = 0xF2)
-    public static final int COLOR_SUNG_DARK = 0xBFFFFFFF;     // White alpha 0.75 (0.75 * 255 = 191 = 0xBF)
-    public static final int COLOR_HALO_DARK = 0x8C000000;     // Black alpha 0.55 (0.55 * 255 = 140 = 0x8C)
-    public static final float HALO_WIDTH_DARK = 0.10f;        // 0.10 em
-    public static final float HALO_BLUR_DARK = 0.03f;         // 0.03 em (crisp, not blurry)
+    public static final int COLOR_ACTIVE_DARK = 0xFF64D2FF;   // Accent cyan #64D2FF
+    public static final int COLOR_BASE_DARK = 0xFFFFFFFF;     // White
+    public static final int COLOR_SUNG_DARK = 0xB3FFFFFF;     // White alpha 0.70 (Return 1)
 
     // Light background (> 0.60):
-    public static final int COLOR_ACTIVE_LIGHT = 0xFF0A84FF;  // Apple systemBlue
-    public static final int COLOR_UPCOMING_LIGHT = 0xE61D1D1F;// Dark rgb(29,29,31) alpha 0.90 (0.90 * 255 = 230 = 0xE6)
-    public static final int COLOR_SUNG_LIGHT = 0xA61D1D1F;    // Dark rgb(29,29,31) alpha 0.65 (0.65 * 255 = 166 = 0xA6)
-    public static final int COLOR_HALO_LIGHT = 0x73FFFFFF;    // White alpha 0.45 (0.45 * 255 = 115 = 0x73)
-    public static final float HALO_WIDTH_LIGHT = 0.08f;       // 0.08 em
-    public static final float HALO_BLUR_LIGHT = 0.03f;        // 0.03 em
+    public static final int COLOR_ACTIVE_LIGHT = 0xFF0A84FF;  // Apple systemBlue #0A84FF
+    public static final int COLOR_BASE_LIGHT = 0xFF1D1D1F;    // Dark rgb(29,29,31)
+    public static final int COLOR_SUNG_LIGHT = 0xB31D1D1F;    // rgb(29,29,31) alpha 0.70 (Return 1)
 
-    // Backward-compatible aliases
+    // Backward-compatible constants
     public static final int COLOR_ACTIVE = COLOR_ACTIVE_DARK;
-    public static final int COLOR_UPCOMING = COLOR_UPCOMING_DARK;
+    public static final int COLOR_UPCOMING_DARK = COLOR_BASE_DARK;
+    public static final int COLOR_UPCOMING_LIGHT = COLOR_BASE_LIGHT;
     public static final int COLOR_SUNG = COLOR_SUNG_DARK;
-    public static final int COLOR_OUTLINE = 0xFF000000;
-    public static final float HALO_ALPHA_DARK = 0.55f;
-    public static final float HALO_ALPHA_LIGHT = 0.45f;
-
-    public enum State {
-        ENTERING,
-        ACTIVE,
-        SUNG,
-        HOLDING,
-        PHYSICAL,
-        FINISHED
-    }
+    public static final int COLOR_UPCOMING = COLOR_BASE_DARK;
+    public static final int COLOR_OUTLINE = 0x00000000;       // Zero halo
 
     private WordAnimation() {}
 
     /**
-     * Analytical Apple Spring progress function (0.0 to 1.0 with subtle physical bounce).
-     *
-     * @param elapsedSec time since spring trigger
-     * @return spring scale in range [0.0, 1.04]
+     * Analytical Apple Spring progress function (response 0.32s, damping 0.62, overshoot ~6%).
      */
     public static float evaluateSpring(float elapsedSec) {
         if (elapsedSec <= 0f) return 0f;
-        if (elapsedSec >= 0.40f) return 1.0f; // Settle cleanly
+        if (elapsedSec >= 0.50f) return 1.0f; // Settled cleanly
 
         float decay = (float) Math.exp(-ZETA * OMEGA * elapsedSec);
         float phase = DAMPED_OMEGA * elapsedSec;
@@ -71,127 +58,161 @@ public final class WordAnimation {
         float s = (float) Math.sin(phase);
 
         float position = 1.0f - decay * (c + (ZETA * OMEGA / DAMPED_OMEGA) * s);
-        return Math.max(0f, Math.min(1.05f, position));
+        return Math.max(0.0f, position);
     }
 
     /**
-     * Computes the scale of a letter during reveal.
+     * Calculates letter reveal step in ms: min(35 ms, 0.3 * duration / length).
      */
+    public static long getLetterStepMs(long wordDurationMs, int wordLength) {
+        if (wordLength <= 1) return 35L;
+        long step = (long) (0.30 * wordDurationMs / wordLength);
+        return Math.min(35L, Math.max(10L, step));
+    }
+
+    /**
+     * Computes the scale of letter i during pop-in appearance.
+     */
+    public static float letterScale(long playbackMs, long wordOnsetMs, long wordDurationMs, int wordLength, int charIndex) {
+        long stepMs = getLetterStepMs(wordDurationMs, wordLength);
+        long charStartMs = wordOnsetMs + charIndex * stepMs;
+        long charElapsedMs = playbackMs - charStartMs;
+        if (charElapsedMs <= 0L) return 0.0f;
+        return evaluateSpring(charElapsedMs / 1000.0f);
+    }
+
+    /**
+     * Computes upward Y offset of letter i during pop-in appearance (+0.12 blocks -> 0.0 blocks).
+     */
+    public static float letterYOffset(long playbackMs, long wordOnsetMs, long wordDurationMs, int wordLength, int charIndex) {
+        long stepMs = getLetterStepMs(wordDurationMs, wordLength);
+        long charStartMs = wordOnsetMs + charIndex * stepMs;
+        long charElapsedMs = playbackMs - charStartMs;
+        if (charElapsedMs <= 0L) return 0.12f;
+        float prog = evaluateSpring(charElapsedMs / 1000.0f);
+        return (1.0f - Math.min(1.0f, prog)) * 0.12f;
+    }
+
+    /**
+     * Computes Z rotation (tilt) of letter i during pop-in appearance (-12° -> 0°).
+     */
+    public static float letterRotZ(long playbackMs, long wordOnsetMs, long wordDurationMs, int wordLength, int charIndex) {
+        long stepMs = getLetterStepMs(wordDurationMs, wordLength);
+        long charStartMs = wordOnsetMs + charIndex * stepMs;
+        long charElapsedMs = playbackMs - charStartMs;
+        if (charElapsedMs <= 0L) return -12.0f;
+        float prog = evaluateSpring(charElapsedMs / 1000.0f);
+        return (1.0f - Math.min(1.0f, prog)) * (-12.0f);
+    }
+
+    /**
+     * Computes opacity of letter i during pop-in (0 -> 1 over 90 ms).
+     */
+    public static float letterAlpha(long playbackMs, long wordOnsetMs, long wordDurationMs, int wordLength, int charIndex) {
+        long stepMs = getLetterStepMs(wordDurationMs, wordLength);
+        long charStartMs = wordOnsetMs + charIndex * stepMs;
+        long charElapsedMs = playbackMs - charStartMs;
+        if (charElapsedMs <= 0L) return 0.0f;
+        return Math.min(1.0f, charElapsedMs / 90.0f);
+    }
+
+    // Simplified overloads for tests / linear word timeline:
     public static float letterScale(long wordElapsedMs, int charIndex) {
-        long charElapsedMs = wordElapsedMs - charIndex * LETTER_STAGGER_MS;
-        if (charElapsedMs <= 0) return 0.60f;
-        float springProgress = evaluateSpring(charElapsedMs / 1000.0f);
-        return 0.60f + 0.40f * springProgress;
-    }
-
-    /**
-     * Computes the opacity (0.0 - 1.0) of a letter during reveal.
-     */
-    public static float letterAlpha(long wordElapsedMs, int charIndex) {
-        long charElapsedMs = wordElapsedMs - charIndex * LETTER_STAGGER_MS;
+        long charElapsedMs = wordElapsedMs - charIndex * 35L;
         if (charElapsedMs <= 0) return 0.0f;
-        float springProgress = evaluateSpring(charElapsedMs / 1000.0f);
-        return Math.min(1.0f, springProgress);
+        return evaluateSpring(charElapsedMs / 1000.0f);
+    }
+
+    public static float letterAlpha(long wordElapsedMs, int charIndex) {
+        long charElapsedMs = wordElapsedMs - charIndex * 35L;
+        if (charElapsedMs <= 0) return 0.0f;
+        return Math.min(1.0f, charElapsedMs / 90.0f);
     }
 
     /**
-     * Interpolates active word color between #64D2FF (dark bg) and #0A84FF (light bg / snow).
+     * Interpolates active word color: #64D2FF (dark) <-> #0A84FF (light).
      */
-    public static int getActiveWordColor(float lightFactor) {
-        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        int r = Math.round((1.0f - t) * 0x64 + t * 0x0A);
-        int g = Math.round((1.0f - t) * 0xD2 + t * 0x84);
-        int b = 0xFF;
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    public static int getActiveWordColor(float lightProgress) {
+        return interpolateColor(COLOR_ACTIVE_DARK, COLOR_ACTIVE_LIGHT, lightProgress);
     }
 
     /**
-     * Interpolates upcoming word color between white 0.95 (dark bg) and dark rgb(29,29,31) 0.90 (light bg).
+     * Interpolates sung word color (alpha 0.70).
      */
-    public static int getUpcomingWordColor(float lightFactor) {
-        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        int r = Math.round((1.0f - t) * 255f + t * 29f);
-        int g = Math.round((1.0f - t) * 255f + t * 29f);
-        int b = Math.round((1.0f - t) * 255f + t * 31f);
-        int a = Math.round(((1.0f - t) * 0.95f + t * 0.90f) * 255f);
-        return (a << 24) | (r << 16) | (g << 8) | b;
+    public static int getSungWordColor(float lightProgress) {
+        return interpolateColor(COLOR_SUNG_DARK, COLOR_SUNG_LIGHT, lightProgress);
     }
 
     /**
-     * Interpolates sung word color between white 0.75 (dark bg) and dark rgb(29,29,31) 0.65 (light bg).
+     * Interpolates base text color: white (dark) <-> rgb(29,29,31) (light).
      */
-    public static int getSungWordColor(float lightFactor) {
-        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        int r = Math.round((1.0f - t) * 255f + t * 29f);
-        int g = Math.round((1.0f - t) * 255f + t * 29f);
-        int b = Math.round((1.0f - t) * 255f + t * 31f);
-        int a = Math.round(((1.0f - t) * 0.75f + t * 0.65f) * 255f);
-        return (a << 24) | (r << 16) | (g << 8) | b;
+    public static int getBaseWordColor(float lightProgress) {
+        return interpolateColor(COLOR_BASE_DARK, COLOR_BASE_LIGHT, lightProgress);
+    }
+
+    public static int getUpcomingWordColor(float lightProgress) {
+        return getBaseWordColor(lightProgress);
+    }
+
+    // Zero halo/shadow in W6d
+    public static int getHaloColor(float lightProgress) {
+        return 0x00000000;
+    }
+
+    public static float getHaloWidth(float lightProgress) {
+        return 0.0f;
+    }
+
+    public static float getHaloBlur(float lightProgress) {
+        return 0.0f;
     }
 
     /**
-     * Interpolates halo outline color between black 0.55 (dark bg) and white 0.45 (light bg).
+     * Resolves letter color based on playback time and active background luminance.
      */
-    public static int getHaloColor(float lightFactor) {
-        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        int rgb = Math.round(t * 255f);
-        int a = Math.round(((1.0f - t) * 0.55f + t * 0.45f) * 255f);
-        return (a << 24) | (rgb << 16) | (rgb << 8) | rgb;
-    }
-
-    /**
-     * Interpolates MSDF halo alpha between 0.55 (dark bg) and 0.45 (light bg / snow).
-     */
-    public static float getHaloAlpha(float lightFactor) {
-        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        return 0.55f + (0.45f - 0.55f) * t;
-    }
-
-    /**
-     * Interpolates MSDF halo width between 0.10 em (dark bg) and 0.08 em (light bg).
-     */
-    public static float getHaloWidth(float lightFactor) {
-        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        return HALO_WIDTH_DARK + (HALO_WIDTH_LIGHT - HALO_WIDTH_DARK) * t;
-    }
-
-    /**
-     * MSDF halo blur: 0.03 em (crisp edge, not cloudy).
-     */
-    public static float getHaloBlur(float lightFactor) {
-        return 0.03f;
-    }
-
-    /**
-     * Applies alpha factor to a color (ARGB).
-     */
-    public static int applyAlpha(int color, float alpha) {
-        int a = Math.max(0, Math.min(255, (int) (((color >>> 24) & 0xFF) * alpha)));
-        return (a << 24) | (color & 0x00FFFFFF);
-    }
-
-    /**
-     * Determines the display color for a word based on current playback time and background light.
-     */
-    public static int getWordColor(long currentPlaybackMs, long wordStartMs, long wordDurationMs, float alpha, float lightFactor) {
-        int baseColor;
-        long wordEnd = wordStartMs + wordDurationMs;
-
-        if (currentPlaybackMs >= wordStartMs && currentPlaybackMs <= wordEnd) {
-            baseColor = getActiveWordColor(lightFactor);
-        } else if (currentPlaybackMs > wordEnd) {
-            baseColor = getSungWordColor(lightFactor);
+    public static int getLetterColor(long playbackMs, long wordOnsetMs, long wordDurationMs, float lightProgress) {
+        if (playbackMs < wordOnsetMs) {
+            // Un-sung (invisible prior to singing, but base color if rendered)
+            return getBaseWordColor(lightProgress);
+        } else if (playbackMs < (wordOnsetMs + wordDurationMs)) {
+            // Actively singing: 100% active accent
+            return getActiveWordColor(lightProgress);
         } else {
-            baseColor = getUpcomingWordColor(lightFactor);
+            // Sung (Return 1: sung words white alpha 0.70 on dark / rgb(29,29,31) alpha 0.70 on light)
+            return getSungWordColor(lightProgress);
         }
-
-        return applyAlpha(baseColor, alpha);
     }
 
-    /**
-     * Determines the display color for a word based on current playback time (default dark background).
-     */
-    public static int getWordColor(long currentPlaybackMs, long wordStartMs, long wordDurationMs, float alpha) {
-        return getWordColor(currentPlaybackMs, wordStartMs, wordDurationMs, alpha, 0.0f);
+    public static int getWordColor(long playbackMs, long wordOnsetMs, long wordDurationMs, float scale, float lightProgress) {
+        return getLetterColor(playbackMs, wordOnsetMs, wordDurationMs, lightProgress);
+    }
+
+    public static int getWordColor(long playbackMs, long wordOnsetMs, long wordDurationMs, float scale) {
+        return getWordColor(playbackMs, wordOnsetMs, wordDurationMs, scale, 0.0f);
+    }
+
+    public static int applyAlpha(int argb, float alpha) {
+        int a = Math.max(0, Math.min(255, (int) (((argb >>> 24) & 0xFF) * alpha)));
+        return (a << 24) | (argb & 0x00FFFFFF);
+    }
+
+    public static int interpolateColor(int colA, int colB, float t) {
+        float f = Math.max(0.0f, Math.min(1.0f, t));
+        int aA = (colA >>> 24) & 0xFF;
+        int rA = (colA >>> 16) & 0xFF;
+        int gA = (colA >>> 8) & 0xFF;
+        int bA = colA & 0xFF;
+
+        int aB = (colB >>> 24) & 0xFF;
+        int rB = (colB >>> 16) & 0xFF;
+        int gB = (colB >>> 8) & 0xFF;
+        int bB = colB & 0xFF;
+
+        int a = (int) (aA + (aB - aA) * f);
+        int r = (int) (rA + (rB - rA) * f);
+        int g = (int) (gA + (gB - gA) * f);
+        int b = (int) (bA + (bB - bA) * f);
+
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 }

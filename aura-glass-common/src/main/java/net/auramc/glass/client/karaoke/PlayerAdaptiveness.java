@@ -236,8 +236,9 @@ public final class PlayerAdaptiveness {
         // Density modifier
         float mult = KaraokeConfig.get().getDensity().wordGroupMultiplier;
         max = Math.min(configuredMax, Math.max(min, Math.round(max * mult)));
-        int limit = Math.max(1, Math.min(max, configuredMax));
-        return Math.max(1, Math.min(limit, desiredWords));
+        // Comfort limit: in standing state support full phrases up to configuredMax (up to 8 words); in motion clamp to 4
+        int limit = (currentResult.state == ActivityState.STANDING) ? Math.min(configuredMax, 8) : Math.min(max, 4);
+        return Math.max(1, Math.max(min, Math.min(limit, desiredWords)));
     }
 
     private static float wrapDegrees(float deg) {

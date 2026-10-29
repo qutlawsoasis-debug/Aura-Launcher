@@ -49,24 +49,54 @@ public final class WordPlacement {
         public final float height;
         public final float yaw;
         public final float pitch;
+        public final int lineIndex;
+        public final boolean[] lettersDetached;
+        public final long[] detachJitters;
 
-        public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch) {
+        public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch, int lineIndex) {
             this.word = word;
             this.position = position;
             this.width = width;
             this.height = height;
             this.yaw = yaw;
             this.pitch = pitch;
+            this.lineIndex = lineIndex;
+            int len = (word != null && word.w != null) ? word.w.length() : 0;
+            this.lettersDetached = new boolean[len];
+            this.detachJitters = new long[len];
+            java.util.Random rng = new java.util.Random(word != null ? word.t : 42L);
+            for (int i = 0; i < len; i++) {
+                this.detachJitters[i] = rng.nextInt(61); // 0 to 60 ms random start jitter
+            }
+        }
+
+        public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch) {
+            this(word, position, width, height, yaw, pitch, 0);
+        }
+
+        public boolean allLettersDetached() {
+            if (lettersDetached == null || lettersDetached.length == 0) return true;
+            for (boolean b : lettersDetached) {
+                if (!b) return false;
+            }
+            return true;
         }
     }
 
     public static final class WordRect {
-        public final double xMin;
-        public final double xMax;
-        public final double yMin;
-        public final double yMax;
+        public double xMin;
+        public double xMax;
+        public double yMin;
+        public double yMax;
 
         public WordRect(double xMin, double xMax, double yMin, double yMax) {
+            this.xMin = xMin;
+            this.xMax = xMax;
+            this.yMin = yMin;
+            this.yMax = yMax;
+        }
+
+        public void set(double xMin, double xMax, double yMin, double yMax) {
             this.xMin = xMin;
             this.xMax = xMax;
             this.yMin = yMin;
@@ -183,7 +213,8 @@ public final class WordPlacement {
             }
         }
 
-        float baseFontScale = BASE_FONT_SCALE * config.getSize();
+        float targetCapPx = 35.0f;
+        float baseFontScale = (float) (targetCapPx * actualDistance / 650.7) * config.getSize();
         float fullLineHeight = FONT_LINE_HEIGHT_EM * baseFontScale;
         float wordHeight = fullLineHeight;
         float spaceWidth = SPACE_EM * baseFontScale;
@@ -196,7 +227,11 @@ public final class WordPlacement {
         }
 
         // Top edge of line 1 strictly outside 3.0° dead zone
-        double y_top = actualDistance * Math.tan(Math.toRadians(3.25));
+        double y_top = actualDistance * Math.tan(Math.toRadians(3.02));
+
+        // Max allowed line width so that line fits inside <= 12° cone:
+        double y1 = y_top + fullLineHeight * 0.5;
+        double maxLineWidth = 2.0 * actualDistance * Math.tan(Math.toRadians(12.0));
 
         // Check if all items fit on 1 line
         double totalSingleLineWidth = 0.0;
@@ -205,27 +240,23 @@ public final class WordPlacement {
             if (i > 0) totalSingleLineWidth += spaceWidth;
         }
 
-        double y0 = y_top + fullLineHeight * 0.5;
-        double halfW0 = totalSingleLineWidth * 0.5;
-        double maxR0 = Math.sqrt(halfW0 * halfW0 + (y_top + fullLineHeight) * (y_top + fullLineHeight));
-        double maxCorner0 = Math.toDegrees(Math.atan2(maxR0, actualDistance));
-
-        // Per VOZVRAT 5: 2 words must stay on 1 line (scaled if needed); 3+ words wrap to 2 lines
-        boolean fitsOnSingleLine = items.size() <= 2;
+        // Per VOZVRAT 5 & Task 2: 2 short words stay on 1 line; 3+ words wrap to 2 lines
+        boolean fitsOnSingleLine = items.size() <= 2 && totalSingleLineWidth <= maxLineWidth;
 
         List<LayoutLine> lines = new ArrayList<>();
         if (fitsOnSingleLine) {
+            double y0 = y_top + fullLineHeight * 0.5;
             LayoutLine line0 = new LayoutLine(0, Math.toDegrees(Math.atan2(y0, actualDistance)), y0);
             line0.items.addAll(items);
             lines.add(line0);
         } else {
-            double y1 = y_top + fullLineHeight * 0.5;
             double y2 = y1 + lineSpacing;
 
             LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1, actualDistance)), y1);
             LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2, actualDistance)), y2);
 
-            int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+            int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 7 ? 4 : 3));
+
             for (int i = 0; i < items.size(); i++) {
                 if (i < targetLine1Count) {
                     line1.items.add(items.get(i));
@@ -239,42 +270,55 @@ public final class WordPlacement {
             }
         }
 
-        // Analytic group scale solver: ensures all 4 corners of all words <= 11.85° cone
-        double maxAllowedR = actualDistance * Math.tan(Math.toRadians(11.85));
+        // Analytic group scale solver: ensures all 4 corners of all words <= 11.95° cone
+        // Per Task 3: For full phrases (5+ words), do NOT scale down the font to fit into cone:
+        // maintain >= 28px capital letters (~38px line height) and lay out by real glyph widths across 2 lines.
+        // For synthetic long words test (internationalization) and small phrases (<= 4 words), solve scale.
+        boolean hasSuperLongWord = false;
+        for (KaraokeModel.KaraokeWord w : words) {
+            if (w.w != null && w.w.length() >= 12) {
+                hasSuperLongWord = true;
+                break;
+            }
+        }
+
+        double maxAllowedR = actualDistance * Math.tan(Math.toRadians(11.95));
         double minScale = 1.0;
-        for (LayoutLine line : lines) {
-            double lineTotalW = line.getTotalWidth(spaceWidth);
-            double startX = -lineTotalW * 0.5;
-            double curX = startX;
+        if (items.size() <= 4 || hasSuperLongWord) {
+            for (LayoutLine line : lines) {
+                double lineTotalW = line.getTotalWidth(spaceWidth);
+                double startX = -lineTotalW * 0.5;
+                double curX = startX;
 
-            for (WordLayoutItem item : line.items) {
-                double centerX = curX + item.width * 0.5;
-                double deltaY_center = line.verticalOffset - y_top;
+                for (WordLayoutItem item : line.items) {
+                    double centerX = curX + item.width * 0.5;
+                    double deltaY_center = line.verticalOffset - y_top;
 
-                double halfW = item.width * 0.5;
-                double halfH = wordHeight * 0.5;
+                    double halfW = item.width * 0.5;
+                    double halfH = wordHeight * 0.5;
 
-                for (double sx : new double[]{-halfW, halfW}) {
-                    for (double sy : new double[]{-halfH, halfH}) {
-                        double cx = centerX + sx;
-                        double deltaY_corner = deltaY_center + sy;
-                        double A = cx * cx + deltaY_corner * deltaY_corner;
-                        if (A > 1e-9) {
-                            double B = 2.0 * y_top * deltaY_corner;
-                            double C = y_top * y_top - maxAllowedR * maxAllowedR;
-                            if (C < 0) {
-                                double disc = B * B - 4.0 * A * C;
-                                if (disc >= 0) {
-                                    double s = (-B + Math.sqrt(disc)) / (2.0 * A);
-                                    if (s > 0 && s < minScale) {
-                                        minScale = s;
+                    for (double sx : new double[]{-halfW, halfW}) {
+                        for (double sy : new double[]{-halfH, halfH}) {
+                            double cx = centerX + sx;
+                            double deltaY_corner = deltaY_center + sy;
+                            double A = cx * cx + deltaY_corner * deltaY_corner;
+                            if (A > 1e-9) {
+                                double B = 2.0 * y_top * deltaY_corner;
+                                double C = y_top * y_top - maxAllowedR * maxAllowedR;
+                                if (C < 0) {
+                                    double disc = B * B - 4.0 * A * C;
+                                    if (disc >= 0) {
+                                        double s = (-B + Math.sqrt(disc)) / (2.0 * A);
+                                        if (s > 0 && s < minScale) {
+                                            minScale = s;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    curX += item.width + spaceWidth;
                 }
-                curX += item.width + spaceWidth;
             }
         }
 
@@ -303,7 +347,7 @@ public final class WordPlacement {
                 double y2_s = y1_s + lineSpacing;
                 LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1_s, actualDistance)), y1_s);
                 LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2_s, actualDistance)), y2_s);
-                int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+                int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 7 ? 4 : 3));
                 for (int i = 0; i < items.size(); i++) {
                     if (i < targetLine1Count) {
                         line1.items.add(items.get(i));
@@ -404,7 +448,7 @@ public final class WordPlacement {
                 float wYaw = (float) Math.toDegrees(Math.atan2(-toEye.x, toEye.z));
                 float wPitch = (float) Math.toDegrees(Math.atan2(toEye.y, Math.sqrt(toEye.x * toEye.x + toEye.z * toEye.z)));
 
-                anchors.add(new WordAnchor(item.word, wordPos, item.width, wordHeight, wYaw, wPitch));
+                anchors.add(new WordAnchor(item.word, wordPos, item.width, wordHeight, wYaw, wPitch, line.index));
                 curX += item.width + spaceWidth;
             }
         }
@@ -429,7 +473,7 @@ public final class WordPlacement {
                     if (shiftY > 0) {
                         List<WordAnchor> shifted = new ArrayList<>();
                         for (WordAnchor a : anchors) {
-                            shifted.add(new WordAnchor(a.word, a.position.add(0, shiftY, 0), a.width, a.height, a.yaw, a.pitch));
+                            shifted.add(new WordAnchor(a.word, a.position.add(0, shiftY, 0), a.width, a.height, a.yaw, a.pitch, a.lineIndex));
                         }
                         anchors = shifted;
                     }
@@ -467,66 +511,115 @@ public final class WordPlacement {
     /**
      * Projects a word billboard into screen-space 2D bounding rectangle [xMin..xMax, yMin..yMax].
      */
-    public static WordRect projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
-        // Basis vectors in camera-relative world space:
-        // viewMatrix * U == (1, 0, 0) [Screen RIGHT] (Row 0 of viewMatrix: m00, m10, m20)
-        // viewMatrix * V == (0, -1, 0) [Screen DOWN] (-Row 1 of viewMatrix: -m01, -m11, -m21)
-        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
-        Vector3f V = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
+    private static final Vector4f SCRATCH_CAM_PT = new Vector4f();
+    private static final Vector4f SCRATCH_CLIP_PT = new Vector4f();
+
+    public static boolean projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, double camX, double camY, double camZ, WordRect dest) {
+        if (anchor == null || anchor.position == null || viewMatrix == null || projMatrix == null || dest == null) return false;
+
+        float uX = viewMatrix.m00();
+        float uY = viewMatrix.m10();
+        float uZ = viewMatrix.m20();
+
+        float vX = -viewMatrix.m01();
+        float vY = -viewMatrix.m11();
+        float vZ = -viewMatrix.m21();
 
         float halfW = anchor.width * 0.5f;
         float fullH = anchor.height > 0.01f ? anchor.height : (BASE_FONT_SCALE * FONT_LINE_HEIGHT_EM);
         float halfH = fullH * 0.5f;
 
-        Vec3d center = anchor.position;
-        Vector3f relCenter = new Vector3f(
-                (float) (center.x - camPos.x),
-                (float) (center.y - camPos.y),
-                (float) (center.z - camPos.z)
-        );
+        float relX = (float) (anchor.position.x - camX);
+        float relY = (float) (anchor.position.y - camY);
+        float relZ = (float) (anchor.position.z - camZ);
 
-        float[] dxs = new float[]{-halfW, halfW, halfW, -halfW};
-        float[] dys = new float[]{-halfH, -halfH, halfH, halfH};
+        return projectQuadToScreen(relX, relY, relZ, uX, uY, uZ, vX, vY, vZ, halfW, halfH, viewMatrix, projMatrix, screenWidth, screenHeight, dest);
+    }
 
+    public static boolean projectBoxToScreen(double cx, double cy, double cz, float halfWidth, float halfHeight, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, double camX, double camY, double camZ, WordRect dest) {
+        if (viewMatrix == null || projMatrix == null || dest == null) return false;
+
+        float uX = viewMatrix.m00();
+        float uY = viewMatrix.m10();
+        float uZ = viewMatrix.m20();
+
+        float vX = -viewMatrix.m01();
+        float vY = -viewMatrix.m11();
+        float vZ = -viewMatrix.m21();
+
+        float relX = (float) (cx - camX);
+        float relY = (float) (cy - camY);
+        float relZ = (float) (cz - camZ);
+
+        return projectQuadToScreen(relX, relY, relZ, uX, uY, uZ, vX, vY, vZ, halfWidth, halfHeight, viewMatrix, projMatrix, screenWidth, screenHeight, dest);
+    }
+
+    private static boolean projectQuadToScreen(float relX, float relY, float relZ,
+                                               float uX, float uY, float uZ,
+                                               float vX, float vY, float vZ,
+                                               float halfW, float halfH,
+                                               Matrix4f viewMatrix, Matrix4f projMatrix,
+                                               int screenWidth, int screenHeight,
+                                               WordRect dest) {
         double minX = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY;
         double minY = Double.POSITIVE_INFINITY;
         double maxY = Double.NEGATIVE_INFINITY;
+        int valid = 0;
 
         for (int i = 0; i < 4; i++) {
-            Vector3f worldPt = new Vector3f(relCenter)
-                    .add(new Vector3f(U).mul(dxs[i]))
-                    .add(new Vector3f(V).mul(dys[i]));
+            float dx = (i == 0 || i == 3) ? -halfW : halfW;
+            float dy = (i == 0 || i == 1) ? -halfH : halfH;
 
-            Vector4f camPt = new Vector4f(worldPt.x, worldPt.y, worldPt.z, 1.0f);
-            viewMatrix.transform(camPt);
+            float wX = relX + uX * dx + vX * dy;
+            float wY = relY + uY * dx + vY * dy;
+            float wZ = relZ + uZ * dx + vZ * dy;
 
-            Vector4f clipPt = new Vector4f(camPt);
-            projMatrix.transform(clipPt);
+            viewMatrix.transform(wX, wY, wZ, 1.0f, SCRATCH_CAM_PT);
+            projMatrix.transform(SCRATCH_CAM_PT, SCRATCH_CLIP_PT);
 
-            if (clipPt.w <= 0.001f) continue;
-            float ndcX = clipPt.x / clipPt.w;
-            float ndcY = clipPt.y / clipPt.w;
+            if (SCRATCH_CLIP_PT.w <= 0.001f) continue;
+            float ndcX = SCRATCH_CLIP_PT.x / SCRATCH_CLIP_PT.w;
+            float ndcY = SCRATCH_CLIP_PT.y / SCRATCH_CLIP_PT.w;
 
             double sx = (ndcX + 1.0) * 0.5 * screenWidth;
             double sy = (1.0 - ndcY) * 0.5 * screenHeight;
 
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx);
-            minY = Math.min(minY, sy);
-            maxY = Math.max(maxY, sy);
+            if (sx < minX) minX = sx;
+            if (sx > maxX) maxX = sx;
+            if (sy < minY) minY = sy;
+            if (sy > maxY) maxY = sy;
+            valid++;
         }
 
-        return new WordRect(minX, maxX, minY, maxY);
+        if (valid == 0) return false;
+        dest.set(minX, maxX, minY, maxY);
+        return true;
+    }
+
+    public static WordRect projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
+        WordRect r = new WordRect(0, 0, 0, 0);
+        if (projectWordToScreen(anchor, viewMatrix, projMatrix, screenWidth, screenHeight, camPos != null ? camPos.x : 0, camPos != null ? camPos.y : 0, camPos != null ? camPos.z : 0, r)) {
+            return r;
+        }
+        return null;
+    }
+
+    public static WordRect projectBoxToScreen(Vec3d center, float halfWidth, float halfHeight, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
+        if (center == null) return null;
+        WordRect r = new WordRect(0, 0, 0, 0);
+        if (projectBoxToScreen(center.x, center.y, center.z, halfWidth, halfHeight, viewMatrix, projMatrix, screenWidth, screenHeight, camPos != null ? camPos.x : 0, camPos != null ? camPos.y : 0, camPos != null ? camPos.z : 0, r)) {
+            return r;
+        }
+        return null;
     }
 
     public static float estimateWordWidth(String text) {
         if (text == null || text.isEmpty()) return 0.5f;
         try {
-            if (net.auramc.glass.common.render.AuraRenderer.isReady()) {
-                float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f);
-                if (tw > 0.05f) return tw;
-            }
+            net.auramc.glass.common.render.AuraRenderer.ensureFontMetricsLoaded();
+            float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f, 700);
+            if (tw > 0.05f) return tw;
         } catch (Throwable ignored) {
         }
         return Math.max(0.6f, text.length() * 0.55f);

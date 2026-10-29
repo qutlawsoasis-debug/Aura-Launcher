@@ -29,3 +29,5 @@ progress.md
 /docs/redesign/qa/**/*.png
 .chrome_*/
 run/
+
+logs/
