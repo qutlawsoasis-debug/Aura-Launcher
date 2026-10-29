@@ -112,6 +112,34 @@ test('fetchLyricsFromLrclib - rejects candidates outside ±3s window', async () 
   assert.strictEqual(res, null);
 });
 
+test('fetchLyricsFromLrclib - aborts when headers arrive fast but body reading hangs', async () => {
+  let signalObserved = null;
+
+  const hangingBodyFetch = async (url, opts) => {
+    signalObserved = opts?.signal;
+    return {
+      ok: true,
+      status: 200,
+      json: () => new Promise(() => {}) // never settles
+    };
+  };
+
+  const start = Date.now();
+  await assert.rejects(
+    async () => {
+      await fetchLyricsFromLrclib('Artist', 'Track', 0, hangingBodyFetch, 25);
+    },
+    (err) => {
+      assert.ok(err.name === 'AbortError' || err.message?.includes('aborted'));
+      return true;
+    }
+  );
+
+  const duration = Date.now() - start;
+  assert.ok(duration < 500, `duration was ${duration} ms, should abort quickly around 25 ms`);
+  assert.strictEqual(signalObserved?.aborted, true, 'signal is marked aborted');
+});
+
 test('handler - returns 400 on missing artist or title', async () => {
   let statusCode = 0;
   let jsonResult = null;

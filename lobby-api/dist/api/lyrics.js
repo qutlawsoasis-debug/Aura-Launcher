@@ -65,7 +65,7 @@ export default async function handler(req, res) {
             lrclibRecord = await fetchLyricsFromLrclib(artist, title, durationSec);
         }
         catch (err) {
-            if (err?.name === 'AbortError') {
+            if (err?.name === 'AbortError' || err?.message?.includes('abort')) {
                 return sendJson(res, 504, { error: 'upstream_timeout', message: 'LRCLIB request timed out' });
             }
             throw err;

@@ -77,8 +77,8 @@ test('estimateLineWords - distributes duration by syllable weight and adds 120ms
 
   // Proportions: availableSinging = 3000 - 120 = 2880 ms
   // Stop! weight 1, Listen weight 2 -> totalWeight 3
-  // res[0].d = round(2880 * 1/3) = 960 ms
-  // res[1].d = 2880 - 960 = 1920 ms (twice duration of Stop!)
+  // res[0].d = floor(2880 * 1/3) = 960 ms
+  // res[1].d = 2880 - 960 = 1920 ms
   assert.strictEqual(res[0].d, 960);
   assert.strictEqual(res[1].d, 1920);
 
@@ -96,8 +96,6 @@ test('parseEnhancedLineWords - parses <mm:ss.xx> tags inside a line', () => {
 
   assert.deepStrictEqual(words[0], { t: 10000, d: 500, w: 'Never' });
   assert.deepStrictEqual(words[1], { t: 10500, d: 500, w: 'gonna' });
-  assert.strictEqual(words[1].t, 10500);
-  assert.strictEqual(words[1].d, 500);
   assert.strictEqual(words[2].t, 11000);
   assert.strictEqual(words[2].d, 1000);
   assert.strictEqual(words[2].w, 'give');
@@ -156,6 +154,67 @@ test('parseLrc - parses full LRC and enforces maximum 8s line duration cap', () 
   const line1 = parsed.lines[1];
   assert.strictEqual(line1.t, 20000);
   assert.strictEqual(line1.text, 'Second line arrives 19s later');
+});
+
+test('parseLrc - short line (100 ms) does not extend past next line', () => {
+  // QA probe: [00:00.00]one\n[00:00.10]two
+  const lrc = `[00:00.00]one\n[00:00.10]two`;
+  const parsed = parseLrc(lrc);
+
+  assert.strictEqual(parsed.lines.length, 2);
+  const line0 = parsed.lines[0];
+  const line1 = parsed.lines[1];
+
+  assert.strictEqual(line0.t, 0);
+  assert.strictEqual(line1.t, 100);
+
+  // Word "one" must not extend past line 1's start (100 ms)
+  assert.strictEqual(line0.words.length, 1);
+  assert.strictEqual(line0.words[0].t, 0);
+  assert.strictEqual(line0.words[0].d, 100);
+  assert.ok(line0.words[0].t + line0.words[0].d <= line1.t, 'word one does not exceed next line start');
+});
+
+test('parseLrc - identical/coinciding timestamps handle boundary without exceeding', () => {
+  const lrc = `[00:01.00]first\n[00:01.00]second\n[00:02.00]third`;
+  const parsed = parseLrc(lrc);
+
+  assert.strictEqual(parsed.lines.length, 3);
+  assert.strictEqual(parsed.lines[0].t, 1000);
+  assert.strictEqual(parsed.lines[1].t, 1000);
+  assert.strictEqual(parsed.lines[2].t, 2000);
+
+  // Line 0 words must not exceed line 1 start (1000 ms)
+  assert.strictEqual(parsed.lines[0].words[0].t, 1000);
+  assert.strictEqual(parsed.lines[0].words[0].d, 0);
+  assert.ok(parsed.lines[0].words[0].t + parsed.lines[0].words[0].d <= parsed.lines[1].t);
+
+  // Line 1 words must not exceed line 2 start (2000 ms)
+  assert.strictEqual(parsed.lines[1].words[0].t, 1000);
+  assert.strictEqual(parsed.lines[1].words[0].d, 1000);
+  assert.ok(parsed.lines[1].words[0].t + parsed.lines[1].words[0].d <= parsed.lines[2].t);
+});
+
+test('parseLrc - global offset applies consistently to lines and enhanced tags', () => {
+  // Positive offset: +1000 ms
+  const posLrc = `[offset:+1000]\n[00:10.00]<00:10.00>word<00:11.00>`;
+  const posParsed = parseLrc(posLrc);
+  assert.strictEqual(posParsed.lines.length, 1);
+  assert.strictEqual(posParsed.lines[0].t, 11000); // 10000 + 1000
+  assert.strictEqual(posParsed.lines[0].words.length, 1);
+  assert.strictEqual(posParsed.lines[0].words[0].t, 11000); // 10000 + 1000
+  assert.strictEqual(posParsed.lines[0].words[0].d, 1000);
+  assert.strictEqual(posParsed.lines[0].words[0].w, 'word');
+
+  // Negative offset: -1000 ms
+  const negLrc = `[offset:-1000]\n[00:10.00]<00:10.00>word<00:11.00>`;
+  const negParsed = parseLrc(negLrc);
+  assert.strictEqual(negParsed.lines.length, 1);
+  assert.strictEqual(negParsed.lines[0].t, 9000); // 10000 - 1000
+  assert.strictEqual(negParsed.lines[0].words.length, 1);
+  assert.strictEqual(negParsed.lines[0].words[0].t, 9000); // 10000 - 1000
+  assert.strictEqual(negParsed.lines[0].words[0].d, 1000);
+  assert.strictEqual(negParsed.lines[0].words[0].w, 'word');
 });
 
 test('parseLrc - parses enhanced LRC lines when present', () => {

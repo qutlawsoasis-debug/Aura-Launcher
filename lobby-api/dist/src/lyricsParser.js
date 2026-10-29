@@ -46,24 +46,32 @@ export function parseLrcTimestamp(mm, ss, frac) {
 /**
  * Distributes line duration across words by syllable weight,
  * adding +120 ms pause after , . ! ? …
+ * The words and pauses strictly stay within [lineStartMs, lineStartMs + lineDurationMs].
  */
 export function estimateLineWords(rawWords, lineStartMs, lineDurationMs) {
     if (!rawWords || rawWords.length === 0) {
         return [];
     }
-    const totalDuration = Math.max(lineDurationMs, 50);
+    if (lineDurationMs <= 0) {
+        return rawWords.map(w => ({
+            t: lineStartMs,
+            d: 0,
+            w
+        }));
+    }
+    const totalDuration = lineDurationMs;
     const weights = rawWords.map(w => countSyllables(w));
     const pauses = rawWords.map(w => (hasPauseAfter(w) ? 120 : 0));
     const totalWeight = weights.reduce((acc, w) => acc + w, 0);
     const totalPauses = pauses.reduce((acc, p) => acc + p, 0);
     // Reserve a minimum amount of singing time so pauses never completely consume the line
-    const minRequiredSinging = Math.min(rawWords.length * 40, Math.floor(totalDuration * 0.5));
+    const minRequiredSinging = Math.min(rawWords.length, totalDuration);
     let availableSinging = totalDuration - totalPauses;
     let pausesToUse = pauses.slice();
     if (availableSinging < minRequiredSinging) {
         const maxPauseBudget = Math.max(0, totalDuration - minRequiredSinging);
-        const pauseScale = totalPauses > 0 ? maxPauseBudget / totalPauses : 1;
-        pausesToUse = pauses.map(p => Math.round(p * pauseScale));
+        const pauseScale = totalPauses > 0 ? maxPauseBudget / totalPauses : 0;
+        pausesToUse = pauses.map(p => Math.floor(p * pauseScale));
         availableSinging = totalDuration - pausesToUse.reduce((acc, p) => acc + p, 0);
     }
     // Allocate durations proportional to syllable weight
@@ -71,10 +79,10 @@ export function estimateLineWords(rawWords, lineStartMs, lineDurationMs) {
     let allocated = 0;
     for (let i = 0; i < rawWords.length; i++) {
         if (i === rawWords.length - 1) {
-            durations.push(Math.max(1, availableSinging - allocated));
+            durations.push(Math.max(0, availableSinging - allocated));
         }
         else {
-            const d = Math.max(1, Math.round(availableSinging * (weights[i] / totalWeight)));
+            const d = Math.max(0, Math.floor(availableSinging * (weights[i] / totalWeight)));
             durations.push(d);
             allocated += d;
         }
@@ -95,17 +103,19 @@ export function estimateLineWords(rawWords, lineStartMs, lineDurationMs) {
 const ENHANCED_TAG_REGEX = /<(\d{1,2}):(\d{2})(?:\.(\d{2,3}))?>/g;
 /**
  * Parses enhanced LRC tags inside a line: <mm:ss.xx>
+ * Applies globalOffset to all enhanced timestamps.
  */
-export function parseEnhancedLineWords(lineContent, lineStartMs, lineDurationMs) {
+export function parseEnhancedLineWords(lineContent, lineStartMs, lineDurationMs, globalOffset = 0) {
     // Extract all tag positions
     const tags = [];
     let match;
     const regex = new RegExp(ENHANCED_TAG_REGEX.source, 'g');
     while ((match = regex.exec(lineContent)) !== null) {
+        const rawTagTime = parseLrcTimestamp(match[1], match[2], match[3]);
         tags.push({
             index: match.index,
             length: match[0].length,
-            timeMs: parseLrcTimestamp(match[1], match[2], match[3])
+            timeMs: Math.max(0, rawTagTime + globalOffset)
         });
     }
     const cleanText = lineContent
@@ -120,12 +130,12 @@ export function parseEnhancedLineWords(lineContent, lineStartMs, lineDurationMs)
         };
     }
     const resultWords = [];
-    const lineEndMs = lineStartMs + lineDurationMs;
+    const lineEndMs = lineStartMs + Math.max(0, lineDurationMs);
     // Segment before first tag (if any)
     const prefixText = lineContent.substring(0, tags[0].index).trim();
     if (prefixText) {
         const segWords = prefixText.split(/\s+/).filter(w => w.length > 0);
-        const segDuration = Math.max(tags[0].timeMs - lineStartMs, 50);
+        const segDuration = Math.max(0, tags[0].timeMs - lineStartMs);
         resultWords.push(...estimateLineWords(segWords, lineStartMs, segDuration));
     }
     // Segments between tags
@@ -141,7 +151,7 @@ export function parseEnhancedLineWords(lineContent, lineStartMs, lineDurationMs)
         const segWords = segText.split(/\s+/).filter(w => w.length > 0);
         const segStartMs = currentTag.timeMs;
         const segEndMs = nextTag ? nextTag.timeMs : lineEndMs;
-        const segDuration = Math.max(segEndMs - segStartMs, 50);
+        const segDuration = Math.max(0, segEndMs - segStartMs);
         if (segWords.length === 1) {
             resultWords.push({
                 t: segStartMs,
@@ -221,11 +231,11 @@ export function parseLrc(lrcText, songDurationMs) {
         let lineDurationMs;
         if (next) {
             const diff = next.timeMs - current.timeMs;
-            lineDurationMs = Math.min(Math.max(diff, 200), 8000);
+            lineDurationMs = Math.max(0, Math.min(diff, 8000));
         }
         else {
             if (songDurationMs && songDurationMs > current.timeMs) {
-                lineDurationMs = Math.min(Math.max(songDurationMs - current.timeMs, 200), 8000);
+                lineDurationMs = Math.max(0, Math.min(songDurationMs - current.timeMs, 8000));
             }
             else {
                 lineDurationMs = 4000;
@@ -233,7 +243,7 @@ export function parseLrc(lrcText, songDurationMs) {
         }
         const hasEnhancedTags = /<(\d{1,2}):(\d{2})(?:\.(\d{2,3}))?>/.test(current.content);
         if (hasEnhancedTags) {
-            const parsed = parseEnhancedLineWords(current.content, current.timeMs, lineDurationMs);
+            const parsed = parseEnhancedLineWords(current.content, current.timeMs, lineDurationMs, globalOffset);
             parsedLines.push({
                 t: current.timeMs,
                 text: parsed.text,
