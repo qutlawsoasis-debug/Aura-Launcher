@@ -16,7 +16,14 @@ tasks.register('runAutoCompleteTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.ui.AutoCompleteGlassTest'
 }
 
+tasks.register('runTopEdgeIntegrityTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.common.render.TopEdgeIntegrityTest'
+}
+
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
+    dependsOn 'runTopEdgeIntegrityTest'
 }
