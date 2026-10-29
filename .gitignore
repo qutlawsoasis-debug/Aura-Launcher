@@ -13,6 +13,8 @@ shots/
 build/
 aura-defaults/data/
 aura-defaults/run/
+aura-ultralight/
+logs/
 task_plan.md
 findings.md
 progress.md
@@ -29,3 +31,5 @@ progress.md
 /docs/redesign/qa/**/*.png
 .chrome_*/
 run/
+aura-ultralight/
+logs/
