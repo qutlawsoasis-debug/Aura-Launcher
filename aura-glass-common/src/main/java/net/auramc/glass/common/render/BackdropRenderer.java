@@ -35,8 +35,9 @@ public final class BackdropRenderer {
     }
     public static void worldImage() { if(worldTexture!=0)draw(worldTexture,worldTexture,0,1,true); }
     static void modal(float progress,boolean available) {
+        if(net.auramc.glass.common.style.GlassStyles.quality() == net.auramc.glass.common.style.GlassQuality.OFF) return;
         boolean timer=GlassDiagnostics.timers().begin(GpuGlassTimers.GLASS);
-        try {draw(BlurService.get().texture(0),BlurService.get().texture(1),progress,1-.25f*progress,available);}
+        try {draw(available ? BlurService.get().texture(0) : 0, available ? BlurService.get().texture(1) : 0, progress, 1-.25f*progress, available);}
         finally {GlassDiagnostics.timers().end(timer);}
     }
     private static void draw(int sharp,int blurred,float amount,float dim,boolean available) {

@@ -30,7 +30,10 @@
     "LockButtonWidgetMixin",
     "TextureDeletionMixin",
     "AuraHudMixin",
-    "ExtraMenuWidgetMixin"
+    "ExtraMenuWidgetMixin",
+    "WorldRendererMixin",
+    "ClientPlayerInteractionManagerMixin",
+    "ClientPlayerEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 0

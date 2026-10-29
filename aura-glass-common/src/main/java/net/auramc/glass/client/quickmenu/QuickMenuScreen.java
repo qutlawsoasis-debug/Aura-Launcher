@@ -9,6 +9,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
 import net.auramc.glass.client.music.*;
+import net.auramc.glass.client.karaoke.KaraokeConfig;
 import net.auramc.glass.client.quickmenu.music.MusicSourceProvider;
 
 import org.lwjgl.glfw.GLFW;
@@ -351,7 +352,7 @@ public final class QuickMenuScreen extends Screen {
         } else if (section == 1) {
             contentH = 3 * 44 + 80;
         } else if (section == 2) {
-            contentH = 320 + Math.min(10, cachedTracks.size()) * 42 + 20;
+            contentH = 544 + Math.min(10, cachedTracks.size()) * 42 + 20;
         } else {
             contentH = 80;
         }
@@ -406,6 +407,7 @@ public final class QuickMenuScreen extends Screen {
     }
 
     private void music(DrawContext context, float x, float y, float w) {
+        var c = QuickMenuConfig.get();
         var source = MusicSourceProvider.get();
         var now = source.now();
         var current = now.track();
@@ -484,17 +486,61 @@ public final class QuickMenuScreen extends Screen {
         // Volume formatted as percentage "50 %"
         slider(x, y + 188, w, "Громкость", now.volume(), 0, 1, v -> {
             source.volume((float) v);
-            QuickMenuConfig.get().musicVolume = v;
+            c.musicVolume = v;
         }, v -> Math.round(v * 100) + " %");
 
-        action(x, y + 236, w, searching ? "Поиск: " + searchText : searchText.isBlank() ? "Поиск в каталоге Aura..." : ("Поиск: " + searchText), () -> searching = true);
+        // Karaoke settings block (Apple glass style)
+        float ky = y + 232;
+        float headerFade = edgeFade(ky, 24);
+        if (headerFade > 0.01f) {
+            text("Караоке", x, ky + 4, 18, 0xFFFFFFFF, 600, headerFade);
+        }
+        ky += 30;
 
-        action(x, y + 276, 120, "Каталог Aura", () -> musicTab = 0);
-        action(x + 130, y + 276, 100, "Очередь", () -> musicTab = 1);
+        toggle(x, ky, w, "Караоке в мире", () -> c.karaoke, v -> {
+            c.karaoke = v;
+            KaraokeConfig.get().setEnabled(v);
+        });
+        ky += 38;
+
+        slider(x, ky, w, "Задержка", c.lyricsOffsetMs, -500, 500, v -> {
+            int rounded = (int) Math.round(v / 10.0) * 10;
+            c.lyricsOffsetMs = rounded;
+            KaraokeConfig.get().setTimingOffsetMs(rounded);
+        }, v -> {
+            int iv = (int) Math.round(v / 10.0) * 10;
+            return (iv > 0 ? "+" : "") + iv + " мс";
+        });
+        ky += 38;
+
+        slider(x, ky, w, "Размер текста", c.karaokeSize, 0.75, 1.50, v -> {
+            double rounded = Math.round(v * 100.0) / 100.0;
+            c.karaokeSize = rounded;
+            KaraokeConfig.get().setSize((float) rounded);
+        }, v -> Math.round(v * 100) + " %");
+        ky += 38;
+
+        slider(x, ky, w, "Слов максимум", c.karaokeMaxWords, 1, 6, v -> {
+            int rounded = (int) Math.round(v);
+            c.karaokeMaxWords = rounded;
+            KaraokeConfig.get().setMaxWords(rounded);
+        }, v -> String.valueOf((int) Math.round(v)));
+        ky += 38;
+
+        toggle(x, ky, w, "Только когда стою", () -> c.karaokeOnlyStanding, v -> {
+            c.karaokeOnlyStanding = v;
+            KaraokeConfig.get().setOnlyStanding(v);
+        });
+        ky += 46;
+
+        action(x, ky, w, searching ? "Поиск: " + searchText : searchText.isBlank() ? "Поиск в каталоге Aura..." : ("Поиск: " + searchText), () -> searching = true);
+
+        action(x, ky + 40, 120, "Каталог Aura", () -> musicTab = 0);
+        action(x + 130, ky + 40, 100, "Очередь", () -> musicTab = 1);
 
         // Asynchronous cached tracks - no network calls on render thread!
         var tracks = cachedTracks;
-        float ty = y + 318;
+        float ty = ky + 82;
         if (!source.available()) {
             float waitingFade = edgeFade(ty, 15);
             if (waitingFade > 0.01f) text("Aura Music: launcher is not running", x, ty, 15, 0xDDFFFFFF, 400, waitingFade);

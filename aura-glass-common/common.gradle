@@ -22,8 +22,36 @@ tasks.register('runGlassLayoutTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.ui.GlassLayoutTest'
 }
 
+tasks.register('runKaraokeTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.common.karaoke.KaraokeSuiteTest'
+}
+
+tasks.register('runMusicKaraokeIntegrationTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.karaoke.MusicKaraokeIntegrationTest'
+}
+
+tasks.register('runKaraokeSettingsTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.karaoke.KaraokeSettingsTest'
+}
+
+tasks.register('runGlassInvariantsTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.common.render.GlassRenderInvariantsTest'
+}
+
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
     dependsOn 'runGlassLayoutTest'
+    dependsOn 'runKaraokeTest'
+    dependsOn 'runMusicKaraokeIntegrationTest'
+    dependsOn 'runKaraokeSettingsTest'
+    dependsOn 'runGlassInvariantsTest'
 }

@@ -1406,7 +1406,7 @@ public class FabricGameLaunchService : IGameLaunchService
             {
                 UserType = "legacy"
             },
-            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir)
+            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir, javaPath)
         };
 
         LogGameLaunchEvent(targetInstanceDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
@@ -1711,7 +1711,247 @@ public class FabricGameLaunchService : IGameLaunchService
         }
     }
 
-    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir)
+    public static string? CustomLogDirectory { get; set; }
+
+    public static bool IsValidCdsArchive(string? path)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+            var fi = new FileInfo(path);
+            // Hotspot base classes.jsa is typically 10-30MB; header alone is >= 4KB.
+            // A zero-byte or corrupted file must never be accepted as a valid CDS archive.
+            if (fi.Length <= 4096) return false;
+
+            // Verify HotSpot CDS header magic number
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var header = new byte[4];
+            if (fs.Read(header, 0, 4) < 4) return false;
+            uint magic = BitConverter.ToUInt32(header, 0);
+
+            // Hotspot CDS magic: 0xF00BABA2 (modern OpenJDK) or 0xD0022F00 (legacy)
+            if (magic != 0xF00BABA2 && magic != 0xD0022F00 && magic != 0xD0022F01)
+            {
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static string? ResolveExecutable(string name)
+    {
+        if (File.Exists(name)) return Path.GetFullPath(name);
+
+        var pathEnv = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrWhiteSpace(pathEnv)) return null;
+
+        var extCandidates = OperatingSystem.IsWindows()
+            ? (Path.HasExtension(name) ? new[] { "" } : new[] { ".exe", ".cmd", ".bat" })
+            : new[] { "" };
+
+        foreach (var rawDir in pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var dir = rawDir.Trim('"', ' ');
+            foreach (var ext in extCandidates)
+            {
+                try
+                {
+                    var full = Path.Combine(dir, name + ext);
+                    if (File.Exists(full)) return full;
+                }
+                catch { }
+            }
+        }
+        return null;
+    }
+
+    public static bool VerifyArchiveWithJvm(string? javaPath, string? archivePath, int timeoutMs = 3000)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(javaPath)) return false;
+            string? effectiveJava = File.Exists(javaPath) ? javaPath : ResolveExecutable(javaPath);
+            if (string.IsNullOrWhiteSpace(effectiveJava) || !File.Exists(effectiveJava)) return false;
+            if (string.IsNullOrWhiteSpace(archivePath) || !IsValidCdsArchive(archivePath)) return false;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = effectiveJava,
+                Arguments = $"-Xshare:on -XX:SharedArchiveFile=\"{archivePath}\" -version",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null) return false;
+
+            var stdout = proc.StandardOutput.ReadToEndAsync();
+            var stderr = proc.StandardError.ReadToEndAsync();
+
+            bool exited = proc.WaitForExit(timeoutMs);
+            if (!exited)
+            {
+                try { proc.Kill(entireProcessTree: true); proc.WaitForExit(1000); } catch { }
+                return false;
+            }
+
+            try { Task.WaitAll(new[] { stdout, stderr }, 1000); } catch { }
+            return proc.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool EnsureBaseCdsArchive(string? javaPath, CancellationToken cancellationToken = default, int timeoutMs = 20000)
+    {
+        if (string.IsNullOrWhiteSpace(javaPath)) return false;
+        string? effectiveJava = File.Exists(javaPath) ? javaPath : ResolveExecutable(javaPath);
+        if (string.IsNullOrWhiteSpace(effectiveJava) || !File.Exists(effectiveJava))
+        {
+            return false;
+        }
+
+        try
+        {
+            var binDir = Path.GetDirectoryName(effectiveJava);
+            if (string.IsNullOrEmpty(binDir)) return false;
+
+            string[] possiblePaths =
+            {
+                Path.Combine(binDir, "server", "classes.jsa"),
+                Path.Combine(binDir, "..", "lib", "server", "classes.jsa"),
+                Path.Combine(binDir, "client", "classes.jsa")
+            };
+
+            foreach (var p in possiblePaths)
+            {
+                if (IsValidCdsArchive(p) && VerifyArchiveWithJvm(effectiveJava, p))
+                {
+                    LogLauncherEvent($"[LAUNCH: CDS] Обнаружен и верифицирован базовый архив CDS: {p}");
+                    return true;
+                }
+            }
+
+            // Remove any 0-byte or corrupted archives so dump can recreate cleanly
+            foreach (var p in possiblePaths)
+            {
+                try
+                {
+                    if (File.Exists(p) && (!IsValidCdsArchive(p) || !VerifyArchiveWithJvm(effectiveJava, p)))
+                    {
+                        File.Delete(p);
+                        LogLauncherEvent($"[LAUNCH: CDS] Удален поврежденный/неверифицированный архив CDS: {p}");
+                    }
+                }
+                catch { }
+            }
+
+            // If base archive is missing, attempt to generate it with java.exe -Xshare:dump
+            string dumpExe = Path.Combine(binDir, "java.exe");
+            if (!File.Exists(dumpExe)) dumpExe = effectiveJava;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = dumpExe,
+                Arguments = "-Xshare:dump",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            Process? proc = null;
+            try
+            {
+                proc = Process.Start(psi);
+                if (proc == null) return false;
+
+                // Asynchronously read stdout and stderr to prevent pipe buffer deadlocks
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
+
+                bool exited = false;
+                if (cancellationToken.CanBeCanceled)
+                {
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    var waitTask = proc.WaitForExitAsync(linkedCts.Token);
+                    var timeoutTask = Task.Delay(timeoutMs);
+                    var finished = Task.WhenAny(waitTask, timeoutTask).GetAwaiter().GetResult();
+                    exited = (finished == waitTask && !cancellationToken.IsCancellationRequested);
+                }
+                else
+                {
+                    exited = proc.WaitForExit(timeoutMs);
+                }
+
+                if (!exited || cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(3000);
+                    }
+                    catch { }
+                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump timed out after {timeoutMs}ms or was cancelled; process killed");
+                    return false;
+                }
+
+                try
+                {
+                    Task.WaitAll(new[] { stdoutTask, stderrTask }, 2000);
+                }
+                catch { }
+
+                if (proc.ExitCode != 0)
+                {
+                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump failed with exit code {proc.ExitCode}");
+                    return false;
+                }
+
+                foreach (var p in possiblePaths)
+                {
+                    if (IsValidCdsArchive(p) && VerifyArchiveWithJvm(effectiveJava, p))
+                    {
+                        LogLauncherEvent($"[LAUNCH: CDS] Успешно сгенерирован и верифицирован базовый архив CDS: {p}");
+                        return true;
+                    }
+                }
+
+                LogLauncherEvent("[LAUNCH: CDS: WARN] Сгенерированный архив не прошел верификацию JVM");
+                return false;
+            }
+            finally
+            {
+                try
+                {
+                    if (proc != null && !proc.HasExited)
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(1000);
+                    }
+                }
+                catch { }
+                proc?.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[LAUNCH: CDS: WARN] Не удалось проверить/сгенерировать базовый архив CDS: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir, string? javaPath = null)
     {
         var list = new List<MArgument>
         {
@@ -1722,14 +1962,22 @@ public class FabricGameLaunchService : IGameLaunchService
 
         try
         {
-            string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
-            if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
+            bool hasBaseCds = EnsureBaseCdsArchive(javaPath);
+            if (hasBaseCds)
             {
-                list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
+                string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
+                if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
+                {
+                    list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
+                }
+                else
+                {
+                    list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
+                }
             }
             else
             {
-                list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
+                LogLauncherEvent("[LAUNCH: CDS] Base CDS archive not available, skipping AppCDS arguments");
             }
         }
         catch { }
@@ -1766,8 +2014,24 @@ public class FabricGameLaunchService : IGameLaunchService
     {
         try
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var logDir = Path.Combine(appData, "Aura");
+            string logDir;
+            if (!string.IsNullOrEmpty(CustomLogDirectory))
+            {
+                logDir = CustomLogDirectory;
+            }
+            else
+            {
+                var envDir = Environment.GetEnvironmentVariable("AURA_LOG_DIR");
+                if (!string.IsNullOrEmpty(envDir))
+                {
+                    logDir = envDir;
+                }
+                else
+                {
+                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    logDir = Path.Combine(appData, "Aura");
+                }
+            }
             Directory.CreateDirectory(logDir);
             var logPath = Path.Combine(logDir, "launcher.log");
             File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
