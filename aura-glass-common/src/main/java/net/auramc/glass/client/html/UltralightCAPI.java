@@ -3,6 +3,10 @@ package net.auramc.glass.client.html;
 import com.sun.jna.Callback;
 import com.sun.jna.Library;
 import com.sun.jna.Pointer;
+import com.sun.jna.Structure;
+
+import java.util.Arrays;
+import java.util.List;
 
 public interface UltralightCAPI extends Library {
     Pointer ulCreateString(String str);
@@ -37,7 +41,67 @@ public interface UltralightCAPI extends Library {
     void ulViewResize(Pointer view, int width, int height);
     Pointer ulViewGetSurface(Pointer view);
     boolean ulViewGetNeedsPaint(Pointer view);
+    void ulViewSetNeedsPaint(Pointer view, boolean needsPaint);
     Pointer ulViewEvaluateScript(Pointer view, Pointer jsString, Pointer exceptionOut);
+
+    class ULIntRect extends Structure {
+        public int left;
+        public int top;
+        public int right;
+        public int bottom;
+
+        @Override
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("left", "top", "right", "bottom");
+        }
+
+        public static class ByValue extends ULIntRect implements Structure.ByValue {}
+    }
+
+    ULIntRect.ByValue ulSurfaceGetDirtyBounds(Pointer surface);
+    void ulSurfaceClearDirtyBounds(Pointer surface);
+    boolean ulIntRectIsEmpty(ULIntRect.ByValue rect);
+
+    interface FileExistsCallback extends Callback {
+        boolean invoke(Pointer path);
+    }
+    interface GetFileMimeTypeCallback extends Callback {
+        Pointer invoke(Pointer path);
+    }
+    interface GetFileCharsetCallback extends Callback {
+        Pointer invoke(Pointer path);
+    }
+    interface OpenFileCallback extends Callback {
+        Pointer invoke(Pointer path);
+    }
+
+    class ULFileSystem extends Structure {
+        public FileExistsCallback file_exists;
+        public GetFileMimeTypeCallback get_file_mime_type;
+        public GetFileCharsetCallback get_file_charset;
+        public OpenFileCallback open_file;
+
+        @Override
+        protected List<String> getFieldOrder() {
+            return Arrays.asList("file_exists", "get_file_mime_type", "get_file_charset", "open_file");
+        }
+
+        public static class ByValue extends ULFileSystem implements Structure.ByValue {}
+    }
+
+    void ulPlatformSetFileSystem(ULFileSystem.ByValue fs);
+    Pointer ulCreateBufferFromCopy(byte[] data, long size);
+    void ulDestroyBuffer(Pointer buffer);
+
+    interface WindowObjectReadyCallback extends Callback {
+        void invoke(Pointer userData, Pointer caller, long frameId, boolean isMainFrame, Pointer url);
+    }
+    void ulViewSetWindowObjectReadyCallback(Pointer view, WindowObjectReadyCallback callback, Pointer userData);
+
+    interface DOMReadyCallback extends Callback {
+        void invoke(Pointer userData, Pointer caller, long frameId, boolean isMainFrame, Pointer url);
+    }
+    void ulViewSetDOMReadyCallback(Pointer view, DOMReadyCallback callback, Pointer userData);
 
     Pointer ulCreateMouseEvent(int type, int x, int y, int button);
     void ulDestroyMouseEvent(Pointer evt);

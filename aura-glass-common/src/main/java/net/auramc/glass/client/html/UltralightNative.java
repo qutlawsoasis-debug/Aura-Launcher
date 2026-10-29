@@ -5,6 +5,7 @@ import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 
 import java.io.File;
+import java.util.Locale;
 
 public final class UltralightNative {
     private interface WinKernel32 extends Library {
@@ -16,6 +17,7 @@ public final class UltralightNative {
     private static AppCoreCAPI app;
     private static Pointer renderer;
     private static File activeSdkDir;
+    private static UltralightCAPI.ULFileSystem.ByValue fileSystem;
 
     public static synchronized boolean isAvailable() {
         if (initialized) return renderer != null;
@@ -54,10 +56,59 @@ public final class UltralightNative {
             app.ulEnablePlatformFontLoader();
 
             File htmlDir = findHtmlDir();
-            String htmlPath = (htmlDir != null ? htmlDir.getAbsolutePath() : sdkDir.getAbsolutePath()) + File.separator;
-            Pointer baseDirStr = ul.ulCreateString(htmlPath);
-            app.ulEnablePlatformFileSystem(baseDirStr);
-            ul.ulDestroyString(baseDirStr);
+            // Setup custom file system to guarantee font/woff2, html, and asset resolution
+            fileSystem = new UltralightCAPI.ULFileSystem.ByValue();
+            fileSystem.file_exists = new UltralightCAPI.FileExistsCallback() {
+                @Override
+                public boolean invoke(Pointer path) {
+                    return resolveFile(path) != null;
+                }
+            };
+            fileSystem.get_file_mime_type = new UltralightCAPI.GetFileMimeTypeCallback() {
+                @Override
+                public Pointer invoke(Pointer path) {
+                    if (path == null) return ul.ulCreateString("application/unknown");
+                    String p = ul.ulStringGetData(path);
+                    if (p == null) return ul.ulCreateString("application/unknown");
+                    String lower = p.toLowerCase(Locale.ROOT);
+                    if (lower.endsWith(".woff2")) return ul.ulCreateString("font/woff2");
+                    if (lower.endsWith(".woff")) return ul.ulCreateString("font/woff");
+                    if (lower.endsWith(".ttf")) return ul.ulCreateString("font/ttf");
+                    if (lower.endsWith(".otf")) return ul.ulCreateString("font/otf");
+                    if (lower.endsWith(".html") || lower.endsWith(".htm")) return ul.ulCreateString("text/html");
+                    if (lower.endsWith(".png")) return ul.ulCreateString("image/png");
+                    if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return ul.ulCreateString("image/jpeg");
+                    if (lower.endsWith(".css")) return ul.ulCreateString("text/css");
+                    if (lower.endsWith(".js")) return ul.ulCreateString("text/javascript");
+                    return ul.ulCreateString("application/unknown");
+                }
+            };
+            fileSystem.get_file_charset = new UltralightCAPI.GetFileCharsetCallback() {
+                @Override
+                public Pointer invoke(Pointer path) {
+                    return ul.ulCreateString("utf-8");
+                }
+            };
+            fileSystem.open_file = new UltralightCAPI.OpenFileCallback() {
+                @Override
+                public Pointer invoke(Pointer path) {
+                    File f = resolveFile(path);
+                    String raw = (path != null && ul != null) ? ul.ulStringGetData(path) : "null";
+                    if (f == null || !f.exists()) {
+                        System.out.println("[AuraFS] open_file NOT FOUND: " + raw);
+                        return null;
+                    }
+                    try {
+                        byte[] bytes = java.nio.file.Files.readAllBytes(f.toPath());
+                        System.out.println("[AuraFS] open_file OK: " + raw + " -> " + f.getName() + " (" + bytes.length + " bytes)");
+                        return ul.ulCreateBufferFromCopy(bytes, bytes.length);
+                    } catch (Exception e) {
+                        System.err.println("[AuraFS] Failed to open file " + f + ": " + e.getMessage());
+                        return null;
+                    }
+                }
+            };
+            ul.ulPlatformSetFileSystem(fileSystem);
 
             Pointer config = ul.ulCreateConfig();
             String resPath = resDir.getAbsolutePath() + File.separator;
@@ -76,6 +127,38 @@ public final class UltralightNative {
             t.printStackTrace();
             return false;
         }
+    }
+
+    public static File resolveFile(Pointer pathStr) {
+        if (pathStr == null || ul == null) return null;
+        String raw = ul.ulStringGetData(pathStr);
+        if (raw == null || raw.isEmpty()) return null;
+        if (raw.startsWith("file:")) {
+            raw = raw.substring("file:".length());
+            while (raw.startsWith("/")) {
+                if (raw.length() >= 3 && Character.isLetter(raw.charAt(1)) && raw.charAt(2) == ':') {
+                    raw = raw.substring(1);
+                    break;
+                }
+                raw = raw.substring(1);
+            }
+        }
+        raw = raw.replace('\\', '/');
+        if (raw.length() >= 3 && raw.charAt(0) == '/' && Character.isLetter(raw.charAt(1)) && raw.charAt(2) == ':') {
+            raw = raw.substring(1);
+        }
+        File direct = new File(raw);
+        if (direct.exists()) return direct;
+
+        File htmlDir = findHtmlDir();
+        if (htmlDir != null) {
+            String name = new File(raw).getName();
+            File candidate = new File(htmlDir, name);
+            if (candidate.exists()) return candidate;
+            File sub = new File(htmlDir, raw);
+            if (sub.exists()) return sub;
+        }
+        return null;
     }
 
     public static File findSdkDir() {

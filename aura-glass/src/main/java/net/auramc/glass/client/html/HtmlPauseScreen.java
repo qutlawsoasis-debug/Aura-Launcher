@@ -24,6 +24,8 @@ import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL21;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -34,8 +36,11 @@ public class HtmlPauseScreen extends Screen {
     private int textureId;
     private int viewWidth;
     private int viewHeight;
+    private boolean textureInitialized = false;
     private long lastStateUpdate;
     private UltralightCAPI.ConsoleCallback consoleCallback;
+    private UltralightCAPI.WindowObjectReadyCallback windowObjectReadyCallback;
+    private UltralightCAPI.DOMReadyCallback domReadyCallback;
 
     public HtmlPauseScreen() {
         super(Text.translatable("menu.game"));
@@ -67,6 +72,7 @@ public class HtmlPauseScreen extends Screen {
             }
             viewWidth = width;
             viewHeight = height;
+            textureInitialized = false;
             view = UltralightNative.createView(width, height, 1.0);
             if (view == null) return;
 
@@ -78,6 +84,16 @@ public class HtmlPauseScreen extends Screen {
                 }
             };
             ul.ulViewSetAddConsoleMessageCallback(view, consoleCallback, null);
+
+            windowObjectReadyCallback = (userData, caller, frameId, isMainFrame, url) -> {
+                injectBridge();
+            };
+            ul.ulViewSetWindowObjectReadyCallback(view, windowObjectReadyCallback, null);
+
+            domReadyCallback = (userData, caller, frameId, isMainFrame, url) -> {
+                updateState(true);
+            };
+            ul.ulViewSetDOMReadyCallback(view, domReadyCallback, null);
 
             File htmlDir = UltralightNative.findHtmlDir();
             String htmlUrl = "file:///pause.html";
@@ -160,22 +176,74 @@ public class HtmlPauseScreen extends Screen {
             UltralightCAPI ul = UltralightNative.ul();
             updateState(false);
             ul.ulUpdate(UltralightNative.renderer());
-            ul.ulRender(UltralightNative.renderer());
 
-            // 3. Upload bitmap to OpenGL texture
+            boolean needsPaint = ul.ulViewGetNeedsPaint(view);
+            if (needsPaint) {
+                ul.ulRender(UltralightNative.renderer());
+            }
+
+            // 3. Upload bitmap to OpenGL texture (only dirty rectangle or full on first frame)
             Pointer surface = ul.ulViewGetSurface(view);
             if (surface != null) {
-                Pointer bitmap = ul.ulBitmapSurfaceGetBitmap(surface);
-                if (bitmap != null) {
-                    int bw = ul.ulBitmapGetWidth(bitmap);
-                    int bh = ul.ulBitmapGetHeight(bitmap);
-                    int stride = ul.ulBitmapGetRowBytes(bitmap);
-                    Pointer pixels = ul.ulBitmapLockPixels(bitmap);
-                    if (pixels != null) {
-                        ByteBuffer buf = pixels.getByteBuffer(0, (long) stride * bh);
-                        GlStateManager._bindTexture(textureId);
-                        GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, bw, bh, 0, GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, buf);
-                        ul.ulBitmapUnlockPixels(bitmap);
+                UltralightCAPI.ULIntRect.ByValue dirty = ul.ulSurfaceGetDirtyBounds(surface);
+                int dw = dirty.right - dirty.left;
+                int dh = dirty.bottom - dirty.top;
+
+                // Ensure no PBO is bound to GL_PIXEL_UNPACK_BUFFER (e.g. from Sodium/ImmediatelyFast)
+                GL15.glBindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, 0);
+                GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4);
+                GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+                GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_PIXELS, 0);
+                GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_ROWS, 0);
+
+                if (!textureInitialized) {
+                    Pointer bitmap = ul.ulBitmapSurfaceGetBitmap(surface);
+                    if (bitmap != null) {
+                        int bw = ul.ulBitmapGetWidth(bitmap);
+                        int bh = ul.ulBitmapGetHeight(bitmap);
+                        int stride = ul.ulBitmapGetRowBytes(bitmap);
+                        Pointer pixels = ul.ulBitmapLockPixels(bitmap);
+                        if (pixels != null) {
+                            ByteBuffer buf = pixels.getByteBuffer(0, (long) stride * bh);
+                            GlStateManager._bindTexture(textureId);
+                            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, stride / 4);
+                            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGBA8, bw, bh, 0, GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, buf);
+                            GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+                            ul.ulBitmapUnlockPixels(bitmap);
+                            textureInitialized = true;
+                            ul.ulSurfaceClearDirtyBounds(surface);
+                        }
+                    }
+                } else if (dw > 0 && dh > 0 && dirty.left >= 0 && dirty.top >= 0) {
+                    Pointer bitmap = ul.ulBitmapSurfaceGetBitmap(surface);
+                    if (bitmap != null) {
+                        int bw = ul.ulBitmapGetWidth(bitmap);
+                        int bh = ul.ulBitmapGetHeight(bitmap);
+                        int stride = ul.ulBitmapGetRowBytes(bitmap);
+                        Pointer pixels = ul.ulBitmapLockPixels(bitmap);
+                        if (pixels != null) {
+                            int x = Math.max(0, dirty.left);
+                            int y = Math.max(0, dirty.top);
+                            int w = Math.min(dw, bw - x);
+                            int h = Math.min(dh, bh - y);
+
+                            if (w > 0 && h > 0) {
+                                ByteBuffer buf = pixels.getByteBuffer(0, (long) stride * bh);
+                                GlStateManager._bindTexture(textureId);
+
+                                GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, stride / 4);
+                                GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_PIXELS, x);
+                                GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_ROWS, y);
+
+                                GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, x, y, w, h, GL12.GL_BGRA, GL11.GL_UNSIGNED_BYTE, buf);
+
+                                GL11.glPixelStorei(GL11.GL_UNPACK_ROW_LENGTH, 0);
+                                GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_PIXELS, 0);
+                                GL11.glPixelStorei(GL12.GL_UNPACK_SKIP_ROWS, 0);
+                            }
+                            ul.ulBitmapUnlockPixels(bitmap);
+                            ul.ulSurfaceClearDirtyBounds(surface);
+                        }
                     }
                 }
             }
@@ -185,6 +253,12 @@ public class HtmlPauseScreen extends Screen {
         }
 
         super.render(context, mouseX, mouseY, delta);
+        HtmlPauseBenchmark.onRenderFrame(client);
+    }
+
+    @Override
+    public boolean shouldPause() {
+        return true;
     }
 
     private void drawHtmlOverlay(DrawContext context) {
