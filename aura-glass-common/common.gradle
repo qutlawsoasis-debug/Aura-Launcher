@@ -10,6 +10,13 @@ tasks.register('runMusicClientTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.music.MusicClientTest'
 }
 
+tasks.register('runKaraokeTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.common.karaoke.KaraokeSuiteTest'
+}
+
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
+    dependsOn 'runKaraokeTest'
 }

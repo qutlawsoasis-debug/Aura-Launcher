@@ -317,8 +317,22 @@ public final class AuraRenderer {
         texture = vbo = vao = program = 0;
     }
 
-    private static final class Glyph {
-        float advance, left, right, top, bottom, u0, v0, u1, v1;
-        boolean visible;
+    public static int fontTexture() { return texture; }
+    public static float distanceRange() { return distanceRange; }
+    public static float fontAscender() { return ascender; }
+    public static float atlasWidth() { return atlasWidth; }
+    public static float atlasHeight() { return atlasHeight; }
+    public static Glyph getGlyph(int weight, int codePoint) {
+        if (!ready) return null;
+        int w = weightIndex(weight);
+        if (codePoint >= 0 && codePoint < GLYPHS[w].length) {
+            return GLYPHS[w][codePoint];
+        }
+        return null;
+    }
+
+    public static final class Glyph {
+        public float advance, left, right, top, bottom, u0, v0, u1, v1;
+        public boolean visible;
     }
 }

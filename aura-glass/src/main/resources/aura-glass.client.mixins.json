@@ -30,7 +30,8 @@
     "LockButtonWidgetMixin",
     "TextureDeletionMixin",
     "AuraHudMixin",
-    "ExtraMenuWidgetMixin"
+    "ExtraMenuWidgetMixin",
+    "WorldRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 0
