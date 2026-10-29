@@ -19,6 +19,7 @@ public class MusicBridgeTests : IDisposable
 {
     private readonly TestAudioService _audioService;
     private readonly TestLobbyApiClient _lobbyApiClient;
+    private readonly EmbedMusicPlayer _embedPlayer;
     private readonly MusicBridgeService _bridge;
     private readonly HttpClient _client;
 
@@ -26,7 +27,8 @@ public class MusicBridgeTests : IDisposable
     {
         _audioService = new TestAudioService();
         _lobbyApiClient = new TestLobbyApiClient();
-        _bridge = new MusicBridgeService(_audioService, _lobbyApiClient);
+        _embedPlayer = new EmbedMusicPlayer();
+        _bridge = new MusicBridgeService(_audioService, _lobbyApiClient, _embedPlayer);
         _bridge.Start();
 
         _client = new HttpClient
@@ -222,14 +224,88 @@ public class MusicBridgeTests : IDisposable
     }
 
     [Fact]
-    public async Task PostQueue_EnqueuesAndSelectsTrack()
+    public async Task PostQueue_LocalFile_EnqueuesInAudioService()
     {
+        string tempFile = Path.Combine(Path.GetTempPath(), $"test_track_{Guid.NewGuid():N}.mp3");
+        try
+        {
+            await File.WriteAllTextAsync(tempFile, "dummy audio content");
+            SetAuthToken(_bridge.Token);
+            var content = new StringContent(JsonSerializer.Serialize(new { trackId = tempFile, title = "Bones", artist = "Imagine Dragons" }), Encoding.UTF8, "application/json");
+            var response = await _client.PostAsync("/queue", content);
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains(_audioService.Tracks, t => t.Title == "Bones" && t.Artist == "Imagine Dragons");
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public async Task PostQueue_ValidYouTubeId_DispatchesLoadCommandToEmbedPlayer()
+    {
+        string? dispatchedOp = null;
+        object? dispatchedPayload = null;
+        _embedPlayer.CommandDispatched += (op, payload) =>
+        {
+            dispatchedOp = op;
+            dispatchedPayload = payload;
+        };
+
         SetAuthToken(_bridge.Token);
-        var content = new StringContent("""{"trackId": "custom-track-99", "title": "Bones", "artist": "Imagine Dragons"}""", Encoding.UTF8, "application/json");
+        var content = new StringContent("""{"trackId": "dQw4w9WgXcQ", "title": "Never Gonna Give You Up", "artist": "Rick Astley"}""", Encoding.UTF8, "application/json");
         var response = await _client.PostAsync("/queue", content);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains(_audioService.Tracks, t => t.Title == "Bones" && t.Artist == "Imagine Dragons");
+        Assert.Equal("load", dispatchedOp);
+        Assert.NotNull(_embedPlayer.CurrentTrack);
+        Assert.Equal("dQw4w9WgXcQ", _embedPlayer.CurrentTrack.Id);
+        Assert.Equal("Never Gonna Give You Up", _embedPlayer.CurrentTrack.Title);
+        Assert.Equal("Rick Astley", _embedPlayer.CurrentTrack.Artist);
+    }
+
+    [Fact]
+    public async Task PostQueue_YouTubeUrl_ExtractsIdAndLoadsVideo()
+    {
+        string? dispatchedOp = null;
+        _embedPlayer.CommandDispatched += (op, payload) => dispatchedOp = op;
+
+        SetAuthToken(_bridge.Token);
+        var content = new StringContent("""{"trackId": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "title": "Never Gonna Give You Up", "artist": "Rick Astley"}""", Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/queue", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("load", dispatchedOp);
+        Assert.Equal("dQw4w9WgXcQ", _embedPlayer.CurrentTrack?.Id);
+    }
+
+    [Fact]
+    public async Task PostQueue_CatalogTrackId_ResolvesViaLobbyApiAndLoads()
+    {
+        string? dispatchedOp = null;
+        _embedPlayer.CommandDispatched += (op, payload) => dispatchedOp = op;
+
+        SetAuthToken(_bridge.Token);
+        var content = new StringContent("""{"trackId": "cat-track-123", "title": "ResolveMe", "artist": "ResolveMeArtist"}""", Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/queue", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("load", dispatchedOp);
+        Assert.Equal("dQw4w9WgXcQ", _embedPlayer.CurrentTrack?.Id);
+    }
+
+    [Fact]
+    public async Task PostQueue_UnresolvableTrack_Returns422UnprocessableEntity()
+    {
+        SetAuthToken(_bridge.Token);
+        var content = new StringContent("""{"trackId": "unknown_unresolvable_track_id_xyz", "title": "Unknown Song", "artist": "Unknown Artist"}""", Encoding.UTF8, "application/json");
+        var response = await _client.PostAsync("/queue", content);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+        Assert.Contains("resolve_failed", json);
     }
 
     [Fact]
@@ -394,6 +470,167 @@ public class MusicBridgeTests : IDisposable
         Assert.Equal(5000, extrapolated);
     }
 
+    [Fact]
+    public async Task EmbedPlayer_TimeUpdateContract_AdvancingPositionPrecisionWithin30Ms()
+    {
+        using var player = new EmbedMusicPlayer();
+        await player.LoadVideoAsync("dQw4w9WgXcQ", "Test Track", "Test Artist", null, 180000);
+
+        // 1. Simulate iframe postMessage: ready
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"ready"}""");
+
+        // 2. Simulate iframe postMessage: stateChange playing (state 1)
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"stateChange","state":1,"videoId":"dQw4w9WgXcQ"}""");
+
+        // 3. Simulate iframe postMessage: timeUpdate at 10.0 seconds
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"timeUpdate","currentTime":10.0,"duration":180.0,"videoId":"dQw4w9WgXcQ"}""");
+
+        // Check immediate position: should be ~10000 ms
+        long posInitial = player.GetExactPositionMs(out long updatedAt);
+        Assert.InRange(posInitial, 10000, 10030);
+
+        // Advance wall-clock by 60ms
+        await Task.Delay(60);
+
+        long posAdv = player.GetExactPositionMs(out long updatedAtAdv);
+        long elapsedPos = posAdv - posInitial;
+        long elapsedWall = updatedAtAdv - updatedAt;
+
+        // Position measurement error against advancing time must be <= 30ms
+        long error = Math.Abs(elapsedPos - elapsedWall);
+        Assert.True(error <= 30, $"Extrapolation error {error} ms exceeded 30ms limit (elapsedPos={elapsedPos}, elapsedWall={elapsedWall})");
+
+        // 4. Now pause (state 2)
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"stateChange","state":2,"videoId":"dQw4w9WgXcQ"}""");
+        long posPaused = player.GetExactPositionMs(out _);
+
+        await Task.Delay(50);
+        long posPausedAfter = player.GetExactPositionMs(out _);
+
+        Assert.Equal(posPaused, posPausedAfter);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_MultipleSteps_MeasurementErrorWithin30Ms()
+    {
+        using var player = new EmbedMusicPlayer();
+        await player.LoadVideoAsync("dQw4w9WgXcQ", "Track", "Artist", null, 300000);
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"stateChange","state":1,"videoId":"dQw4w9WgXcQ"}""");
+        player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"timeUpdate","currentTime":15.0,"duration":300.0,"videoId":"dQw4w9WgXcQ"}""");
+
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        long startPos = player.GetExactPositionMs(out _);
+
+        for (int i = 0; i < 4; i++)
+        {
+            await Task.Delay(25);
+            long currentPos = player.GetExactPositionMs(out _);
+            long expectedAdvancement = sw.ElapsedMilliseconds;
+            long actualAdvancement = currentPos - startPos;
+            long diff = Math.Abs(actualAdvancement - expectedAdvancement);
+
+            Assert.True(diff <= 30, $"At step {i}, diff {diff}ms exceeded 30ms (actual={actualAdvancement}, expected={expectedAdvancement})");
+        }
+    }
+
+    [Fact]
+    public async Task GetSearch_NormalizesRawLobbyApi_MatchesJavaClientContract()
+    {
+        // Set raw lobby-api response with items, artwork, durationSec
+        _lobbyApiClient.MockSearchResponse = """
+        {
+            "items": [
+                {
+                    "id": "yt_dQw4w9WgXcQ",
+                    "kind": "track",
+                    "title": "Believer",
+                    "artist": "Imagine Dragons",
+                    "artwork": "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                    "durationSec": 204.5
+                }
+            ]
+        }
+        """;
+
+        SetAuthToken(_bridge.Token);
+        var response = await _client.GetAsync("/search?q=believer");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = await response.Content.ReadAsStringAsync();
+
+        // Must be JSON array, conforming to Java MusicJsonParser.parseTrackList contract
+        using var doc = JsonDocument.Parse(json);
+        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
+
+        var firstTrack = doc.RootElement[0];
+        Assert.Equal("yt_dQw4w9WgXcQ", firstTrack.GetProperty("id").GetString());
+        Assert.Equal("Believer", firstTrack.GetProperty("title").GetString());
+        Assert.Equal("Imagine Dragons", firstTrack.GetProperty("artist").GetString());
+        Assert.Equal(204500, firstTrack.GetProperty("durationMs").GetInt64());
+        Assert.Equal("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg", firstTrack.GetProperty("coverUrl").GetString());
+
+        // Cross-Language Contract validation:
+        // Simulate net.auramc.glass.client.music.MusicJsonParser.parseTrack logic
+        string parsedId = firstTrack.TryGetProperty("id", out var idProp) ? idProp.GetString() ?? "" : "";
+        string parsedArtist = firstTrack.TryGetProperty("artist", out var artProp) ? artProp.GetString() ?? "" : "";
+        string parsedTitle = firstTrack.TryGetProperty("title", out var titProp) ? titProp.GetString() ?? "" : "";
+        long parsedDurationMs = firstTrack.TryGetProperty("durationMs", out var durProp) ? durProp.GetInt64() : 0;
+        string parsedCoverUrl = firstTrack.TryGetProperty("coverUrl", out var covProp) ? covProp.GetString() ?? "" : "";
+
+        Assert.Equal("yt_dQw4w9WgXcQ", parsedId);
+        Assert.Equal("Imagine Dragons", parsedArtist);
+        Assert.Equal("Believer", parsedTitle);
+        Assert.Equal(204500, parsedDurationMs);
+        Assert.Equal("https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg", parsedCoverUrl);
+    }
+
+    [Fact]
+    public async Task Search_Then_Queue_WiredToEmbedPlayer_LoadsVideo()
+    {
+        _lobbyApiClient.MockSearchResponse = """
+        [
+            {
+                "id": "dQw4w9WgXcQ",
+                "title": "Believer",
+                "artist": "Imagine Dragons",
+                "artwork": "https://example.com/art.jpg",
+                "durationSec": 204
+            }
+        ]
+        """;
+
+        SetAuthToken(_bridge.Token);
+
+        // 1. Search
+        var searchResp = await _client.GetAsync("/search?q=believer");
+        Assert.Equal(HttpStatusCode.OK, searchResp.StatusCode);
+        var searchJson = await searchResp.Content.ReadAsStringAsync();
+        var tracks = JsonSerializer.Deserialize<List<MusicBridgeTrack>>(searchJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        Assert.NotNull(tracks);
+        Assert.NotEmpty(tracks);
+
+        var track = tracks[0];
+        Assert.Equal("dQw4w9WgXcQ", track.Id);
+
+        // 2. Queue
+        var queueContent = new StringContent(JsonSerializer.Serialize(new { trackId = track.Id, title = track.Title, artist = track.Artist }), Encoding.UTF8, "application/json");
+        var queueResp = await _client.PostAsync("/queue", queueContent);
+        Assert.Equal(HttpStatusCode.OK, queueResp.StatusCode);
+
+        // 3. Verify embed player is now playing
+        Assert.NotNull(_embedPlayer.CurrentTrack);
+        Assert.Equal("dQw4w9WgXcQ", _embedPlayer.CurrentTrack.Id);
+        Assert.Equal("playing", _embedPlayer.State);
+
+        // 4. Verify /now returns embed player info
+        var nowResp = await _client.GetAsync("/now");
+        Assert.Equal(HttpStatusCode.OK, nowResp.StatusCode);
+        var now = JsonSerializer.Deserialize<MusicBridgeNowResponse>(await nowResp.Content.ReadAsStringAsync(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        Assert.NotNull(now);
+        Assert.Equal("playing", now.State);
+        Assert.Equal("dQw4w9WgXcQ", now.Track?.Id);
+    }
+
     #endregion
 
     #region Helper Test Classes
@@ -454,6 +691,17 @@ public class MusicBridgeTests : IDisposable
         public Task<string> SearchMusicRawAsync(string query, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(MockSearchResponse);
+        }
+
+        public Task<MusicResolveResult?> ResolveMusicAsync(string artist, string title, CancellationToken cancellationToken = default)
+        {
+            if (title.Contains("ResolveMe", StringComparison.OrdinalIgnoreCase) ||
+                artist.Contains("ResolveMe", StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("Believer", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<MusicResolveResult?>(new MusicResolveResult("dQw4w9WgXcQ", null));
+            }
+            return Task.FromResult<MusicResolveResult?>(null);
         }
 
         public Task<LobbyCreateResponse?> CreateLobbyAsync(string hostName, IReadOnlyList<ModManifestEntry>? manifest = null, CancellationToken cancellationToken = default) => Task.FromResult<LobbyCreateResponse?>(null);

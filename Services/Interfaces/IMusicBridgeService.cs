@@ -8,6 +8,7 @@ public interface IMusicBridgeService : IDisposable
     int Port { get; }
     string Token { get; }
     bool IsRunning { get; }
+    IEmbedMusicPlayer EmbedPlayer { get; }
 
     void Start();
     void Stop();

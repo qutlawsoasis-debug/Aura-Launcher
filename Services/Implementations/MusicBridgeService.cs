@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -43,6 +44,7 @@ public class MusicBridgeService : IMusicBridgeService
 
     private readonly IAudioService _audioService;
     private readonly ILobbyApiClient? _lobbyApiClient;
+    private readonly IEmbedMusicPlayer _embedPlayer;
     private readonly HttpClient _httpClient;
     private readonly object _lock = new();
     private readonly HashSet<string> _activeInstanceDirs = new(StringComparer.OrdinalIgnoreCase);
@@ -78,15 +80,19 @@ public class MusicBridgeService : IMusicBridgeService
         }
     }
 
+    public IEmbedMusicPlayer EmbedPlayer => _embedPlayer;
+
     public MusicBridgeService(
         IAudioService audioService,
         ILobbyApiClient? lobbyApiClient = null,
+        IEmbedMusicPlayer? embedPlayer = null,
         HttpClient? httpClient = null,
         int port = 0,
         string? token = null)
     {
         _audioService = audioService ?? throw new ArgumentNullException(nameof(audioService));
         _lobbyApiClient = lobbyApiClient;
+        _embedPlayer = embedPlayer ?? new EmbedMusicPlayer();
         _httpClient = httpClient ?? new HttpClient();
 
         _port = port;
@@ -243,6 +249,20 @@ public class MusicBridgeService : IMusicBridgeService
 
     public MusicBridgeNowResponse GetNowPlaying()
     {
+        // 1. Primary source: Embed player
+        if (_embedPlayer.CurrentTrack != null)
+        {
+            long positionMs = _embedPlayer.GetExactPositionMs(out long updatedAtUnixMs);
+            return new MusicBridgeNowResponse(
+                State: _embedPlayer.State,
+                Track: _embedPlayer.CurrentTrack,
+                PositionMs: positionMs,
+                UpdatedAtUnixMs: updatedAtUnixMs,
+                Volume: _embedPlayer.Volume
+            );
+        }
+
+        // 2. Secondary source: Native AudioService
         TimeSpan position;
         TimeSpan duration = _audioService.Duration;
         bool isPlaying = _audioService.IsPlaying;
@@ -265,8 +285,8 @@ public class MusicBridgeService : IMusicBridgeService
             position = _audioService.Position;
         }
 
-        long updatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        long positionMs = Math.Max(0, (long)position.TotalMilliseconds);
+        long nativeUpdatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        long nativePositionMs = Math.Max(0, (long)position.TotalMilliseconds);
         double volume = Math.Clamp(volumePercent / 100.0, 0.0, 1.0);
 
         string state;
@@ -302,8 +322,8 @@ public class MusicBridgeService : IMusicBridgeService
         return new MusicBridgeNowResponse(
             State: state,
             Track: track,
-            PositionMs: positionMs,
-            UpdatedAtUnixMs: updatedAtUnixMs,
+            PositionMs: nativePositionMs,
+            UpdatedAtUnixMs: nativeUpdatedAt,
             Volume: volume
         );
     }
@@ -358,7 +378,7 @@ public class MusicBridgeService : IMusicBridgeService
         var request = context.Request;
         var response = context.Response;
 
-        // Reject browser requests containing Origin header (bridge is only for in-game HTTP client)
+        // Reject browser requests containing Origin header (bridge is strictly for in-game HTTP client)
         if (!string.IsNullOrWhiteSpace(request.Headers["Origin"]))
         {
             await SendJsonAsync(response, 403, new { error = "forbidden", message = "Origin header not allowed" });
@@ -436,28 +456,56 @@ public class MusicBridgeService : IMusicBridgeService
         return SendJsonAsync(response, 200, now);
     }
 
-    private Task HandlePostPlayAsync(HttpListenerResponse response)
+    private async Task HandlePostPlayAsync(HttpListenerResponse response)
     {
-        RunOnUiOrDirect(() => _audioService.Play());
-        return SendJsonAsync(response, 200, new { ok = true, state = "playing" });
+        if (_embedPlayer.CurrentTrack != null)
+        {
+            await _embedPlayer.PlayAsync();
+        }
+        else
+        {
+            RunOnUiOrDirect(() => _audioService.Play());
+        }
+        await SendJsonAsync(response, 200, new { ok = true, state = "playing" });
     }
 
-    private Task HandlePostPauseAsync(HttpListenerResponse response)
+    private async Task HandlePostPauseAsync(HttpListenerResponse response)
     {
-        RunOnUiOrDirect(() => _audioService.Pause());
-        return SendJsonAsync(response, 200, new { ok = true, state = "paused" });
+        if (_embedPlayer.CurrentTrack != null)
+        {
+            await _embedPlayer.PauseAsync();
+        }
+        else
+        {
+            RunOnUiOrDirect(() => _audioService.Pause());
+        }
+        await SendJsonAsync(response, 200, new { ok = true, state = "paused" });
     }
 
-    private Task HandlePostNextAsync(HttpListenerResponse response)
+    private async Task HandlePostNextAsync(HttpListenerResponse response)
     {
-        RunOnUiOrDirect(() => _audioService.Next());
-        return SendJsonAsync(response, 200, new { ok = true });
+        if (_embedPlayer.CurrentTrack != null)
+        {
+            await _embedPlayer.NextAsync();
+        }
+        else
+        {
+            RunOnUiOrDirect(() => _audioService.Next());
+        }
+        await SendJsonAsync(response, 200, new { ok = true });
     }
 
-    private Task HandlePostPrevAsync(HttpListenerResponse response)
+    private async Task HandlePostPrevAsync(HttpListenerResponse response)
     {
-        RunOnUiOrDirect(() => _audioService.Previous());
-        return SendJsonAsync(response, 200, new { ok = true });
+        if (_embedPlayer.CurrentTrack != null)
+        {
+            await _embedPlayer.PreviousAsync();
+        }
+        else
+        {
+            RunOnUiOrDirect(() => _audioService.Previous());
+        }
+        await SendJsonAsync(response, 200, new { ok = true });
     }
 
     private async Task HandlePostSeekAsync(HttpListenerRequest request, HttpListenerResponse response)
@@ -478,7 +526,14 @@ public class MusicBridgeService : IMusicBridgeService
         }
 
         long targetMs = Math.Max(0, ms ?? 0);
-        RunOnUiOrDirect(() => _audioService.Seek(TimeSpan.FromMilliseconds(targetMs)));
+        if (_embedPlayer.CurrentTrack != null)
+        {
+            await _embedPlayer.SeekAsync(targetMs);
+        }
+        else
+        {
+            RunOnUiOrDirect(() => _audioService.Seek(TimeSpan.FromMilliseconds(targetMs)));
+        }
         await SendJsonAsync(response, 200, new { ok = true, positionMs = targetMs });
     }
 
@@ -499,8 +554,9 @@ public class MusicBridgeService : IMusicBridgeService
         }
 
         volume = Math.Clamp(volume, 0.0, 1.0);
-        int percent = (int)Math.Round(volume * 100.0);
+        await _embedPlayer.SetVolumeAsync(volume);
 
+        int percent = (int)Math.Round(volume * 100.0);
         RunOnUiOrDirect(() =>
         {
             _audioService.VolumePercent = percent;
@@ -520,6 +576,7 @@ public class MusicBridgeService : IMusicBridgeService
         string? title = null;
         string? artist = null;
         string? coverUrl = null;
+        long? durationMs = null;
 
         if (!string.IsNullOrWhiteSpace(body))
         {
@@ -530,39 +587,109 @@ public class MusicBridgeService : IMusicBridgeService
                 title = req?.Title;
                 artist = req?.Artist;
                 coverUrl = req?.CoverUrl;
+                durationMs = req?.DurationMs;
             }
             catch { }
         }
 
         if (string.IsNullOrWhiteSpace(trackId))
         {
-            await SendJsonAsync(response, 400, new { error = "missing_track_id", message = "trackId is required" });
+            await SendJsonAsync(response, 400, new { ok = false, error = "missing_track_id", message = "trackId is required" });
             return;
         }
 
-        RunOnUiOrDirect(() =>
+        string? resolvedVideoId = null;
+
+        // 1. Is trackId already a valid 11-char YouTube ID?
+        if (Regex.IsMatch(trackId, @"^[a-zA-Z0-9_-]{11}$"))
         {
-            // 1. Try finding in existing playlist
-            bool played = _audioService.PlayTrack(trackId);
-            if (!played)
+            resolvedVideoId = trackId;
+        }
+        // 2. Or is it a YouTube URL?
+        else if (TryExtractYouTubeVideoId(trackId, out string? extractedId))
+        {
+            resolvedVideoId = extractedId;
+        }
+        // 3. Or resolve via catalog lobby-api (/api/music/resolve)
+        else if (_lobbyApiClient != null)
+        {
+            string artistToResolve = !string.IsNullOrWhiteSpace(artist) ? artist : "";
+            string titleToResolve = !string.IsNullOrWhiteSpace(title) ? title : trackId;
+            var res = await _lobbyApiClient.ResolveMusicAsync(artistToResolve, titleToResolve);
+            if (res != null && !string.IsNullOrWhiteSpace(res.VideoId) && Regex.IsMatch(res.VideoId, @"^[a-zA-Z0-9_-]{11}$"))
             {
-                // 2. Add as new track
-                string effectiveTitle = !string.IsNullOrWhiteSpace(title)
-                    ? title
-                    : (File.Exists(trackId) ? Path.GetFileNameWithoutExtension(trackId) : trackId);
-                string effectiveArtist = !string.IsNullOrWhiteSpace(artist) ? artist : "Aura";
+                resolvedVideoId = res.VideoId;
+            }
+        }
 
-                var newTrack = new AudioTrack(effectiveTitle, effectiveArtist, trackId, coverUrl);
-                _audioService.Enqueue(newTrack);
-
+        // 4. If not a YouTube/catalog ID, check if it's an existing local file
+        if (resolvedVideoId == null && File.Exists(trackId))
+        {
+            string effTitle = !string.IsNullOrWhiteSpace(title) ? title : Path.GetFileNameWithoutExtension(trackId);
+            string effArtist = !string.IsNullOrWhiteSpace(artist) ? artist : "Aura";
+            var localTrack = new AudioTrack(effTitle, effArtist, trackId, coverUrl);
+            RunOnUiOrDirect(() =>
+            {
+                _audioService.Enqueue(localTrack);
                 if (!_audioService.IsPlaying)
                 {
-                    _audioService.PlayTrack(effectiveTitle);
+                    _audioService.PlayTrack(effTitle);
                 }
-            }
-        });
+            });
+            await SendJsonAsync(response, 200, new { ok = true, trackId });
+            return;
+        }
 
-        await SendJsonAsync(response, 200, new { ok = true, trackId });
+        // 5. If resolution failed: do not report success! Return 422 Unprocessable Entity
+        if (resolvedVideoId == null)
+        {
+            await SendJsonAsync(response, 422, new
+            {
+                ok = false,
+                error = "resolve_failed",
+                message = $"Track '{trackId}' could not be resolved to a playable stream"
+            });
+            return;
+        }
+
+        // 6. Queue and load into embed player
+        string finalTitle = !string.IsNullOrWhiteSpace(title) ? title : resolvedVideoId;
+        string finalArtist = !string.IsNullOrWhiteSpace(artist) ? artist : "Aura";
+        long finalDuration = durationMs ?? 0;
+
+        bool loaded = await _embedPlayer.LoadVideoAsync(resolvedVideoId, finalTitle, finalArtist, coverUrl, finalDuration);
+        if (!loaded)
+        {
+            await SendJsonAsync(response, 500, new { ok = false, error = "player_failed", message = "Embed player failed to load track" });
+            return;
+        }
+
+        await SendJsonAsync(response, 200, new { ok = true, trackId = resolvedVideoId });
+    }
+
+    private static bool TryExtractYouTubeVideoId(string urlOrId, out string? videoId)
+    {
+        videoId = null;
+        if (string.IsNullOrWhiteSpace(urlOrId)) return false;
+
+        if (urlOrId.StartsWith("yt:", StringComparison.OrdinalIgnoreCase))
+        {
+            string sub = urlOrId.Substring(3).Trim();
+            if (Regex.IsMatch(sub, @"^[a-zA-Z0-9_-]{11}$"))
+            {
+                videoId = sub;
+                return true;
+            }
+        }
+
+        var match = Regex.Match(urlOrId, @"(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})");
+        if (match.Success)
+        {
+            videoId = match.Groups[1].Value;
+            return true;
+        }
+
+        return false;
     }
 
     private async Task HandleGetSearchAsync(HttpListenerRequest request, HttpListenerResponse response)
@@ -574,52 +701,102 @@ public class MusicBridgeService : IMusicBridgeService
             return;
         }
 
-        string rawResults = "[]";
+        var normalizedTracks = new List<MusicBridgeTrack>();
+
         if (_lobbyApiClient != null)
         {
             try
             {
-                rawResults = await _lobbyApiClient.SearchMusicRawAsync(query);
+                string rawJson = await _lobbyApiClient.SearchMusicRawAsync(query);
+                if (!string.IsNullOrWhiteSpace(rawJson) && rawJson.Trim() != "[]")
+                {
+                    using var doc = JsonDocument.Parse(rawJson);
+                    var root = doc.RootElement;
+
+                    if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var elem in root.EnumerateArray())
+                        {
+                            var t = ExtractTrack(elem);
+                            if (t != null) normalizedTracks.Add(t);
+                        }
+                    }
+                    else if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        JsonElement arrayElem = default;
+                        if (root.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+                            arrayElem = items;
+                        else if (root.TryGetProperty("tracks", out var tracks) && tracks.ValueKind == JsonValueKind.Array)
+                            arrayElem = tracks;
+                        else if (root.TryGetProperty("results", out var results) && results.ValueKind == JsonValueKind.Array)
+                            arrayElem = results;
+
+                        if (arrayElem.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var elem in arrayElem.EnumerateArray())
+                            {
+                                var t = ExtractTrack(elem);
+                                if (t != null) normalizedTracks.Add(t);
+                            }
+                        }
+                    }
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                rawResults = "[]";
+                FabricGameLaunchService.LogLauncherEvent($"[MUSIC-BRIDGE: WARN] Search catalog parse failed: {ex.Message}");
             }
         }
 
-        // If remote search returned empty, fall back to matching local tracks
-        if (string.IsNullOrWhiteSpace(rawResults) || rawResults.Trim() == "[]")
+        // Fallback to local playlist if catalog returned no results
+        if (normalizedTracks.Count == 0)
         {
             try
             {
                 var localMatches = _audioService.Playlist
                     .Where(t => t.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
                                 t.Artist.Contains(query, StringComparison.OrdinalIgnoreCase))
-                    .Select(t => new
-                    {
-                        id = t.Path,
-                        kind = "track",
-                        title = t.Title,
-                        artist = t.Artist,
-                        artwork = t.CoverPath ?? "",
-                        durationSec = (int)_audioService.Duration.TotalSeconds
-                    })
-                    .ToList();
-
-                if (localMatches.Count > 0)
-                {
-                    rawResults = JsonSerializer.Serialize(localMatches, _jsonOptions);
-                }
+                    .Select(t => new MusicBridgeTrack(
+                        Id: t.Path,
+                        Artist: t.Artist,
+                        Title: t.Title,
+                        DurationMs: Math.Max(0, (long)_audioService.Duration.TotalMilliseconds),
+                        CoverUrl: t.CoverPath
+                    ));
+                normalizedTracks.AddRange(localMatches);
             }
             catch { }
         }
 
-        response.StatusCode = 200;
-        response.ContentType = "application/json; charset=utf-8";
-        byte[] buffer = Encoding.UTF8.GetBytes(rawResults);
-        response.ContentLength64 = buffer.Length;
-        await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
-        response.OutputStream.Close();
+        // Return normalized array adhering to MusicJsonParser contract (id, artist, title, durationMs, coverUrl)
+        await SendJsonAsync(response, 200, normalizedTracks);
+    }
+
+    private static MusicBridgeTrack? ExtractTrack(JsonElement elem)
+    {
+        if (elem.ValueKind != JsonValueKind.Object) return null;
+
+        string id = elem.TryGetProperty("id", out var pId) ? pId.GetString() ?? "" : "";
+        string title = elem.TryGetProperty("title", out var pT) ? pT.GetString() ?? "" : "";
+        string artist = elem.TryGetProperty("artist", out var pA) ? pA.GetString() ?? "" : "";
+
+        string? coverUrl = null;
+        if (elem.TryGetProperty("coverUrl", out var pC) && pC.ValueKind == JsonValueKind.String)
+            coverUrl = pC.GetString();
+        else if (elem.TryGetProperty("artwork", out var pArt) && pArt.ValueKind == JsonValueKind.String)
+            coverUrl = pArt.GetString();
+
+        long durationMs = 0;
+        if (elem.TryGetProperty("durationMs", out var pDm) && pDm.TryGetInt64(out long dm))
+            durationMs = dm;
+        else if (elem.TryGetProperty("duration", out var pD) && pD.TryGetInt64(out long d))
+            durationMs = d;
+        else if (elem.TryGetProperty("durationSec", out var pDs) && pDs.TryGetDouble(out double ds))
+            durationMs = (long)(ds * 1000.0);
+
+        if (string.IsNullOrWhiteSpace(id) && string.IsNullOrWhiteSpace(title)) return null;
+
+        return new MusicBridgeTrack(id, artist, title, durationMs, coverUrl);
     }
 
     private static void RunOnUiOrDirect(Action action)
@@ -658,6 +835,7 @@ public class MusicBridgeService : IMusicBridgeService
         _disposed = true;
 
         Stop();
+        _embedPlayer.Dispose();
 
         // Clean up any remaining written config files
         lock (_lock)

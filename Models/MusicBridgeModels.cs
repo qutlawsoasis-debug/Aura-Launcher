@@ -43,3 +43,8 @@ public record MusicBridgeQueueRequest(
     [property: JsonPropertyName("coverUrl")] string? CoverUrl,
     [property: JsonPropertyName("durationMs")] long? DurationMs
 );
+
+public record MusicResolveResult(
+    [property: JsonPropertyName("videoId")] string? VideoId,
+    [property: JsonPropertyName("error")] string? Error
+);
