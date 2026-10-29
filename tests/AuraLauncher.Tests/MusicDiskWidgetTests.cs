@@ -92,6 +92,26 @@ public class MusicDiskWidgetTests
         }
 
         public void Stop() => Pause();
+        public void Enqueue(AudioTrack track)
+        {
+            if (track == null) return;
+            _tracks.Add(track);
+            TrackChanged?.Invoke(this, CurrentTrack);
+        }
+
+        public bool PlayTrack(string trackIdOrTitle)
+        {
+            int found = _tracks.FindIndex(t => string.Equals(t.Title, trackIdOrTitle, StringComparison.OrdinalIgnoreCase) ||
+                                               string.Equals(t.Path, trackIdOrTitle, StringComparison.OrdinalIgnoreCase));
+            if (found >= 0)
+            {
+                _index = found;
+                Play();
+                TrackChanged?.Invoke(this, CurrentTrack);
+                return true;
+            }
+            return false;
+        }
         public void Dispose() => Stop();
     }
 

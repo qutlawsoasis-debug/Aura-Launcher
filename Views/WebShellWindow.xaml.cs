@@ -27,6 +27,7 @@ public partial class WebShellWindow : Window
     private readonly IAchievementService? _achievementService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IPrewarmGameService? _prewarmGameService;
+    private readonly IEmbedMusicPlayer? _embedPlayer;
     private WebBridge? _bridge;
 
     /// <summary>Лаунчер только что перезапущен после обновления — экран загрузки покажет «Что нового».</summary>
@@ -75,7 +76,8 @@ public partial class WebShellWindow : Window
         ICloudLobbyService? cloudLobbyService = null,
         IAchievementService? achievementService = null,
         IDiscordRpcService? discordRpcService = null,
-        IPrewarmGameService? prewarmGameService = null)
+        IPrewarmGameService? prewarmGameService = null,
+        IEmbedMusicPlayer? embedPlayer = null)
     {
         InitializeComponent();
         if (TryFindResource("BgBase") is System.Windows.Media.SolidColorBrush bgBrush)
@@ -97,6 +99,7 @@ public partial class WebShellWindow : Window
         _achievementService = achievementService;
         _discordRpcService = discordRpcService;
         _prewarmGameService = prewarmGameService;
+        _embedPlayer = embedPlayer;
 
         Loaded += WebShellWindow_Loaded;
         Closing += WebShellWindow_Closing;
@@ -122,7 +125,7 @@ public partial class WebShellWindow : Window
             WebViewControl.CoreWebView2.Settings.AreDevToolsEnabled = false;
 #endif
 
-            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService, _cloudLobbyService, _achievementService, _discordRpcService, _prewarmGameService)
+            _bridge = new WebBridge(this, _gameSessionService, _configService, _presetService, _workshopService, _packUpdateService, _launchService, _skinService, _friendService, _reportService, _lobbySession, _launcherUpdateService, _cloudLobbyService, _achievementService, _discordRpcService, _prewarmGameService, embedPlayer: _embedPlayer)
             {
                 IsUpdatedRestart = IsUpdatedRestart
             };

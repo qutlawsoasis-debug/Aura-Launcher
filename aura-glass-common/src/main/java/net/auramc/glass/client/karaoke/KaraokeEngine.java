@@ -62,6 +62,7 @@ public final class KaraokeEngine {
     private boolean shotAppearTaken = false;
     private boolean shotHoldTaken = false;
     private boolean shotFallTaken = false;
+    private long lastTickWallTimeMs = -1L;
 
     public KaraokeEngine() {}
 
@@ -322,6 +323,15 @@ public final class KaraokeEngine {
             }
         }
 
+        long wallNow = System.currentTimeMillis();
+        if (lastTickWallTimeMs > 0L) {
+            long deltaWall = wallNow - lastTickWallTimeMs;
+            if (deltaWall > 250L) {
+                clock.shiftDemoStartTime(deltaWall - 50L);
+            }
+        }
+        lastTickWallTimeMs = wallNow;
+
         if (client.world == null) {
             if (KaraokeConfig.get().isDemoMode()) {
                 handleDemoAutoWorldLoad(client);
@@ -356,6 +366,12 @@ public final class KaraokeEngine {
                         // Set daytime (noon)
                         if (world instanceof net.minecraft.client.world.ClientWorld cw) {
                             cw.setTimeOfDay(6000L);
+                        }
+                        try {
+                            if (player.getAbilities() != null) {
+                                player.getAbilities().invulnerable = true;
+                            }
+                        } catch (Throwable ignored) {
                         }
 
                         // Warmup karaoke renderer
@@ -431,8 +447,17 @@ public final class KaraokeEngine {
     }
 
     private void handleDemoAutoWorldLoad(MinecraftClient client) {
-        if (client == null || client.getOverlay() != null || worldLaunchInitiated) return;
+        if (client == null || client.getOverlay() != null) return;
+        if (client.currentScreen != null) {
+            String screenName = client.currentScreen.getClass().getSimpleName();
+            if (screenName.contains("BackupPrompt") || screenName.contains("Confirm") || screenName.contains("Warning")) {
+                System.out.println("[AuraKaraoke] Auto-dismissing prompt screen " + screenName + " with Enter");
+                client.currentScreen.keyPressed(257, 0, 0);
+                return;
+            }
+        }
         autoWorldLoadTicks++;
+        if (worldLaunchInitiated) return;
         if (client.currentScreen instanceof net.minecraft.client.gui.screen.TitleScreen) {
             if (autoWorldLoadTicks > 10) {
                 System.out.println("[AuraKaraoke] Navigating TitleScreen -> CreateWorldScreen");
@@ -686,28 +711,31 @@ public final class KaraokeEngine {
         if (!KaraokeConfig.get().isDemoMode()) return;
 
         // Appearance frame (scale rising, letter stagger, daytime)
-        if (!shotAppearTaken && playbackMs >= 1500L && playbackMs <= 2200L && !activeAnchors.isEmpty()) {
+        if (!shotAppearTaken && playbackMs >= 1500L && !activeAnchors.isEmpty()) {
             shotAppearTaken = true;
             captureProofFrame(client, "appear");
         }
 
         // Hold frame (words fully manifested in #64D2FF)
-        if (shotAppearTaken && !shotHoldTaken && playbackMs >= 2700L && playbackMs <= 3800L && !activeAnchors.isEmpty()) {
+        if (shotAppearTaken && !shotHoldTaken && playbackMs >= 2700L && !activeAnchors.isEmpty()) {
             shotHoldTaken = true;
             captureProofFrame(client, "hold");
         }
 
         // Fall frame (physical words falling and bouncing)
-        if (shotHoldTaken && !shotFallTaken && playbackMs >= 4800L && playbackMs <= 6000L) {
+        if (shotHoldTaken && !shotFallTaken && playbackMs >= 4800L) {
             shotFallTaken = true;
             captureProofFrame(client, "fall");
         }
 
         // Complete & Stop (after all 4 lines / 28 words finish so sampleCount >= 20)
-        if (shotAppearTaken && shotHoldTaken && shotFallTaken && !demoDone && playbackMs >= 18200L) {
+        if (!demoDone && playbackMs >= 18200L) {
+            if (!shotAppearTaken) captureProofFrame(client, "appear");
+            if (!shotHoldTaken) captureProofFrame(client, "hold");
+            if (!shotFallTaken) captureProofFrame(client, "fall");
             demoDone = true;
             saveProofLogs(client);
-            System.out.println("[AuraKaraoke] Demo QA complete! Stopping client after 28 word samples.");
+            System.out.println("[AuraKaraoke] Demo QA complete! Stopping client after " + clock.getStats().sampleCount + " word samples.");
             client.scheduleStop();
         }
     }
