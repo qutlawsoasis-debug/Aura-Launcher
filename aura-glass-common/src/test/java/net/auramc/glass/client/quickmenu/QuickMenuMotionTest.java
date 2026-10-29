@@ -11,6 +11,7 @@ public final class QuickMenuMotionTest {
         interruptionKeepsGeometry();
         dragAndArcReturn();
         smallViewportClamps();
+        testMusicSourceProviderFailurePath();
         System.out.println("Quick menu motion: anchored opening, area, axis delay, reversible springs, drag bounds and arc return PASS");
     }
 
@@ -136,6 +137,46 @@ public final class QuickMenuMotionTest {
         check(frame.width() <= 368 && frame.height() <= 202, "small screens honor maximum bounds over minimums");
         check(frame.x() >= 0 && frame.y() >= 0, "small viewport has no overflow");
         check(frame.x() + frame.width() <= 400 && frame.bottom() <= 250, "small viewport complete bounds");
+    }
+
+    private static void testMusicSourceProviderFailurePath() {
+        // 1. Default production initialization without QA flag:
+        System.clearProperty("aura.qa.stubMusic");
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.initDefault();
+        var prodSource = net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get();
+        check(prodSource != null, "Provider returns non-null source in production");
+        check(!(prodSource instanceof net.auramc.glass.client.music.StubMusicSource), "Production must not default to StubMusicSource");
+        check(!prodSource.available(), "Bridge is offline in tests, available must be false");
+        check(prodSource.now() != null && prodSource.now().track() == null, "Production offline must have empty track");
+        check(prodSource.search("test").isEmpty(), "Production offline search must return empty");
+
+        // 2. Explicit failure path (simulated exception during source acquisition):
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.set(
+            net.auramc.glass.client.quickmenu.music.MusicSourceProvider.UnavailableMusicSource.INSTANCE
+        );
+        var unavailSource = net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get();
+        check(!unavailSource.available(), "Failure path must have available=false");
+        check(unavailSource.now() != null && unavailSource.now().track() == null, "Failure path must have no track");
+        check(!unavailSource.now().isPlaying(), "Failure path must not be playing");
+        check(unavailSource.search("demo").isEmpty(), "Failure path search must return empty list");
+
+        // 3. QA stub flag:
+        System.setProperty("aura.qa.stubMusic", "true");
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.initDefault();
+        var qaSource = net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get();
+        check(qaSource instanceof net.auramc.glass.client.music.StubMusicSource, "QA flag must enable StubMusicSource");
+        check(qaSource.available(), "StubMusicSource is available for QA");
+        check(qaSource.now() != null && qaSource.now().track() != null, "StubMusicSource provides demo track");
+
+        // 4. Switching back to production restores empty / unavailable state:
+        System.clearProperty("aura.qa.stubMusic");
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.initDefault();
+        var restoredSource = net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get();
+        check(!(restoredSource instanceof net.auramc.glass.client.music.StubMusicSource), "Clearing QA flag must remove StubMusicSource");
+        check(!restoredSource.available(), "Restored production source must be unavailable offline");
+
+        // 5. Lifecycle close:
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.close();
     }
 
     private static void same(QuickMenuMotion.Geometry a, QuickMenuMotion.Geometry b, String reason) {

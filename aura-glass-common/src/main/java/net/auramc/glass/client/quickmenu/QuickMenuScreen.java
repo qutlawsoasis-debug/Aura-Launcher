@@ -409,8 +409,15 @@ public final class QuickMenuScreen extends Screen {
         var source = MusicSourceProvider.get();
         var now = source.now();
         var current = now.track();
-        String title = current == null ? "Ничего не играет" : current.title();
-        String artist = current == null ? "Выберите трек из каталога" : current.artist();
+        String title;
+        String artist;
+        if (!source.available()) {
+            title = "Aura Music: launcher is not running";
+            artist = "Aura Music: лаунчер не запущен";
+        } else {
+            title = current == null ? "Ничего не играет" : current.title();
+            artist = current == null ? "Выберите трек из каталога" : current.artist();
+        }
 
         // Empty artwork in Music: Rounded 84x84 card (radius 10px, fill .24), note glyph with soft blue accent
         float cardFade = edgeFade(y, 84);
@@ -449,7 +456,7 @@ public final class QuickMenuScreen extends Screen {
         String status;
         int statusColor;
         if (!source.available()) {
-            status = "○ Ожидание Aura Launcher...";
+            status = "○ Aura Music: launcher is not running";
             statusColor = 0xDDFFFFFF;
         } else if (now.isPlaying()) {
             status = "● Воспроизведение · Aura Music";
@@ -490,7 +497,7 @@ public final class QuickMenuScreen extends Screen {
         float ty = y + 318;
         if (!source.available()) {
             float waitingFade = edgeFade(ty, 15);
-            if (waitingFade > 0.01f) text("Мост Aura Music не подключен.", x, ty, 15, 0xDDFFFFFF, 400, waitingFade);
+            if (waitingFade > 0.01f) text("Aura Music: launcher is not running", x, ty, 15, 0xDDFFFFFF, 400, waitingFade);
         } else if (tracks.isEmpty()) {
             float emptyFade = edgeFade(ty, 15);
             if (emptyFade > 0.01f) text("Нет треков по запросу.", x, ty, 15, 0xDDFFFFFF, 400, emptyFade);
