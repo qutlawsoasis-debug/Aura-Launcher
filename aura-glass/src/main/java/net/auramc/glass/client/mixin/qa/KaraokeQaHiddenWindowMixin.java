@@ -1,4 +1,4 @@
-package net.auramc.glass.client.mixin;
+package net.auramc.glass.client.mixin.qa;
 
 import net.minecraft.client.util.Window;
 import org.lwjgl.glfw.GLFW;

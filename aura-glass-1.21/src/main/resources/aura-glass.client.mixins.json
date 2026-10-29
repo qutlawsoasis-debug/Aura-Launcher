@@ -31,9 +31,6 @@
     "AuraHudMixin",
     "ExtraMenuWidgetMixin",
     "WorldRendererMixin",
-    "KaraokeQaHiddenWindowMixin",
-    "KaraokeQaNoAudioMixin",
-    "KaraokeQaNoCursorMixin",
     "ClientPlayerInteractionManagerMixin",
     "ClientPlayerEntityMixin"
   ],

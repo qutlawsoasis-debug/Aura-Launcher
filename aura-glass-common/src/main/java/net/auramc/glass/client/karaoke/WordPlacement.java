@@ -27,6 +27,9 @@ public final class WordPlacement {
     public static final double DEAD_ZONE_ANGLE_DEG = 3.0;
     public static final double MAX_CONE_ANGLE_DEG = 12.0;
 
+    public static final float BASE_FONT_SCALE = 0.35f; // Letter height ≈ 0.35 blocks per Claude VOZVRAT 2
+    public static final float SPACE_GAP_BLOCKS = 0.25f; // Visible gap between words in world blocks
+
     public static final class WordAnchor {
         public final KaraokeModel.KaraokeWord word;
         public final Vec3d position;
@@ -73,17 +76,19 @@ public final class WordPlacement {
                 Math.cos(yawRad) * Math.cos(pitchRad)
         ).normalize();
 
+        // Camera horizontal right vector in Minecraft coordinate system
+        // Looking South (yaw=0): look=(0,0,1), right=(-1,0,0) (West is camera right)
         Vec3d rightVec = new Vec3d(
-                Math.cos(yawRad),
+                -Math.cos(yawRad),
                 0,
-                Math.sin(yawRad)
+                -Math.sin(yawRad)
         ).normalize();
 
         Vec3d upVec = rightVec.crossProduct(lookVec).normalize();
 
-        // Crosshair cone angle: tilt downwards by 4.8°..6.5°
+        // Crosshair cone angle: tilt downwards by 5.2°..6.5°
         // Center is safely > 3.0° dead zone and leaves budget for horizontal spread <= 12.0°
-        double baseOffsetDeg = 4.8 * Math.max(0.75, gazeAngleFactor);
+        double baseOffsetDeg = 5.2 * Math.max(0.75, gazeAngleFactor);
         double offsetRad = Math.toRadians(baseOffsetDeg);
 
         // Vector tilted downwards from look vector
@@ -119,37 +124,29 @@ public final class WordPlacement {
             groupCenter = groupCenter.add(motionLead);
         }
 
-        // Calculate text widths and clamp total horizontal spread to stay within 12° cone
-        // Max half-angle horizontally: sqrt(11.8^2 - baseOffsetDeg^2)
-        double maxHorizDeg = Math.sqrt(Math.max(1.0, 11.5 * 11.5 - baseOffsetDeg * baseOffsetDeg));
-        double maxHalfSpread = actualDistance * Math.tan(Math.toRadians(maxHorizDeg));
+        // Calculate text widths in world blocks (scale = 0.35 blocks letter height)
+        float wordScale = BASE_FONT_SCALE * config.getSize();
+        float spaceGap = SPACE_GAP_BLOCKS * config.getSize();
 
-        float scale = 0.030f * config.getSize();
         float[] widths = new float[words.size()];
-        float rawTotalWidth = 0;
-        float gap = 0.20f;
+        float rawTotalWidth = 0f;
 
         for (int i = 0; i < words.size(); i++) {
-            widths[i] = estimateWordWidth(words.get(i).w) * scale;
+            widths[i] = estimateWordWidth(words.get(i).w) * wordScale;
             rawTotalWidth += widths[i];
-            if (i > 0) rawTotalWidth += gap;
+            if (i > 0) rawTotalWidth += spaceGap;
         }
 
-        // If line is wider than max half-spread * 2, scale spacing/widths proportionally
-        float layoutScale = 1.0f;
-        if (rawTotalWidth * 0.5 > maxHalfSpread) {
-            layoutScale = (float) (maxHalfSpread / (rawTotalWidth * 0.5));
-        }
-
-        float totalWidth = rawTotalWidth * layoutScale;
-        double startOffset = -totalWidth * 0.5;
+        // Left-to-right reading order: start at -rawTotalWidth * 0.5 along rightVec
+        double startOffset = -rawTotalWidth * 0.5;
         double currentOffset = startOffset;
 
         for (int i = 0; i < words.size(); i++) {
             KaraokeModel.KaraokeWord w = words.get(i);
-            float wWidth = widths[i] * layoutScale;
+            float wWidth = widths[i];
             double wordCenterOffset = currentOffset + wWidth * 0.5;
 
+            // Offset along rightVec: negative offset is LEFT on screen, positive is RIGHT
             Vec3d wordPos = groupCenter.add(rightVec.multiply(wordCenterOffset));
 
             // Elevate above ground if needed
@@ -162,8 +159,8 @@ public final class WordPlacement {
             float wYaw = (float) Math.toDegrees(Math.atan2(-toEye.x, toEye.z));
             float wPitch = (float) Math.toDegrees(Math.atan2(toEye.y, Math.sqrt(toEye.x * toEye.x + toEye.z * toEye.z)));
 
-            anchors.add(new WordAnchor(w, wordPos, wWidth, 0.35f, wYaw, wPitch));
-            currentOffset += wWidth + gap * layoutScale;
+            anchors.add(new WordAnchor(w, wordPos, wWidth, wordScale, wYaw, wPitch));
+            currentOffset += wWidth + spaceGap;
         }
 
         return anchors;
@@ -184,8 +181,17 @@ public final class WordPlacement {
         return pos;
     }
 
-    private static float estimateWordWidth(String text) {
-        return Math.max(10f, text.length() * 10.5f);
+    public static float estimateWordWidth(String text) {
+        if (text == null || text.isEmpty()) return 0.5f;
+        try {
+            if (net.auramc.glass.common.render.AuraRenderer.isReady()) {
+                float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f);
+                if (tw > 0.05f) return tw;
+            }
+        } catch (Throwable ignored) {
+        }
+        // In Onest MSDF font, average character advance is ~0.55 EM
+        return Math.max(0.6f, text.length() * 0.55f);
     }
 
     /**
@@ -202,7 +208,7 @@ public final class WordPlacement {
     }
 
     /**
-     * Verifies that a point is inside the 12° gaze cone.
+     * Verifies that the group center is positioned inside the 4–12° gaze cone.
      */
     public static boolean isInsideCone(Vec3d point, Vec3d eyePos, Vec3d lookVec) {
         Vec3d toPoint = point.subtract(eyePos);
@@ -212,5 +218,21 @@ public final class WordPlacement {
         cosAngle = Math.max(-1.0, Math.min(1.0, cosAngle));
         double angleDeg = Math.toDegrees(Math.acos(cosAngle));
         return angleDeg <= MAX_CONE_ANGLE_DEG;
+    }
+
+    public static Vec3d getGroupCenter(Vec3d eyePos, float playerYaw, float playerPitch, double distance, float gazeAngleFactor) {
+        double pitchRad = Math.toRadians(playerPitch);
+        double yawRad = Math.toRadians(playerYaw);
+        Vec3d lookVec = new Vec3d(
+                -Math.sin(yawRad) * Math.cos(pitchRad),
+                -Math.sin(pitchRad),
+                Math.cos(yawRad) * Math.cos(pitchRad)
+        ).normalize();
+        Vec3d rightVec = new Vec3d(-Math.cos(yawRad), 0, -Math.sin(yawRad)).normalize();
+        Vec3d upVec = rightVec.crossProduct(lookVec).normalize();
+        double baseOffsetDeg = 5.2 * Math.max(0.75, gazeAngleFactor);
+        double offsetRad = Math.toRadians(baseOffsetDeg);
+        Vec3d coneDir = lookVec.multiply(Math.cos(offsetRad)).add(upVec.multiply(-Math.sin(offsetRad))).normalize();
+        return eyePos.add(coneDir.multiply(distance));
     }
 }

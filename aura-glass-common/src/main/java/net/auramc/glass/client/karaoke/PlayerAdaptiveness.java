@@ -222,7 +222,9 @@ public final class PlayerAdaptiveness {
         // Density modifier
         float mult = KaraokeConfig.get().getDensity().wordGroupMultiplier;
         max = Math.max(min, Math.round(max * mult));
-        return Math.max(min, Math.min(max, desiredWords));
+        // Comfort limit: maximum 4 words per group so text stays comfortably centered and legible
+        int limit = Math.min(max, 4);
+        return Math.max(min, Math.min(limit, desiredWords));
     }
 
     private static float wrapDegrees(float deg) {

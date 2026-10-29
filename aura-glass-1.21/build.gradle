@@ -48,6 +48,8 @@ java {
 }
 
 jar {
+    exclude 'net/auramc/glass/client/mixin/qa/**'
+    exclude 'aura-glass-qa.client.mixins.json'
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}" }
     }

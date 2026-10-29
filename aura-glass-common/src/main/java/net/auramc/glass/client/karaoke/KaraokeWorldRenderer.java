@@ -125,6 +125,8 @@ public final class KaraokeWorldRenderer {
             initialized = true;
         } catch (Exception e) {
             failed = true;
+            System.err.println("[AuraKaraoke] ERROR in KaraokeWorldRenderer.initialize: " + e);
+            e.printStackTrace();
         }
     }
 
@@ -166,6 +168,12 @@ public final class KaraokeWorldRenderer {
         Quaternionf camRot = camera.getRotation();
 
         // 1. Emit active singing words (billboard facing camera)
+        // Basis vectors in camera-relative space derived directly from viewMatrix:
+        // viewMatrix * U == (1, 0, 0) [Screen RIGHT]
+        // viewMatrix * V == (0, -1, 0) [Screen DOWN]
+        Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m01(), viewMatrix.m02());
+        Vector3f billboardV = new Vector3f(-viewMatrix.m10(), -viewMatrix.m11(), -viewMatrix.m12());
+
         for (WordPlacement.WordAnchor anchor : activeAnchors) {
             KaraokeModel.KaraokeWord kw = anchor.word;
             float lightFactor = computeLightFactor(anchor.position, world);
@@ -182,7 +190,8 @@ public final class KaraokeWorldRenderer {
 
             int outlineColor = applyAlpha(WordAnimation.COLOR_OUTLINE, ((wordColor >>> 24) & 0xFF) / 255f);
 
-            emitString(kw.w, anchor.position, camPos, camRot, null, wordColor, outlineColor, wordElapsedMs, KaraokeConfig.get().getSize() * 0.038f);
+            float fontScale = KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+            emitString(kw.w, anchor.position, camPos, billboardU, billboardV, wordColor, outlineColor, wordElapsedMs, fontScale);
         }
 
         // 2. Emit physical falling bodies
@@ -202,8 +211,13 @@ public final class KaraokeWorldRenderer {
                     .rotateX((float) Math.toRadians(pw.getInterpolatedPitch(tickDelta)))
                     .rotateZ((float) Math.toRadians(pw.getInterpolatedRoll(tickDelta)));
 
-            float scale = KaraokeConfig.get().getSize() * 0.038f * pw.getScale();
-            emitString(pw.text, interpPos, camPos, null, bodyRot, color, outlineColor, 10000L, scale);
+            Vector3f physU = new Vector3f(1, 0, 0);
+            Vector3f physV = new Vector3f(0, -1, 0);
+            bodyRot.transform(physU);
+            bodyRot.transform(physV);
+
+            float scale = KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE * pw.getScale();
+            emitString(pw.text, interpPos, camPos, physU, physV, color, outlineColor, 10000L, scale);
         }
 
         if (vertexCount == 0) return;
@@ -267,7 +281,7 @@ public final class KaraokeWorldRenderer {
     }
 
     private static void emitString(String text, Vec3d worldPos, Vec3d camPos,
-                                   Quaternionf camRot, Quaternionf customRot,
+                                   Vector3f U, Vector3f V,
                                    int color, int outlineColor,
                                    long wordElapsedMs, float scale) {
         if (text == null || text.isEmpty()) return;
@@ -278,18 +292,6 @@ public final class KaraokeWorldRenderer {
                 (float) (worldPos.y - camPos.y),
                 (float) (worldPos.z - camPos.z)
         );
-
-        // Local basis vectors in camera-relative space
-        Vector3f U = new Vector3f(1, 0, 0);
-        Vector3f V = new Vector3f(0, -1, 0); // Y down
-
-        if (customRot != null) {
-            customRot.transform(U);
-            customRot.transform(V);
-        } else if (camRot != null) {
-            camRot.transform(U);
-            camRot.transform(V);
-        }
 
         float totalW = AuraRenderer.textWidth(text, 1.0f);
         float penX = -totalW * 0.5f;

@@ -55,6 +55,7 @@ public final class KaraokeEngine {
     private boolean demoDone = false;
     private boolean worldLaunchInitiated = false;
     private int autoWorldLoadTicks = 0;
+    private int worldStabilizationTicks = 0;
     private boolean shotAppearTaken = false;
     private boolean shotHoldTaken = false;
     private boolean shotFallTaken = false;
@@ -176,24 +177,44 @@ public final class KaraokeEngine {
         World world = client.world;
         PlayerEntity player = client.player;
 
-        // Initialize demo timeline when player is ready in the world
-        if (KaraokeConfig.get().isDemoMode() && !demoWorldStarted && player != null && client.getOverlay() == null) {
-            demoWorldStarted = true;
-            currentLineIndex = 0;
-            currentWordIndex = 0;
-            activeAnchors.clear();
-            activeGroupWords.clear();
-            groupHoldStartTime = -1L;
-            groupPhysicsSpawned = false;
-            lastActiveOnsetRecordedWordT = -1L;
-            shotAppearTaken = false;
-            shotHoldTaken = false;
-            shotFallTaken = false;
-            demoDone = false;
-            clock.startDemoTimeline();
-            player.setYaw(0.0f);
-            player.setPitch(0.0f);
-            System.out.println("[AuraKaraoke] Demo timeline started in world: " + world.getRegistryKey().getValue());
+        // Initialize demo timeline when player is ready in the world, chunks are loaded, and screens are closed
+        if (KaraokeConfig.get().isDemoMode() && !demoWorldStarted && player != null) {
+            if (client.getOverlay() == null && client.currentScreen == null) {
+                int cx = player.getBlockX() >> 4;
+                int cz = player.getBlockZ() >> 4;
+                if (world.isChunkLoaded(cx, cz)) {
+                    worldStabilizationTicks++;
+                    if (worldStabilizationTicks >= 40) { // 2.0s of steady in-world ticks
+                        demoWorldStarted = true;
+                        currentLineIndex = 0;
+                        currentWordIndex = 0;
+                        activeAnchors.clear();
+                        activeGroupWords.clear();
+                        groupHoldStartTime = -1L;
+                        groupPhysicsSpawned = false;
+                        lastActiveOnsetRecordedWordT = -1L;
+                        shotAppearTaken = false;
+                        shotHoldTaken = false;
+                        shotFallTaken = false;
+                        demoDone = false;
+
+                        // Set daytime (noon)
+                        if (world instanceof net.minecraft.client.world.ClientWorld cw) {
+                            cw.setTimeOfDay(6000L);
+                        }
+
+                        // Warmup karaoke renderer
+                        KaraokeWorldRenderer.initialize();
+
+                        // Player looks slightly down (12°) so the horizon and ground are both clearly visible
+                        player.setYaw(0.0f);
+                        player.setPitch(12.0f);
+
+                        clock.startDemoTimeline();
+                        System.out.println("[AuraKaraoke] Demo timeline started in stable daytime world: " + world.getRegistryKey().getValue());
+                    }
+                }
+            }
         }
 
         // Run physics simulation
@@ -279,13 +300,18 @@ public final class KaraokeEngine {
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
         if (lyrics == null || lyrics.isEmpty()) return;
 
+        // 1. Check and record word onsets on each tick
+        checkWordOnsets(playbackMs);
+
         // If line finished and hold elapsed, transition active words into physics bodies
         if (!activeGroupWords.isEmpty()) {
             KaraokeModel.KaraokeWord lastWord = activeGroupWords.get(activeGroupWords.size() - 1);
+            boolean isEndOfLine = (currentLineIndex >= lyrics.lines.size() || currentWordIndex >= lyrics.lines.get(currentLineIndex).words.size());
+            long holdMs = isEndOfLine ? WordAnimation.POST_PHRASE_HOLD_MS : 0L;
             if (playbackMs >= lastWord.end()) {
                 if (groupHoldStartTime < 0L) {
                     groupHoldStartTime = playbackMs;
-                } else if (!groupPhysicsSpawned && (playbackMs - groupHoldStartTime >= WordAnimation.POST_PHRASE_HOLD_MS)) {
+                } else if (!groupPhysicsSpawned && (playbackMs - groupHoldStartTime >= holdMs)) {
                     groupPhysicsSpawned = true;
                     // Spawn physics bodies for words
                     for (WordPlacement.WordAnchor anchor : activeAnchors) {
@@ -367,13 +393,17 @@ public final class KaraokeEngine {
             groupHoldStartTime = -1L;
             groupPhysicsSpawned = false;
         }
+    }
 
-        // Record onset events for active words
+    /**
+     * Checks and records word onset events on every render frame and tick for sub-frame accuracy.
+     */
+    public void checkWordOnsets(long playbackMs) {
+        if (activeGroupWords.isEmpty()) return;
         for (KaraokeModel.KaraokeWord w : activeGroupWords) {
             if (playbackMs >= w.t && w.t > lastActiveOnsetRecordedWordT) {
                 lastActiveOnsetRecordedWordT = w.t;
                 clock.recordOnset(w.w, w.t, playbackMs);
-                break;
             }
         }
     }
@@ -432,8 +462,8 @@ public final class KaraokeEngine {
     private void handleDemoScreenshots(MinecraftClient client, long playbackMs) {
         if (!KaraokeConfig.get().isDemoMode()) return;
 
-        // Appearance frame (scale rising, letter stagger)
-        if (!shotAppearTaken && playbackMs >= 1300L && playbackMs <= 1800L && !activeAnchors.isEmpty()) {
+        // Appearance frame (scale rising, letter stagger, daytime)
+        if (!shotAppearTaken && playbackMs >= 1500L && playbackMs <= 2200L && !activeAnchors.isEmpty()) {
             shotAppearTaken = true;
             captureProofFrame(client, "appear");
         }
@@ -445,16 +475,16 @@ public final class KaraokeEngine {
         }
 
         // Fall frame (physical words falling and bouncing)
-        if (shotHoldTaken && !shotFallTaken && playbackMs >= 5000L && playbackMs <= 6000L) {
+        if (shotHoldTaken && !shotFallTaken && playbackMs >= 4800L && playbackMs <= 6000L) {
             shotFallTaken = true;
             captureProofFrame(client, "fall");
         }
 
-        // Complete & Stop
-        if (shotAppearTaken && shotHoldTaken && shotFallTaken && !demoDone && playbackMs >= 6200L) {
+        // Complete & Stop (after all 4 lines / 28 words finish so sampleCount >= 20)
+        if (shotAppearTaken && shotHoldTaken && shotFallTaken && !demoDone && playbackMs >= 18200L) {
             demoDone = true;
             saveProofLogs(client);
-            System.out.println("[AuraKaraoke] Demo QA complete! Stopping client.");
+            System.out.println("[AuraKaraoke] Demo QA complete! Stopping client after 28 word samples.");
             client.scheduleStop();
         }
     }
@@ -565,6 +595,9 @@ public final class KaraokeEngine {
 
         long playbackMs = clock.getEffectivePositionMs();
         if (playbackMs < 0L) return;
+
+        // Frame-accurate onset recording
+        checkWordOnsets(playbackMs);
 
         KaraokeWorldRenderer.renderBatch(
                 viewMatrix,
