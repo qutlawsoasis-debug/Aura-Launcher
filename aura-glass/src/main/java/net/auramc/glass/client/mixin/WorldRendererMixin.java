@@ -1,5 +1,6 @@
 package net.auramc.glass.client.mixin;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.auramc.glass.client.karaoke.KaraokeEngine;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.GameRenderer;
@@ -26,6 +27,10 @@ public abstract class WorldRendererMixin {
             Matrix4f projectionMatrix,
             CallbackInfo ci
     ) {
-        KaraokeEngine.getInstance().render(matrices.peek().getPositionMatrix(), projectionMatrix, camera, tickDelta);
+        Matrix4f viewMatrix = new Matrix4f()
+                .rotationX((float) Math.toRadians(camera.getPitch()))
+                .rotationY((float) Math.toRadians(camera.getYaw() + 180.0f));
+        Matrix4f proj = projectionMatrix != null ? projectionMatrix : RenderSystem.getProjectionMatrix();
+        KaraokeEngine.getInstance().render(viewMatrix, proj, camera, tickDelta);
     }
 }

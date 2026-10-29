@@ -190,8 +190,8 @@ public final class KaraokeWorldRenderer {
 
             int outlineColor = applyAlpha(WordAnimation.COLOR_OUTLINE, ((wordColor >>> 24) & 0xFF) / 255f);
 
-            float fontScale = KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
-            emitString(kw.w, anchor.position, camPos, billboardU, billboardV, wordColor, outlineColor, wordElapsedMs, fontScale);
+            float wordScale = anchor.height > 0.01f ? anchor.height : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+            emitString(kw.w, anchor.position, camPos, billboardU, billboardV, wordColor, outlineColor, wordElapsedMs, wordScale);
         }
 
         // 2. Emit physical falling bodies
@@ -237,9 +237,8 @@ public final class KaraokeWorldRenderer {
         boolean prevCull = glIsEnabled(GL_CULL_FACE);
 
         try {
-            glEnable(GL_DEPTH_TEST);
-            glDepthFunc(GL_LEQUAL);
-            glDepthMask(false); // Transparent overlay: depth test without depth write
+            glDisable(GL_DEPTH_TEST);
+            glDepthMask(false); // Transparent overlay: drawn on top of foliage and terrain
 
             glEnable(GL_BLEND);
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -266,7 +265,7 @@ public final class KaraokeWorldRenderer {
             glDrawArrays(GL_TRIANGLES, 0, vertexCount);
         } finally {
             glDepthMask(true);
-            if (!prevDepthTest) glDisable(GL_DEPTH_TEST);
+            if (prevDepthTest) glEnable(GL_DEPTH_TEST);
             if (!prevBlend) glDisable(GL_BLEND);
             if (prevCull) glEnable(GL_CULL_FACE);
 

@@ -308,9 +308,26 @@ public final class KaraokeEngine {
                         // Warmup karaoke renderer
                         KaraokeWorldRenderer.initialize();
 
-                        // Player looks slightly down (12°) so the horizon and ground are both clearly visible
+                        // Player looks slightly down (10°) so words and horizon are centered in view
                         player.setYaw(0.0f);
-                        player.setPitch(12.0f);
+                        player.setPitch(10.0f);
+
+                        // Clear tall grass / vegetation in front of player for open daytime view
+                        try {
+                            net.minecraft.util.math.BlockPos pPos = player.getBlockPos();
+                            for (int dx = -4; dx <= 4; dx++) {
+                                for (int dz = 0; dz <= 8; dz++) {
+                                    for (int dy = -1; dy <= 3; dy++) {
+                                        net.minecraft.util.math.BlockPos b = pPos.add(dx, dy, dz);
+                                        var bs = world.getBlockState(b);
+                                        if (!bs.isAir() && bs.getCollisionShape(world, b).isEmpty()) {
+                                            world.removeBlock(b, false);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Throwable ignored) {
+                        }
 
                         clock.startDemoTimeline();
                         System.out.println("[AuraKaraoke] Demo timeline started in stable daytime world: " + world.getRegistryKey().getValue());
@@ -418,18 +435,21 @@ public final class KaraokeEngine {
             if (playbackMs >= lastWord.end()) {
                 if (groupHoldStartTime < 0L) {
                     groupHoldStartTime = playbackMs;
-                } else if (!groupPhysicsSpawned && (playbackMs - groupHoldStartTime >= holdMs)) {
+                }
+                if (!groupPhysicsSpawned && (holdMs == 0L || (playbackMs - groupHoldStartTime >= holdMs))) {
                     groupPhysicsSpawned = true;
-                    // Spawn physics bodies for words
-                    for (WordPlacement.WordAnchor anchor : activeAnchors) {
-                        physics.spawnBody(
-                                anchor.word.w,
-                                anchor.position,
-                                anchor.width,
-                                anchor.height,
-                                anchor.yaw,
-                                anchor.pitch
-                        );
+                    // Spawn physics bodies for words at end of line
+                    if (isEndOfLine) {
+                        for (WordPlacement.WordAnchor anchor : activeAnchors) {
+                            physics.spawnBody(
+                                    anchor.word.w,
+                                    anchor.position,
+                                    anchor.width,
+                                    anchor.height,
+                                    anchor.yaw,
+                                    anchor.pitch
+                            );
+                        }
                     }
                     activeAnchors.clear();
                     activeGroupWords.clear();
@@ -504,8 +524,25 @@ public final class KaraokeEngine {
                     world
             );
 
-            activeGroupWords = group;
-            currentWordIndex += groupSize;
+            if (activeAnchors.isEmpty()) {
+                // Obstacle closer than MIN_DISTANCE: do NOT spawn behind wall; drop elapsed words
+                while (currentWordIndex < currentLine.words.size()) {
+                    KaraokeModel.KaraokeWord w = currentLine.words.get(currentWordIndex);
+                    if (playbackMs > w.end()) {
+                        currentWordIndex++;
+                    } else {
+                        break;
+                    }
+                }
+                return;
+            }
+
+            List<KaraokeModel.KaraokeWord> placedWords = new ArrayList<>();
+            for (WordPlacement.WordAnchor anchor : activeAnchors) {
+                placedWords.add(anchor.word);
+            }
+            activeGroupWords = placedWords;
+            currentWordIndex += activeAnchors.size();
             groupHoldStartTime = -1L;
             groupPhysicsSpawned = false;
         }
@@ -553,22 +590,23 @@ public final class KaraokeEngine {
             Files.createDirectories(proofDir);
             String tag = getVersionTag();
 
-            // Versioned screenshot: e.g. karaoke-120-appear.png and karaoke-121-appear.png
             String versionedName = "karaoke-" + tag + "-" + phase + ".png";
             Path targetVersioned = proofDir.resolve(versionedName);
-            try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
-                image.writeTo(targetVersioned);
-                System.out.println("[AuraKaraoke] Saved versioned proof frame: " + targetVersioned + " (" + Files.size(targetVersioned) + " bytes)");
-            }
+            net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer());
 
-            // Also save standard unversioned name in the isolated run's own proof directory
-            Path localProof = client.runDirectory.toPath().resolve("proof").resolve("karaoke-" + phase + ".png");
-            if (!localProof.equals(targetVersioned)) {
-                Files.createDirectories(localProof.getParent());
-                try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
-                    image.writeTo(localProof);
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try (image) {
+                    image.writeTo(targetVersioned);
+                    System.out.println("[AuraKaraoke] Saved versioned proof frame: " + targetVersioned + " (" + Files.size(targetVersioned) + " bytes)");
+                    Path localProof = client.runDirectory.toPath().resolve("proof").resolve("karaoke-" + phase + ".png");
+                    if (!localProof.equals(targetVersioned)) {
+                        Files.createDirectories(localProof.getParent());
+                        image.writeTo(localProof);
+                    }
+                } catch (Throwable t) {
+                    System.err.println("[AuraKaraoke] Error writing screenshot async: " + t);
                 }
-            }
+            });
         } catch (Throwable t) {
             System.err.println("[AuraKaraoke] Error capturing proof frame " + phase + ": " + t.getMessage());
             t.printStackTrace();

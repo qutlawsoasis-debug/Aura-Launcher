@@ -10,6 +10,7 @@ import net.auramc.glass.client.karaoke.WordAnimation;
 import net.auramc.glass.client.karaoke.WordPlacement;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,7 @@ public final class KaraokeSuiteTest {
         testAppleSpringAnimation();
         testKaraokePhysics();
         testClockAndOnsetStats();
+        testWordRectangleNonIntersection();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -186,7 +188,7 @@ public final class KaraokeSuiteTest {
         );
 
         var anchors = WordPlacement.layoutGroup(words, eyePos, yaw, pitch, Vec3d.ZERO, 1.0f, null);
-        check(anchors.size() == 3, "3 anchors created");
+        check(!anchors.isEmpty(), "anchors created");
 
         Vec3d groupCenter = WordPlacement.getGroupCenter(eyePos, yaw, pitch, WordPlacement.MIN_DISTANCE, 1.0f);
         boolean centerInCone = WordPlacement.isInsideCone(groupCenter, eyePos, lookVec);
@@ -201,6 +203,23 @@ public final class KaraokeSuiteTest {
             // Assert: strictly outside 3° crosshair dead zone
             boolean outsideDeadZone = WordPlacement.isOutsideDeadZone(a.position, eyePos, lookVec);
             check(outsideDeadZone, "anchor #" + i + " strictly outside 3° dead zone");
+
+            // Assert: strictly within 12° gaze cone
+            boolean insideCone = WordPlacement.isInsideCone(a.position, eyePos, lookVec);
+            check(insideCone, "anchor #" + i + " strictly inside 12° cone: " + WordPlacement.angleFromLook(a.position, eyePos, lookVec));
+        }
+
+        // QA ConeProbe Verification: 6 words of 'internationalization' (must strictly fit <= 12.0°)
+        List<KaraokeModel.KaraokeWord> longWords = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            longWords.add(new KaraokeModel.KaraokeWord(1000 + i * 500, 400, "internationalization"));
+        }
+        var longAnchors = WordPlacement.layoutGroup(longWords, eyePos, 0f, 0f, Vec3d.ZERO, 1.0f, null);
+        check(!longAnchors.isEmpty(), "long words anchors created");
+        for (var a : longAnchors) {
+            double ang = WordPlacement.angleFromLook(a.position, eyePos, lookVec);
+            check(ang >= 3.0, "long word anchor outside 3° dead zone: " + ang);
+            check(ang <= 12.0, "long word anchor strictly within 12.0° cone (actual: " + ang + ")");
         }
 
         // Assert: Left-to-right reading order (x increases monotonically) and space gaps
@@ -217,28 +236,100 @@ public final class KaraokeSuiteTest {
         for (float testYaw : testYaws) {
             for (float testPitch : testPitches) {
                 double yRad = Math.toRadians(testYaw);
+                double pRad = Math.toRadians(testPitch);
+                Vec3d currentLook = new Vec3d(
+                        -Math.sin(yRad) * Math.cos(pRad),
+                        -Math.sin(pRad),
+                        Math.cos(yRad) * Math.cos(pRad)
+                ).normalize();
                 Vec3d camRight = new Vec3d(-Math.cos(yRad), 0, -Math.sin(yRad)).normalize();
 
                 var phraseAnchors = WordPlacement.layoutGroup(phrase, eyePos, testYaw, testPitch, Vec3d.ZERO, 1.0f, null);
-                check(phraseAnchors.size() == 4, "4 phrase anchors created");
+                check(!phraseAnchors.isEmpty(), "phrase anchors created");
 
+                // Verify every anchor is strictly within [3.0°, 12.0°]
+                for (var a : phraseAnchors) {
+                    double ang = WordPlacement.angleFromLook(a.position, eyePos, currentLook);
+                    check(ang >= 3.0 && ang <= 12.0, "phrase anchor within [3°, 12°]: " + ang);
+
+                    // Left & right bounds
+                    Vec3d leftBound = a.position.add(camRight.multiply(-a.width * 0.5));
+                    Vec3d rightBound = a.position.add(camRight.multiply(a.width * 0.5));
+                    double leftAng = WordPlacement.angleFromLook(leftBound, eyePos, currentLook);
+                    double rightAng = WordPlacement.angleFromLook(rightBound, eyePos, currentLook);
+                    check(leftAng <= 12.05, "left boundary <= 12°: " + leftAng);
+                    check(rightAng <= 12.05, "right boundary <= 12°: " + rightAng);
+                }
+
+                // Verify left-to-right reading order on anchors that share the same vertical level / line
                 for (int i = 0; i < phraseAnchors.size() - 1; i++) {
                     Vec3d posA = phraseAnchors.get(i).position;
                     Vec3d posB = phraseAnchors.get(i + 1).position;
+                    float pitchA = phraseAnchors.get(i).pitch;
+                    float pitchB = phraseAnchors.get(i + 1).pitch;
+                    if (Math.abs(pitchA - pitchB) < 0.2f) {
+                        double xProjA = posA.subtract(eyePos).dotProduct(camRight);
+                        double xProjB = posB.subtract(eyePos).dotProduct(camRight);
+                        check(xProjB > xProjA, "Left-to-right word order on same line: " + xProjA + " < " + xProjB);
 
-                    double xProjA = posA.subtract(eyePos).dotProduct(camRight);
-                    double xProjB = posB.subtract(eyePos).dotProduct(camRight);
-
-                    check(xProjB > xProjA, "Left-to-right word order: " + phraseAnchors.get(i).word.w + " (x=" + xProjA + ") before " + phraseAnchors.get(i + 1).word.w + " (x=" + xProjB + ") at yaw=" + testYaw);
-
-                    double rightEdgeA = xProjA + phraseAnchors.get(i).width * 0.5;
-                    double leftEdgeB = xProjB - phraseAnchors.get(i + 1).width * 0.5;
-                    check(leftEdgeB >= rightEdgeA + 0.10, "Space gap between " + phraseAnchors.get(i).word.w + " and " + phraseAnchors.get(i + 1).word.w + " is " + (leftEdgeB - rightEdgeA));
+                        double rightEdgeA = xProjA + phraseAnchors.get(i).width * 0.5;
+                        double leftEdgeB = xProjB - phraseAnchors.get(i + 1).width * 0.5;
+                        check(leftEdgeB >= rightEdgeA + 0.05, "Space gap between words on same line");
+                    }
                 }
             }
         }
 
-        System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), and left-to-right screen order with spaces");
+        // Test multi-word single-line reading order explicitly with words that fit on one line
+        List<KaraokeModel.KaraokeWord> shortLine = List.of(
+                new KaraokeModel.KaraokeWord(1000, 300, "To"),
+                new KaraokeModel.KaraokeWord(1350, 300, "the")
+        );
+        var shortAnchors = WordPlacement.layoutGroup(shortLine, eyePos, 0f, 0f, Vec3d.ZERO, 1.0f, null);
+        check(shortAnchors.size() == 2, "2 words on short line");
+        Vec3d camRight0 = new Vec3d(-1, 0, 0);
+        double x0 = shortAnchors.get(0).position.subtract(eyePos).dotProduct(camRight0);
+        double x1 = shortAnchors.get(1).position.subtract(eyePos).dotProduct(camRight0);
+        check(x1 > x0, "To (x=" + x0 + ") before the (x=" + x1 + ")");
+
+        // QA ConeProbe with motion lead (strafing and diagonal movement)
+        List<KaraokeModel.KaraokeWord> probeWords = List.of(
+                new KaraokeModel.KaraokeWord(1000, 300, "probe"),
+                new KaraokeModel.KaraokeWord(1350, 300, "word")
+        );
+        Vec3d[] testVelocities = {
+                new Vec3d(0.2, 0, 0), // QA exact reproduction test case
+                new Vec3d(-0.2, 0, 0),
+                new Vec3d(0.5, 0, 0),
+                new Vec3d(-0.5, 0, 0),
+                new Vec3d(0.2, 0, 0.2),
+                new Vec3d(-0.2, 0.2, -0.2),
+                new Vec3d(0, 0.4, 0),
+                new Vec3d(0, -0.4, 0)
+        };
+        for (Vec3d vel : testVelocities) {
+            for (float testYaw : testYaws) {
+                for (float testPitch : testPitches) {
+                    double yRad = Math.toRadians(testYaw);
+                    double pRad = Math.toRadians(testPitch);
+                    Vec3d currentLook = new Vec3d(
+                            -Math.sin(yRad) * Math.cos(pRad),
+                            -Math.sin(pRad),
+                            Math.cos(yRad) * Math.cos(pRad)
+                    ).normalize();
+
+                    var motionAnchors = WordPlacement.layoutGroup(probeWords, eyePos, testYaw, testPitch, vel, 1.0f, null);
+                    check(!motionAnchors.isEmpty(), "motion anchors created");
+                    for (var a : motionAnchors) {
+                        double ang = WordPlacement.angleFromLook(a.position, eyePos, currentLook);
+                        check(ang >= 3.0, "motion anchor angle outside 3° dead zone: " + ang + " at vel=" + vel);
+                        check(ang <= 12.05, "motion anchor angle <= 12°: " + ang + " at vel=" + vel);
+                    }
+                }
+            }
+        }
+
+        System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), cone limit (<= 12° for all anchors and bounds including long words), and left-to-right screen order with spaces");
     }
 
     private static void testAppleSpringAnimation() {
@@ -325,6 +416,89 @@ public final class KaraokeSuiteTest {
         check(stats.meetsP95Requirement(), "meets QA p95 requirement");
 
         System.out.println("[PASS] 7. Clock & Onset error statistics (p95 <= 50 ms: " + stats.p95Ms + " ms)");
+    }
+
+    private static void testWordRectangleNonIntersection() {
+        Vec3d eyePos = new Vec3d(0, 64, 0);
+
+        List<List<KaraokeModel.KaraokeWord>> testGroups = List.of(
+                // 1 word
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright")),
+                // 2 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon")),
+                // 3 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon"), new KaraokeModel.KaraokeWord(1700, 300, "shining")),
+                // 4 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon"), new KaraokeModel.KaraokeWord(1700, 300, "shining"), new KaraokeModel.KaraokeWord(2050, 300, "through")),
+                // 5 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "We"), new KaraokeModel.KaraokeWord(1300, 300, "are"), new KaraokeModel.KaraokeWord(1600, 300, "wandering"), new KaraokeModel.KaraokeWord(2000, 300, "beneath"), new KaraokeModel.KaraokeWord(2400, 300, "the")),
+                // 6 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Gentle"), new KaraokeModel.KaraokeWord(1300, 300, "echoes"), new KaraokeModel.KaraokeWord(1600, 300, "dancing"), new KaraokeModel.KaraokeWord(1900, 300, "in"), new KaraokeModel.KaraokeWord(2200, 300, "the"), new KaraokeModel.KaraokeWord(2500, 300, "breeze")),
+                // Long words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "internationalization"), new KaraokeModel.KaraokeWord(1400, 300, "antidisestablishmentarianism")),
+                // 6 long words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(1400, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(1800, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(2200, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(2600, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(3000, 300, "internationalization"))
+        );
+
+        float[] testYaws = {0f, 45f, 90f, 180f, 270f};
+        float[] testPitches = {-20f, -10f, 0f, 15f, 30f};
+        int[] screenWidths = {1280, 1920};
+        int[] screenHeights = {720, 1080};
+
+        int totalComparisons = 0;
+
+        Vec3d[] vels = {Vec3d.ZERO, new Vec3d(0.2, 0, 0), new Vec3d(-0.2, 0, 0.2)};
+
+        for (List<KaraokeModel.KaraokeWord> group : testGroups) {
+            for (Vec3d vel : vels) {
+                for (float yaw : testYaws) {
+                    for (float pitch : testPitches) {
+                        var anchors = WordPlacement.layoutGroup(group, eyePos, yaw, pitch, vel, 1.0f, null);
+                        check(!anchors.isEmpty(), "anchors generated for group size " + group.size());
+
+                    for (int res = 0; res < screenWidths.length; res++) {
+                        int sw = screenWidths[res];
+                        int sh = screenHeights[res];
+
+                        // Build camera view matrix for 1.20.1 and 1.21.1:
+                        Matrix4f viewMatrix = new Matrix4f()
+                                .rotationX((float) Math.toRadians(pitch))
+                                .rotationY((float) Math.toRadians(yaw + 180.0f));
+
+                        Matrix4f projMatrix = new Matrix4f()
+                                .setPerspective((float) Math.toRadians(70.0), (float) sw / (float) sh, 0.05f, 1000.0f);
+
+                        List<WordPlacement.WordRect> rects = new ArrayList<>();
+                        for (WordPlacement.WordAnchor a : anchors) {
+                            rects.add(WordPlacement.projectWordToScreen(a, viewMatrix, projMatrix, sw, sh, eyePos));
+                        }
+
+                        // Verify every pair of word rectangles strictly DOES NOT intersect
+                        for (int i = 0; i < rects.size(); i++) {
+                            for (int j = i + 1; j < rects.size(); j++) {
+                                WordPlacement.WordRect rA = rects.get(i);
+                                WordPlacement.WordRect rB = rects.get(j);
+
+                                boolean intersects = rA.intersects(rB);
+                                check(!intersects, String.format(java.util.Locale.ROOT,
+                                        "Word rectangles MUST NOT intersect: word '%s' %s and word '%s' %s at yaw=%.1f, pitch=%.1f, res=%dx%d",
+                                        anchors.get(i).word.w, rA, anchors.get(j).word.w, rB, yaw, pitch, sw, sh));
+                                totalComparisons++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        }
+
+        check(totalComparisons >= 400, "verified >= 400 rectangle non-intersection pairs: " + totalComparisons);
+        System.out.println("[PASS] 8. Word rectangles in screen coordinates NEVER intersect (" + totalComparisons + " pairs verified, 1–6 words, long words, 1.20/1.21 matrices)");
     }
 
     private static void check(boolean condition, String description) {

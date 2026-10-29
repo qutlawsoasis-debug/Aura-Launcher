@@ -98,10 +98,9 @@ public final class KaraokeClock {
         }
         Collections.sort(errorsCopy);
         int n = errorsCopy.size();
-        long p50 = errorsCopy.get((int) (n * 0.50));
-        long p90 = errorsCopy.get((int) (Math.min(n - 1, n * 0.90)));
-        long p95 = errorsCopy.get((int) (Math.min(n - 1, n * 0.95)));
-        long p99 = errorsCopy.get((int) (Math.min(n - 1, n * 0.99)));
+        long p50 = Math.round(computePercentile(errorsCopy, 0.50));
+        long p90 = Math.round(computePercentile(errorsCopy, 0.90));
+        long p95 = Math.round(computePercentile(errorsCopy, 0.95));
         long max = errorsCopy.get(n - 1);
         double mean = errorsCopy.stream().mapToLong(Long::longValue).average().orElse(0.0);
 
@@ -110,6 +109,16 @@ public final class KaraokeClock {
             logsCopy = new ArrayList<>(onsetLogs);
         }
         return new OnsetStats(n, mean, p50, p90, p95, max, logsCopy);
+    }
+
+    private static double computePercentile(List<Long> sorted, double percentile) {
+        if (sorted.isEmpty()) return 0.0;
+        if (sorted.size() == 1) return sorted.get(0);
+        double index = (sorted.size() - 1) * percentile;
+        int lower = (int) Math.floor(index);
+        int upper = (int) Math.ceil(index);
+        double weight = index - lower;
+        return sorted.get(lower) * (1.0 - weight) + sorted.get(upper) * weight;
     }
 
     public static final class OnsetStats {

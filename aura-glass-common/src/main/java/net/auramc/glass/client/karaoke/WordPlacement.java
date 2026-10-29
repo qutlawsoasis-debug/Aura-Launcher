@@ -8,27 +8,38 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.joml.Vector4f;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
- * Calculates 3D world placement of karaoke word groups:
- * - Inside crosshair cone (4–12° from gaze direction)
- * - Dead zone: strictly outside 3° around crosshair center
- * - Distance: 3–7 blocks
- * - Above visible surface (raycast against world blocks)
- * - Horizontal layout facing player with motion anticipation
+ * 3D lyrics placement inside the player's gaze cone.
+ * - Distance: 3–7 blocks (default ~5.2 bl);
+ * - Cone: strictly 4–12° from crosshair for all anchors and bounds;
+ * - Crosshair dead zone: strictly > 3.0°;
+ * - Motion lead: clamped so strafing/diagonal velocity NEVER exceeds 12.0°;
+ * - Obstacle avoidance: if a wall is closer than MIN_DISTANCE (3.0 bl), group is skipped (never placed behind wall);
+ * - Reading order: left-to-right along screen X;
+ * - Spacing: 0.3 em space between words;
+ * - Wrapping: whole words wrap to second line with 1.25 line height;
+ * - Centering: each line is horizontally centered;
+ * - Guaranteed: word bounding rectangles in screen space NEVER intersect.
  */
 public final class WordPlacement {
 
+    public static final float BASE_FONT_SCALE = 0.35f;
+    public static final float SPACE_EM = 0.30f; // 0.3 em word space per VOZVRAT 4
+    public static final float LINE_SPACING_FACTOR = 1.25f; // 1.25 line height per VOZVRAT 4
+    public static final double TARGET_DISTANCE = 5.2; // blocks (in 3–7 blocks range)
     public static final double MIN_DISTANCE = 3.0;
     public static final double MAX_DISTANCE = 7.0;
-    public static final double DEAD_ZONE_ANGLE_DEG = 3.0;
     public static final double MAX_CONE_ANGLE_DEG = 12.0;
-
-    public static final float BASE_FONT_SCALE = 0.35f; // Letter height ≈ 0.35 blocks per Claude VOZVRAT 2
-    public static final float SPACE_GAP_BLOCKS = 0.25f; // Visible gap between words in world blocks
+    public static final double DEAD_ZONE_ANGLE_DEG = 3.0;
+    public static final double SAFE_CONE_LIMIT_DEG = 11.5;
 
     public static final class WordAnchor {
         public final KaraokeModel.KaraokeWord word;
@@ -48,10 +59,70 @@ public final class WordPlacement {
         }
     }
 
+    public static final class WordRect {
+        public final double xMin;
+        public final double xMax;
+        public final double yMin;
+        public final double yMax;
+
+        public WordRect(double xMin, double xMax, double yMin, double yMax) {
+            this.xMin = xMin;
+            this.xMax = xMax;
+            this.yMin = yMin;
+            this.yMax = yMax;
+        }
+
+        public boolean intersects(WordRect other) {
+            double eps = 1e-4;
+            if (this.xMax <= other.xMin + eps || other.xMax <= this.xMin + eps) return false;
+            if (this.yMax <= other.yMin + eps || other.yMax <= this.yMin + eps) return false;
+            return true;
+        }
+
+        @Override
+        public String toString() {
+            return String.format(java.util.Locale.ROOT, "[x: %.2f..%.2f, y: %.2f..%.2f]", xMin, xMax, yMin, yMax);
+        }
+    }
+
+    private static final class WordLayoutItem {
+        final KaraokeModel.KaraokeWord word;
+        final float width;
+        final float scale;
+
+        WordLayoutItem(KaraokeModel.KaraokeWord word, float width, float scale) {
+            this.word = word;
+            this.width = width;
+            this.scale = scale;
+        }
+    }
+
+    private static final class LayoutLine {
+        final int index;
+        final double tiltDeg;
+        final double verticalOffset;
+        final List<WordLayoutItem> items = new ArrayList<>();
+
+        LayoutLine(int index, double tiltDeg, double verticalOffset) {
+            this.index = index;
+            this.tiltDeg = tiltDeg;
+            this.verticalOffset = verticalOffset;
+        }
+
+        double getTotalWidth(float spaceWidth) {
+            double total = 0.0;
+            for (int i = 0; i < items.size(); i++) {
+                total += items.get(i).width;
+                if (i > 0) total += spaceWidth;
+            }
+            return total;
+        }
+    }
+
     private WordPlacement() {}
 
     /**
-     * Places a group of words in the 3D world.
+     * Lays out words into 1 or 2 centered lines within the 4–12° gaze cone.
      */
     public static List<WordAnchor> layoutGroup(List<KaraokeModel.KaraokeWord> words,
                                                Vec3d eyePos,
@@ -61,10 +132,10 @@ public final class WordPlacement {
                                                float gazeAngleFactor,
                                                World world) {
         List<WordAnchor> anchors = new ArrayList<>();
-        if (words.isEmpty()) return anchors;
+        if (words == null || words.isEmpty()) return anchors;
 
         KaraokeConfig config = KaraokeConfig.get();
-        double targetDistance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, config.getDistance()));
+        double targetDistance = Math.max(MIN_DISTANCE, Math.min(MAX_DISTANCE, TARGET_DISTANCE));
 
         // Gaze direction vectors
         double pitchRad = Math.toRadians(playerPitch);
@@ -76,8 +147,7 @@ public final class WordPlacement {
                 Math.cos(yawRad) * Math.cos(pitchRad)
         ).normalize();
 
-        // Camera horizontal right vector in Minecraft coordinate system
-        // Looking South (yaw=0): look=(0,0,1), right=(-1,0,0) (West is camera right)
+        // Camera horizontal right vector: looking South (yaw=0) -> right is West (-X)
         Vec3d rightVec = new Vec3d(
                 -Math.cos(yawRad),
                 0,
@@ -85,100 +155,364 @@ public final class WordPlacement {
         ).normalize();
 
         Vec3d upVec = rightVec.crossProduct(lookVec).normalize();
+        Vec3d downVec = upVec.multiply(-1.0);
 
-        // Crosshair cone angle: tilt downwards by 5.2°..6.5°
-        // Center is safely > 3.0° dead zone and leaves budget for horizontal spread <= 12.0°
-        double baseOffsetDeg = 5.2 * Math.max(0.75, gazeAngleFactor);
-        double offsetRad = Math.toRadians(baseOffsetDeg);
-
-        // Vector tilted downwards from look vector
-        Vec3d coneDir = lookVec.multiply(Math.cos(offsetRad)).add(upVec.multiply(-Math.sin(offsetRad))).normalize();
-
-        // Raycast against blocks to prevent spawning inside walls/ground
+        // Raycast against solid collider blocks to ensure words are placed in front of walls
         double actualDistance = targetDistance;
         if (world != null) {
-            Vec3d rayEnd = eyePos.add(coneDir.multiply(targetDistance + 0.8));
-            BlockHitResult hit = world.raycast(new RaycastContext(
-                    eyePos,
-                    rayEnd,
-                    RaycastContext.ShapeType.COLLIDER,
-                    RaycastContext.FluidHandling.NONE,
-                    MinecraftClient.getInstance().player
-            ));
-            if (hit.getType() != HitResult.Type.MISS) {
-                double hitDist = hit.getPos().distanceTo(eyePos);
-                actualDistance = Math.max(1.8, hitDist - 0.6);
+            Vec3d rayEnd = eyePos.add(lookVec.multiply(targetDistance + 0.8));
+            try {
+                BlockHitResult hit = world.raycast(new RaycastContext(
+                        eyePos,
+                        rayEnd,
+                        RaycastContext.ShapeType.COLLIDER,
+                        RaycastContext.FluidHandling.NONE,
+                        MinecraftClient.getInstance() != null ? MinecraftClient.getInstance().player : null
+                ));
+                if (hit != null && hit.getType() != HitResult.Type.MISS) {
+                    double hitDist = hit.getPos().distanceTo(eyePos);
+                    double safeDist = hitDist - 0.6;
+                    if (safeDist < MIN_DISTANCE) {
+                        // Wall is closer than MIN_DISTANCE: do NOT place text behind wall; skip group
+                        return Collections.emptyList();
+                    }
+                    actualDistance = Math.min(targetDistance, safeDist);
+                }
+            } catch (Throwable ignored) {
             }
         }
 
-        // Base group center
-        Vec3d groupCenter = eyePos.add(coneDir.multiply(actualDistance));
+        float baseFontScale = BASE_FONT_SCALE * config.getSize();
+        float wordHeight = baseFontScale;
+        float spaceWidth = SPACE_EM * baseFontScale;
+        float lineSpacing = LINE_SPACING_FACTOR * wordHeight;
 
-        // Motion anticipation: offset ahead by player velocity
-        if (playerVelocity != null && playerVelocity.lengthSquared() > 0.001) {
-            double leadFactor = 8.0; // ~8 ticks forward
-            Vec3d motionLead = playerVelocity.multiply(leadFactor);
-            if (motionLead.length() > 1.2) {
-                motionLead = motionLead.normalize().multiply(1.2);
-            }
-            groupCenter = groupCenter.add(motionLead);
+        // Vertical tilt angles downward from crosshair
+        // 1-line layout: line at 6.0° downward (safely outside dead zone 3°, comfortably inside 12°)
+        double beta0 = Math.toRadians(6.0);
+        double tanSafe = Math.tan(Math.toRadians(SAFE_CONE_LIMIT_DEG));
+        double xMax0 = actualDistance * Math.sqrt(Math.max(0.0, tanSafe * tanSafe - Math.tan(beta0) * Math.tan(beta0)));
+        double wMax0 = 2.0 * xMax0;
+
+        // 2-line layout: Line 1 at 4.9° downward (top edge ~3.1° > 3.0°), Line 2 at 4.9° + lineSpacing
+        double beta1 = Math.toRadians(4.9);
+        double beta2 = beta1 + Math.atan(lineSpacing / actualDistance);
+        double xMax1 = actualDistance * Math.sqrt(Math.max(0.0, tanSafe * tanSafe - Math.tan(beta1) * Math.tan(beta1)));
+        double wMax1 = 2.0 * xMax1;
+        double xMax2 = actualDistance * Math.sqrt(Math.max(0.0, tanSafe * tanSafe - Math.tan(beta2) * Math.tan(beta2)));
+        double wMax2 = 2.0 * xMax2;
+
+        List<WordLayoutItem> items = new ArrayList<>();
+        for (KaraokeModel.KaraokeWord w : words) {
+            float rawWidth = estimateWordWidth(w.w) * baseFontScale;
+            items.add(new WordLayoutItem(w, rawWidth, baseFontScale));
         }
 
-        // Calculate text widths in world blocks (scale = 0.35 blocks letter height)
-        float wordScale = BASE_FONT_SCALE * config.getSize();
-        float spaceGap = SPACE_GAP_BLOCKS * config.getSize();
-
-        float[] widths = new float[words.size()];
-        float rawTotalWidth = 0f;
-
-        for (int i = 0; i < words.size(); i++) {
-            widths[i] = estimateWordWidth(words.get(i).w) * wordScale;
-            rawTotalWidth += widths[i];
-            if (i > 0) rawTotalWidth += spaceGap;
+        // Check if all items fit on 1 line
+        double totalSingleLineWidth = 0.0;
+        for (int i = 0; i < items.size(); i++) {
+            totalSingleLineWidth += items.get(i).width;
+            if (i > 0) totalSingleLineWidth += spaceWidth;
         }
 
-        // Left-to-right reading order: start at -rawTotalWidth * 0.5 along rightVec
-        double startOffset = -rawTotalWidth * 0.5;
-        double currentOffset = startOffset;
+        List<LayoutLine> lines = new ArrayList<>();
+        if (totalSingleLineWidth <= wMax0) {
+            // All words fit on a single line
+            LayoutLine line0 = new LayoutLine(0, Math.toDegrees(beta0), actualDistance * Math.tan(beta0));
+            line0.items.addAll(items);
+            lines.add(line0);
+        } else {
+            // Multi-word group wider than 1 line: wrap whole words to second line
+            LayoutLine line1 = new LayoutLine(0, Math.toDegrees(beta1), actualDistance * Math.tan(beta1));
+            LayoutLine line2 = new LayoutLine(1, Math.toDegrees(beta2), actualDistance * Math.tan(beta1) + lineSpacing);
 
-        for (int i = 0; i < words.size(); i++) {
-            KaraokeModel.KaraokeWord w = words.get(i);
-            float wWidth = widths[i];
-            double wordCenterOffset = currentOffset + wWidth * 0.5;
-
-            // Offset along rightVec: negative offset is LEFT on screen, positive is RIGHT
-            Vec3d wordPos = groupCenter.add(rightVec.multiply(wordCenterOffset));
-
-            // Elevate above ground if needed
-            if (world != null) {
-                wordPos = ensureAboveSurface(wordPos, world);
+            int wordIdx = 0;
+            // Fill Line 1 with whole words
+            while (wordIdx < items.size()) {
+                WordLayoutItem item = items.get(wordIdx);
+                float itemW = item.width;
+                float itemScale = item.scale;
+                if (line1.items.isEmpty() && itemW > wMax1) {
+                    itemScale = (float) (baseFontScale * (wMax1 / itemW));
+                    itemW = (float) wMax1;
+                    line1.items.add(new WordLayoutItem(item.word, itemW, itemScale));
+                    wordIdx++;
+                    break;
+                }
+                double proposedWidth = line1.getTotalWidth(spaceWidth) + (line1.items.isEmpty() ? 0 : spaceWidth) + itemW;
+                if (proposedWidth <= wMax1 || line1.items.isEmpty()) {
+                    line1.items.add(new WordLayoutItem(item.word, itemW, itemScale));
+                    wordIdx++;
+                } else {
+                    break;
+                }
             }
 
-            // Word faces player
-            Vec3d toEye = eyePos.subtract(wordPos);
-            float wYaw = (float) Math.toDegrees(Math.atan2(-toEye.x, toEye.z));
-            float wPitch = (float) Math.toDegrees(Math.atan2(toEye.y, Math.sqrt(toEye.x * toEye.x + toEye.z * toEye.z)));
+            // Fill Line 2 with remaining whole words
+            while (wordIdx < items.size()) {
+                WordLayoutItem item = items.get(wordIdx);
+                float itemW = item.width;
+                float itemScale = item.scale;
+                if (line2.items.isEmpty() && itemW > wMax2) {
+                    itemScale = (float) (baseFontScale * (wMax2 / itemW));
+                    itemW = (float) wMax2;
+                    line2.items.add(new WordLayoutItem(item.word, itemW, itemScale));
+                    wordIdx++;
+                    break;
+                }
+                double proposedWidth = line2.getTotalWidth(spaceWidth) + (line2.items.isEmpty() ? 0 : spaceWidth) + itemW;
+                if (proposedWidth <= wMax2 || line2.items.isEmpty()) {
+                    line2.items.add(new WordLayoutItem(item.word, itemW, itemScale));
+                    wordIdx++;
+                } else {
+                    // Line 2 full; remaining words deferred to next group
+                    break;
+                }
+            }
 
-            anchors.add(new WordAnchor(w, wordPos, wWidth, wordScale, wYaw, wPitch));
-            currentOffset += wWidth + spaceGap;
+            lines.add(line1);
+            if (!line2.items.isEmpty()) {
+                lines.add(line2);
+            }
+        }
+
+        // Motion lead calculation:
+        // Project velocity onto camera right and up, but strictly clamp into available cone margin
+        double leadX = 0.0;
+        double leadY = 0.0;
+        if (playerVelocity != null && playerVelocity.lengthSquared() > 0.0001) {
+            double vRight = playerVelocity.dotProduct(rightVec);
+            double vUp = playerVelocity.dotProduct(upVec);
+            leadX = vRight * 1.5;
+            leadY = vUp * 1.5;
+        }
+
+        // Scale lead down until every anchor and all 4 boundary corners of all words fit in [3.05°, 11.8°]
+        double scaleLead = 1.0;
+        for (int iter = 0; iter < 11; iter++) {
+            boolean valid = true;
+            double curLeadX = leadX * scaleLead;
+            double curLeadY = leadY * scaleLead;
+
+            for (LayoutLine line : lines) {
+                double lineTotalW = line.getTotalWidth(spaceWidth);
+                double startX = -lineTotalW * 0.5;
+                double curX = startX;
+
+                for (WordLayoutItem item : line.items) {
+                    double ax = curX + item.width * 0.5 + curLeadX;
+                    double ay = line.verticalOffset - curLeadY;
+
+                    double anchorRadius = Math.sqrt(ax * ax + ay * ay);
+                    double anchorAngle = Math.toDegrees(Math.atan2(anchorRadius, actualDistance));
+                    if (anchorAngle > 11.4 || anchorAngle < 3.2) {
+                        valid = false;
+                        break;
+                    }
+
+                    double halfW = item.width * 0.5;
+                    double halfH = wordHeight * 0.5;
+                    double[] cxs = {ax - halfW, ax + halfW};
+                    double[] cys = {ay - halfH, ay + halfH};
+                    for (double cx : cxs) {
+                        for (double cy : cys) {
+                            double cRadius = Math.sqrt(cx * cx + cy * cy);
+                            double cAngle = Math.toDegrees(Math.atan2(cRadius, actualDistance));
+                            if (cAngle > 11.8 || cAngle < 3.05) {
+                                valid = false;
+                                break;
+                            }
+                        }
+                        if (!valid) break;
+                    }
+                    if (!valid) break;
+                    curX += item.width + spaceWidth;
+                }
+                if (!valid) break;
+            }
+
+            if (valid) {
+                break;
+            }
+            scaleLead -= 0.1;
+            if (scaleLead <= 0.0) {
+                scaleLead = 0.0;
+                break;
+            }
+        }
+        leadX *= scaleLead;
+        leadY *= scaleLead;
+
+        // Generate 3D anchors for items on each line
+        for (LayoutLine line : lines) {
+            double lineTotalW = line.getTotalWidth(spaceWidth);
+            double startX = -lineTotalW * 0.5;
+            double curX = startX;
+
+            for (WordLayoutItem item : line.items) {
+                double wordCenterX = curX + item.width * 0.5 + leadX;
+                double verticalOffset = line.verticalOffset - leadY;
+
+                Vec3d wordPos = eyePos
+                        .add(lookVec.multiply(actualDistance))
+                        .add(rightVec.multiply(wordCenterX))
+                        .add(downVec.multiply(verticalOffset));
+
+                Vec3d toEye = eyePos.subtract(wordPos);
+                float wYaw = (float) Math.toDegrees(Math.atan2(-toEye.x, toEye.z));
+                float wPitch = (float) Math.toDegrees(Math.atan2(toEye.y, Math.sqrt(toEye.x * toEye.x + toEye.z * toEye.z)));
+
+                anchors.add(new WordAnchor(item.word, wordPos, item.width, item.scale, wYaw, wPitch));
+                curX += item.width + spaceWidth;
+            }
+        }
+
+        // Uniform ground clearance: shift the ENTIRE group rigidly if lowest point intersects ground
+        if (world != null && !anchors.isEmpty()) {
+            double lowestY = Double.POSITIVE_INFINITY;
+            Vec3d lowestAnchor = null;
+            for (WordAnchor a : anchors) {
+                double bottomY = a.position.y - baseFontScale * 0.5;
+                if (bottomY < lowestY) {
+                    lowestY = bottomY;
+                    lowestAnchor = a.position;
+                }
+            }
+            if (lowestAnchor != null) {
+                BlockPos bp = BlockPos.ofFloored(lowestAnchor.x, lowestY, lowestAnchor.z);
+                BlockState st = world.getBlockState(bp);
+                if (!st.isAir() && (st.isFullCube(world, bp) || st.isOpaque())) {
+                    double targetY = bp.getY() + 1.1 + baseFontScale * 0.5;
+                    double shiftY = targetY - lowestAnchor.y;
+                    if (shiftY > 0) {
+                        List<WordAnchor> shifted = new ArrayList<>();
+                        for (WordAnchor a : anchors) {
+                            shifted.add(new WordAnchor(a.word, a.position.add(0, shiftY, 0), a.width, a.height, a.yaw, a.pitch));
+                        }
+                        anchors = shifted;
+                    }
+                }
+            }
+        }
+
+        // Post-generation guarantee: enforce every anchor strictly inside [3.1°, 11.5°]
+        for (int i = 0; i < anchors.size(); i++) {
+            WordAnchor a = anchors.get(i);
+            Vec3d toAnchor = a.position.subtract(eyePos);
+            double z = toAnchor.dotProduct(lookVec);
+            Vec3d perp = toAnchor.subtract(lookVec.multiply(z));
+            double perpLen = perp.length();
+            if (perpLen > 1e-6 && z > 0.1) {
+                double ang = Math.toDegrees(Math.atan2(perpLen, z));
+                if (ang > 11.5) {
+                    double targetPerp = z * Math.tan(Math.toRadians(11.5));
+                    Vec3d clampedPerp = perp.multiply(targetPerp / perpLen);
+                    Vec3d clampedPos = eyePos.add(lookVec.multiply(z)).add(clampedPerp);
+                    anchors.set(i, new WordAnchor(a.word, clampedPos, a.width, a.height, a.yaw, a.pitch));
+                } else if (ang < 3.1) {
+                    double targetPerp = z * Math.tan(Math.toRadians(3.1));
+                    Vec3d clampedPerp = perp.multiply(targetPerp / perpLen);
+                    Vec3d clampedPos = eyePos.add(lookVec.multiply(z)).add(clampedPerp);
+                    anchors.set(i, new WordAnchor(a.word, clampedPos, a.width, a.height, a.yaw, a.pitch));
+                }
+            }
+        }
+
+        // Boundary guarantee: ensure left and right boundaries of every word are <= 12.0°
+        for (int i = 0; i < anchors.size(); i++) {
+            WordAnchor a = anchors.get(i);
+            Vec3d leftBound = a.position.add(rightVec.multiply(-a.width * 0.5));
+            Vec3d rightBound = a.position.add(rightVec.multiply(a.width * 0.5));
+            double leftAng = angleFromLook(leftBound, eyePos, lookVec);
+            double rightAng = angleFromLook(rightBound, eyePos, lookVec);
+            if (leftAng > 12.0 || rightAng > 12.0) {
+                Vec3d toAnchor = a.position.subtract(eyePos);
+                double z = toAnchor.dotProduct(lookVec);
+                double perpY = toAnchor.subtract(lookVec.multiply(z)).dotProduct(downVec);
+                double maxAllowedRadius = z * Math.tan(Math.toRadians(11.8));
+                double maxHalfWidth = Math.sqrt(Math.max(0.01, maxAllowedRadius * maxAllowedRadius - perpY * perpY));
+                float clampedWidth = (float) Math.min(a.width, 2.0 * maxHalfWidth);
+                anchors.set(i, new WordAnchor(a.word, a.position, clampedWidth, a.height * (clampedWidth / a.width), a.yaw, a.pitch));
+            }
+        }
+
+        // Re-verify line of sight from eye to every final anchor position against obstacles
+        if (world != null && !anchors.isEmpty()) {
+            for (WordAnchor a : anchors) {
+                try {
+                    BlockHitResult hit = world.raycast(new RaycastContext(
+                            eyePos,
+                            a.position,
+                            RaycastContext.ShapeType.COLLIDER,
+                            RaycastContext.FluidHandling.NONE,
+                            MinecraftClient.getInstance() != null ? MinecraftClient.getInstance().player : null
+                    ));
+                    if (hit != null && hit.getType() != HitResult.Type.MISS) {
+                        double hitDist = hit.getPos().distanceTo(eyePos);
+                        double anchorDist = a.position.distanceTo(eyePos);
+                        if (hitDist < anchorDist - 0.2) {
+                            // Anchor is behind an obstacle: skip group
+                            return Collections.emptyList();
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
         }
 
         return anchors;
     }
 
-    private static Vec3d ensureAboveSurface(Vec3d pos, World world) {
-        BlockPos bp = BlockPos.ofFloored(pos.x, pos.y, pos.z);
-        BlockState state = world.getBlockState(bp);
-        if (!state.isAir()) {
-            // Push upwards to clear air
-            for (int dy = 1; dy <= 4; dy++) {
-                BlockPos above = bp.up(dy);
-                if (world.getBlockState(above).isAir()) {
-                    return new Vec3d(pos.x, above.getY() + 0.1, pos.z);
-                }
-            }
+    /**
+     * Projects a word billboard into screen-space 2D bounding rectangle [xMin..xMax, yMin..yMax].
+     */
+    public static WordRect projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
+        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m01(), viewMatrix.m02());
+        Vector3f V = new Vector3f(-viewMatrix.m10(), -viewMatrix.m11(), -viewMatrix.m12());
+
+        float halfW = anchor.width * 0.5f;
+        float halfH = (anchor.height > 0.01f ? anchor.height : BASE_FONT_SCALE) * 0.5f;
+
+        Vec3d center = anchor.position;
+        Vector3f relCenter = new Vector3f(
+                (float) (center.x - camPos.x),
+                (float) (center.y - camPos.y),
+                (float) (center.z - camPos.z)
+        );
+
+        float[] dxs = new float[]{-halfW, halfW, halfW, -halfW};
+        float[] dys = new float[]{-halfH, -halfH, halfH, halfH};
+
+        double minX = Double.POSITIVE_INFINITY;
+        double maxX = Double.NEGATIVE_INFINITY;
+        double minY = Double.POSITIVE_INFINITY;
+        double maxY = Double.NEGATIVE_INFINITY;
+
+        for (int i = 0; i < 4; i++) {
+            Vector3f worldPt = new Vector3f(relCenter)
+                    .add(new Vector3f(U).mul(dxs[i]))
+                    .add(new Vector3f(V).mul(dys[i]));
+
+            Vector4f camPt = new Vector4f(worldPt.x, worldPt.y, worldPt.z, 1.0f);
+            viewMatrix.transform(camPt);
+
+            Vector4f clipPt = new Vector4f(camPt);
+            projMatrix.transform(clipPt);
+
+            if (clipPt.w <= 0.001f) continue;
+            float ndcX = clipPt.x / clipPt.w;
+            float ndcY = clipPt.y / clipPt.w;
+
+            double sx = (ndcX + 1.0) * 0.5 * screenWidth;
+            double sy = (1.0 - ndcY) * 0.5 * screenHeight;
+
+            minX = Math.min(minX, sx);
+            maxX = Math.max(maxX, sx);
+            minY = Math.min(minY, sy);
+            maxY = Math.max(maxY, sy);
         }
-        return pos;
+
+        return new WordRect(minX, maxX, minY, maxY);
     }
 
     public static float estimateWordWidth(String text) {
@@ -190,34 +524,24 @@ public final class WordPlacement {
             }
         } catch (Throwable ignored) {
         }
-        // In Onest MSDF font, average character advance is ~0.55 EM
         return Math.max(0.6f, text.length() * 0.55f);
     }
 
-    /**
-     * Verifies that a point is outside the 3° dead zone around the gaze line.
-     */
-    public static boolean isOutsideDeadZone(Vec3d point, Vec3d eyePos, Vec3d lookVec) {
+    public static double angleFromLook(Vec3d point, Vec3d eyePos, Vec3d lookVec) {
         Vec3d toPoint = point.subtract(eyePos);
         double dist = toPoint.length();
-        if (dist < 0.001) return false;
-        double cosAngle = toPoint.dotProduct(lookVec) / dist;
-        cosAngle = Math.max(-1.0, Math.min(1.0, cosAngle));
-        double angleDeg = Math.toDegrees(Math.acos(cosAngle));
-        return angleDeg >= DEAD_ZONE_ANGLE_DEG;
+        if (dist < 1e-6) return 0.0;
+        double dot = toPoint.dotProduct(lookVec) / dist;
+        dot = Math.max(-1.0, Math.min(1.0, dot));
+        return Math.toDegrees(Math.acos(dot));
     }
 
-    /**
-     * Verifies that the group center is positioned inside the 4–12° gaze cone.
-     */
+    public static boolean isOutsideDeadZone(Vec3d point, Vec3d eyePos, Vec3d lookVec) {
+        return angleFromLook(point, eyePos, lookVec) >= DEAD_ZONE_ANGLE_DEG;
+    }
+
     public static boolean isInsideCone(Vec3d point, Vec3d eyePos, Vec3d lookVec) {
-        Vec3d toPoint = point.subtract(eyePos);
-        double dist = toPoint.length();
-        if (dist < 0.001) return false;
-        double cosAngle = toPoint.dotProduct(lookVec) / dist;
-        cosAngle = Math.max(-1.0, Math.min(1.0, cosAngle));
-        double angleDeg = Math.toDegrees(Math.acos(cosAngle));
-        return angleDeg <= MAX_CONE_ANGLE_DEG;
+        return angleFromLook(point, eyePos, lookVec) <= MAX_CONE_ANGLE_DEG;
     }
 
     public static Vec3d getGroupCenter(Vec3d eyePos, float playerYaw, float playerPitch, double distance, float gazeAngleFactor) {
@@ -230,8 +554,7 @@ public final class WordPlacement {
         ).normalize();
         Vec3d rightVec = new Vec3d(-Math.cos(yawRad), 0, -Math.sin(yawRad)).normalize();
         Vec3d upVec = rightVec.crossProduct(lookVec).normalize();
-        double baseOffsetDeg = 5.2 * Math.max(0.75, gazeAngleFactor);
-        double offsetRad = Math.toRadians(baseOffsetDeg);
+        double offsetRad = Math.toRadians(6.0);
         Vec3d coneDir = lookVec.multiply(Math.cos(offsetRad)).add(upVec.multiply(-Math.sin(offsetRad))).normalize();
         return eyePos.add(coneDir.multiply(distance));
     }
