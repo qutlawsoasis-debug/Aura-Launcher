@@ -329,6 +329,65 @@ public final class KaraokeSuiteTest {
             }
         }
 
+        // VOZVRAT 5: Check 2 short words ("Bright horizon") stay on ONE single line
+        List<KaraokeModel.KaraokeWord> twoShortWords = List.of(
+                new KaraokeModel.KaraokeWord(1000, 300, "Bright"),
+                new KaraokeModel.KaraokeWord(1350, 300, "horizon")
+        );
+        var twoWordAnchors = WordPlacement.layoutGroup(twoShortWords, eyePos, 0f, 0f, Vec3d.ZERO, 1.0f, null);
+        check(twoWordAnchors.size() == 2, "2 words on single line");
+        check(Math.abs(twoWordAnchors.get(0).position.y - twoWordAnchors.get(1).position.y) < 0.05,
+                "Bright horizon must stay on ONE single line (y0=" + twoWordAnchors.get(0).position.y + ", y1=" + twoWordAnchors.get(1).position.y + ")");
+
+        // QA 11:05 ConeProbe 4 corners across sizes 0.5, 1.0, 1.5, 2.0
+        float[] testSizes = {0.5f, 1.0f, 1.5f, 2.0f};
+        List<List<KaraokeModel.KaraokeWord>> probeSets = List.of(
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "word")),
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "word"), new KaraokeModel.KaraokeWord(1300, 300, "word"), new KaraokeModel.KaraokeWord(1600, 300, "word")),
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon")),
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "probe"), new KaraokeModel.KaraokeWord(1350, 300, "word"))
+        );
+        Vec3d[] probeVelocities = {Vec3d.ZERO, new Vec3d(0.2, 0, 0), new Vec3d(-0.2, 0, 0.2)};
+
+        for (float sz : testSizes) {
+            KaraokeConfig.get().setSize(sz);
+            for (var pWords : probeSets) {
+                for (Vec3d vel : probeVelocities) {
+                    for (float testYaw : new float[]{0f, 45f, 90f}) {
+                        for (float testPitch : new float[]{-10f, 0f, 15f}) {
+                            double yRad = Math.toRadians(testYaw);
+                            double pRad = Math.toRadians(testPitch);
+                            Vec3d currentLook = new Vec3d(
+                                    -Math.sin(yRad) * Math.cos(pRad),
+                                    -Math.sin(pRad),
+                                    Math.cos(yRad) * Math.cos(pRad)
+                            ).normalize();
+                            Vec3d camRight = new Vec3d(-Math.cos(yRad), 0, -Math.sin(yRad)).normalize();
+                            Vec3d camUp = camRight.crossProduct(currentLook).normalize();
+                            Vec3d camDown = camUp.multiply(-1.0);
+
+                            var pAnchors = WordPlacement.layoutGroup(pWords, eyePos, testYaw, testPitch, vel, 1.0f, null);
+                            check(!pAnchors.isEmpty(), "anchors generated for size " + sz);
+
+                            for (var a : pAnchors) {
+                                double halfW = a.width * 0.5;
+                                double halfH = a.height * 0.5;
+                                for (double sx : new double[]{-halfW, halfW}) {
+                                    for (double sy : new double[]{-halfH, halfH}) {
+                                        Vec3d corner = a.position.add(camRight.multiply(sx)).add(camDown.multiply(sy));
+                                        double cAng = WordPlacement.angleFromLook(corner, eyePos, currentLook);
+                                        check(cAng >= 2.9999, "Corner inside dead zone: " + cAng + " at size=" + sz);
+                                        check(cAng <= 12.0001, "Corner exceeds 12.0° cone: " + cAng + " at size=" + sz);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        KaraokeConfig.get().setSize(1.0f); // Reset to default
+
         System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), cone limit (<= 12° for all anchors and bounds including long words), and left-to-right screen order with spaces");
     }
 

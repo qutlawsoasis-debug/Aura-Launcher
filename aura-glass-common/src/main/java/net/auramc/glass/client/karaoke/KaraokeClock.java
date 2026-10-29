@@ -45,6 +45,12 @@ public final class KaraokeClock {
         this.onsetLogs.clear();
     }
 
+    public void shiftDemoStartTime(long deltaMs) {
+        if (demoStartTime >= 0L) {
+            demoStartTime += deltaMs;
+        }
+    }
+
     public void reset() {
         this.demoStartTime = -1L;
         this.demoPaused = false;

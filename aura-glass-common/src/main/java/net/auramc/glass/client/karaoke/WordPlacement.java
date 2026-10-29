@@ -31,10 +31,11 @@ import java.util.List;
  */
 public final class WordPlacement {
 
-    public static final float BASE_FONT_SCALE = 0.35f;
+    public static final float BASE_FONT_SCALE = 0.30f;
+    public static final float FONT_LINE_HEIGHT_EM = 1.28f; // ascent + descent of Onest font (0.97 + 0.305 = 1.275 ~ 1.28 em)
     public static final float SPACE_EM = 0.30f; // 0.3 em word space per VOZVRAT 4
-    public static final float LINE_SPACING_FACTOR = 1.25f; // 1.25 line height per VOZVRAT 4
-    public static final double TARGET_DISTANCE = 5.2; // blocks (in 3–7 blocks range)
+    public static final float LINE_SPACING_FACTOR = 1.25f; // 1.25 line height per VOZVRAT 4 & 5
+    public static final double TARGET_DISTANCE = 5.6; // blocks (in 3–7 blocks range, comfortably fitting words in 12° cone)
     public static final double MIN_DISTANCE = 3.0;
     public static final double MAX_DISTANCE = 7.0;
     public static final double MAX_CONE_ANGLE_DEG = 12.0;
@@ -183,30 +184,19 @@ public final class WordPlacement {
         }
 
         float baseFontScale = BASE_FONT_SCALE * config.getSize();
-        float wordHeight = baseFontScale;
+        float fullLineHeight = FONT_LINE_HEIGHT_EM * baseFontScale;
+        float wordHeight = fullLineHeight;
         float spaceWidth = SPACE_EM * baseFontScale;
-        float lineSpacing = LINE_SPACING_FACTOR * wordHeight;
-
-        // Vertical tilt angles downward from crosshair
-        // 1-line layout: line at 6.0° downward (safely outside dead zone 3°, comfortably inside 12°)
-        double beta0 = Math.toRadians(6.0);
-        double tanSafe = Math.tan(Math.toRadians(SAFE_CONE_LIMIT_DEG));
-        double xMax0 = actualDistance * Math.sqrt(Math.max(0.0, tanSafe * tanSafe - Math.tan(beta0) * Math.tan(beta0)));
-        double wMax0 = 2.0 * xMax0;
-
-        // 2-line layout: Line 1 at 4.9° downward (top edge ~3.1° > 3.0°), Line 2 at 4.9° + lineSpacing
-        double beta1 = Math.toRadians(4.9);
-        double beta2 = beta1 + Math.atan(lineSpacing / actualDistance);
-        double xMax1 = actualDistance * Math.sqrt(Math.max(0.0, tanSafe * tanSafe - Math.tan(beta1) * Math.tan(beta1)));
-        double wMax1 = 2.0 * xMax1;
-        double xMax2 = actualDistance * Math.sqrt(Math.max(0.0, tanSafe * tanSafe - Math.tan(beta2) * Math.tan(beta2)));
-        double wMax2 = 2.0 * xMax2;
+        float lineSpacing = LINE_SPACING_FACTOR * fullLineHeight;
 
         List<WordLayoutItem> items = new ArrayList<>();
         for (KaraokeModel.KaraokeWord w : words) {
             float rawWidth = estimateWordWidth(w.w) * baseFontScale;
             items.add(new WordLayoutItem(w, rawWidth, baseFontScale));
         }
+
+        // Top edge of line 1 strictly outside 3.0° dead zone
+        double y_top = actualDistance * Math.tan(Math.toRadians(3.25));
 
         // Check if all items fit on 1 line
         double totalSingleLineWidth = 0.0;
@@ -215,64 +205,116 @@ public final class WordPlacement {
             if (i > 0) totalSingleLineWidth += spaceWidth;
         }
 
+        double y0 = y_top + fullLineHeight * 0.5;
+        double halfW0 = totalSingleLineWidth * 0.5;
+        double maxR0 = Math.sqrt(halfW0 * halfW0 + (y_top + fullLineHeight) * (y_top + fullLineHeight));
+        double maxCorner0 = Math.toDegrees(Math.atan2(maxR0, actualDistance));
+
+        // Per VOZVRAT 5: 2 words must stay on 1 line (scaled if needed); 3+ words wrap to 2 lines
+        boolean fitsOnSingleLine = items.size() <= 2;
+
         List<LayoutLine> lines = new ArrayList<>();
-        if (totalSingleLineWidth <= wMax0) {
-            // All words fit on a single line
-            LayoutLine line0 = new LayoutLine(0, Math.toDegrees(beta0), actualDistance * Math.tan(beta0));
+        if (fitsOnSingleLine) {
+            LayoutLine line0 = new LayoutLine(0, Math.toDegrees(Math.atan2(y0, actualDistance)), y0);
             line0.items.addAll(items);
             lines.add(line0);
         } else {
-            // Multi-word group wider than 1 line: wrap whole words to second line
-            LayoutLine line1 = new LayoutLine(0, Math.toDegrees(beta1), actualDistance * Math.tan(beta1));
-            LayoutLine line2 = new LayoutLine(1, Math.toDegrees(beta2), actualDistance * Math.tan(beta1) + lineSpacing);
+            double y1 = y_top + fullLineHeight * 0.5;
+            double y2 = y1 + lineSpacing;
 
-            int wordIdx = 0;
-            // Fill Line 1 with whole words
-            while (wordIdx < items.size()) {
-                WordLayoutItem item = items.get(wordIdx);
-                float itemW = item.width;
-                float itemScale = item.scale;
-                if (line1.items.isEmpty() && itemW > wMax1) {
-                    itemScale = (float) (baseFontScale * (wMax1 / itemW));
-                    itemW = (float) wMax1;
-                    line1.items.add(new WordLayoutItem(item.word, itemW, itemScale));
-                    wordIdx++;
-                    break;
-                }
-                double proposedWidth = line1.getTotalWidth(spaceWidth) + (line1.items.isEmpty() ? 0 : spaceWidth) + itemW;
-                if (proposedWidth <= wMax1 || line1.items.isEmpty()) {
-                    line1.items.add(new WordLayoutItem(item.word, itemW, itemScale));
-                    wordIdx++;
+            LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1, actualDistance)), y1);
+            LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2, actualDistance)), y2);
+
+            int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+            for (int i = 0; i < items.size(); i++) {
+                if (i < targetLine1Count) {
+                    line1.items.add(items.get(i));
                 } else {
-                    break;
+                    line2.items.add(items.get(i));
                 }
             }
-
-            // Fill Line 2 with remaining whole words
-            while (wordIdx < items.size()) {
-                WordLayoutItem item = items.get(wordIdx);
-                float itemW = item.width;
-                float itemScale = item.scale;
-                if (line2.items.isEmpty() && itemW > wMax2) {
-                    itemScale = (float) (baseFontScale * (wMax2 / itemW));
-                    itemW = (float) wMax2;
-                    line2.items.add(new WordLayoutItem(item.word, itemW, itemScale));
-                    wordIdx++;
-                    break;
-                }
-                double proposedWidth = line2.getTotalWidth(spaceWidth) + (line2.items.isEmpty() ? 0 : spaceWidth) + itemW;
-                if (proposedWidth <= wMax2 || line2.items.isEmpty()) {
-                    line2.items.add(new WordLayoutItem(item.word, itemW, itemScale));
-                    wordIdx++;
-                } else {
-                    // Line 2 full; remaining words deferred to next group
-                    break;
-                }
-            }
-
             lines.add(line1);
             if (!line2.items.isEmpty()) {
                 lines.add(line2);
+            }
+        }
+
+        // Analytic group scale solver: ensures all 4 corners of all words <= 11.85° cone
+        double maxAllowedR = actualDistance * Math.tan(Math.toRadians(11.85));
+        double minScale = 1.0;
+        for (LayoutLine line : lines) {
+            double lineTotalW = line.getTotalWidth(spaceWidth);
+            double startX = -lineTotalW * 0.5;
+            double curX = startX;
+
+            for (WordLayoutItem item : line.items) {
+                double centerX = curX + item.width * 0.5;
+                double deltaY_center = line.verticalOffset - y_top;
+
+                double halfW = item.width * 0.5;
+                double halfH = wordHeight * 0.5;
+
+                for (double sx : new double[]{-halfW, halfW}) {
+                    for (double sy : new double[]{-halfH, halfH}) {
+                        double cx = centerX + sx;
+                        double deltaY_corner = deltaY_center + sy;
+                        double A = cx * cx + deltaY_corner * deltaY_corner;
+                        if (A > 1e-9) {
+                            double B = 2.0 * y_top * deltaY_corner;
+                            double C = y_top * y_top - maxAllowedR * maxAllowedR;
+                            if (C < 0) {
+                                double disc = B * B - 4.0 * A * C;
+                                if (disc >= 0) {
+                                    double s = (-B + Math.sqrt(disc)) / (2.0 * A);
+                                    if (s > 0 && s < minScale) {
+                                        minScale = s;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                curX += item.width + spaceWidth;
+            }
+        }
+
+        if (minScale < 0.999) {
+            float s = (float) minScale;
+            baseFontScale *= s;
+            fullLineHeight *= s;
+            wordHeight = fullLineHeight;
+            spaceWidth *= s;
+            lineSpacing *= s;
+
+            items.clear();
+            for (KaraokeModel.KaraokeWord w : words) {
+                float rawWidth = estimateWordWidth(w.w) * baseFontScale;
+                items.add(new WordLayoutItem(w, rawWidth, baseFontScale));
+            }
+
+            lines.clear();
+            if (fitsOnSingleLine) {
+                double y0_s = y_top + fullLineHeight * 0.5;
+                LayoutLine line0 = new LayoutLine(0, Math.toDegrees(Math.atan2(y0_s, actualDistance)), y0_s);
+                line0.items.addAll(items);
+                lines.add(line0);
+            } else {
+                double y1_s = y_top + fullLineHeight * 0.5;
+                double y2_s = y1_s + lineSpacing;
+                LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1_s, actualDistance)), y1_s);
+                LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2_s, actualDistance)), y2_s);
+                int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+                for (int i = 0; i < items.size(); i++) {
+                    if (i < targetLine1Count) {
+                        line1.items.add(items.get(i));
+                    } else {
+                        line2.items.add(items.get(i));
+                    }
+                }
+                lines.add(line1);
+                if (!line2.items.isEmpty()) {
+                    lines.add(line2);
+                }
             }
         }
 
@@ -362,7 +404,7 @@ public final class WordPlacement {
                 float wYaw = (float) Math.toDegrees(Math.atan2(-toEye.x, toEye.z));
                 float wPitch = (float) Math.toDegrees(Math.atan2(toEye.y, Math.sqrt(toEye.x * toEye.x + toEye.z * toEye.z)));
 
-                anchors.add(new WordAnchor(item.word, wordPos, item.width, item.scale, wYaw, wPitch));
+                anchors.add(new WordAnchor(item.word, wordPos, item.width, wordHeight, wYaw, wPitch));
                 curX += item.width + spaceWidth;
             }
         }
@@ -392,47 +434,6 @@ public final class WordPlacement {
                         anchors = shifted;
                     }
                 }
-            }
-        }
-
-        // Post-generation guarantee: enforce every anchor strictly inside [3.1°, 11.5°]
-        for (int i = 0; i < anchors.size(); i++) {
-            WordAnchor a = anchors.get(i);
-            Vec3d toAnchor = a.position.subtract(eyePos);
-            double z = toAnchor.dotProduct(lookVec);
-            Vec3d perp = toAnchor.subtract(lookVec.multiply(z));
-            double perpLen = perp.length();
-            if (perpLen > 1e-6 && z > 0.1) {
-                double ang = Math.toDegrees(Math.atan2(perpLen, z));
-                if (ang > 11.5) {
-                    double targetPerp = z * Math.tan(Math.toRadians(11.5));
-                    Vec3d clampedPerp = perp.multiply(targetPerp / perpLen);
-                    Vec3d clampedPos = eyePos.add(lookVec.multiply(z)).add(clampedPerp);
-                    anchors.set(i, new WordAnchor(a.word, clampedPos, a.width, a.height, a.yaw, a.pitch));
-                } else if (ang < 3.1) {
-                    double targetPerp = z * Math.tan(Math.toRadians(3.1));
-                    Vec3d clampedPerp = perp.multiply(targetPerp / perpLen);
-                    Vec3d clampedPos = eyePos.add(lookVec.multiply(z)).add(clampedPerp);
-                    anchors.set(i, new WordAnchor(a.word, clampedPos, a.width, a.height, a.yaw, a.pitch));
-                }
-            }
-        }
-
-        // Boundary guarantee: ensure left and right boundaries of every word are <= 12.0°
-        for (int i = 0; i < anchors.size(); i++) {
-            WordAnchor a = anchors.get(i);
-            Vec3d leftBound = a.position.add(rightVec.multiply(-a.width * 0.5));
-            Vec3d rightBound = a.position.add(rightVec.multiply(a.width * 0.5));
-            double leftAng = angleFromLook(leftBound, eyePos, lookVec);
-            double rightAng = angleFromLook(rightBound, eyePos, lookVec);
-            if (leftAng > 12.0 || rightAng > 12.0) {
-                Vec3d toAnchor = a.position.subtract(eyePos);
-                double z = toAnchor.dotProduct(lookVec);
-                double perpY = toAnchor.subtract(lookVec.multiply(z)).dotProduct(downVec);
-                double maxAllowedRadius = z * Math.tan(Math.toRadians(11.8));
-                double maxHalfWidth = Math.sqrt(Math.max(0.01, maxAllowedRadius * maxAllowedRadius - perpY * perpY));
-                float clampedWidth = (float) Math.min(a.width, 2.0 * maxHalfWidth);
-                anchors.set(i, new WordAnchor(a.word, a.position, clampedWidth, a.height * (clampedWidth / a.width), a.yaw, a.pitch));
             }
         }
 
@@ -467,11 +468,15 @@ public final class WordPlacement {
      * Projects a word billboard into screen-space 2D bounding rectangle [xMin..xMax, yMin..yMax].
      */
     public static WordRect projectWordToScreen(WordAnchor anchor, Matrix4f viewMatrix, Matrix4f projMatrix, int screenWidth, int screenHeight, Vec3d camPos) {
-        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m01(), viewMatrix.m02());
-        Vector3f V = new Vector3f(-viewMatrix.m10(), -viewMatrix.m11(), -viewMatrix.m12());
+        // Basis vectors in camera-relative world space:
+        // viewMatrix * U == (1, 0, 0) [Screen RIGHT] (Row 0 of viewMatrix: m00, m10, m20)
+        // viewMatrix * V == (0, -1, 0) [Screen DOWN] (-Row 1 of viewMatrix: -m01, -m11, -m21)
+        Vector3f U = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
+        Vector3f V = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
 
         float halfW = anchor.width * 0.5f;
-        float halfH = (anchor.height > 0.01f ? anchor.height : BASE_FONT_SCALE) * 0.5f;
+        float fullH = anchor.height > 0.01f ? anchor.height : (BASE_FONT_SCALE * FONT_LINE_HEIGHT_EM);
+        float halfH = fullH * 0.5f;
 
         Vec3d center = anchor.position;
         Vector3f relCenter = new Vector3f(

@@ -171,8 +171,8 @@ public final class KaraokeWorldRenderer {
         // Basis vectors in camera-relative space derived directly from viewMatrix:
         // viewMatrix * U == (1, 0, 0) [Screen RIGHT]
         // viewMatrix * V == (0, -1, 0) [Screen DOWN]
-        Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m01(), viewMatrix.m02());
-        Vector3f billboardV = new Vector3f(-viewMatrix.m10(), -viewMatrix.m11(), -viewMatrix.m12());
+        Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
+        Vector3f billboardV = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
 
         for (WordPlacement.WordAnchor anchor : activeAnchors) {
             KaraokeModel.KaraokeWord kw = anchor.word;
@@ -190,7 +190,7 @@ public final class KaraokeWorldRenderer {
 
             int outlineColor = applyAlpha(WordAnimation.COLOR_OUTLINE, ((wordColor >>> 24) & 0xFF) / 255f);
 
-            float wordScale = anchor.height > 0.01f ? anchor.height : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
+            float wordScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
             emitString(kw.w, anchor.position, camPos, billboardU, billboardV, wordColor, outlineColor, wordElapsedMs, wordScale);
         }
 
@@ -316,10 +316,11 @@ public final class KaraokeWorldRenderer {
             int charOut = applyAlpha(outlineColor, charAlpha * ((outlineColor >>> 24) / 255f));
 
             if (glyph.visible) {
+                float verticalCenterOffset = 0.726f * charScale;
                 float lx0 = (penX + glyph.left) * charScale;
                 float lx1 = (penX + glyph.right) * charScale;
-                float ly0 = (-ascender + glyph.top) * charScale;
-                float ly1 = (-ascender + glyph.bottom) * charScale;
+                float ly0 = (-ascender + glyph.top) * charScale - verticalCenterOffset;
+                float ly1 = (-ascender + glyph.bottom) * charScale - verticalCenterOffset;
 
                 emitQuad(D, U, V, lx0, ly0, lx1, ly1,
                         glyph.u0, glyph.v0, glyph.u1, glyph.v1,
