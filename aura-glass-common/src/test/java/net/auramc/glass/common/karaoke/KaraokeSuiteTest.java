@@ -2,6 +2,7 @@ package net.auramc.glass.common.karaoke;
 
 import net.auramc.glass.client.karaoke.KaraokeClock;
 import net.auramc.glass.client.karaoke.KaraokeConfig;
+import net.auramc.glass.client.karaoke.KaraokeEngine;
 import net.auramc.glass.client.karaoke.KaraokeModel;
 import net.auramc.glass.client.karaoke.KaraokePhysics;
 import net.auramc.glass.client.karaoke.PlayerAdaptiveness;
@@ -146,7 +147,30 @@ public final class KaraokeSuiteTest {
         var resFlight = adapt.getCurrentResult();
         check(resFlight.canSpawn && resFlight.minGroup == 1 && resFlight.maxGroup == 1, "flight 1 word");
 
-        System.out.println("[PASS] 3. Player adaptiveness (all 10 states + non-accumulation)");
+        // 11. Real Production Event Hookup Path: onPlayerAttack()
+        KaraokeEngine engine = KaraokeEngine.getInstance();
+        engine.getAdaptiveness().setScriptedState(0.01, 5.0, false, false, false, false, false, false, 20.0f, -10000L, System.currentTimeMillis());
+        check(engine.getAdaptiveness().getCurrentResult().canSpawn, "engine reset to standing");
+        long tAttack = System.currentTimeMillis();
+        engine.onPlayerAttack();
+        var resAttack = engine.getAdaptiveness().getCurrentResult();
+        check(!resAttack.canSpawn, "onPlayerAttack immediately gates spawning");
+        check(resAttack.state == PlayerAdaptiveness.ActivityState.BLOCKED_COMBAT, "onPlayerAttack enters BLOCKED_COMBAT");
+        check(engine.getAdaptiveness().clampGroupSize(4) == 0, "clamped words is 0 during combat");
+        check(engine.getAdaptiveness().getLastCombatTimeMs() >= tAttack, "lastCombatTimeMs updated on attack");
+
+        // 12. Real Production Event Hookup Path: onPlayerDamage()
+        engine.getAdaptiveness().setScriptedState(0.01, 5.0, false, false, false, false, false, false, 20.0f, -10000L, System.currentTimeMillis());
+        check(engine.getAdaptiveness().getCurrentResult().canSpawn, "engine reset to standing");
+        long tDamage = System.currentTimeMillis();
+        engine.onPlayerDamage();
+        var resDamage = engine.getAdaptiveness().getCurrentResult();
+        check(!resDamage.canSpawn, "onPlayerDamage immediately gates spawning");
+        check(resDamage.state == PlayerAdaptiveness.ActivityState.BLOCKED_COMBAT, "onPlayerDamage enters BLOCKED_COMBAT");
+        check(engine.getAdaptiveness().clampGroupSize(4) == 0, "clamped words is 0 during combat");
+        check(engine.getAdaptiveness().getLastCombatTimeMs() >= tDamage, "lastCombatTimeMs updated on damage");
+
+        System.out.println("[PASS] 3. Player adaptiveness (all 10 states + attack/damage event hooks + non-accumulation)");
     }
 
     private static void testWordPlacementAndDeadZone() {

@@ -75,6 +75,11 @@ public final class PlayerAdaptiveness {
 
     public void recordCombat(long nowMs) {
         this.lastCombatTimeMs = nowMs;
+        evaluateState(nowMs);
+    }
+
+    public long getLastCombatTimeMs() {
+        return lastCombatTimeMs;
     }
 
     public void setScriptedState(double speed, double turnRateDegSec, boolean sprint, boolean jump,

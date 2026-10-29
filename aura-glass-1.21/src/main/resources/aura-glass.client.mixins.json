@@ -33,7 +33,9 @@
     "WorldRendererMixin",
     "KaraokeQaHiddenWindowMixin",
     "KaraokeQaNoAudioMixin",
-    "KaraokeQaNoCursorMixin"
+    "KaraokeQaNoCursorMixin",
+    "ClientPlayerInteractionManagerMixin",
+    "ClientPlayerEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 0

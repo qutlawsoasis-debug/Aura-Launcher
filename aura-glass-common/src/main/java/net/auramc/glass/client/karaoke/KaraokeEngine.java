@@ -45,6 +45,10 @@ public final class KaraokeEngine {
     private boolean groupPhysicsSpawned = false;
     private long lastActiveOnsetRecordedWordT = -1L;
 
+    // Client-side combat telemetry
+    private float lastRecordedHealth = -1.0f;
+    private int lastRecordedHurtTime = 0;
+
     // QA / Demo auto-capture flags
     private boolean demoChecked = false;
     private boolean demoWorldStarted = false;
@@ -69,6 +73,18 @@ public final class KaraokeEngine {
         return physics;
     }
 
+    public void onPlayerAttack() {
+        long now = System.currentTimeMillis();
+        adaptiveness.recordCombat(now);
+        System.out.println("[AuraKaraoke] Client combat event: player attack hook triggered at " + now);
+    }
+
+    public void onPlayerDamage() {
+        long now = System.currentTimeMillis();
+        adaptiveness.recordCombat(now);
+        System.out.println("[AuraKaraoke] Client combat event: player damage hook triggered at " + now);
+    }
+
     public void setLyrics(KaraokeModel.KaraokeLyrics lyrics) {
         this.lyrics = lyrics;
         this.currentLineIndex = 0;
@@ -78,6 +94,8 @@ public final class KaraokeEngine {
         this.groupHoldStartTime = -1L;
         this.groupPhysicsSpawned = false;
         this.lastActiveOnsetRecordedWordT = -1L;
+        this.lastRecordedHealth = -1.0f;
+        this.lastRecordedHurtTime = 0;
     }
 
     public void setLyricsFromJson(String json) {
@@ -180,6 +198,17 @@ public final class KaraokeEngine {
 
         // Run physics simulation
         physics.tick(world);
+
+        // Monitor real damage state on the player (client-side telemetry)
+        if (player != null) {
+            float hp = player.getHealth();
+            int hurt = player.hurtTime;
+            if (lastRecordedHealth > 0.0f && (hp < lastRecordedHealth || (hurt > 0 && hurt > lastRecordedHurtTime))) {
+                onPlayerDamage();
+            }
+            lastRecordedHealth = hp;
+            lastRecordedHurtTime = hurt;
+        }
 
         if (!isPlaying() || player == null) {
             return;
@@ -349,23 +378,53 @@ public final class KaraokeEngine {
         }
     }
 
-    private void captureProofFrame(MinecraftClient client, String filename) {
+    private Path getProofDirectory(MinecraftClient client) {
+        String prop = System.getProperty("aura.qa.proofDir");
+        if (prop != null && !prop.isBlank()) {
+            return Path.of(prop);
+        }
+        return client.runDirectory.toPath().resolve("proof");
+    }
+
+    private String getVersionTag() {
+        String prop = System.getProperty("aura.qa.versionSuffix");
+        if (prop != null && !prop.isBlank()) {
+            return prop.startsWith("-") ? prop.substring(1) : prop;
+        }
         try {
-            Path proofDir = client.runDirectory.toPath().resolve("proof");
+            String ver = net.minecraft.SharedConstants.getGameVersion().getName();
+            if (ver.contains("1.21")) return "121";
+            if (ver.contains("1.20")) return "120";
+            return ver.replace(".", "");
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
+    }
+
+    private void captureProofFrame(MinecraftClient client, String phase) {
+        try {
+            Path proofDir = getProofDirectory(client);
             Files.createDirectories(proofDir);
-            Path target = proofDir.resolve(filename);
+            String tag = getVersionTag();
+
+            // Versioned screenshot: e.g. karaoke-120-appear.png and karaoke-121-appear.png
+            String versionedName = "karaoke-" + tag + "-" + phase + ".png";
+            Path targetVersioned = proofDir.resolve(versionedName);
             try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
-                image.writeTo(target);
-                System.out.println("[AuraKaraoke] Saved proof frame: " + target + " (" + Files.size(target) + " bytes)");
+                image.writeTo(targetVersioned);
+                System.out.println("[AuraKaraoke] Saved versioned proof frame: " + targetVersioned + " (" + Files.size(targetVersioned) + " bytes)");
             }
-            Path screenshotsDir = client.runDirectory.toPath().resolve("screenshots");
-            Files.createDirectories(screenshotsDir);
-            Path screenshotTarget = screenshotsDir.resolve(filename);
-            try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
-                image.writeTo(screenshotTarget);
+
+            // Also save standard unversioned name in the isolated run's own proof directory
+            Path localProof = client.runDirectory.toPath().resolve("proof").resolve("karaoke-" + phase + ".png");
+            if (!localProof.equals(targetVersioned)) {
+                Files.createDirectories(localProof.getParent());
+                try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
+                    image.writeTo(localProof);
+                }
             }
         } catch (Throwable t) {
-            System.err.println("[AuraKaraoke] Error capturing " + filename + ": " + t.getMessage());
+            System.err.println("[AuraKaraoke] Error capturing proof frame " + phase + ": " + t.getMessage());
             t.printStackTrace();
         }
     }
@@ -376,19 +435,19 @@ public final class KaraokeEngine {
         // Appearance frame (scale rising, letter stagger)
         if (!shotAppearTaken && playbackMs >= 1300L && playbackMs <= 1800L && !activeAnchors.isEmpty()) {
             shotAppearTaken = true;
-            captureProofFrame(client, "karaoke-appear.png");
+            captureProofFrame(client, "appear");
         }
 
         // Hold frame (words fully manifested in #64D2FF)
         if (shotAppearTaken && !shotHoldTaken && playbackMs >= 2700L && playbackMs <= 3800L && !activeAnchors.isEmpty()) {
             shotHoldTaken = true;
-            captureProofFrame(client, "karaoke-hold.png");
+            captureProofFrame(client, "hold");
         }
 
         // Fall frame (physical words falling and bouncing)
         if (shotHoldTaken && !shotFallTaken && playbackMs >= 5000L && playbackMs <= 6000L) {
             shotFallTaken = true;
-            captureProofFrame(client, "karaoke-fall.png");
+            captureProofFrame(client, "fall");
         }
 
         // Complete & Stop
@@ -402,13 +461,14 @@ public final class KaraokeEngine {
 
     private void saveProofLogs(MinecraftClient client) {
         try {
-            Path proofDir = client.runDirectory.toPath().resolve("proof");
+            Path proofDir = getProofDirectory(client);
             Files.createDirectories(proofDir);
+            String tag = getVersionTag();
 
             // 1. Onset errors log
             KaraokeClock.OnsetStats stats = clock.getStats();
             StringBuilder onsetSb = new StringBuilder();
-            onsetSb.append("=== Karaoke Onset Timing Log (Real Game Run) ===\n");
+            onsetSb.append("=== Karaoke Onset Timing Log (Real Game Run ").append(tag).append(") ===\n");
             onsetSb.append(String.format(java.util.Locale.ROOT, "Samples: %d\n", stats.sampleCount));
             onsetSb.append(String.format(java.util.Locale.ROOT, "Mean error: %.2f ms\n", stats.meanErrorMs));
             onsetSb.append(String.format(java.util.Locale.ROOT, "p50: %d ms\n", stats.p50Ms));
@@ -419,11 +479,12 @@ public final class KaraokeEngine {
             for (String log : stats.recentLogs) {
                 onsetSb.append("  ").append(log).append("\n");
             }
-            Files.writeString(proofDir.resolve("onset-errors.log"), onsetSb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(proofDir.resolve("onset-errors-" + tag + ".log"), onsetSb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(client.runDirectory.toPath().resolve("proof/onset-errors.log"), onsetSb.toString(), StandardCharsets.UTF_8);
 
             // 2. Adaptiveness scenarios log
             StringBuilder scenSb = new StringBuilder();
-            scenSb.append("=== Player Adaptiveness Scenarios Evaluation ===\n");
+            scenSb.append("=== Player Adaptiveness Scenarios Evaluation (Game Run ").append(tag).append(") ===\n");
             PlayerAdaptiveness.EvaluationResult current = adaptiveness.getCurrentResult();
             scenSb.append(String.format(java.util.Locale.ROOT, "Current in-game state: state=%s, canSpawn=%b, words=%d..%d, gazeFactor=%.2f\n\n",
                     current.state, current.canSpawn, current.minGroup, current.maxGroup, current.gazeAngleFactor));
@@ -468,11 +529,25 @@ public final class KaraokeEngine {
 
             adaptiveness.setScriptedState(0.1, 0.0, false, false, true, false, false, false, 20.0f, -10000L, t);
             res = adaptiveness.getCurrentResult();
-            scenSb.append(String.format(java.util.Locale.ROOT, "  Flying: canSpawn=%b, words=%d..%d (Expect 1..1)\n", res.canSpawn, res.minGroup, res.maxGroup));
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Flying: canSpawn=%b, words=%d..%d (Expect 1..1)\n\n", res.canSpawn, res.minGroup, res.maxGroup));
 
-            Files.writeString(proofDir.resolve("scenarios.log"), scenSb.toString(), StandardCharsets.UTF_8);
+            // Production Combat Event Hookup Verification
+            scenSb.append("Production Event Hookup Paths:\n");
+            onPlayerAttack();
+            var resAttack = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Live Hookup (onPlayerAttack): canSpawn=%b, state=%s, combatDtMs=%d (Gated=true)\n",
+                    resAttack.canSpawn, resAttack.state, (System.currentTimeMillis() - adaptiveness.getLastCombatTimeMs())));
 
-            System.out.println("[AuraKaraoke] Saved onset-errors.log and scenarios.log to " + proofDir);
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, System.currentTimeMillis());
+            onPlayerDamage();
+            var resDamage = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Live Hookup (onPlayerDamage): canSpawn=%b, state=%s, combatDtMs=%d (Gated=true)\n",
+                    resDamage.canSpawn, resDamage.state, (System.currentTimeMillis() - adaptiveness.getLastCombatTimeMs())));
+
+            Files.writeString(proofDir.resolve("scenarios-" + tag + ".log"), scenSb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(client.runDirectory.toPath().resolve("proof/scenarios.log"), scenSb.toString(), StandardCharsets.UTF_8);
+
+            System.out.println("[AuraKaraoke] Saved onset-errors-" + tag + ".log and scenarios-" + tag + ".log to " + proofDir);
         } catch (Throwable t) {
             System.err.println("[AuraKaraoke] Error saving proof logs: " + t.getMessage());
             t.printStackTrace();
