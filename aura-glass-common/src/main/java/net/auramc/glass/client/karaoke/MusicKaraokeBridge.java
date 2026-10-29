@@ -118,6 +118,7 @@ public final class MusicKaraokeBridge implements AutoCloseable {
      * beyond W5's BridgeMusicSource.
      */
     public synchronized void update(long nowTimeMs) {
+        if (KaraokeConfig.get().isDemoMode()) return;
         MusicSource source = clock.source();
         if (source == null || !source.available()) {
             if (active) {

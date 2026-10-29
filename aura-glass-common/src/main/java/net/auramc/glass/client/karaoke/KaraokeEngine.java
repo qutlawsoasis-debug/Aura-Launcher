@@ -274,7 +274,9 @@ public final class KaraokeEngine {
      */
     public synchronized void tick(MinecraftClient client) {
         checkDemoStartup();
-        MusicKaraokeBridge.getInstance().update();
+        if (!KaraokeConfig.get().isDemoMode()) {
+            MusicKaraokeBridge.getInstance().update();
+        }
 
         if (client == null) return;
 
@@ -620,6 +622,21 @@ public final class KaraokeEngine {
     }
 
     private void setupSnowEnvironment(PlayerEntity player, World world) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var server = mc.getServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (var sw : server.getWorlds()) {
+                    sw.setTimeOfDay(6000L);
+                }
+            });
+        }
+        if (mc.getNetworkHandler() != null) {
+            try {
+                mc.getNetworkHandler().sendCommand("time set 6000");
+            } catch (Throwable ignored) {
+            }
+        }
         if (world instanceof net.minecraft.client.world.ClientWorld cw) {
             cw.setTimeOfDay(6000L); // Daytime (noon)
         }
@@ -638,6 +655,21 @@ public final class KaraokeEngine {
     }
 
     private void setupForestEnvironment(PlayerEntity player, World world) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var server = mc.getServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (var sw : server.getWorlds()) {
+                    sw.setTimeOfDay(6000L);
+                }
+            });
+        }
+        if (mc.getNetworkHandler() != null) {
+            try {
+                mc.getNetworkHandler().sendCommand("time set 6000");
+            } catch (Throwable ignored) {
+            }
+        }
         if (world instanceof net.minecraft.client.world.ClientWorld cw) {
             cw.setTimeOfDay(6000L); // Daytime (noon)
         }
@@ -656,6 +688,21 @@ public final class KaraokeEngine {
     }
 
     private void setupNightEnvironment(PlayerEntity player, World world) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        var server = mc.getServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (var sw : server.getWorlds()) {
+                    sw.setTimeOfDay(18000L);
+                }
+            });
+        }
+        if (mc.getNetworkHandler() != null) {
+            try {
+                mc.getNetworkHandler().sendCommand("time set 18000");
+            } catch (Throwable ignored) {
+            }
+        }
         if (world instanceof net.minecraft.client.world.ClientWorld cw) {
             cw.setTimeOfDay(18000L); // Midnight starlit sky
         }
@@ -733,6 +780,9 @@ public final class KaraokeEngine {
         if (!nightEnvApplied && playbackMs >= 14200L && client.world != null) {
             nightEnvApplied = true;
             setupNightEnvironment(client.player, client.world);
+        }
+        if (nightEnvApplied && client.world != null) {
+            client.world.setTimeOfDay(18000L);
         }
         if (shotForestFallTaken && !shotNightHoldTaken && playbackMs >= 16200L && !activeAnchors.isEmpty()) {
             shotNightHoldTaken = true;

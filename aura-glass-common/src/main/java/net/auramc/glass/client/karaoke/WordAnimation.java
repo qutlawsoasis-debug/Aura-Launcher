@@ -1,10 +1,11 @@
 package net.auramc.glass.client.karaoke;
 
 /**
- * Handles spring animation and color states for karaoke words based on Apple HIG:
+ * Handles spring animation and color states for karaoke words based on Apple HIG & W6b:
  * - Scale 0.6 -> 1.0 via Apple Spring (response=0.35s, damping=0.85)
  * - Letter-by-letter reveal with 20 ms stagger
- * - Current word accent #64D2FF, sung words #FFFFFF, upcoming words #D0C4E8F8
+ * - Light background (> 0.60): words dark rgb(29,29,31) alpha 0.90; current #0A84FF; sung dark rgb(29,29,31) alpha 0.65; white halo alpha 0.45 (width 0.08 em, blur 0.03 em)
+ * - Dark background (< 0.50): words white alpha 0.95; current #64D2FF; sung white alpha 0.75; black halo alpha 0.55 (width 0.10 em, blur 0.03 em)
  * - Post-phrase hold (400 ms) before physical drop
  */
 public final class WordAnimation {
@@ -18,17 +19,30 @@ public final class WordAnimation {
     public static final long LETTER_STAGGER_MS = 20L;  // 15–25 ms per letter
     public static final long POST_PHRASE_HOLD_MS = 400L;
 
-    // Palette per Apple HIG / W6b spec
-    public static final int COLOR_ACTIVE_DARK = 0xFF64D2FF;  // Accent cyan on dark background
-    public static final int COLOR_ACTIVE_LIGHT = 0xFF0A84FF; // Apple systemBlue on light background / snow
-    public static final int COLOR_ACTIVE = COLOR_ACTIVE_DARK; // Default / fallback
-    public static final int COLOR_UPCOMING = 0xF2FFFFFF;     // White 0.95 (rgba(255, 255, 255, 0.95))
-    public static final int COLOR_SUNG = 0xCCFFFFFF;         // White 0.80 (rgba(255, 255, 255, 0.80))
-    public static final int COLOR_OUTLINE = 0xFF000000;      // rgb(0, 0, 0) deep contrast outline / halo
+    // Palette per Apple HIG / W6b VOZVRAT 1 spec:
+    // Dark background (< 0.50):
+    public static final int COLOR_ACTIVE_DARK = 0xFF64D2FF;   // Accent cyan
+    public static final int COLOR_UPCOMING_DARK = 0xF2FFFFFF; // White alpha 0.95 (0.95 * 255 = 242 = 0xF2)
+    public static final int COLOR_SUNG_DARK = 0xBFFFFFFF;     // White alpha 0.75 (0.75 * 255 = 191 = 0xBF)
+    public static final int COLOR_HALO_DARK = 0x8C000000;     // Black alpha 0.55 (0.55 * 255 = 140 = 0x8C)
+    public static final float HALO_WIDTH_DARK = 0.10f;        // 0.10 em
+    public static final float HALO_BLUR_DARK = 0.03f;         // 0.03 em (crisp, not blurry)
 
-    // MSDF halo alpha thresholds per W6b ТЗ
-    public static final float HALO_ALPHA_DARK = 0.35f;
-    public static final float HALO_ALPHA_LIGHT = 0.60f;
+    // Light background (> 0.60):
+    public static final int COLOR_ACTIVE_LIGHT = 0xFF0A84FF;  // Apple systemBlue
+    public static final int COLOR_UPCOMING_LIGHT = 0xE61D1D1F;// Dark rgb(29,29,31) alpha 0.90 (0.90 * 255 = 230 = 0xE6)
+    public static final int COLOR_SUNG_LIGHT = 0xA61D1D1F;    // Dark rgb(29,29,31) alpha 0.65 (0.65 * 255 = 166 = 0xA6)
+    public static final int COLOR_HALO_LIGHT = 0x73FFFFFF;    // White alpha 0.45 (0.45 * 255 = 115 = 0x73)
+    public static final float HALO_WIDTH_LIGHT = 0.08f;       // 0.08 em
+    public static final float HALO_BLUR_LIGHT = 0.03f;        // 0.03 em
+
+    // Backward-compatible aliases
+    public static final int COLOR_ACTIVE = COLOR_ACTIVE_DARK;
+    public static final int COLOR_UPCOMING = COLOR_UPCOMING_DARK;
+    public static final int COLOR_SUNG = COLOR_SUNG_DARK;
+    public static final int COLOR_OUTLINE = 0xFF000000;
+    public static final float HALO_ALPHA_DARK = 0.55f;
+    public static final float HALO_ALPHA_LIGHT = 0.45f;
 
     public enum State {
         ENTERING,
@@ -92,11 +106,60 @@ public final class WordAnimation {
     }
 
     /**
-     * Interpolates MSDF halo alpha between 0.35 (dark bg) and 0.60 (light bg / snow).
+     * Interpolates upcoming word color between white 0.95 (dark bg) and dark rgb(29,29,31) 0.90 (light bg).
+     */
+    public static int getUpcomingWordColor(float lightFactor) {
+        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
+        int r = Math.round((1.0f - t) * 255f + t * 29f);
+        int g = Math.round((1.0f - t) * 255f + t * 29f);
+        int b = Math.round((1.0f - t) * 255f + t * 31f);
+        int a = Math.round(((1.0f - t) * 0.95f + t * 0.90f) * 255f);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    /**
+     * Interpolates sung word color between white 0.75 (dark bg) and dark rgb(29,29,31) 0.65 (light bg).
+     */
+    public static int getSungWordColor(float lightFactor) {
+        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
+        int r = Math.round((1.0f - t) * 255f + t * 29f);
+        int g = Math.round((1.0f - t) * 255f + t * 29f);
+        int b = Math.round((1.0f - t) * 255f + t * 31f);
+        int a = Math.round(((1.0f - t) * 0.75f + t * 0.65f) * 255f);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    /**
+     * Interpolates halo outline color between black 0.55 (dark bg) and white 0.45 (light bg).
+     */
+    public static int getHaloColor(float lightFactor) {
+        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
+        int rgb = Math.round(t * 255f);
+        int a = Math.round(((1.0f - t) * 0.55f + t * 0.45f) * 255f);
+        return (a << 24) | (rgb << 16) | (rgb << 8) | rgb;
+    }
+
+    /**
+     * Interpolates MSDF halo alpha between 0.55 (dark bg) and 0.45 (light bg / snow).
      */
     public static float getHaloAlpha(float lightFactor) {
         float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
-        return HALO_ALPHA_DARK + (HALO_ALPHA_LIGHT - HALO_ALPHA_DARK) * t;
+        return 0.55f + (0.45f - 0.55f) * t;
+    }
+
+    /**
+     * Interpolates MSDF halo width between 0.10 em (dark bg) and 0.08 em (light bg).
+     */
+    public static float getHaloWidth(float lightFactor) {
+        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
+        return HALO_WIDTH_DARK + (HALO_WIDTH_LIGHT - HALO_WIDTH_DARK) * t;
+    }
+
+    /**
+     * MSDF halo blur: 0.03 em (crisp edge, not cloudy).
+     */
+    public static float getHaloBlur(float lightFactor) {
+        return 0.03f;
     }
 
     /**
@@ -117,9 +180,9 @@ public final class WordAnimation {
         if (currentPlaybackMs >= wordStartMs && currentPlaybackMs <= wordEnd) {
             baseColor = getActiveWordColor(lightFactor);
         } else if (currentPlaybackMs > wordEnd) {
-            baseColor = COLOR_SUNG;
+            baseColor = getSungWordColor(lightFactor);
         } else {
-            baseColor = COLOR_UPCOMING;
+            baseColor = getUpcomingWordColor(lightFactor);
         }
 
         return applyAlpha(baseColor, alpha);

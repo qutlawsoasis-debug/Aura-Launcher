@@ -563,21 +563,39 @@ public final class KaraokeSuiteTest {
     }
 
     private static void testAdaptiveContrastAndHaloHysteresis() {
-        // 1. Palette check per W6b ТЗ
-        check(WordAnimation.COLOR_UPCOMING == 0xF2FFFFFF, "upcoming color white 0.95 (0xF2FFFFFF)");
-        check(WordAnimation.COLOR_SUNG == 0xCCFFFFFF, "sung color white 0.80 (0xCCFFFFFF)");
-        check(WordAnimation.COLOR_OUTLINE == 0xFF000000, "halo color rgb(0, 0, 0)");
+        // 1. Palette check per W6b VOZVRAT 1
+        check(WordAnimation.COLOR_UPCOMING_DARK == 0xF2FFFFFF, "upcoming dark white 0.95 (0xF2FFFFFF)");
+        check(WordAnimation.COLOR_UPCOMING_LIGHT == 0xE61D1D1F, "upcoming light rgb(29,29,31) 0.90 (0xE61D1D1F)");
+        check(WordAnimation.COLOR_SUNG_DARK == 0xBFFFFFFF, "sung dark white 0.75 (0xBFFFFFFF)");
+        check(WordAnimation.COLOR_SUNG_LIGHT == 0xA61D1D1F, "sung light rgb(29,29,31) 0.65 (0xA61D1D1F)");
+        check(WordAnimation.COLOR_HALO_DARK == 0x8C000000, "halo dark rgb(0,0,0) 0.55 (0x8C000000)");
+        check(WordAnimation.COLOR_HALO_LIGHT == 0x73FFFFFF, "halo light rgb(255,255,255) 0.45 (0x73FFFFFF)");
         check(WordAnimation.COLOR_ACTIVE_DARK == 0xFF64D2FF, "active dark color #64D2FF");
         check(WordAnimation.COLOR_ACTIVE_LIGHT == 0xFF0A84FF, "active light color #0A84FF");
 
-        // 2. Dynamic active word color
+        // 2. Halo width and blur (sharp MSDF, 0.03 em blur)
+        check(Math.abs(WordAnimation.getHaloWidth(0.0f) - 0.10f) < 0.001f, "halo width dark 0.10 em");
+        check(Math.abs(WordAnimation.getHaloWidth(1.0f) - 0.08f) < 0.001f, "halo width light 0.08 em");
+        check(Math.abs(WordAnimation.getHaloBlur(0.0f) - 0.03f) < 0.001f, "halo blur dark 0.03 em");
+        check(Math.abs(WordAnimation.getHaloBlur(1.0f) - 0.03f) < 0.001f, "halo blur light 0.03 em");
+
+        // 3. Dynamic active, upcoming, and sung word colors
         check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "active color at 0.0 factor is #64D2FF");
         check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "active color at 1.0 factor is #0A84FF");
+        check(WordAnimation.getUpcomingWordColor(0.0f) == WordAnimation.COLOR_UPCOMING_DARK, "upcoming dark color");
+        check(WordAnimation.getUpcomingWordColor(1.0f) == WordAnimation.COLOR_UPCOMING_LIGHT, "upcoming light color");
+        check(WordAnimation.getSungWordColor(0.0f) == WordAnimation.COLOR_SUNG_DARK, "sung dark color");
+        check(WordAnimation.getSungWordColor(1.0f) == WordAnimation.COLOR_SUNG_LIGHT, "sung light color");
+        check(WordAnimation.getHaloColor(0.0f) == WordAnimation.COLOR_HALO_DARK, "halo dark color");
+        check(WordAnimation.getHaloColor(1.0f) == WordAnimation.COLOR_HALO_LIGHT, "halo light color");
 
-        // 3. Dynamic halo alpha: 0.35 on dark bg, 0.60 on light bg
-        check(Math.abs(WordAnimation.getHaloAlpha(0.0f) - 0.35f) < 0.001f, "halo alpha dark 0.35");
-        check(Math.abs(WordAnimation.getHaloAlpha(1.0f) - 0.60f) < 0.001f, "halo alpha light 0.60");
-        check(Math.abs(WordAnimation.getHaloAlpha(0.5f) - 0.475f) < 0.001f, "halo alpha interpolated 0.475");
+        // Dynamic word color resolution
+        check(WordAnimation.getWordColor(0, 1000, 500, 1.0f, 0.0f) == WordAnimation.COLOR_UPCOMING_DARK, "word color upcoming dark");
+        check(WordAnimation.getWordColor(1200, 1000, 500, 1.0f, 0.0f) == WordAnimation.COLOR_ACTIVE_DARK, "word color active dark");
+        check(WordAnimation.getWordColor(2000, 1000, 500, 1.0f, 0.0f) == WordAnimation.COLOR_SUNG_DARK, "word color sung dark");
+        check(WordAnimation.getWordColor(0, 1000, 500, 1.0f, 1.0f) == WordAnimation.COLOR_UPCOMING_LIGHT, "word color upcoming light");
+        check(WordAnimation.getWordColor(1200, 1000, 500, 1.0f, 1.0f) == WordAnimation.COLOR_ACTIVE_LIGHT, "word color active light");
+        check(WordAnimation.getWordColor(2000, 1000, 500, 1.0f, 1.0f) == WordAnimation.COLOR_SUNG_LIGHT, "word color sung light");
 
         // 4. Hysteresis & 300 ms transition
         KaraokeWorldRenderer.resetState();
@@ -618,14 +636,13 @@ public final class KaraokeSuiteTest {
         check(KaraokeWorldRenderer.getLightProgress() == 0.0f, "transition back to dark reaches 0.0");
 
         // 5. Falling words halo fades with alpha
-        float haloLight = WordAnimation.getHaloAlpha(1.0f);
-        int outAlpha100 = WordAnimation.applyAlpha(WordAnimation.COLOR_OUTLINE, haloLight * 1.0f) >>> 24;
-        int outAlpha50 = WordAnimation.applyAlpha(WordAnimation.COLOR_OUTLINE, haloLight * 0.5f) >>> 24;
+        int haloBaseLight = WordAnimation.getHaloColor(1.0f);
+        int outAlpha100 = WordAnimation.applyAlpha(haloBaseLight, 1.0f) >>> 24;
+        int outAlpha50 = WordAnimation.applyAlpha(haloBaseLight, 0.5f) >>> 24;
         check(Math.abs(outAlpha50 - outAlpha100 / 2) <= 1, "falling word halo alpha halves with body alpha");
 
-        System.out.println("[PASS] 9. Adaptive contrast: luminance hysteresis (>0.60 light, <0.50 dark), 300ms transition, colors (#64D2FF / #0A84FF), and falling word halo fade");
+        System.out.println("[PASS] 9. Adaptive contrast: luminance hysteresis (>0.60 light, <0.50 dark), 300ms transition, colors (#64D2FF / #0A84FF), sharp halo (0.03 em blur), and falling word halo fade");
     }
-
     private static void check(boolean condition, String description) {
         if (!condition) {
             throw new AssertionError("Test assertion failed: " + description);

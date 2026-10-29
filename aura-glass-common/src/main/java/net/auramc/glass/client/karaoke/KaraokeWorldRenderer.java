@@ -46,6 +46,7 @@ public final class KaraokeWorldRenderer {
     private static int projUniform = -1;
     private static int mvUniform = -1;
     private static int fontUniform = -1;
+    private static int haloConfigUniform = -1;
 
     private static boolean initialized = false;
     private static boolean failed = false;
@@ -154,6 +155,7 @@ public final class KaraokeWorldRenderer {
             projUniform = glGetUniformLocation(program, "Projection");
             mvUniform = glGetUniformLocation(program, "ModelView");
             fontUniform = glGetUniformLocation(program, "Font");
+            haloConfigUniform = glGetUniformLocation(program, "HaloConfig");
 
             vao = glGenVertexArrays();
             vbo = glGenBuffers();
@@ -248,8 +250,9 @@ public final class KaraokeWorldRenderer {
         Vector3f billboardU = new Vector3f(viewMatrix.m00(), viewMatrix.m10(), viewMatrix.m20());
         Vector3f billboardV = new Vector3f(-viewMatrix.m01(), -viewMatrix.m11(), -viewMatrix.m21());
 
-        float haloAlpha = WordAnimation.getHaloAlpha(lightProgress);
-        int outlineBase = WordAnimation.COLOR_OUTLINE; // rgb(0, 0, 0)
+        int haloBase = WordAnimation.getHaloColor(lightProgress);
+        float haloWidth = WordAnimation.getHaloWidth(lightProgress);
+        float haloBlur = WordAnimation.getHaloBlur(lightProgress);
 
         // 1. Emit active singing words (billboard facing camera)
         for (WordPlacement.WordAnchor anchor : activeAnchors) {
@@ -259,11 +262,11 @@ public final class KaraokeWorldRenderer {
             long wordElapsedMs = playbackMs - (kw.t - KaraokeClock.PREROLL_MS);
             if (wordElapsedMs < 0) continue;
 
-            // Dynamic color: #64D2FF on dark bg, #0A84FF on light bg, white 0.95 upcoming, white 0.80 sung
+            // Dynamic color: #64D2FF on dark bg, #0A84FF on light bg, adaptive upcoming/sung
             int wordColor = WordAnimation.getWordColor(playbackMs, kw.t, kw.d, 1.0f, lightProgress);
 
-            // Halo outline: rgb(0, 0, 0), alpha 0.35 dark, 0.60 light
-            int outlineColor = WordAnimation.applyAlpha(outlineBase, haloAlpha * ((wordColor >>> 24) / 255f));
+            // Halo outline: white 0.45 light, black 0.55 dark
+            int outlineColor = WordAnimation.applyAlpha(haloBase, ((wordColor >>> 24) / 255f));
 
             float wordScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : KaraokeConfig.get().getSize() * WordPlacement.BASE_FONT_SCALE;
             emitString(kw.w, anchor.position, camPos, billboardU, billboardV, wordColor, outlineColor, wordElapsedMs, wordScale);
@@ -275,9 +278,10 @@ public final class KaraokeWorldRenderer {
             float alpha = pw.getAlpha();
             if (alpha <= 0.01f) continue;
 
-            // Falling words: white 0.80, halo fades out together with word alpha
-            int color = WordAnimation.applyAlpha(WordAnimation.COLOR_SUNG, alpha);
-            int outlineColor = WordAnimation.applyAlpha(outlineBase, haloAlpha * alpha);
+            // Falling words: sung color fading with body alpha, halo fading with alpha
+            int sungColor = WordAnimation.getSungWordColor(lightProgress);
+            int color = WordAnimation.applyAlpha(sungColor, alpha);
+            int outlineColor = WordAnimation.applyAlpha(haloBase, alpha);
 
             // Body rotation quaternion
             Quaternionf bodyRot = new Quaternionf()
@@ -329,6 +333,10 @@ public final class KaraokeWorldRenderer {
             glUniformMatrix4fv(mvUniform, false, MODELVIEW_BUF);
 
             glUniform1i(fontUniform, 0);
+
+            if (haloConfigUniform >= 0) {
+                glUniform2f(haloConfigUniform, haloWidth, haloBlur);
+            }
 
             GlStateManager._bindTexture(AuraRenderer.fontTexture());
 
@@ -495,15 +503,15 @@ public final class KaraokeWorldRenderer {
 
             if (glyph.visible) {
                 float verticalCenterOffset = 0.726f * charScale;
-                // Expand quad by 0.05 em padding to allow the 0.10 em halo to render completely without clipping
-                float pad = 0.05f * charScale;
+                // Expand quad by 0.08 em padding to allow the 0.10 em halo to render completely without clipping
+                float pad = 0.08f * charScale;
                 float lx0 = (penX + glyph.left) * charScale - pad;
                 float lx1 = (penX + glyph.right) * charScale + pad;
                 float ly0 = (-ascender + glyph.top) * charScale - verticalCenterOffset - pad;
                 float ly1 = (-ascender + glyph.bottom) * charScale - verticalCenterOffset + pad;
 
-                float uPad = 0.05f * 40.0f / atlasW;
-                float vPad = 0.05f * 40.0f / atlasH;
+                float uPad = pad * 40.0f / atlasW;
+                float vPad = pad * 40.0f / atlasH;
 
                 emitQuad(D, U, V, lx0, ly0, lx1, ly1,
                         glyph.u0 - uPad, glyph.v0 - vPad,

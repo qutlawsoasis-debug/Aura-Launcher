@@ -1,5 +1,6 @@
 #version 150
 uniform sampler2D Font;
+uniform vec2 HaloConfig; // x = width (0.10 em dark, 0.08 em light), y = blur (0.03 em)
 
 in vec2 uv;
 in vec4 fillColor;
@@ -29,7 +30,7 @@ void main() {
     vec3 msdf = texture(Font, clampedUV).rgb;
     float sd = median3(msdf) - 0.5;
 
-    // Crisp text coverage via MSDF
+    // Crisp sharp text coverage via MSDF (without extra glyph blur)
     bool insideQuad = (uv.x >= uvBounds.x && uv.x <= uvBounds.z && uv.y >= uvBounds.y && uv.y <= uvBounds.w);
     float textCoverage = insideQuad ? clamp(range * sd + 0.5, 0.0, 1.0) : 0.0;
 
@@ -40,24 +41,29 @@ void main() {
     float outsideEm = length(outsideUV * vec2(textureSize(Font, 0))) / 40.0;
 
     // Signed distance in em from glyph contour:
-    // When inside quad: distEm = sd * (distanceRange / 40.0)
-    // When outside quad: distEm continues outward into the expanded padding
     float distEm = sd * (distanceRange / 40.0) - outsideEm;
 
-    // Halo (MSDF outline / soft shadow): width 0.10 em, blur 0.08 em, color rgb(0,0,0)
-    // Outer edge at -0.10 em, solid core from 0.0 to -0.02 em, smooth blur over 0.08 em
-    float haloDist = (distEm + 0.10) / 0.08;
+    // Halo (MSDF outline / crisp shadow):
+    // Width: 0.10 em (dark) / 0.08 em (light)
+    // Blur: 0.03 em (sharp edge, not blurry/cloudy)
+    float haloWidth = HaloConfig.x > 0.001 ? HaloConfig.x : 0.10;
+    float haloBlur = HaloConfig.y > 0.001 ? HaloConfig.y : 0.03;
+
+    float haloDist = (distEm + haloWidth) / haloBlur;
     float haloStep = clamp(haloDist, 0.0, 1.0);
     float haloCoverage = haloStep * haloStep * (3.0 - 2.0 * haloStep);
 
-    vec4 outCol = vec4(0.0, 0.0, 0.0, outlineColor.a * haloCoverage);
+    // Halo color comes from vertex outlineColor (white on light bg, black on dark bg)
+    vec4 outCol = vec4(outlineColor.rgb, outlineColor.a * haloCoverage);
 
     vec4 fillCol = fillColor;
     fillCol.a *= textCoverage;
 
-    // Over-composite: text fill on top of soft dark halo (Apple HIG typography)
-    vec4 col = mix(outCol, fillCol, fillCol.a > 0.001 ? fillCol.a : 0.0);
-    col.a = max(outCol.a, fillCol.a);
+    // True Porter-Duff Over composite: crisp glyph fill over soft/crisp halo
+    float outAlpha = outCol.a * (1.0 - fillCol.a);
+    float finalAlpha = fillCol.a + outAlpha;
+    vec3 finalRgb = finalAlpha > 0.0001 ? (fillCol.rgb * fillCol.a + outCol.rgb * outAlpha) / finalAlpha : vec3(0.0);
+    vec4 col = vec4(finalRgb, finalAlpha);
 
     if (col.a < 0.01) {
         discard;
