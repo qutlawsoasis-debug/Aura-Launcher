@@ -32,7 +32,7 @@ public final class GlassScreenText {
     }
 
     public static boolean draw(DrawContext c,TextRenderer font,String text,int x,int y,int color,boolean shadow){
-        if(text==null)return false;
+        if(text==null || GlassGlyphText.vanillaGlyph())return false;
         if(y <= 80 && isScreenTitle(text, y)){
             return drawScreenTitle(c, font, text, null);
         }
@@ -65,7 +65,7 @@ public final class GlassScreenText {
         command.text=text;command.ordered=null;command.width=font.getWidth(text);GlassRenderer.foreground(command);return true;
     }
     public static boolean draw(DrawContext c,TextRenderer font,OrderedText text,int x,int y,int color,boolean shadow){
-        if(text==null)return false;
+        if(text==null || GlassGlyphText.vanillaGlyph())return false;
         String str = extractString(text);
         if(y <= 80 && isScreenTitle(str, y)){
             return drawScreenTitle(c, font, str, text);
