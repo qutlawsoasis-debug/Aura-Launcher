@@ -20,6 +20,14 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
     private const string DefaultChannel = "aura-music";
     private const string DefaultEmbedOrigin = "https://lobby-api.vercel.app";
 
+    private sealed class PendingPlayerState
+    {
+        public MusicBridgeTrack? Track { get; set; }
+        public string DesiredState { get; set; } = "playing";
+        public double StartSeconds { get; set; } = 0.0;
+        public double? Volume { get; set; }
+    }
+
     private readonly object _lock = new();
     private readonly Stopwatch _stopwatch = new();
     private dynamic? _coreWebView2;
@@ -27,7 +35,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
 
     private string _state = "stopped";
     private MusicBridgeTrack? _currentTrack;
-    private MusicBridgeTrack? _pendingTrackToLoad;
+    private PendingPlayerState? _pendingState;
     private double _currentTimeSeconds = 0.0;
     private long _lastUpdatedAtUnixMs = 0;
     private double _volume = 1.0;
@@ -238,18 +246,21 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             string videoId = root.TryGetProperty("videoId", out var vidProp) ? vidProp.GetString() ?? "" : "";
 
             string? newStateToNotify = null;
-            MusicBridgeTrack? trackToReplayOnReady = null;
+            PendingPlayerState? stateToApplyOnReady = null;
 
             lock (_lock)
             {
                 switch (evt)
                 {
                     case "ready":
-                        _isReady = true;
-                        if (_pendingTrackToLoad != null)
+                        if (!_isReady)
                         {
-                            trackToReplayOnReady = _pendingTrackToLoad;
-                            _pendingTrackToLoad = null;
+                            _isReady = true;
+                            if (_pendingState != null)
+                            {
+                                stateToApplyOnReady = _pendingState;
+                                _pendingState = null;
+                            }
                         }
                         break;
 
@@ -323,10 +334,27 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                 }
             }
 
-            if (trackToReplayOnReady != null)
+            if (stateToApplyOnReady != null && stateToApplyOnReady.Track != null)
             {
-                var payload = new { videoId = trackToReplayOnReady.Id, startSeconds = 0 };
-                _ = DispatchCommandAsync("load", payload);
+                var track = stateToApplyOnReady.Track;
+                double startSec = Math.Max(0.0, stateToApplyOnReady.StartSeconds);
+
+                if (stateToApplyOnReady.DesiredState == "paused")
+                {
+                    var payload = new { videoId = track.Id, startSeconds = startSec };
+                    _ = DispatchCommandAsync("cue", payload);
+                }
+                else if (stateToApplyOnReady.DesiredState == "playing")
+                {
+                    var payload = new { videoId = track.Id, startSeconds = startSec };
+                    _ = DispatchCommandAsync("load", payload);
+                }
+
+                if (stateToApplyOnReady.Volume.HasValue)
+                {
+                    var volPayload = new { value = Math.Round(stateToApplyOnReady.Volume.Value * 100.0, 1) };
+                    _ = DispatchCommandAsync("volume", volPayload);
+                }
             }
 
             if (newStateToNotify != null)
@@ -453,11 +481,17 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
 
             if (!_isReady)
             {
-                _pendingTrackToLoad = track;
+                _pendingState = new PendingPlayerState
+                {
+                    Track = track,
+                    DesiredState = "playing",
+                    StartSeconds = 0.0,
+                    Volume = null
+                };
             }
             else
             {
-                _pendingTrackToLoad = null;
+                _pendingState = null;
             }
         }
 
@@ -470,7 +504,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             lock (_lock)
             {
                 _state = "stopped";
-                _pendingTrackToLoad = null;
+                _pendingState = null;
             }
             return false;
         }
@@ -488,6 +522,11 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             _state = "playing";
             _stopwatch.Restart();
             _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            if (!_isReady && _pendingState != null)
+            {
+                _pendingState.DesiredState = "playing";
+            }
         }
 
         StateChanged?.Invoke("playing");
@@ -503,6 +542,12 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             CommitElapsedTimeLocked();
             _state = "paused";
             _stopwatch.Reset();
+            _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+            if (!_isReady && _pendingState != null)
+            {
+                _pendingState.DesiredState = "paused";
+            }
         }
 
         StateChanged?.Invoke("paused");
@@ -574,6 +619,11 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             {
                 _stopwatch.Reset();
             }
+
+            if (!_isReady && _pendingState != null)
+            {
+                _pendingState.StartSeconds = seconds;
+            }
         }
 
         return await DispatchCommandAsync("seek", new { seconds });
@@ -587,6 +637,10 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         lock (_lock)
         {
             _volume = clamped;
+            if (!_isReady && _pendingState != null)
+            {
+                _pendingState.Volume = clamped;
+            }
         }
 
         return await DispatchCommandAsync("volume", new { value = clamped * 100.0 });
@@ -765,7 +819,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         _stopwatch.Stop();
         _coreWebView2 = null;
         _customScriptExecutor = null;
-        _pendingTrackToLoad = null;
+        _pendingState = null;
         _queue.Clear();
     }
 }

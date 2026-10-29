@@ -762,6 +762,124 @@ public class MusicBridgeTests : IDisposable
     }
 
     [Fact]
+    public async Task EmbedPlayer_ColdLoad_Pause_Ready_DispatchesCueNotLoad_AndRemainsPaused()
+    {
+        var ops = new List<string>();
+        string? lastScript = null;
+
+        using var cold = new EmbedMusicPlayer(script =>
+        {
+            lastScript = script;
+            return Task.FromResult<string?>("true");
+        });
+        cold.CommandDispatched += (op, _) => ops.Add(op);
+
+        // 1. Cold Load (state remains stopped until player confirms or Pause/Play called)
+        await cold.LoadVideoAsync("trackColdPause");
+        Assert.False(cold.IsReady);
+
+        // 2. Pause before ready
+        await cold.PauseAsync();
+        Assert.Equal("paused", cold.State);
+
+        // 3. Ready arrives from iframe
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"ready"}""");
+
+        // Verify: ops are load, pause, cue (NO load after pause that would accidentally start playback!)
+        Assert.Equal(new[] { "load", "pause", "cue" }, ops);
+        Assert.Equal("paused", cold.State);
+        Assert.NotNull(lastScript);
+        Assert.Contains("\"op\":\"cue\"", lastScript);
+        Assert.Contains("\"videoId\":\"trackColdPause\"", lastScript);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_ColdLoad_Seek_Ready_PreservesPendingSeekPosition()
+    {
+        var ops = new List<string>();
+        string? lastScript = null;
+
+        using var cold = new EmbedMusicPlayer(script =>
+        {
+            lastScript = script;
+            return Task.FromResult<string?>("true");
+        });
+        cold.CommandDispatched += (op, _) => ops.Add(op);
+
+        // 1. Cold Load
+        await cold.LoadVideoAsync("trackColdSeek");
+
+        // 2. Seek before ready
+        await cold.SeekAsync(42500); // 42.5 seconds
+        Assert.Equal(42.5, cold.CurrentTimeSeconds);
+
+        // 3. Ready arrives
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"ready"}""");
+
+        // Verify: ops are load, seek, load
+        Assert.Equal(new[] { "load", "seek", "load" }, ops);
+        Assert.NotNull(lastScript);
+        Assert.Contains("\"op\":\"load\"", lastScript);
+        Assert.Contains("\"videoId\":\"trackColdSeek\"", lastScript);
+        Assert.Contains("\"startSeconds\":42.5", lastScript);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_Handshake_NextPrev_AppliesOnlyFinalTrack()
+    {
+        var ops = new List<string>();
+        string? lastScript = null;
+
+        using var cold = new EmbedMusicPlayer(script =>
+        {
+            lastScript = script;
+            return Task.FromResult<string?>("true");
+        });
+        cold.CommandDispatched += (op, _) => ops.Add(op);
+
+        var track1 = new MusicBridgeTrack("track_handshake_1", "Artist 1", "Song 1", 180000, null);
+        var track2 = new MusicBridgeTrack("track_handshake_2", "Artist 2", "Song 2", 200000, null);
+
+        // Queue track1 then track2
+        await cold.QueueTrackAsync(track1, playNow: true);
+        await cold.QueueTrackAsync(track2, playNow: false);
+
+        // Switch to track 2 during handshake
+        await cold.NextAsync();
+        Assert.Equal("track_handshake_2", cold.CurrentTrack?.Id);
+
+        // Ready arrives
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"ready"}""");
+
+        // Only track2 must be replayed on ready, track1 is canceled/superseded
+        Assert.NotNull(lastScript);
+        Assert.Contains("\"videoId\":\"track_handshake_2\"", lastScript);
+        Assert.DoesNotContain("\"videoId\":\"track_handshake_1\"", lastScript);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_RepeatedReady_DoesNotReplayCommands()
+    {
+        var ops = new List<string>();
+
+        using var cold = new EmbedMusicPlayer(_ => Task.FromResult<string?>("true"));
+        cold.CommandDispatched += (op, _) => ops.Add(op);
+
+        await cold.LoadVideoAsync("trackRepeatReady");
+        Assert.Single(ops); // ["load"]
+
+        // First ready -> dispatches pending state
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"ready"}""");
+        Assert.Equal(2, ops.Count); // ["load", "load"]
+
+        // Second and third ready -> must be ignored, no additional commands
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"ready"}""");
+        cold.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","origin":"https://lobby-api.vercel.app","event":"ready"}""");
+
+        Assert.Equal(2, ops.Count);
+    }
+
+    [Fact]
     public async Task EmbedPlayer_Security_RejectsForeignOriginAndChannelMessages()
     {
         using var player = new EmbedMusicPlayer(_ => Task.FromResult<string?>("true"));
