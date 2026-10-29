@@ -147,6 +147,9 @@ public final class KaraokeEngine {
         return pos >= 0L;
     }
 
+        private boolean isOnlyStandingSuppressed() {
+        return KaraokeConfig.get().isOnlyStanding() && adaptiveness.getCurrentResult().state != PlayerAdaptiveness.ActivityState.STANDING;
+    }
     public synchronized void resetWords() {
         this.activeAnchors.clear();
         this.activeGroupWords.clear();
@@ -156,33 +159,42 @@ public final class KaraokeEngine {
         this.physics.clear();
     }
 
-    public synchronized void seekTo(long positionMs) {
-        resetWords();
+    public synchronized void resyncTimelinePosition(long playbackMs) {
         if (lyrics == null || lyrics.isEmpty()) {
             currentLineIndex = 0;
             currentWordIndex = 0;
             return;
         }
-        currentLineIndex = 0;
-        currentWordIndex = 0;
-        for (int i = 0; i < lyrics.lines.size(); i++) {
-            KaraokeModel.KaraokeLine line = lyrics.lines.get(i);
-            if (positionMs > line.end() + 1000L) {
-                currentLineIndex = i + 1;
+        int lineIdx = 0;
+        while (lineIdx < lyrics.lines.size()) {
+            KaraokeModel.KaraokeLine line = lyrics.lines.get(lineIdx);
+            if (playbackMs > line.end() + 1000L && lineIdx + 1 < lyrics.lines.size()) {
+                lineIdx++;
             } else {
-                currentLineIndex = i;
-                for (int j = 0; j < line.words.size(); j++) {
-                    KaraokeModel.KaraokeWord w = line.words.get(j);
-                    if (positionMs > w.end()) {
-                        currentWordIndex = j + 1;
-                    } else {
-                        currentWordIndex = j;
-                        break;
-                    }
-                }
                 break;
             }
         }
+        currentLineIndex = lineIdx;
+        if (currentLineIndex >= lyrics.lines.size()) {
+            currentWordIndex = 0;
+            return;
+        }
+        KaraokeModel.KaraokeLine currentLine = lyrics.lines.get(currentLineIndex);
+        int wordIdx = 0;
+        while (wordIdx < currentLine.words.size()) {
+            KaraokeModel.KaraokeWord w = currentLine.words.get(wordIdx);
+            if (playbackMs > w.end()) {
+                wordIdx++;
+            } else {
+                break;
+            }
+        }
+        currentWordIndex = wordIdx;
+    }
+
+    public synchronized void seekTo(long positionMs) {
+        resetWords();
+        resyncTimelinePosition(positionMs);
     }
 
     public synchronized void dissolveAll() {
@@ -256,9 +268,39 @@ public final class KaraokeEngine {
      * Headless ticking logic for testing without Minecraft world.
      */
     public synchronized void tickHeadless(long playbackMs) {
+        if (!KaraokeConfig.get().isEnabled()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+        }
         physics.tick(null);
         if (!isPlaying()) return;
-        updateLyricsTimeline(playbackMs, null, null);
+        long effectiveMs = playbackMs + KaraokeConfig.get().getTimingOffsetMs();
+        updateLyricsTimeline(effectiveMs, null, null);
+    }
+
+    public synchronized void tickHeadless() {
+        if (!KaraokeConfig.get().isEnabled()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+        }
+        physics.tick(null);
+        if (!isPlaying()) return;
+        long effectiveMs = clock.getEffectivePositionMs();
+        updateLyricsTimeline(effectiveMs, null, null);
     }
 
     /**
@@ -269,6 +311,17 @@ public final class KaraokeEngine {
         MusicKaraokeBridge.getInstance().update();
 
         if (client == null) return;
+        if (!KaraokeConfig.get().isEnabled()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+        }
 
         long wallNow = System.currentTimeMillis();
         if (lastTickWallTimeMs > 0L) {
@@ -442,7 +495,23 @@ public final class KaraokeEngine {
     }
 
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
+        if (!KaraokeConfig.get().isEnabled()) return;
         if (lyrics == null || lyrics.isEmpty()) return;
+
+        // If "only standing" is active and player is moving/suppressed:
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            resyncTimelinePosition(playbackMs);
+            return;
+        }
+
+        // If no group is currently active, ensure cursor is resynced to playbackMs
+        // so that any interrupted or prematurely cleared group resumes from the current unexpired word
+        if (activeGroupWords.isEmpty()) {
+            resyncTimelinePosition(playbackMs);
+        }
 
         // 1. Check and record word onsets on each tick
         checkWordOnsets(playbackMs);
@@ -770,6 +839,13 @@ public final class KaraokeEngine {
      * In-world render call from WorldRenderer hook.
      */
     public synchronized void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
+        if (!KaraokeConfig.get().isEnabled()) return;
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
         boolean hasActive = !activeAnchors.isEmpty();
         boolean hasBodies = physics.getBodyCount() > 0;
         if (!hasActive && !hasBodies) {
