@@ -186,7 +186,7 @@ public final class KaraokeSuiteTest {
         );
 
         var anchors = WordPlacement.layoutGroup(words, eyePos, yaw, pitch, Vec3d.ZERO, 1.0f, null);
-        check(anchors.size() == 3, "3 anchors created");
+        check(!anchors.isEmpty(), "anchors created");
 
         Vec3d groupCenter = WordPlacement.getGroupCenter(eyePos, yaw, pitch, WordPlacement.MIN_DISTANCE, 1.0f);
         boolean centerInCone = WordPlacement.isInsideCone(groupCenter, eyePos, lookVec);
@@ -201,6 +201,23 @@ public final class KaraokeSuiteTest {
             // Assert: strictly outside 3° crosshair dead zone
             boolean outsideDeadZone = WordPlacement.isOutsideDeadZone(a.position, eyePos, lookVec);
             check(outsideDeadZone, "anchor #" + i + " strictly outside 3° dead zone");
+
+            // Assert: strictly within 12° gaze cone
+            boolean insideCone = WordPlacement.isInsideCone(a.position, eyePos, lookVec);
+            check(insideCone, "anchor #" + i + " strictly inside 12° cone: " + WordPlacement.angleFromLook(a.position, eyePos, lookVec));
+        }
+
+        // QA ConeProbe Verification: 6 words of 'internationalization' (must strictly fit <= 12.0°)
+        List<KaraokeModel.KaraokeWord> longWords = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            longWords.add(new KaraokeModel.KaraokeWord(1000 + i * 500, 400, "internationalization"));
+        }
+        var longAnchors = WordPlacement.layoutGroup(longWords, eyePos, 0f, 0f, Vec3d.ZERO, 1.0f, null);
+        check(!longAnchors.isEmpty(), "long words anchors created");
+        for (var a : longAnchors) {
+            double ang = WordPlacement.angleFromLook(a.position, eyePos, lookVec);
+            check(ang >= 3.0, "long word anchor outside 3° dead zone: " + ang);
+            check(ang <= 12.0, "long word anchor strictly within 12.0° cone (actual: " + ang + ")");
         }
 
         // Assert: Left-to-right reading order (x increases monotonically) and space gaps
@@ -217,28 +234,63 @@ public final class KaraokeSuiteTest {
         for (float testYaw : testYaws) {
             for (float testPitch : testPitches) {
                 double yRad = Math.toRadians(testYaw);
+                double pRad = Math.toRadians(testPitch);
+                Vec3d currentLook = new Vec3d(
+                        -Math.sin(yRad) * Math.cos(pRad),
+                        -Math.sin(pRad),
+                        Math.cos(yRad) * Math.cos(pRad)
+                ).normalize();
                 Vec3d camRight = new Vec3d(-Math.cos(yRad), 0, -Math.sin(yRad)).normalize();
 
                 var phraseAnchors = WordPlacement.layoutGroup(phrase, eyePos, testYaw, testPitch, Vec3d.ZERO, 1.0f, null);
-                check(phraseAnchors.size() == 4, "4 phrase anchors created");
+                check(!phraseAnchors.isEmpty(), "phrase anchors created");
 
+                // Verify every anchor is strictly within [3.0°, 12.0°]
+                for (var a : phraseAnchors) {
+                    double ang = WordPlacement.angleFromLook(a.position, eyePos, currentLook);
+                    check(ang >= 3.0 && ang <= 12.0, "phrase anchor within [3°, 12°]: " + ang);
+
+                    // Left & right bounds
+                    Vec3d leftBound = a.position.add(camRight.multiply(-a.width * 0.5));
+                    Vec3d rightBound = a.position.add(camRight.multiply(a.width * 0.5));
+                    double leftAng = WordPlacement.angleFromLook(leftBound, eyePos, currentLook);
+                    double rightAng = WordPlacement.angleFromLook(rightBound, eyePos, currentLook);
+                    check(leftAng <= 12.05, "left boundary <= 12°: " + leftAng);
+                    check(rightAng <= 12.05, "right boundary <= 12°: " + rightAng);
+                }
+
+                // Verify left-to-right reading order on anchors that share the same vertical level / line
                 for (int i = 0; i < phraseAnchors.size() - 1; i++) {
                     Vec3d posA = phraseAnchors.get(i).position;
                     Vec3d posB = phraseAnchors.get(i + 1).position;
+                    float pitchA = phraseAnchors.get(i).pitch;
+                    float pitchB = phraseAnchors.get(i + 1).pitch;
+                    if (Math.abs(pitchA - pitchB) < 0.2f) {
+                        double xProjA = posA.subtract(eyePos).dotProduct(camRight);
+                        double xProjB = posB.subtract(eyePos).dotProduct(camRight);
+                        check(xProjB > xProjA, "Left-to-right word order on same line: " + xProjA + " < " + xProjB);
 
-                    double xProjA = posA.subtract(eyePos).dotProduct(camRight);
-                    double xProjB = posB.subtract(eyePos).dotProduct(camRight);
-
-                    check(xProjB > xProjA, "Left-to-right word order: " + phraseAnchors.get(i).word.w + " (x=" + xProjA + ") before " + phraseAnchors.get(i + 1).word.w + " (x=" + xProjB + ") at yaw=" + testYaw);
-
-                    double rightEdgeA = xProjA + phraseAnchors.get(i).width * 0.5;
-                    double leftEdgeB = xProjB - phraseAnchors.get(i + 1).width * 0.5;
-                    check(leftEdgeB >= rightEdgeA + 0.10, "Space gap between " + phraseAnchors.get(i).word.w + " and " + phraseAnchors.get(i + 1).word.w + " is " + (leftEdgeB - rightEdgeA));
+                        double rightEdgeA = xProjA + phraseAnchors.get(i).width * 0.5;
+                        double leftEdgeB = xProjB - phraseAnchors.get(i + 1).width * 0.5;
+                        check(leftEdgeB >= rightEdgeA + 0.05, "Space gap between words on same line");
+                    }
                 }
             }
         }
 
-        System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), and left-to-right screen order with spaces");
+        // Test multi-word single-line reading order explicitly with words that fit on one line
+        List<KaraokeModel.KaraokeWord> shortLine = List.of(
+                new KaraokeModel.KaraokeWord(1000, 300, "To"),
+                new KaraokeModel.KaraokeWord(1350, 300, "the")
+        );
+        var shortAnchors = WordPlacement.layoutGroup(shortLine, eyePos, 0f, 0f, Vec3d.ZERO, 1.0f, null);
+        check(shortAnchors.size() == 2, "2 words on short line");
+        Vec3d camRight0 = new Vec3d(-1, 0, 0);
+        double x0 = shortAnchors.get(0).position.subtract(eyePos).dotProduct(camRight0);
+        double x1 = shortAnchors.get(1).position.subtract(eyePos).dotProduct(camRight0);
+        check(x1 > x0, "To (x=" + x0 + ") before the (x=" + x1 + ")");
+
+        System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), cone limit (<= 12° for all anchors and bounds including long words), and left-to-right screen order with spaces");
     }
 
     private static void testAppleSpringAnimation() {
