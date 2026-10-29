@@ -328,18 +328,21 @@ public final class KaraokeEngine {
             if (playbackMs >= lastWord.end()) {
                 if (groupHoldStartTime < 0L) {
                     groupHoldStartTime = playbackMs;
-                } else if (!groupPhysicsSpawned && (playbackMs - groupHoldStartTime >= holdMs)) {
+                }
+                if (!groupPhysicsSpawned && (holdMs == 0L || (playbackMs - groupHoldStartTime >= holdMs))) {
                     groupPhysicsSpawned = true;
-                    // Spawn physics bodies for words
-                    for (WordPlacement.WordAnchor anchor : activeAnchors) {
-                        physics.spawnBody(
-                                anchor.word.w,
-                                anchor.position,
-                                anchor.width,
-                                anchor.height,
-                                anchor.yaw,
-                                anchor.pitch
-                        );
+                    // Spawn physics bodies for words at end of line
+                    if (isEndOfLine) {
+                        for (WordPlacement.WordAnchor anchor : activeAnchors) {
+                            physics.spawnBody(
+                                    anchor.word.w,
+                                    anchor.position,
+                                    anchor.width,
+                                    anchor.height,
+                                    anchor.yaw,
+                                    anchor.pitch
+                            );
+                        }
                     }
                     activeAnchors.clear();
                     activeGroupWords.clear();

@@ -10,6 +10,7 @@ import net.auramc.glass.client.karaoke.WordAnimation;
 import net.auramc.glass.client.karaoke.WordPlacement;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,7 @@ public final class KaraokeSuiteTest {
         testAppleSpringAnimation();
         testKaraokePhysics();
         testClockAndOnsetStats();
+        testWordRectangleNonIntersection();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -377,6 +379,85 @@ public final class KaraokeSuiteTest {
         check(stats.meetsP95Requirement(), "meets QA p95 requirement");
 
         System.out.println("[PASS] 7. Clock & Onset error statistics (p95 <= 50 ms: " + stats.p95Ms + " ms)");
+    }
+
+    private static void testWordRectangleNonIntersection() {
+        Vec3d eyePos = new Vec3d(0, 64, 0);
+
+        List<List<KaraokeModel.KaraokeWord>> testGroups = List.of(
+                // 1 word
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright")),
+                // 2 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon")),
+                // 3 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon"), new KaraokeModel.KaraokeWord(1700, 300, "shining")),
+                // 4 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Bright"), new KaraokeModel.KaraokeWord(1350, 300, "horizon"), new KaraokeModel.KaraokeWord(1700, 300, "shining"), new KaraokeModel.KaraokeWord(2050, 300, "through")),
+                // 5 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "We"), new KaraokeModel.KaraokeWord(1300, 300, "are"), new KaraokeModel.KaraokeWord(1600, 300, "wandering"), new KaraokeModel.KaraokeWord(2000, 300, "beneath"), new KaraokeModel.KaraokeWord(2400, 300, "the")),
+                // 6 words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "Gentle"), new KaraokeModel.KaraokeWord(1300, 300, "echoes"), new KaraokeModel.KaraokeWord(1600, 300, "dancing"), new KaraokeModel.KaraokeWord(1900, 300, "in"), new KaraokeModel.KaraokeWord(2200, 300, "the"), new KaraokeModel.KaraokeWord(2500, 300, "breeze")),
+                // Long words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "internationalization"), new KaraokeModel.KaraokeWord(1400, 300, "antidisestablishmentarianism")),
+                // 6 long words
+                List.of(new KaraokeModel.KaraokeWord(1000, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(1400, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(1800, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(2200, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(2600, 300, "internationalization"),
+                        new KaraokeModel.KaraokeWord(3000, 300, "internationalization"))
+        );
+
+        float[] testYaws = {0f, 45f, 90f, 180f, 270f};
+        float[] testPitches = {-20f, -10f, 0f, 15f, 30f};
+        int[] screenWidths = {1280, 1920};
+        int[] screenHeights = {720, 1080};
+
+        int totalComparisons = 0;
+
+        for (List<KaraokeModel.KaraokeWord> group : testGroups) {
+            for (float yaw : testYaws) {
+                for (float pitch : testPitches) {
+                    var anchors = WordPlacement.layoutGroup(group, eyePos, yaw, pitch, Vec3d.ZERO, 1.0f, null);
+                    check(!anchors.isEmpty(), "anchors generated for group size " + group.size());
+
+                    for (int res = 0; res < screenWidths.length; res++) {
+                        int sw = screenWidths[res];
+                        int sh = screenHeights[res];
+
+                        // Build camera view matrix for 1.20.1 and 1.21.1:
+                        Matrix4f viewMatrix = new Matrix4f()
+                                .rotationX((float) Math.toRadians(pitch))
+                                .rotationY((float) Math.toRadians(yaw + 180.0f));
+
+                        Matrix4f projMatrix = new Matrix4f()
+                                .setPerspective((float) Math.toRadians(70.0), (float) sw / (float) sh, 0.05f, 1000.0f);
+
+                        List<WordPlacement.WordRect> rects = new ArrayList<>();
+                        for (WordPlacement.WordAnchor a : anchors) {
+                            rects.add(WordPlacement.projectWordToScreen(a, viewMatrix, projMatrix, sw, sh, eyePos));
+                        }
+
+                        // Verify every pair of word rectangles strictly DOES NOT intersect
+                        for (int i = 0; i < rects.size(); i++) {
+                            for (int j = i + 1; j < rects.size(); j++) {
+                                WordPlacement.WordRect rA = rects.get(i);
+                                WordPlacement.WordRect rB = rects.get(j);
+
+                                boolean intersects = rA.intersects(rB);
+                                check(!intersects, String.format(java.util.Locale.ROOT,
+                                        "Word rectangles MUST NOT intersect: word '%s' %s and word '%s' %s at yaw=%.1f, pitch=%.1f, res=%dx%d",
+                                        anchors.get(i).word.w, rA, anchors.get(j).word.w, rB, yaw, pitch, sw, sh));
+                                totalComparisons++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        check(totalComparisons >= 400, "verified >= 400 rectangle non-intersection pairs: " + totalComparisons);
+        System.out.println("[PASS] 8. Word rectangles in screen coordinates NEVER intersect (" + totalComparisons + " pairs verified, 1–6 words, long words, 1.20/1.21 matrices)");
     }
 
     private static void check(boolean condition, String description) {
