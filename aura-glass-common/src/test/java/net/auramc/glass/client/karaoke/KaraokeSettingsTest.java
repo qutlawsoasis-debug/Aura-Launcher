@@ -51,6 +51,7 @@ public final class KaraokeSettingsTest {
         testMaxWordsLimitsGroupSize();
         testDisabledKaraokeZeroWordsAndZeroEngineWork();
         testOnlyStandingSuppressesWordSpawningOnMove();
+        testOnlyStandingTransitionWithActiveWords();
         testKaraokeSizeBounds();
         testConfigImmediateApplyWithoutRelog();
 
@@ -316,6 +317,101 @@ public final class KaraokeSettingsTest {
         c.karaoke = true;
 
         System.out.println("[PASS] 6. Config persistence and immediate application without relog");
+    }
+
+    private static void testOnlyStandingTransitionWithActiveWords() {
+        System.out.println("Running testOnlyStandingTransitionWithActiveWords...");
+        KaraokeConfig.get().setEnabled(true);
+        KaraokeConfig.get().setOnlyStanding(false);
+
+        KaraokeEngine engine = new KaraokeEngine();
+        AtomicLong virtualTime = new AtomicLong(1000L);
+        engine.setClockSupplier(virtualTime::get);
+        engine.setLyricsFromJson(SAMPLE_LYRICS);
+        engine.setStopped(false);
+        engine.setPaused(false);
+
+        PlayerAdaptiveness adapt = engine.getAdaptiveness();
+        long now = 1_000_000L;
+
+        // 1. Player is STANDING: spawn active words
+        adapt.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, now);
+        check(adapt.getCurrentResult().state == PlayerAdaptiveness.ActivityState.STANDING, "player standing initially");
+        engine.tickHeadless(1000L);
+        check(engine.getActiveAnchorCount() > 0, "active words spawned while standing (count: " + engine.getActiveAnchorCount() + ")");
+
+        // Also add a physics body
+        engine.getPhysics().spawnBody("FallWord", new net.minecraft.util.math.Vec3d(0, 64, 0), 1.0f, 0.4f, 0f, 0f);
+        check(engine.getPhysics().getBodyCount() > 0, "physics bodies present");
+
+        // 2. Enable "only standing" WHILE words are already visible
+        KaraokeConfig.get().setOnlyStanding(true);
+        // Words should still be visible because player is STANDING
+        engine.tickHeadless(1100L);
+        check(engine.getActiveAnchorCount() > 0, "words remain while standing with onlyStanding=true");
+
+        // 3. Transition: Standing -> Running / Sprinting
+        adapt.setScriptedState(0.25, 15.0, true, false, false, false, false, false, 20.0f, -10000L, now + 50_000L);
+        check(adapt.getCurrentResult().onlyStandingSuppressed, "running activates onlyStandingSuppressed");
+
+        // Next engine tick: active anchors and falling physics bodies MUST be cleared immediately!
+        engine.tickHeadless(1200L);
+        check(engine.getActiveAnchorCount() == 0, "running MUST clear active anchors (actual: " + engine.getActiveAnchorCount() + ")");
+        check(engine.getPhysics().getBodyCount() == 0, "running MUST clear falling physics bodies (actual: " + engine.getPhysics().getBodyCount() + ")");
+
+        // 4. Moving during upcoming words: no accumulation of expired words
+        // Time advances through words at 1400, 1800 while running
+        virtualTime.set(2000L);
+        engine.tickHeadless(2000L);
+        check(engine.getActiveAnchorCount() == 0, "no words spawned while running");
+
+        // 5. Transition: Running -> Standing (player stops)
+        adapt.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, now + 100_000L);
+        check(!adapt.getCurrentResult().onlyStandingSuppressed, "standing clears onlyStandingSuppressed");
+        check(adapt.getCurrentResult().canSpawn, "canSpawn is true when standing again");
+
+        // At playback 2150L word "through" arrives: should spawn cleanly without expired backlog!
+        virtualTime.set(2150L);
+        engine.tickHeadless(2150L);
+        check(engine.getActiveAnchorCount() > 0, "words resume spawning at current playback position after stopping");
+
+        // 6. Test jumping transition with active words
+        adapt.setScriptedState(0.05, 10.0, false, true, false, false, false, false, 20.0f, -10000L, now + 150_000L);
+        engine.tickHeadless(2200L);
+        check(engine.getActiveAnchorCount() == 0, "jumping MUST clear active anchors");
+
+        // 7. Test flying / falling transition with active words
+        // Stop jumping, let word spawn
+        adapt.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, now + 200_000L);
+        virtualTime.set(2500L); // word "the" at 2500
+        engine.tickHeadless(2500L);
+        check(engine.getActiveAnchorCount() > 0, "word spawned when standing");
+
+        adapt.setScriptedState(0.05, 10.0, false, false, true, false, false, false, 20.0f, -10000L, now + 250_000L);
+        engine.tickHeadless(2550L);
+        check(engine.getActiveAnchorCount() == 0, "flying/falling MUST clear active anchors");
+
+        // 8. Test turning on setting during running
+        KaraokeConfig.get().setOnlyStanding(false);
+        engine.seekTo(0L);
+        virtualTime.set(1000L);
+        adapt.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, now + 300_000L);
+        engine.tickHeadless(1000L);
+        check(engine.getActiveAnchorCount() > 0, "word spawned with onlyStanding=false");
+
+        // Player starts running while onlyStanding is still false
+        adapt.setScriptedState(0.25, 15.0, true, false, false, false, false, false, 20.0f, -10000L, now + 350_000L);
+        engine.tickHeadless(1050L);
+        check(engine.getActiveAnchorCount() > 0, "word still visible when running if onlyStanding=false");
+
+        // NOW enable onlyStanding during run
+        KaraokeConfig.get().setOnlyStanding(true);
+        engine.tickHeadless(1060L);
+        check(engine.getActiveAnchorCount() == 0, "enabling onlyStanding during run MUST clear active anchors immediately");
+
+        // Clean up
+        KaraokeConfig.get().setOnlyStanding(false);
+        System.out.println("[PASS] 7. Transition standing -> running/jumping/flying and mid-run toggle properly clears active words");
     }
 
     private static void check(boolean condition, String message) {

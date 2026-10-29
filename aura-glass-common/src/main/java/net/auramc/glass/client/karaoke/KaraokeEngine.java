@@ -146,6 +146,9 @@ public final class KaraokeEngine {
         return pos >= 0L;
     }
 
+        private boolean isOnlyStandingSuppressed() {
+        return KaraokeConfig.get().isOnlyStanding() && adaptiveness.getCurrentResult().state != PlayerAdaptiveness.ActivityState.STANDING;
+    }
     public synchronized void resetWords() {
         this.activeAnchors.clear();
         this.activeGroupWords.clear();
@@ -261,6 +264,11 @@ public final class KaraokeEngine {
             }
             return;
         }
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+        }
         physics.tick(null);
         if (!isPlaying()) return;
         long effectiveMs = playbackMs + KaraokeConfig.get().getTimingOffsetMs();
@@ -273,6 +281,11 @@ public final class KaraokeEngine {
                 resetWords();
             }
             return;
+        }
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
         }
         physics.tick(null);
         if (!isPlaying()) return;
@@ -293,6 +306,11 @@ public final class KaraokeEngine {
                 resetWords();
             }
             return;
+        }
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
         }
 
         if (client.world == null) {
@@ -445,6 +463,31 @@ public final class KaraokeEngine {
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
         if (!KaraokeConfig.get().isEnabled()) return;
         if (lyrics == null || lyrics.isEmpty()) return;
+
+        // If "only standing" is active and player is moving/suppressed:
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            while (currentLineIndex < lyrics.lines.size()) {
+                KaraokeModel.KaraokeLine line = lyrics.lines.get(currentLineIndex);
+                while (currentWordIndex < line.words.size()) {
+                    KaraokeModel.KaraokeWord w = line.words.get(currentWordIndex);
+                    if (playbackMs > w.end()) {
+                        currentWordIndex++;
+                    } else {
+                        break;
+                    }
+                }
+                if (currentWordIndex >= line.words.size() && playbackMs > line.end() + 1000L) {
+                    currentLineIndex++;
+                    currentWordIndex = 0;
+                } else {
+                    break;
+                }
+            }
+            return;
+        }
 
         // 1. Check and record word onsets on each tick
         checkWordOnsets(playbackMs);
@@ -770,6 +813,12 @@ public final class KaraokeEngine {
      */
     public synchronized void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
         if (!KaraokeConfig.get().isEnabled()) return;
+        if (isOnlyStandingSuppressed()) {
+            if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
+                resetWords();
+            }
+            return;
+        }
         boolean hasActive = !activeAnchors.isEmpty();
         boolean hasBodies = physics.getBodyCount() > 0;
         if (!hasActive && !hasBodies) {

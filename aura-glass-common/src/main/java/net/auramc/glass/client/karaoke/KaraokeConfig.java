@@ -111,6 +111,9 @@ public final class KaraokeConfig {
     public void setOnlyStanding(boolean onlyStanding) {
         QuickMenuConfig.get().karaokeOnlyStanding = onlyStanding;
         QuickMenuConfig.save();
+        if (onlyStanding && KaraokeEngine.getInstance().getAdaptiveness().getCurrentResult().state != PlayerAdaptiveness.ActivityState.STANDING) {
+            KaraokeEngine.getInstance().resetWords();
+        }
     }
 
     public boolean isDemoMode() {
