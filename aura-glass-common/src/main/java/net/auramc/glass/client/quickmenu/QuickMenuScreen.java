@@ -3,6 +3,7 @@ package net.auramc.glass.client.quickmenu;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.auramc.glass.common.render.AuraRenderer;
 import net.auramc.glass.common.render.GlassRenderer;
+import net.auramc.glass.common.render.MenuResources;
 import net.auramc.glass.common.style.GlassPreset;
 import net.auramc.glass.common.style.GlassStyles;
 import net.minecraft.client.gui.DrawContext;
@@ -159,6 +160,9 @@ public final class QuickMenuScreen extends Screen {
         }
         context.draw();
 
+        if (client != null) {
+            MenuResources.prepare(client);
+        }
         // Authentic Apple Liquid Glass panel with adaptive contrast tone
         if (GlassStyles.quality().needsBackdrop()) {
             QuickMenuRuntime.totalCaptureRequests++;
@@ -172,7 +176,8 @@ public final class QuickMenuScreen extends Screen {
             style.dispersion = 0;
             style.wobble = 0;
             style.depth = 0.02f;
-            style.frost = 2.5f;
+            style.frost = 3.0f;
+            style.saturation = 1.9f;
             style.gloss = 0.12f;
             style.rimOuter = 0.20f;
             style.rimInner = 0.40f;
@@ -194,7 +199,8 @@ public final class QuickMenuScreen extends Screen {
         }
 
         int before = GlassRenderer.drawCalls();
-        GlassRenderer.draw(box.x(), box.y(), box.width(), box.height(), style, Math.min(1, box.progress() * 5 + 0.05f));
+        float panelAlpha = Math.max(0f, Math.min(1f, box.progress()));
+        GlassRenderer.drawSurface(QuickMenuScreen.class, box.x(), box.y(), box.width(), box.height(), style, panelAlpha);
         GlassRenderer.flush();
         QuickMenuRuntime.totalDrawCalls += Math.max(0, GlassRenderer.drawCalls() - before);
 
@@ -255,7 +261,7 @@ public final class QuickMenuScreen extends Screen {
                 clipTop = viewportTop;
                 clipRight = right - 18;
                 clipBottom = viewportBottom;
-                float rowsY = viewportTop + 6 - scroll + box.sectionOffset(2);
+                float rowsY = viewportTop + 16 - scroll + box.sectionOffset(2);
                 textOpacity = box.sectionOpacity(2);
 
                 if (section == 0) visual(contentX, rowsY, contentW);
@@ -340,7 +346,7 @@ public final class QuickMenuScreen extends Screen {
     private float edgeFade(float itemY, float itemH) {
         if (clipBottom <= clipTop) return 1.0f;
         if (itemY + itemH <= clipTop || itemY >= clipBottom) return 0.0f;
-        float topFade = Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
+        float topFade = scroll <= 0 ? 1.0f : Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
         float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + itemH)) / 16.0f));
         return Math.max(0.0f, Math.min(1.0f, Math.min(topFade, bottomFade)));
     }
@@ -587,8 +593,9 @@ public final class QuickMenuScreen extends Screen {
     private void toggle(float x, float y, float w, String label, BooleanSupplier get, Consumer<Boolean> set) {
         float rowFade = edgeFade(y, 32);
         if (rowFade <= 0.01f) return;
-        row(x, y, w, label, rowFade);
         boolean on = get.getAsBoolean();
+        int textColor = on ? 0xEBFFFFFF : 0x73FFFFFF;
+        row(x, y, w, label, rowFade, textColor);
         rect(x + w - 44, y + 4, 42, 23, 11.5f, on ? ACCENT : 0x80767680, 0x1AFFFFFF, rowFade);
         rect(x + w - (on ? 22 : 40), y + 7, 17, 17, 8.5f, on ? ACCENT_TEXT : 0xFFFFFFFF, 0, rowFade);
         controls.add(new Control(x, y, w, 32, label, () -> {
@@ -614,7 +621,7 @@ public final class QuickMenuScreen extends Screen {
     private void slider(float x, float y, float w, String label, double value, double min, double max, DoubleConsumer set, Function<Double, String> format) {
         float rowFade = edgeFade(y, 36);
         if (rowFade <= 0.01f) return;
-        text(label, x, y + 1, 18, 0xFFFFFFFF, 400, rowFade);
+        text(label, x, y + 1, 18, 0xEBFFFFFF, 400, rowFade);
         if (format != null) {
             String display = format.apply(value);
             if (display != null && !display.isEmpty()) {
@@ -633,7 +640,11 @@ public final class QuickMenuScreen extends Screen {
     }
 
     private void row(float x, float y, float w, String label, float fade) {
-        text(label, x, y + 7, 18, 0xFFFFFFFF, 400, fade);
+        row(x, y, w, label, fade, 0xEBFFFFFF);
+    }
+
+    private void row(float x, float y, float w, String label, float fade, int textColor) {
+        text(label, x, y + 7, 18, textColor, 400, fade);
         rect(x, y + 35, w, 1, 0, 0x16767680, 0, fade);
     }
 
