@@ -15,7 +15,7 @@ public final class QuickMenuRuntime {
         QuickMenuConfig.initialize();
         menu = KeyBindingHelper.registerKeyBinding(new KeyBinding("Меню Aura", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_F8, "category.aura"));
         QuickMenuEffects.initialize();
-        net.auramc.glass.client.music.MusicSource.get().volume((float) QuickMenuConfig.get().musicVolume);
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get().volume((float) QuickMenuConfig.get().musicVolume);
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             net.auramc.glass.client.quickmenu.music.MusicArtwork.close();
         });
