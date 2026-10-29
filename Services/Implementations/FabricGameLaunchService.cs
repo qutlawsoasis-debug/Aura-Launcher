@@ -1,1946 +1,1999 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.IO.Compression;
-using System.Linq;
-using System.Management;
-using System.Net.Http;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using AuraLauncher.Core;
-using AuraLauncher.Models;
-using AuraLauncher.Services.Interfaces;
-using CmlLib.Core;
-using CmlLib.Core.Auth;
-using CmlLib.Core.FileExtractors;
-using CmlLib.Core.Files;
-using CmlLib.Core.Installers;
-using CmlLib.Core.ModLoaders.FabricMC;
-using CmlLib.Core.ProcessBuilder;
-using CmlLib.Core.Rules;
-
-namespace AuraLauncher.Services.Implementations;
-
-/// <summary>
-/// Асинхронный сервис автоустановки игрового окружения Minecraft (CmlLib.Core)
-/// и запуска клиента игры с Fabric Loader.
-/// Не модифицирует папки mods, config, saves, shaderpacks, resourcepacks.
-/// </summary>
-public class FabricGameLaunchService : IGameLaunchService
-{
-    public const string FabricLoaderVersion = "0.19.5";
-    public const string MinecraftVersion = "1.20.1";
-
-    private readonly IConfigService? _configService;
-    private readonly IMusicBridgeService? _musicBridgeService;
-
-    public FabricGameLaunchService(IConfigService? configService = null, IMusicBridgeService? musicBridgeService = null)
-    {
-        _configService = configService;
-        _musicBridgeService = musicBridgeService;
-    }
-
-    public static string ResolveFabricLoaderVersion(string gameDir, string? version = null)
-    {
-        try
-        {
-            var state = PackState.LoadValidState(gameDir);
-            if (state != null && !string.IsNullOrWhiteSpace(state.FabricLoader))
-            {
-                return state.FabricLoader.Trim();
-            }
-        }
-        catch
-        {
-        }
-        return GameVersionProfiles.GetDefaultFabricLoader(version);
-    }
-
-    private Process? _gameProcess;
-
-    public bool IsGameRunning => _gameProcess != null && !_gameProcess.HasExited;
-    public Process? CurrentGameProcess => _gameProcess;
-    public event EventHandler<int>? GameExited;
-
-    private static readonly HttpClient _httpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(60)
-    };
-
-    public string ResolveMinecraftDirectory(string? customPath = null)
-    {
-        if (!string.IsNullOrWhiteSpace(customPath))
-        {
-            return customPath.Trim();
-        }
-
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appData, ".aura");
-    }
-
-    /// <summary>
-    /// Определение изолированной папки инстанса для выбранной версии (.aura/instances/1.20.1 или 1.21.1).
-    /// </summary>
-    public string ResolveInstanceDirectory(string? customPath = null, string? version = null)
-    {
-        var rootDir = ResolveMinecraftDirectory(customPath);
-        var targetVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
-
-        // Если customPath уже является явной папкой инстанса, возвращаем напрямую
-        if (!string.IsNullOrWhiteSpace(customPath) && customPath.Contains(Path.Combine("instances", targetVersion), StringComparison.OrdinalIgnoreCase))
-        {
-            return customPath.Trim();
-        }
-
-        var instancesDir = Path.Combine(rootDir, "instances");
-
-        // Безопасная фоновая миграция legacy 1.20.1 файлов из корня при наличии
-        EnsureInstanceMigrated(rootDir);
-
-        var instancePath = Path.Combine(instancesDir, targetVersion);
-        if (!Directory.Exists(instancePath))
-        {
-            try { Directory.CreateDirectory(instancePath); } catch { }
-        }
-        return instancePath;
-    }
-
-    /// <summary>
-    /// Бесшовная миграция одиночной сборки 1.20.1 из корня .aura в .aura/instances/1.20.1.
-    /// </summary>
-    public static void EnsureInstanceMigrated(string rootGameDir)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(rootGameDir) || !Directory.Exists(rootGameDir))
-                return;
-
-            var instancesDir = Path.Combine(rootGameDir, "instances");
-            var instance120 = Path.Combine(instancesDir, GameVersionProfiles.Version120);
-
-            if (Directory.Exists(instance120))
-                return;
-
-            var rootMods = Path.Combine(rootGameDir, "mods");
-            var rootState = Path.Combine(rootGameDir, "pack.state.json");
-
-            if (!Directory.Exists(rootMods) && !File.Exists(rootState))
-                return;
-
-            Directory.CreateDirectory(instance120);
-            LogLauncherEvent($"[MIGRATION] Начата миграция одиночного инстанса 1.20.1 в {instance120}");
-
-            var foldersToMove = new[]
-            {
-                "mods", "config", "shaderpacks", "resourcepacks",
-                "schematics", "saves", "CustomSkinLoader", "tlm_custom_pack", "logs"
-            };
-
-            foreach (var folder in foldersToMove)
-            {
-                var src = Path.Combine(rootGameDir, folder);
-                var dst = Path.Combine(instance120, folder);
-                if (Directory.Exists(src) && !Directory.Exists(dst))
-                {
-                    try
-                    {
-                        Directory.Move(src, dst);
-                        LogLauncherEvent($"[MIGRATION] Перемещена папка {folder} в инстанс 1.20.1");
-                    }
-                    catch (Exception ex)
-                    {
-                        LogLauncherEvent($"[MIGRATION-COPY] Сбой Move для {folder}, копирование: {ex.Message}");
-                        CopyDirectory(src, dst);
-                    }
-                }
-            }
-
-            var filesToMove = new[] { "pack.state.json", "options.txt", "servers.dat" };
-            foreach (var file in filesToMove)
-            {
-                var src = Path.Combine(rootGameDir, file);
-                var dst = Path.Combine(instance120, file);
-                if (File.Exists(src) && !File.Exists(dst))
-                {
-                    try
-                    {
-                        File.Move(src, dst);
-                        LogLauncherEvent($"[MIGRATION] Перемещен файл {file} в инстанс 1.20.1");
-                    }
-                    catch
-                    {
-                        File.Copy(src, dst, true);
-                    }
-                }
-            }
-
-            LogLauncherEvent("[MIGRATION] Миграция 1.20.1 успешно завершена.");
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[MIGRATION-ERROR] Сбой миграции: {ex.Message}");
-        }
-    }
-
-    private static void CopyDirectory(string sourceDir, string targetDir)
-    {
-        Directory.CreateDirectory(targetDir);
-        foreach (var file in Directory.GetFiles(sourceDir))
-        {
-            var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
-            File.Copy(file, targetFile, true);
-        }
-        foreach (var subDir in Directory.GetDirectories(sourceDir))
-        {
-            var targetSubDir = Path.Combine(targetDir, Path.GetFileName(subDir));
-            CopyDirectory(subDir, targetSubDir);
-        }
-    }
-
-    /// <summary>
-    /// Локальная проверка готовности окружения (Fabric profile, vanilla jar, Java runtime) без сети.
-    /// </summary>
-    public bool CheckEnvironmentInstalled(string gameDir, string? version = null)
-    {
-        try
-        {
-            var fullGameDir = ResolveMinecraftDirectory(gameDir);
-            var mcVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
-            var targetInstanceDir = ResolveInstanceDirectory(fullGameDir, mcVersion);
-            var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
-            var fabricId = $"fabric-loader-{fabricLoader}-{mcVersion}";
-            var fabricJson = Path.Combine(fullGameDir, "versions", fabricId, $"{fabricId}.json");
-            var vanillaJar = Path.Combine(fullGameDir, "versions", mcVersion, $"{mcVersion}.jar");
-            var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
-            var javaRuntime = ResolveJavaRuntime(fullGameDir, minJava);
-
-            return File.Exists(fabricJson) && File.Exists(vanillaJar) && !string.IsNullOrWhiteSpace(javaRuntime);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Определение уже запущенной игры при старте лаунчера через Win32_Process в System.Management.
-    /// </summary>
-    public Process? FindRunningGameProcess(string gameDir)
-    {
-        try
-        {
-            var fullGameDir = ResolveMinecraftDirectory(gameDir);
-            using var searcher = new ManagementObjectSearcher(
-                "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'javaw.exe' OR Name = 'java.exe'");
-            using var results = searcher.Get();
-            foreach (ManagementObject obj in results)
-            {
-                var cmdLine = obj["CommandLine"]?.ToString();
-                if (!string.IsNullOrEmpty(cmdLine) &&
-                    cmdLine.Contains(fullGameDir, StringComparison.OrdinalIgnoreCase))
-                {
-                    var pid = Convert.ToInt32(obj["ProcessId"]);
-                    try
-                    {
-                        var proc = Process.GetProcessById(pid);
-                        if (!proc.HasExited)
-                        {
-                            AttachRunningProcess(proc);
-                            return proc;
-                        }
-                    }
-                    catch
-                    {
-                        // Процесс мог уже завершиться
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[WMI: ERROR] Ошибка при поиске процесса игры: {ex.Message}");
-        }
-        return null;
-    }
-
-    private void AttachRunningProcess(Process proc)
-    {
-        _gameProcess = proc;
-        try
-        {
-            proc.EnableRaisingEvents = true;
-            proc.Exited += (s, e) =>
-            {
-                int exitCode = 0;
-                try { exitCode = proc.ExitCode; } catch { }
-                _gameProcess = null;
-                LogLauncherEvent($"[EXIT] Ранее запущенная игра (PID {proc.Id}) завершилась с кодом {exitCode}");
-                GameExited?.Invoke(this, exitCode);
-            };
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[ATTACH: ERROR] Ошибка привязки к процессу: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Корректно завершает запущенный процесс игры:
-    /// Сначала вызывает CloseMainWindow (дает игре шанс сохранить мир и закрыться),
-    /// при превышении таймаута принудительно убивает процесс.
-    /// </summary>
-    public async Task<bool> StopGameProcessAsync(int timeoutMs = 6000)
-    {
-        var proc = _gameProcess;
-        if (proc == null || proc.HasExited)
-        {
-            return true;
-        }
-
-        try
-        {
-            LogLauncherEvent($"[STOP-GAME] Запрос корректного завершения процесса игры (PID {proc.Id})...");
-            if (proc.CloseMainWindow())
-            {
-                using var cts = new CancellationTokenSource(timeoutMs);
-                try
-                {
-                    await proc.WaitForExitAsync(cts.Token);
-                    LogLauncherEvent($"[STOP-GAME] Процесс игры (PID {proc.Id}) успешно завершён через CloseMainWindow");
-                    return true;
-                }
-                catch (OperationCanceledException)
-                {
-                    LogLauncherEvent($"[STOP-GAME] Процесс игры не завершился за {timeoutMs} мс после CloseMainWindow, выполняем принудительное завершение.");
-                }
-            }
-
-            if (!proc.HasExited)
-            {
-                proc.Kill();
-                await proc.WaitForExitAsync();
-                LogLauncherEvent($"[STOP-GAME] Процесс игры принудительно завершён (Kill)");
-            }
-            return true;
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[STOP-GAME: ERROR] Ошибка при остановке процесса игры: {ex.Message}");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Если перед первым запуском в GameDir нет options.txt, создает его с дефолтными настройками.
-    /// Не перезаписывает, если файл уже существует.
-    /// </summary>
-    public static void EnsureDefaultOptions(string gameDir, string? graphicsPreset = null)
-    {
-        try
-        {
-            var optionsPath = Path.Combine(gameDir, "options.txt");
-            if (!File.Exists(optionsPath))
-            {
-                Directory.CreateDirectory(gameDir);
-                var content = "version:3465\nlang:ru_ru\nguiScale:2\nfullscreen:true\n";
-                File.WriteAllText(optionsPath, content, new UTF8Encoding(false));
-                LogLauncherEvent($"[OPTIONS] Создан файл настроек по умолчанию (options.txt): {optionsPath}");
-                ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Medium");
-            }
-            else if (!string.IsNullOrWhiteSpace(graphicsPreset) && !string.Equals(graphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
-            {
-                var optionsShaders = Path.Combine(gameDir, "optionsshaders.txt");
-                if (!File.Exists(optionsShaders))
-                {
-                    ApplyGraphicsPreset(gameDir, graphicsPreset);
-                }
-            }
-            EnsureDefaultResourcePacksEnabled(gameDir);
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[OPTIONS: ERROR] Ошибка создания options.txt: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Парсинг списка в формате Minecraft options.txt (например, resourcePacks:["vanilla","fabric","file/pack.zip"]).
-    /// </summary>
-    public static List<string> ParseOptionsList(string rawLine)
-    {
-        var list = new List<string>();
-        if (string.IsNullOrWhiteSpace(rawLine))
-        {
-            return list;
-        }
-
-        int colonIdx = rawLine.IndexOf(':');
-        string content = colonIdx >= 0 ? rawLine.Substring(colonIdx + 1).Trim() : rawLine.Trim();
-
-        if (content.StartsWith('[') && content.EndsWith(']'))
-        {
-            content = content.Substring(1, content.Length - 2);
-        }
-
-        var matches = Regex.Matches(content, @"""((?:[^""\\]|\\.)*)""");
-        foreach (Match m in matches)
-        {
-            var val = m.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\");
-            list.Add(val);
-        }
-
-        return list;
-    }
-
-    /// <summary>
-    /// Форматирование списка в формат массива Minecraft options.txt.
-    /// </summary>
-    public static string FormatOptionsList(IEnumerable<string> items)
-    {
-        var formatted = items.Select(i =>
-        {
-            var escaped = i.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            return $"\"{escaped}\"";
-        });
-        return $"[{string.Join(",", formatted)}]";
-    }
-
-    /// <summary>
-    /// Файлы, исключённые из сборки модов (удаляются перед запуском при наличии).
-    /// </summary>
-    public static readonly string[] DroppedModpackFiles = new[]
-    {
-        "resourcepacks/Transparent-GUI-White-Border.zip"
-    };
-
-    /// <summary>
-    /// Автоматическое обнаружение и включение всех ресурспаков из папки resourcepacks в options.txt
-    /// с дублированием в incompatibleResourcePacks перед запуском клиента.
-    /// </summary>
-    public static void EnsureDefaultResourcePacksEnabled(string gameDir)
-    {
-        if (string.IsNullOrWhiteSpace(gameDir))
-        {
-            return;
-        }
-
-        try
-        {
-            // Удаление исключённых из сборки файлов
-            foreach (var droppedRelPath in DroppedModpackFiles)
-            {
-                try
-                {
-                    var fullDroppedPath = Path.Combine(gameDir, droppedRelPath.Replace('/', Path.DirectorySeparatorChar));
-                    if (File.Exists(fullDroppedPath))
-                    {
-                        File.Delete(fullDroppedPath);
-                        LogLauncherEvent($"[PACK] removed {droppedRelPath}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogLauncherEvent($"[PACK: ERROR] Не удалось удалить {droppedRelPath}: {ex.Message}");
-                }
-            }
-
-            var rpDir = Path.Combine(gameDir, "resourcepacks");
-            var foundPacks = new List<string>();
-
-            if (Directory.Exists(rpDir))
-            {
-                foreach (var file in Directory.GetFiles(rpDir, "*.zip"))
-                {
-                    foundPacks.Add(Path.GetFileName(file));
-                }
-
-                foreach (var dir in Directory.GetDirectories(rpDir))
-                {
-                    if (File.Exists(Path.Combine(dir, "pack.mcmeta")))
-                    {
-                        foundPacks.Add(Path.GetFileName(dir));
-                    }
-                }
-            }
-
-            // Стабильный алфавитный порядок для новых ресурспаков
-            foundPacks.Sort(StringComparer.OrdinalIgnoreCase);
-
-            var optionsPath = Path.Combine(gameDir, "options.txt");
-            Directory.CreateDirectory(gameDir);
-
-            List<string> lines;
-            if (File.Exists(optionsPath))
-            {
-                lines = File.ReadAllLines(optionsPath, Encoding.UTF8).ToList();
-            }
-            else
-            {
-                lines = new List<string>
-                {
-                    "version:3465",
-                    "lang:ru_ru",
-                    "guiScale:2",
-                    "fullscreen:true"
-                };
-            }
-
-            // 1. Обработка resourcePacks:[...]
-            int rpLineIndex = lines.FindIndex(l => l.StartsWith("resourcePacks:", StringComparison.Ordinal));
-            List<string> currentPacks = rpLineIndex >= 0
-                ? ParseOptionsList(lines[rpLineIndex])
-                : new List<string>();
-
-            // Удаляем исключённые из сборки ресурспаки из списков options.txt
-            foreach (var droppedRelPath in DroppedModpackFiles)
-            {
-                var packFileName = Path.GetFileName(droppedRelPath);
-                var packEntry = $"file/{packFileName}";
-                currentPacks.RemoveAll(p => string.Equals(p, packEntry, StringComparison.OrdinalIgnoreCase) ||
-                                           string.Equals(p, packFileName, StringComparison.OrdinalIgnoreCase));
-            }
-
-            // Гарантируем "vanilla"
-            if (!currentPacks.Contains("vanilla", StringComparer.OrdinalIgnoreCase))
-            {
-                currentPacks.Insert(0, "vanilla");
-            }
-
-            // Гарантируем "fabric" (или "Fabric Mods")
-            if (!currentPacks.Contains("fabric", StringComparer.OrdinalIgnoreCase) &&
-                !currentPacks.Contains("Fabric Mods", StringComparer.OrdinalIgnoreCase))
-            {
-                int vanillaIdx = currentPacks.FindIndex(p => string.Equals(p, "vanilla", StringComparison.OrdinalIgnoreCase));
-                int insertIdx = vanillaIdx >= 0 ? vanillaIdx + 1 : 0;
-                currentPacks.Insert(insertIdx, "fabric");
-            }
-
-            // Добавляем все найденные ресурспаки из resourcepacks/, сохраняя существующие позиции
-            foreach (var packName in foundPacks)
-            {
-                var packEntry = $"file/{packName}";
-                if (!currentPacks.Contains(packEntry, StringComparer.OrdinalIgnoreCase))
-                {
-                    currentPacks.Add(packEntry);
-                }
-            }
-
-            var newRpLine = $"resourcePacks:{FormatOptionsList(currentPacks)}";
-            if (rpLineIndex >= 0)
-            {
-                lines[rpLineIndex] = newRpLine;
-            }
-            else
-            {
-                lines.Add(newRpLine);
-            }
-
-            // 2. Обработка incompatibleResourcePacks:[...]
-            int incompLineIndex = lines.FindIndex(l => l.StartsWith("incompatibleResourcePacks:", StringComparison.Ordinal));
-            List<string> incompPacks = incompLineIndex >= 0
-                ? ParseOptionsList(lines[incompLineIndex])
-                : new List<string>();
-
-            // Удаляем исключённые из сборки ресурспаки из incompatibleResourcePacks
-            foreach (var droppedRelPath in DroppedModpackFiles)
-            {
-                var packFileName = Path.GetFileName(droppedRelPath);
-                var packEntry = $"file/{packFileName}";
-                incompPacks.RemoveAll(p => string.Equals(p, packEntry, StringComparison.OrdinalIgnoreCase) ||
-                                           string.Equals(p, packFileName, StringComparison.OrdinalIgnoreCase));
-            }
-
-            // Продублировать все ресурспаки из resourcepacks/ в incompatibleResourcePacks
-            foreach (var packName in foundPacks)
-            {
-                var packEntry = $"file/{packName}";
-                if (!incompPacks.Contains(packEntry, StringComparer.OrdinalIgnoreCase))
-                {
-                    incompPacks.Add(packEntry);
-                }
-            }
-
-            var newIncompLine = $"incompatibleResourcePacks:{FormatOptionsList(incompPacks)}";
-            if (incompLineIndex >= 0)
-            {
-                lines[incompLineIndex] = newIncompLine;
-            }
-            else
-            {
-                lines.Add(newIncompLine);
-            }
-
-            File.WriteAllLines(optionsPath, lines, new UTF8Encoding(false));
-            LogLauncherEvent($"[OPTIONS] Синхронизированы ресурспаки в options.txt (активно: {currentPacks.Count}, несовместимых: {incompPacks.Count})");
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[OPTIONS: ERROR] Ошибка при обновлении ресурспаков в options.txt: {ex.Message}");
-        }
-    }
-
-    public static void LogGameLaunchEvent(string gameDir, string message)
-    {
-        LogLauncherEvent(message);
-        try
-        {
-            var logsDir = Path.Combine(gameDir, "logs");
-            Directory.CreateDirectory(logsDir);
-            var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
-            File.AppendAllText(gameLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
-        }
-        catch { }
-    }
-
-    public static void ApplyGraphicsPreset(string gameDir, string? preset, IGraphicsPresetService? presetService = null, bool persistConfig = false)
-    {
-        if (string.IsNullOrWhiteSpace(gameDir))
-        {
-            return;
-        }
-
-        try
-        {
-            var service = presetService ?? new GraphicsPresetService(new InMemoryConfigService(), new WorkshopService());
-            string targetKey = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "Balanced", StringComparison.OrdinalIgnoreCase)
-                ? service.AutoDetectPreset()
-                : preset;
-
-            if (string.Equals(targetKey, "Custom", StringComparison.OrdinalIgnoreCase) ||
-                service.GetPreset(targetKey) == null)
-            {
-                return;
-            }
-            service.ApplyPreset(gameDir, targetKey, persistConfig: persistConfig);
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[OPTIONS: ERROR] Не удалось применить профиль графики '{preset}': {ex.Message}");
-        }
-    }
-
-    public static void EnsureDefaultLspConfig(string gameDir)
-    {
-        try
-        {
-            var configDir = Path.Combine(gameDir, "config");
-            var lspPath = Path.Combine(configDir, "lsp.json");
-            Directory.CreateDirectory(configDir);
-
-            if (!File.Exists(lspPath))
-            {
-                var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
-                File.WriteAllText(lspPath, content, new UTF8Encoding(false));
-                LogLauncherEvent($"[CONFIG] Создан файл конфигурации по умолчанию (lsp.json): {lspPath}");
-            }
-            else
-            {
-                var existingText = File.ReadAllText(lspPath);
-                try
-                {
-                    var doc = System.Text.Json.Nodes.JsonNode.Parse(existingText)?.AsObject();
-                    if (doc != null)
-                    {
-                        bool changed = false;
-                        if (doc["enablePreference"]?.GetValue<bool>() != true) { doc["enablePreference"] = true; changed = true; }
-                        if (doc["defaultPort"]?.GetValue<int>() != 25565) { doc["defaultPort"] = 25565; changed = true; }
-                        if (doc["onlineMode"]?.GetValue<bool>() != false) { doc["onlineMode"] = false; changed = true; }
-
-                        if (changed)
-                        {
-                            File.WriteAllText(lspPath, doc.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
-                            LogLauncherEvent($"[CONFIG] Обновлен lsp.json (onlineMode: false, port 25565): {lspPath}");
-                        }
-                    }
-                }
-                catch
-                {
-                    var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
-                    File.WriteAllText(lspPath, content, new UTF8Encoding(false));
-                    LogLauncherEvent($"[CONFIG] Перезаписан поврежденный lsp.json: {lspPath}");
-                }
-            }
-
-            EnsureE4allConfig(configDir);
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[CONFIG: ERROR] Ошибка создания lsp.json: {ex.Message}");
-        }
-    }
-
-    private static void EnsureE4allConfig(string configDir)
-    {
-        if (!LobbyService.UseE4allTunnel)
-        {
-            return;
-        }
-
-        try
-        {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var flagPath = Path.Combine(appData, ".aura", "dialtone.on");
-            bool dialtoneEnabled = File.Exists(flagPath);
-            var dialtoneTag = dialtoneEnabled ? "dialtone=ON (flag)" : "dialtone=OFF (default)";
-            LogLauncherEvent($"[CONFIG] Настройка e4all: {dialtoneTag}");
-
-            var e4allDirs = new[] { configDir, Path.Combine(configDir, "e4all") };
-            foreach (var dir in e4allDirs)
-            {
-                Directory.CreateDirectory(dir);
-                var tomlPath = Path.Combine(dir, "e4all.toml");
-                if (File.Exists(tomlPath))
-                {
-                    var text = File.ReadAllText(tomlPath);
-                    bool changed = false;
-
-                    if (text.Contains("offlineMode = false"))
-                    {
-                        text = text.Replace("offlineMode = false", "offlineMode = true");
-                        changed = true;
-                    }
-                    if (dialtoneEnabled)
-                    {
-                        if (text.Contains("dialtoneHostEnabled = false"))
-                        {
-                            text = text.Replace("dialtoneHostEnabled = false", "dialtoneHostEnabled = true");
-                            changed = true;
-                        }
-                        if (text.Contains("dialtonePlayerEnabled = false"))
-                        {
-                            text = text.Replace("dialtonePlayerEnabled = false", "dialtonePlayerEnabled = true");
-                            changed = true;
-                        }
-                    }
-                    else
-                    {
-                        if (text.Contains("dialtoneHostEnabled = true"))
-                        {
-                            text = text.Replace("dialtoneHostEnabled = true", "dialtoneHostEnabled = false");
-                            changed = true;
-                        }
-                        if (text.Contains("dialtonePlayerEnabled = true"))
-                        {
-                            text = text.Replace("dialtonePlayerEnabled = true", "dialtonePlayerEnabled = false");
-                            changed = true;
-                        }
-                    }
-                    if (text.Contains("voiceP2PEnabled = true"))
-                    {
-                        text = text.Replace("voiceP2PEnabled = true", "voiceP2PEnabled = false");
-                        changed = true;
-                    }
-                    if (text.Contains("loginReadyTimeoutMs = 15000"))
-                    {
-                        text = text.Replace("loginReadyTimeoutMs = 15000", "loginReadyTimeoutMs = 45000");
-                        changed = true;
-                    }
-
-                    if (changed)
-                    {
-                        File.WriteAllText(tomlPath, text, new UTF8Encoding(false));
-                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, {dialtoneTag}, voice=false, timeout=45s)");
-                    }
-                }
-            }
-        }
-        catch { }
-    }
-
-    /// <summary>
-    /// Распаковка нативных библиотек (LWJGL и др.) в папку &lt;GameDir&gt;\versions\&lt;version&gt;\natives,
-    /// на которую указывает -Djava.library.path.
-    /// </summary>
-    public static void EnsureNativesExtracted(string gameDir, string versionName)
-    {
-        try
-        {
-            var nativesDir = Path.Combine(gameDir, "versions", versionName, "natives");
-            Directory.CreateDirectory(nativesDir);
-
-            var libDir = Path.Combine(gameDir, "libraries");
-            if (!Directory.Exists(libDir))
-                return;
-
-            string pattern = Environment.Is64BitOperatingSystem
-                ? "*natives-windows.jar"
-                : "*natives-windows-x86.jar";
-
-            var nativeJars = Directory.GetFiles(libDir, pattern, SearchOption.AllDirectories);
-            foreach (var jar in nativeJars)
-            {
-                try
-                {
-                    using var zip = ZipFile.OpenRead(jar);
-                    foreach (var entry in zip.Entries)
-                    {
-                        if (entry.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var destPath = Path.Combine(nativesDir, entry.Name);
-                            if (!File.Exists(destPath) || new FileInfo(destPath).Length != entry.Length)
-                            {
-                                entry.ExtractToFile(destPath, overwrite: true);
-                                LogLauncherEvent($"[NATIVES] Извлечена библиотека {entry.Name} из {Path.GetFileName(jar)}");
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogLauncherEvent($"[NATIVES: ERROR] Ошибка распаковки {jar}: {ex.Message}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[NATIVES: ERROR] Ошибка подготовки natives: {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Парсер аргументов командной строки с учетом кавычек.
-    /// </summary>
-    public static List<string> ParseCommandLineArguments(string commandLine)
-    {
-        var tokens = new List<string>();
-        if (string.IsNullOrWhiteSpace(commandLine))
-            return tokens;
-
-        var sb = new StringBuilder();
-        bool inQuotes = false;
-        for (int i = 0; i < commandLine.Length; i++)
-        {
-            char c = commandLine[i];
-            if (c == '"')
-            {
-                inQuotes = !inQuotes;
-            }
-            else if (char.IsWhiteSpace(c) && !inQuotes)
-            {
-                if (sb.Length > 0)
-                {
-                    tokens.Add(sb.ToString());
-                    sb.Clear();
-                }
-            }
-            else
-            {
-                sb.Append(c);
-            }
-        }
-        if (sb.Length > 0)
-        {
-            tokens.Add(sb.ToString());
-        }
-        return tokens;
-    }
-
-    /// <summary>
-    /// Форматирование аргумента для Java argfile: аргументы с пробелами оборачиваются в кавычки,
-    /// внутри кавычек экранируются обратный слэш (\ -> \\) и кавычки (" -> \").
-    /// </summary>
-    public static string FormatArgForJavaArgFile(string token)
-    {
-        if (token.Contains(' ') || token.Contains('\t'))
-        {
-            var escaped = token.Replace(@"\", @"\\").Replace("\"", "\\\"");
-            return $"\"{escaped}\"";
-        }
-        return token;
-    }
-
-    /// <summary>
-    /// Поиск установленной Java (17+ или 21+).
-    /// Приоритет отдается локальной Java в &lt;GameDir&gt;\runtime, затем системным путям.
-    /// </summary>
-    public string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17)
-    {
-        var candidates = new List<string>();
-
-        // 1. Приоритетный путь Mojang Java 21 (java-runtime-delta), если требуется >= 21
-        var deltaDefault = Path.Combine(gameDir, "runtime", "windows-x64", "java-runtime-delta", "bin", "javaw.exe");
-        if (File.Exists(deltaDefault))
-        {
-            candidates.Add(deltaDefault);
-        }
-
-        var deltaAlt = Path.Combine(gameDir, "runtime", "java-runtime-delta", "windows", "java-runtime-delta", "bin", "javaw.exe");
-        if (File.Exists(deltaAlt))
-        {
-            candidates.Add(deltaAlt);
-        }
-
-        // 2. Приоритетный путь Mojang Java 17 (java-runtime-gamma) в папке игры
-        var gammaDefault = Path.Combine(gameDir, "runtime", "windows-x64", "java-runtime-gamma", "bin", "javaw.exe");
-        if (File.Exists(gammaDefault))
-        {
-            candidates.Add(gammaDefault);
-        }
-
-        var gammaAlt = Path.Combine(gameDir, "runtime", "java-runtime-gamma", "windows", "java-runtime-gamma", "bin", "javaw.exe");
-        if (File.Exists(gammaAlt))
-        {
-            candidates.Add(gammaAlt);
-        }
-
-        // Поиск любых других javaw.exe внутри <GameDir>\runtime
-        var runtimeDir = Path.Combine(gameDir, "runtime");
-        if (Directory.Exists(runtimeDir))
-        {
-            try
-            {
-                var found = Directory.GetFiles(runtimeDir, "javaw.exe", SearchOption.AllDirectories);
-                foreach (var f in found)
-                {
-                    if (!candidates.Contains(f))
-                    {
-                        candidates.Add(f);
-                    }
-                }
-            }
-            catch { }
-        }
-
-        // 3. Системные переменные окружения и директории (запасной вариант)
-        var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
-        if (!string.IsNullOrWhiteSpace(javaHome))
-        {
-            candidates.Add(Path.Combine(javaHome, "bin", "javaw.exe"));
-        }
-
-        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        if (Directory.Exists(Path.Combine(programFiles, "Eclipse Adoptium")))
-        {
-            foreach (var dir in Directory.GetDirectories(Path.Combine(programFiles, "Eclipse Adoptium")))
-            {
-                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
-            }
-        }
-        if (Directory.Exists(Path.Combine(programFiles, "Microsoft")))
-        {
-            foreach (var dir in Directory.GetDirectories(Path.Combine(programFiles, "Microsoft"), "jdk*"))
-            {
-                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
-            }
-        }
-        if (Directory.Exists(Path.Combine(programFiles, "Java")))
-        {
-            foreach (var dir in Directory.GetDirectories(Path.Combine(programFiles, "Java"), "jdk*"))
-            {
-                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
-            }
-        }
-
-        // Системный javaw в PATH
-        candidates.Add("javaw.exe");
-
-        foreach (var candidate in candidates)
-        {
-            if (candidate == "javaw.exe" || File.Exists(candidate))
-            {
-                var major = GetJavaMajorVersion(candidate);
-                if (major >= minMajorVersion)
-                {
-                    return candidate;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Определение мажорной версии Java через чтение release-файла или запуск javaw -version.
-    /// </summary>
-    public static int GetJavaMajorVersion(string javaExecutable)
-    {
-        try
-        {
-            // Вариант 1: Быстрое чтение файла release в корне JRE
-            if (javaExecutable != "javaw.exe" && File.Exists(javaExecutable))
-            {
-                var binDir = Path.GetDirectoryName(javaExecutable);
-                var jreDir = binDir != null ? Directory.GetParent(binDir)?.FullName : null;
-                if (!string.IsNullOrEmpty(jreDir))
-                {
-                    var releasePath = Path.Combine(jreDir, "release");
-                    if (File.Exists(releasePath))
-                    {
-                        var lines = File.ReadAllLines(releasePath);
-                        foreach (var line in lines)
-                        {
-                            if (line.StartsWith("JAVA_VERSION=", StringComparison.OrdinalIgnoreCase))
-                            {
-                                var verStr = line.Split('=')[1].Trim('"', ' ', '\'');
-                                var match = Regex.Match(verStr, @"^(?:1\.)?(\d+)");
-                                if (match.Success && int.TryParse(match.Groups[1].Value, out int ver))
-                                {
-                                    return ver;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Вариант 2: Запуск java/javaw -version и чтение вывода ошибки (stderr)
-            var psi = new ProcessStartInfo
-            {
-                FileName = javaExecutable,
-                Arguments = "-version",
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-            if (process == null) return 0;
-
-            var stderr = process.StandardError.ReadToEnd();
-            process.WaitForExit(3000);
-
-            var versionMatch = Regex.Match(stderr, @"(?:version\s+""(?:1\.)?(\d+))");
-            if (versionMatch.Success && int.TryParse(versionMatch.Groups[1].Value, out int parsedVer))
-            {
-                return parsedVer;
-            }
-        }
-        catch { }
-
-        return 0;
-    }
-
-    /// <summary>
-    /// Генерация детерминированного Offline UUID v3 (MD5 от UTF-8 строки "OfflinePlayer:" + nick).
-    /// </summary>
-    public static string GenerateOfflineUuid(string nickname)
-    {
-        var rawString = "OfflinePlayer:" + (nickname ?? string.Empty).Trim();
-        var bytes = Encoding.UTF8.GetBytes(rawString);
-        var hash = MD5.HashData(bytes);
-
-        // Установка версии 3 (биты 4-7 шестого байта = 0011)
-        hash[6] = (byte)((hash[6] & 0x0F) | 0x30);
-        // Установка варианта RFC 4122 (биты 6-7 восьмого байта = 10)
-        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
-
-        // Формирование строки в big-endian, как Java UUID.nameUUIDFromBytes:
-        // байты 0-3 (8 hex), 4-5 (4 hex), 6-7 (4 hex, начинается с 3), 8-9 (4 hex, начинается с 8/9/a/b), 10-15 (12 hex)
-        return $"{Convert.ToHexString(hash, 0, 4)}-{Convert.ToHexString(hash, 4, 2)}-{Convert.ToHexString(hash, 6, 2)}-{Convert.ToHexString(hash, 8, 2)}-{Convert.ToHexString(hash, 10, 6)}".ToLowerInvariant();
-    }
-
-    /// <summary>
-    /// Автоматическая проверка и загрузка недостающего окружения Minecraft (5 этапов):
-    /// <summary>
-    /// Автоустановка и верификация всех этапов игрового окружения:
-    /// 1. Minecraft (Клиент и базовый манифест)
-    /// 2. Java (Официальный Mojang JRE: java-runtime-gamma для 1.20.1, java-runtime-delta для 1.21.1)
-    /// 3. Fabric (Профиль и загрузчик Fabric)
-    /// 4. Библиотеки (Объединенные библиотеки Vanilla и Fabric)
-    /// 5. Ресурсы (Индекс ассетов и файлы объектов)
-    /// </summary>
-    public async Task EnsureInstalledAsync(
-        string gameDir,
-        IProgress<InstallProgressReport>? progress = null,
-        Action<string>? onLogReceived = null,
-        CancellationToken cancellationToken = default,
-        string? version = null)
-    {
-        var mcVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
-        var targetInstanceDir = ResolveInstanceDirectory(gameDir, mcVersion);
-        var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
-        var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
-        var javaTitle = minJava >= 21 ? "Java 21" : "Java 17";
-        var javaRuntimeName = GameVersionProfiles.GetJavaRuntimeComponent(mcVersion);
-
-        LogLauncherEvent($"[INSTALL] Начало проверки/установки окружения Minecraft {mcVersion} в {gameDir}");
-        var mcPath = new MinecraftPath(gameDir);
-        var launcher = new MinecraftLauncher(mcPath);
-        var rules = new RulesEvaluatorContext(LauncherOSRule.Current);
-
-        var clientExtractor = launcher.FileExtractors.OfType<ClientFileExtractor>().FirstOrDefault() ?? new ClientFileExtractor();
-        var libExtractor = launcher.FileExtractors.OfType<LibraryFileExtractor>().FirstOrDefault() ?? new LibraryFileExtractor("client", launcher.RulesEvaluator);
-        var assetExtractor = launcher.FileExtractors.OfType<AssetFileExtractor>().FirstOrDefault() ?? new AssetFileExtractor(_httpClient);
-        var javaExtractor = launcher.FileExtractors.OfType<JavaFileExtractor>().FirstOrDefault() ?? new JavaFileExtractor(_httpClient, launcher.JavaPathResolver);
-        var logExtractor = launcher.FileExtractors.OfType<LogFileExtractor>().FirstOrDefault() ?? new LogFileExtractor();
-
-        // Этап 1: Minecraft (базовый манифест и client.jar)
-        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 1/5: Проверка Minecraft {mcVersion}...");
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = $"Minecraft {mcVersion}",
-            StageIndex = 1,
-            TotalStages = 5,
-            Percentage = 0,
-            DetailText = $"Проверка клиента Minecraft {mcVersion}..."
-        });
-
-        var vanillaVersion = await RetryAsync(async () =>
-            await launcher.GetVersionAsync(mcVersion, cancellationToken),
-            $"Загрузка манифеста Minecraft {mcVersion}", onLogReceived, cancellationToken);
-
-        var clientFiles = (await clientExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
-        var logFiles = (await logExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
-        var stage1Files = clientFiles.Concat(logFiles).ToList();
-
-        await InstallGameFilesStageAsync(
-            launcher, stage1Files, $"Minecraft {mcVersion}", 1, 5, progress, onLogReceived, cancellationToken);
-
-        // Этап 2: Java (Mojang runtime)
-        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 2/5: Проверка {javaTitle}...");
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = javaTitle,
-            StageIndex = 2,
-            TotalStages = 5,
-            Percentage = 20,
-            DetailText = $"Проверка среды выполнения {javaTitle}..."
-        });
-
-        var existingJava = ResolveJavaRuntime(gameDir, minJava);
-        bool hasLocalJava = !string.IsNullOrWhiteSpace(existingJava) && existingJava.StartsWith(gameDir, StringComparison.OrdinalIgnoreCase);
-
-        if (!hasLocalJava)
-        {
-            onLogReceived?.Invoke($"[AURA-INSTALL] Локальная {javaTitle} не найдена в runtime. Загрузка {javaRuntimeName} от Mojang...");
-            var javaFiles = (await javaExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
-            await InstallGameFilesStageAsync(
-                launcher, javaFiles, javaTitle, 2, 5, progress, onLogReceived, cancellationToken);
-        }
-        else
-        {
-            onLogReceived?.Invoke($"[AURA-INSTALL] Найдена готовая {javaTitle} в runtime: {existingJava}");
-            progress?.Report(new InstallProgressReport
-            {
-                Stage = javaTitle,
-                StageIndex = 2,
-                TotalStages = 5,
-                Percentage = 40,
-                DetailText = $"{javaTitle} готова"
-            });
-        }
-
-        // Этап 3: Fabric (профиль загрузчика)
-        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 3/5: Проверка профиля Fabric Loader {fabricLoader}...");
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = "Fabric",
-            StageIndex = 3,
-            TotalStages = 5,
-            Percentage = 40,
-            DetailText = $"Проверка профиля Fabric Loader {fabricLoader}..."
-        });
-
-        var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoader}-{mcVersion}");
-        var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoader}-{mcVersion}.json");
-
-        if (!File.Exists(fabricJson))
-        {
-            onLogReceived?.Invoke($"[AURA-INSTALL] Загрузка профиля Fabric с meta.fabricmc.net...");
-            var fabricInstaller = new FabricInstaller(_httpClient);
-            await RetryAsync(async () =>
-            {
-                await fabricInstaller.Install(mcVersion, fabricLoader, mcPath);
-                return true;
-            }, "Загрузка профиля Fabric", onLogReceived, cancellationToken);
-        }
-
-        await EnsureFabricClientJarAsync(gameDir, fabricLoader, mcVersion, onLogReceived, cancellationToken);
-
-        var fabricVersionName = $"fabric-loader-{fabricLoader}-{mcVersion}";
-        var fabricVersion = await RetryAsync(async () =>
-            await launcher.GetVersionAsync(fabricVersionName, cancellationToken),
-            "Чтение профиля Fabric", onLogReceived, cancellationToken);
-
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = "Fabric",
-            StageIndex = 3,
-            TotalStages = 5,
-            Percentage = 60,
-            DetailText = "Профиль Fabric загружен"
-        });
-
-        // Этап 4: Библиотеки (Vanilla + Fabric)
-        onLogReceived?.Invoke("[AURA-INSTALL] Этап 4/5: Проверка библиотек игры и Fabric...");
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = "Библиотеки",
-            StageIndex = 4,
-            TotalStages = 5,
-            Percentage = 60,
-            DetailText = "Проверка библиотек..."
-        });
-
-        var vanillaLibs = await libExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken);
-        var fabricLibs = await libExtractor.Extract(mcPath, fabricVersion, rules, cancellationToken);
-        var allLibraries = vanillaLibs.Concat(fabricLibs)
-            .GroupBy(f => f.Path)
-            .Select(g => g.First())
-            .ToList();
-
-        await InstallGameFilesStageAsync(
-            launcher, allLibraries, "Библиотеки", 4, 5, progress, onLogReceived, cancellationToken);
-
-        // Этап 5: Ресурсы (ассеты Minecraft 1.20.1)
-        onLogReceived?.Invoke("[AURA-INSTALL] Этап 5/5: Проверка ресурсов (ассетов)...");
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = "Ресурсы",
-            StageIndex = 5,
-            TotalStages = 5,
-            Percentage = 80,
-            DetailText = "Проверка ассетов Minecraft..."
-        });
-
-        var assets = (await assetExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
-        await InstallGameFilesStageAsync(
-            launcher, assets, "Ресурсы", 5, 5, progress, onLogReceived, cancellationToken);
-
-        progress?.Report(new InstallProgressReport
-        {
-            Stage = "Ресурсы",
-            StageIndex = 5,
-            TotalStages = 5,
-            Percentage = 100,
-            DetailText = "Все компоненты установлены!"
-        });
-
-        EnsureNativesExtracted(gameDir, fabricVersionName);
-
-        LogLauncherEvent("[INSTALL] Окружение Minecraft и Fabric успешно проверено/установлено.");
-        onLogReceived?.Invoke("[AURA-INSTALL] Установка окружения успешно завершена.");
-    }
-
-    /// <summary>
-    /// Потокобезопасная установка пачки файлов этапа с расчетом скорости и обработкой разрывов сети (до 3 попыток).
-    /// </summary>
-    private static async Task InstallGameFilesStageAsync(
-        MinecraftLauncher launcher,
-        IEnumerable<GameFile> files,
-        string stageName,
-        int stageIndex,
-        int totalStages,
-        IProgress<InstallProgressReport>? progress,
-        Action<string>? onLogReceived,
-        CancellationToken cancellationToken)
-    {
-        var fileList = files.ToList();
-        if (fileList.Count == 0) return;
-
-        var sw = Stopwatch.StartNew();
-        long lastBytes = 0;
-        long lastTime = 0;
-        string speedStr = string.Empty;
-        string currentDetail = string.Empty;
-
-        var fileProg = new SyncProgress<InstallerProgressChangedEventArgs>(e =>
-        {
-            currentDetail = $"{e.Name} ({e.ProgressedTasks}/{e.TotalTasks})";
-        });
-
-        var byteProg = new SyncProgress<ByteProgress>(bp =>
-        {
-            if (bp.TotalBytes > 0)
-            {
-                double stagePct = (double)bp.ProgressedBytes / bp.TotalBytes * 100.0;
-                long elapsed = sw.ElapsedMilliseconds;
-                if (elapsed - lastTime >= 400)
-                {
-                    long deltaBytes = bp.ProgressedBytes - lastBytes;
-                    double seconds = (elapsed - lastTime) / 1000.0;
-                    if (seconds > 0)
-                    {
-                        double bytesPerSec = deltaBytes / seconds;
-                        double mbPerSec = bytesPerSec / (1024.0 * 1024.0);
-                        speedStr = mbPerSec >= 1.0
-                            ? $"{mbPerSec:F1} МБ/с"
-                            : $"{(bytesPerSec / 1024.0):F0} КБ/с";
-                    }
-                    lastBytes = bp.ProgressedBytes;
-                    lastTime = elapsed;
-                }
-
-                double stageWeight = 100.0 / totalStages;
-                double overallPct = (stageIndex - 1) * stageWeight + (stagePct * stageWeight / 100.0);
-
-                progress?.Report(new InstallProgressReport
-                {
-                    Stage = stageName,
-                    StageIndex = stageIndex,
-                    TotalStages = totalStages,
-                    Percentage = Math.Clamp(overallPct, 0, 100),
-                    FormattedSpeed = speedStr,
-                    DetailText = currentDetail
-                });
-            }
-        });
-
-        int maxRetries = 3;
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                await launcher.GameInstaller.Install(fileList, fileProg, byteProg, cancellationToken);
-                break;
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                if (attempt >= maxRetries)
-                {
-                    throw new InvalidOperationException(
-                        $"Сбой сети на этапе \"{stageName}\" после {maxRetries} попыток. Проверьте интернет-соединение. Ошибка: {ex.Message}", ex);
-                }
-
-                onLogReceived?.Invoke($"[AURA-INSTALL] Сбой сети ({stageName}, попытка {attempt}/{maxRetries}): {ex.Message}. Повтор через 2с...");
-                await Task.Delay(2000, cancellationToken);
-            }
-        }
-    }
-
-    private static async Task<T> RetryAsync<T>(
-        Func<Task<T>> action,
-        string operationName,
-        Action<string>? onLogReceived,
-        CancellationToken cancellationToken,
-        int maxRetries = 3)
-    {
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                return await action();
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                if (attempt >= maxRetries)
-                {
-                    throw new InvalidOperationException($"Ошибка операции \"{operationName}\" после {maxRetries} попыток: {ex.Message}", ex);
-                }
-
-                onLogReceived?.Invoke($"[AURA-RETRY] Попытка {attempt}/{maxRetries} для \"{operationName}\" не удалась: {ex.Message}. Повтор...");
-                await Task.Delay(2000, cancellationToken);
-            }
-        }
-
-        throw new InvalidOperationException($"Не удалось выполнить \"{operationName}\"");
-    }
-
-    /// <summary>
-    /// Запуск процесса игры с гарантированной установкой окружения и сохранением логов.
-    /// </summary>
-    public async Task<Process> LaunchGameAsync(
-        LauncherConfig config,
-        Action<string>? onLogReceived = null,
-        Action<int, string>? onGameExited = null,
-        IProgress<InstallProgressReport>? installProgress = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-        var nickResult = NicknameValidator.Validate(config.Nickname);
-        if (!nickResult.IsValid)
-        {
-            LogLauncherEvent("[LAUNCH] Невалидный никнейм игрока. Запуск отменен.");
-            throw new InvalidOperationException($"Игровой никнейм не соответствует правилам (3-16 символов, A-Z, 0-9, _): {nickResult.Error}");
-        }
-
-        var rootGameDir = ResolveMinecraftDirectory(config.GameDir);
-        var mcVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
-        var targetInstanceDir = ResolveInstanceDirectory(rootGameDir, mcVersion);
-        LogLauncherEvent($"[LAUNCH] Запуск игры Minecraft {mcVersion} для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {targetInstanceDir}");
-
-        // 0. Настройки игры по умолчанию (options.txt, lsp.json) перед первым запуском
-        EnsureDefaultOptions(targetInstanceDir, config.GraphicsPreset);
-        EnsureDefaultLspConfig(targetInstanceDir);
-        _musicBridgeService?.WriteConfigFile(targetInstanceDir);
-
-        // 1. Автоматическая проверка и докачка недостающих компонентов окружения
-        await EnsureInstalledAsync(rootGameDir, installProgress, onLogReceived, cancellationToken, mcVersion);
-
-        // 2. Определение пути к Java (17+ для 1.20.1, 21+ для 1.21.1)
-        var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
-        var javaTitle = minJava >= 21 ? "Java 21" : "Java 17";
-        var javaPath = ResolveJavaRuntime(rootGameDir, minJava);
-        if (string.IsNullOrWhiteSpace(javaPath))
-        {
-            throw new InvalidOperationException($"Не найдена {javaTitle}+ для запуска игры Minecraft {mcVersion}.");
-        }
-        onLogReceived?.Invoke($"[AURA-JAVA] Исполняемый файл {javaTitle}: {javaPath}");
-
-        // 3. Детерминированный offline UUID
-        var playerUuid = GenerateOfflineUuid(config.Nickname);
-        onLogReceived?.Invoke($"[AURA-UUID] Сгенерирован детерминированный Offline UUID: {playerUuid}");
-        LogLauncherEvent($"[LAUNCH] Ник: {config.Nickname}, Offline UUID: {playerUuid}, Java: {javaPath}");
-
-        // 4. Подготовка параметров запуска CmlLib.Core
-        var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
-        await EnsureFabricClientJarAsync(rootGameDir, fabricLoader, mcVersion, onLogReceived, cancellationToken);
-        var mcPath = new MinecraftPath(rootGameDir);
-        var launcher = new MinecraftLauncher(mcPath);
-        var fabricVersionName = $"fabric-loader-{fabricLoader}-{mcVersion}";
-
-        // Гарантируем распаковку нативных библиотек в папку, на которую указывает -Djava.library.path
-        EnsureNativesExtracted(rootGameDir, fabricVersionName);
-
-        var launchOptions = new MLaunchOption
-        {
-            JavaPath = javaPath,
-            MaximumRamMb = config.RamMb,
-            MinimumRamMb = Math.Min(1024, config.RamMb),
-            Session = new MSession(config.Nickname, "0", playerUuid)
-            {
-                UserType = "legacy"
-            },
-            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir, javaPath)
-        };
-
-        LogGameLaunchEvent(targetInstanceDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
-
-        var process = await launcher.CreateProcessAsync(fabricVersionName, launchOptions);
-        process.StartInfo.UseShellExecute = false;
-        process.StartInfo.RedirectStandardOutput = true;
-        process.StartInfo.RedirectStandardError = true;
-        process.StartInfo.CreateNoWindow = true;
-
-        // Генерация Java @argsFile
-        var rawArgs = process.StartInfo.Arguments;
-        var tokens = ParseCommandLineArguments(rawArgs);
-
-        // Убираем аргумент --fullscreen (игра прочитает из options.txt)
-        tokens.RemoveAll(t => t.Equals("--fullscreen", StringComparison.OrdinalIgnoreCase));
-
-        // Подменяем --gameDir на targetInstanceDir для изоляции модов, конфигов и сохранений
-        if (!string.Equals(rootGameDir, targetInstanceDir, StringComparison.OrdinalIgnoreCase))
-        {
-            for (int i = 0; i < tokens.Count; i++)
-            {
-                if (tokens[i].Equals("--gameDir", StringComparison.OrdinalIgnoreCase) && i + 1 < tokens.Count)
-                {
-                    tokens[i + 1] = targetInstanceDir;
-                    break;
-                }
-            }
-        }
-
-        // Если задан адрес сервера для быстрого подключения (P2P LAN / лобби)
-        if (!string.IsNullOrWhiteSpace(config.QuickPlayMultiplayer))
-        {
-            tokens.Add("--quickPlayMultiplayer");
-            tokens.Add(config.QuickPlayMultiplayer.Trim());
-        }
-        else if (!string.IsNullOrWhiteSpace(config.QuickPlaySingleplayer))
-        {
-            tokens.Add("--quickPlaySingleplayer");
-            tokens.Add(config.QuickPlaySingleplayer.Trim());
-        }
-
-        var formattedLines = new List<string>();
-        var maskedLinesForLog = new List<string>();
-        bool nextIsToken = false;
-        bool nextIsClasspath = false;
-
-        for (int i = 0; i < tokens.Count; i++)
-        {
-            var token = tokens[i];
-
-            if (nextIsClasspath)
-            {
-                // Аргумент classpath всегда оборачивается в кавычки с экранированием обратных слэшей
-                var escapedCp = token.Replace(@"\", @"\\").Replace("\"", "\\\"");
-                var quotedCp = $"\"{escapedCp}\"";
-                formattedLines.Add(quotedCp);
-                maskedLinesForLog.Add(quotedCp);
-                nextIsClasspath = false;
-                continue;
-            }
-
-            if (token.Equals("-cp", StringComparison.OrdinalIgnoreCase) ||
-                token.Equals("-classpath", StringComparison.OrdinalIgnoreCase) ||
-                token.Equals("--class-path", StringComparison.OrdinalIgnoreCase))
-            {
-                formattedLines.Add(token);
-                maskedLinesForLog.Add(token);
-                nextIsClasspath = true;
-                continue;
-            }
-
-            var formatted = FormatArgForJavaArgFile(token);
-            formattedLines.Add(formatted);
-
-            if (nextIsToken)
-            {
-                maskedLinesForLog.Add("\"***\"");
-                nextIsToken = false;
-            }
-            else
-            {
-                if (token.Equals("--accessToken", StringComparison.OrdinalIgnoreCase))
-                {
-                    nextIsToken = true;
-                    maskedLinesForLog.Add(formatted);
-                }
-                else if (token.StartsWith("--accessToken=", StringComparison.OrdinalIgnoreCase))
-                {
-                    maskedLinesForLog.Add("--accessToken=\"***\"");
-                }
-                else
-                {
-                    maskedLinesForLog.Add(formatted);
-                }
-            }
-        }
-
-        var argsFilePath = Path.Combine(targetInstanceDir, "argsFile.txt");
-        await File.WriteAllLinesAsync(argsFilePath, formattedLines, new UTF8Encoding(false), cancellationToken);
-
-        // Запись содержимого argsFile в launcher.log с маскировкой accessToken
-        var maskedArgsContent = string.Join(Environment.NewLine, maskedLinesForLog);
-        LogLauncherEvent($"[ARGSFILE]\n{maskedArgsContent}");
-        onLogReceived?.Invoke($"[AURA-ARGSFILE] Записан файл аргументов: {argsFilePath}");
-
-        // Передача аргумента @argsFile
-        process.StartInfo.ArgumentList.Clear();
-        process.StartInfo.Arguments = argsFilePath.Contains(' ') ? $"@\"{argsFilePath}\"" : $"@{argsFilePath}";
-
-        LogLauncherEvent($"[ARGS] {process.StartInfo.FileName} {process.StartInfo.Arguments}");
-        onLogReceived?.Invoke($"[AURA-ARGS] {process.StartInfo.FileName} {process.StartInfo.Arguments}");
-
-        // 5. Настройка логирования в файл <targetInstanceDir>\logs\launcher-game.log
-        var logsDir = Path.Combine(targetInstanceDir, "logs");
-        Directory.CreateDirectory(logsDir);
-        var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
-
-        // Ротация вместо стирания: вывод Java прошлой попытки — улика сбоя и не должна
-        // уничтожаться следующим запуском. Имя архива уникально (stamp + ticks): повторный
-        // запуск в ту же секунду не должен приводить к пропуску ротации, а Move без
-        // overwrite-режима не перезапишет уже существующий архив.
-        try
-        {
-            if (File.Exists(gameLogPath))
-            {
-                string stamp = File.GetLastWriteTime(gameLogPath).ToString("yyyyMMdd-HHmmss");
-                string archivePath = Path.Combine(logsDir, $"launcher-game-{stamp}-{DateTime.UtcNow.Ticks:x8}.log");
-                File.Move(gameLogPath, archivePath);
-
-                // Чистим только собственные архивы ротации (launcher-game-*.log), держим последние 5
-                var archives = new DirectoryInfo(logsDir)
-                    .GetFiles("launcher-game-*.log")
-                    .OrderByDescending(f => f.LastWriteTimeUtc)
-                    .ToList();
-                foreach (var extra in archives.Skip(5))
-                {
-                    try { extra.Delete(); } catch { }
-                }
-            }
-        }
-        catch { }
-
-        // Ротация не удалась (файл занят сторонним процессом) — не открываем launcher-game.log
-        // на запись: FileMode.Create стёр бы единственный непрочитанный лог прошлой попытки.
-        // Текущая сессия в этом случае пишется под уникальным именем.
-        string sessionLogPath = gameLogPath;
-        if (File.Exists(gameLogPath))
-        {
-            sessionLogPath = Path.Combine(logsDir, $"launcher-game-{DateTime.Now:yyyyMMdd-HHmmss}-{DateTime.UtcNow.Ticks:x8}.log");
-        }
-
-        var gameLogWriter = new StreamWriter(new FileStream(sessionLogPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
-        {
-            AutoFlush = true
-        };
-
-        process.OutputDataReceived += (s, e) =>
-        {
-            if (e.Data != null)
-            {
-                gameLogWriter.WriteLine(e.Data);
-                onLogReceived?.Invoke(e.Data);
-            }
-        };
-
-        process.ErrorDataReceived += (s, e) =>
-        {
-            if (e.Data != null)
-            {
-                gameLogWriter.WriteLine("[STDERR] " + e.Data);
-                onLogReceived?.Invoke("[STDERR] " + e.Data);
-            }
-        };
-
-        // Гарантированное применение настроек пресета графики перед стартом клиента
-        if (!string.IsNullOrWhiteSpace(config.GraphicsPreset) && !string.Equals(config.GraphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
-        {
-            ApplyGraphicsPreset(targetInstanceDir, config.GraphicsPreset);
-        }
-        else
-        {
-            EnsureDefaultResourcePacksEnabled(targetInstanceDir);
-        }
-
-        try
-        {
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-        }
-        catch (Exception ex)
-        {
-            _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
-            gameLogWriter.Dispose();
-            LogLauncherEvent($"[LAUNCH: START-ERROR] Не удалось запустить процесс Java: {ex.Message}");
-            throw new InvalidOperationException($"Не удалось запустить процесс Java: {ex.Message}", ex);
-        }
-
-        _gameProcess = process;
-
-        LogLauncherEvent($"[LAUNCH] Игровой процесс запущен (PID {process.Id})");
-        onLogReceived?.Invoke($"[AURA-PROCESS] Игровой процесс запущен с PID {process.Id}");
-
-        // Отслеживание завершения игры
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await process.WaitForExitAsync();
-                // Синхронный WaitForExit после асинхронного догружает остатки stdout/stderr
-                // (последние строки перед выходом JVM) до того, как лог будет прочитан анализатором
-                process.WaitForExit();
-                int exitCode = process.ExitCode;
-                gameLogWriter.WriteLine($"[LAUNCHER] Процесс игры завершён: код {exitCode}, {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                await gameLogWriter.FlushAsync();
-                gameLogWriter.Dispose();
-
-                _gameProcess = null;
-
-                LogLauncherEvent($"[EXIT] Игра (PID {process.Id}) завершилась с кодом выхода {exitCode}");
-                _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
-                GameExited?.Invoke(this, exitCode);
-                onGameExited?.Invoke(exitCode, sessionLogPath);
-            }
-            catch (Exception ex)
-            {
-                _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
-                _gameProcess = null;
-                LogLauncherEvent($"[EXIT-ERROR] Ошибка при ожидании процесса игры: {ex.Message}");
-            }
-        });
-
-        return process;
-    }
-
-    /// <summary>
-    /// Обеспечивает корректность профиля Fabric и наличие клиентского jar в classpath:
-    /// 1. Добавляет "jar": "<mcVersion>" в fabric-loader-*.json (если meta.fabricmc.net не включила его).
-    /// 2. Гарантирует наличие fabric-loader-*.jar (копия vanilla <mcVersion>.jar).
-    /// </summary>
-    private static async Task EnsureFabricClientJarAsync(string gameDir, string fabricLoaderVersion, string minecraftVersion, Action<string>? onLogReceived, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var vanillaDir = Path.Combine(gameDir, "versions", minecraftVersion);
-            var vanillaJar = Path.Combine(vanillaDir, $"{minecraftVersion}.jar");
-
-            var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}");
-            var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}.json");
-            var fabricJar = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}.jar");
-
-            // 1. Патч JSON профиля Fabric (добавление поля "jar": "<mcVersion>", если отсутствует)
-            if (File.Exists(fabricJson))
-            {
-                var jsonText = await File.ReadAllTextAsync(fabricJson, cancellationToken);
-                if (!jsonText.Contains("\"jar\"", StringComparison.OrdinalIgnoreCase))
-                {
-                    try
-                    {
-                        var node = System.Text.Json.Nodes.JsonNode.Parse(jsonText);
-                        if (node is System.Text.Json.Nodes.JsonObject obj)
-                        {
-                            obj["jar"] = minecraftVersion;
-                            await File.WriteAllTextAsync(fabricJson, obj.ToJsonString(), cancellationToken);
-                            LogLauncherEvent($"[FABRIC-FIX] Добавлено 'jar': '{minecraftVersion}' в {fabricJson}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogLauncherEvent($"[FABRIC-FIX: WARN] Не удалось обновить JSON профиля: {ex.Message}");
-                    }
-                }
-            }
-
-            // 2. Копирование <mcVersion>.jar в fabric-loader-*.jar, если файл отсутствует или размер отличается
-            if (File.Exists(vanillaJar))
-            {
-                Directory.CreateDirectory(fabricDir);
-                bool needsCopy = !File.Exists(fabricJar);
-                if (!needsCopy)
-                {
-                    var vInfo = new FileInfo(vanillaJar);
-                    var fInfo = new FileInfo(fabricJar);
-                    if (vInfo.Length != fInfo.Length || vInfo.Length == 0)
-                    {
-                        needsCopy = true;
-                    }
-                }
-
-                if (needsCopy)
-                {
-                    File.Copy(vanillaJar, fabricJar, true);
-                    onLogReceived?.Invoke($"[AURA-INSTALL] Синхронизирован клиентский JAR ({minecraftVersion}) для Fabric Loader.");
-                    LogLauncherEvent($"[FABRIC-FIX] Скопирован {vanillaJar} -> {fabricJar}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[FABRIC-FIX: ERROR] Ошибка синхронизации Fabric JAR: {ex.Message}");
-        }
-    }
-
-    public static string? CustomLogDirectory { get; set; }
-
-    public static bool IsValidCdsArchive(string? path)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
-            var fi = new FileInfo(path);
-            // Hotspot base classes.jsa is typically 10-30MB; header alone is >= 4KB.
-            // A zero-byte or corrupted file must never be accepted as a valid CDS archive.
-            return fi.Length > 4096;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    public static bool EnsureBaseCdsArchive(string? javaPath, CancellationToken cancellationToken = default, int timeoutMs = 20000)
-    {
-        if (string.IsNullOrWhiteSpace(javaPath) || !File.Exists(javaPath))
-        {
-            return false;
-        }
-
-        try
-        {
-            var binDir = Path.GetDirectoryName(javaPath);
-            if (string.IsNullOrEmpty(binDir)) return false;
-
-            string[] possiblePaths =
-            {
-                Path.Combine(binDir, "server", "classes.jsa"),
-                Path.Combine(binDir, "..", "lib", "server", "classes.jsa"),
-                Path.Combine(binDir, "client", "classes.jsa")
-            };
-
-            if (possiblePaths.Any(IsValidCdsArchive))
-            {
-                return true;
-            }
-
-            // Remove any 0-byte or corrupted archives so dump can recreate cleanly
-            foreach (var p in possiblePaths)
-            {
-                try
-                {
-                    if (File.Exists(p) && !IsValidCdsArchive(p))
-                    {
-                        File.Delete(p);
-                    }
-                }
-                catch { }
-            }
-
-            // If base archive is missing, attempt to generate it with java.exe -Xshare:dump
-            string dumpExe = Path.Combine(binDir, "java.exe");
-            if (!File.Exists(dumpExe)) dumpExe = javaPath;
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = dumpExe,
-                Arguments = "-Xshare:dump",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            Process? proc = null;
-            try
-            {
-                proc = Process.Start(psi);
-                if (proc == null) return false;
-
-                // Asynchronously read stdout and stderr to prevent pipe buffer deadlocks
-                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-                var stderrTask = proc.StandardError.ReadToEndAsync();
-
-                bool exited = false;
-                if (cancellationToken.CanBeCanceled)
-                {
-                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                    var waitTask = proc.WaitForExitAsync(linkedCts.Token);
-                    var timeoutTask = Task.Delay(timeoutMs);
-                    var finished = Task.WhenAny(waitTask, timeoutTask).GetAwaiter().GetResult();
-                    exited = (finished == waitTask && !cancellationToken.IsCancellationRequested);
-                }
-                else
-                {
-                    exited = proc.WaitForExit(timeoutMs);
-                }
-
-                if (!exited || cancellationToken.IsCancellationRequested)
-                {
-                    try
-                    {
-                        proc.Kill(entireProcessTree: true);
-                        proc.WaitForExit(3000);
-                    }
-                    catch { }
-                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump timed out after {timeoutMs}ms or was cancelled; process killed");
-                    return false;
-                }
-
-                try
-                {
-                    Task.WaitAll(new[] { stdoutTask, stderrTask }, 2000);
-                }
-                catch { }
-
-                if (proc.ExitCode != 0)
-                {
-                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump failed with exit code {proc.ExitCode}");
-                    return false;
-                }
-
-                if (possiblePaths.Any(IsValidCdsArchive))
-                {
-                    LogLauncherEvent("[LAUNCH: CDS] Успешно сгенерирован базовый архив CDS classes.jsa");
-                    return true;
-                }
-            }
-            finally
-            {
-                try
-                {
-                    if (proc != null && !proc.HasExited)
-                    {
-                        proc.Kill(entireProcessTree: true);
-                        proc.WaitForExit(1000);
-                    }
-                }
-                catch { }
-                proc?.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            LogLauncherEvent($"[LAUNCH: CDS: WARN] Не удалось проверить/сгенерировать базовый архив CDS: {ex.Message}");
-        }
-
-        return false;
-    }
-
-    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir, string? javaPath = null)
-    {
-        var list = new List<MArgument>
-        {
-            new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main "),
-            new MArgument("-XX:+UnlockExperimentalVMOptions"),
-            new MArgument("-Dmodernfix.mixin.perf.dynamic_resources=true")
-        };
-
-        try
-        {
-            bool hasBaseCds = EnsureBaseCdsArchive(javaPath);
-            if (hasBaseCds)
-            {
-                string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
-                if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
-                {
-                    list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
-                }
-                else
-                {
-                    list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
-                }
-            }
-            else
-            {
-                LogLauncherEvent("[LAUNCH: CDS] Base CDS archive not available, skipping AppCDS arguments");
-            }
-        }
-        catch { }
-
-        if (!string.IsNullOrWhiteSpace(jvmArgs))
-        {
-            var tokens = jvmArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var t in tokens)
-            {
-                if (t.Equals("-XX:+UnlockExperimentalVMOptions", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-                list.Add(new MArgument(t));
-            }
-        }
-        else
-        {
-            list.Add(new MArgument("-XX:+UseG1GC"));
-            list.Add(new MArgument("-XX:+ParallelRefProcEnabled"));
-            list.Add(new MArgument("-XX:G1ReservePercent=15"));
-            list.Add(new MArgument("-XX:G1HeapRegionSize=32M"));
-            list.Add(new MArgument("-XX:MaxGCPauseMillis=50"));
-            list.Add(new MArgument("-XX:+AlwaysPreTouch"));
-        }
-
-        return list.ToArray();
-    }
-
-    /// <summary>
-    /// Логирование событий самого лаунчера в %AppData%\Aura\launcher.log.
-    /// </summary>
-    public static void LogLauncherEvent(string message)
-    {
-        try
-        {
-            string logDir;
-            if (!string.IsNullOrEmpty(CustomLogDirectory))
-            {
-                logDir = CustomLogDirectory;
-            }
-            else
-            {
-                var envDir = Environment.GetEnvironmentVariable("AURA_LOG_DIR");
-                if (!string.IsNullOrEmpty(envDir))
-                {
-                    logDir = envDir;
-                }
-                else
-                {
-                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-                    logDir = Path.Combine(appData, "Aura");
-                }
-            }
-            Directory.CreateDirectory(logDir);
-            var logPath = Path.Combine(logDir, "launcher.log");
-            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
-        }
-        catch { }
-    }
-}
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Management;
+using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
+using AuraLauncher.Core;
+using AuraLauncher.Models;
+using AuraLauncher.Services.Interfaces;
+using CmlLib.Core;
+using CmlLib.Core.Auth;
+using CmlLib.Core.FileExtractors;
+using CmlLib.Core.Files;
+using CmlLib.Core.Installers;
+using CmlLib.Core.ModLoaders.FabricMC;
+using CmlLib.Core.ProcessBuilder;
+using CmlLib.Core.Rules;
+
+namespace AuraLauncher.Services.Implementations;
+
+/// <summary>
+/// Асинхронный сервис автоустановки игрового окружения Minecraft (CmlLib.Core)
+/// и запуска клиента игры с Fabric Loader.
+/// Не модифицирует папки mods, config, saves, shaderpacks, resourcepacks.
+/// </summary>
+public class FabricGameLaunchService : IGameLaunchService
+{
+    public const string FabricLoaderVersion = "0.19.5";
+    public const string MinecraftVersion = "1.20.1";
+
+    private readonly IConfigService? _configService;
+    private readonly IMusicBridgeService? _musicBridgeService;
+
+    public FabricGameLaunchService(IConfigService? configService = null, IMusicBridgeService? musicBridgeService = null)
+    {
+        _configService = configService;
+        _musicBridgeService = musicBridgeService;
+    }
+
+    public static string ResolveFabricLoaderVersion(string gameDir, string? version = null)
+    {
+        try
+        {
+            var state = PackState.LoadValidState(gameDir);
+            if (state != null && !string.IsNullOrWhiteSpace(state.FabricLoader))
+            {
+                return state.FabricLoader.Trim();
+            }
+        }
+        catch
+        {
+        }
+        return GameVersionProfiles.GetDefaultFabricLoader(version);
+    }
+
+    private Process? _gameProcess;
+
+    public bool IsGameRunning => _gameProcess != null && !_gameProcess.HasExited;
+    public Process? CurrentGameProcess => _gameProcess;
+    public event EventHandler<int>? GameExited;
+
+    private static readonly HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(60)
+    };
+
+    public string ResolveMinecraftDirectory(string? customPath = null)
+    {
+        if (!string.IsNullOrWhiteSpace(customPath))
+        {
+            return customPath.Trim();
+        }
+
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return Path.Combine(appData, ".aura");
+    }
+
+    /// <summary>
+    /// Определение изолированной папки инстанса для выбранной версии (.aura/instances/1.20.1 или 1.21.1).
+    /// </summary>
+    public string ResolveInstanceDirectory(string? customPath = null, string? version = null)
+    {
+        var rootDir = ResolveMinecraftDirectory(customPath);
+        var targetVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
+
+        // Если customPath уже является явной папкой инстанса, возвращаем напрямую
+        if (!string.IsNullOrWhiteSpace(customPath) && customPath.Contains(Path.Combine("instances", targetVersion), StringComparison.OrdinalIgnoreCase))
+        {
+            return customPath.Trim();
+        }
+
+        var instancesDir = Path.Combine(rootDir, "instances");
+
+        // Безопасная фоновая миграция legacy 1.20.1 файлов из корня при наличии
+        EnsureInstanceMigrated(rootDir);
+
+        var instancePath = Path.Combine(instancesDir, targetVersion);
+        if (!Directory.Exists(instancePath))
+        {
+            try { Directory.CreateDirectory(instancePath); } catch { }
+        }
+        return instancePath;
+    }
+
+    /// <summary>
+    /// Бесшовная миграция одиночной сборки 1.20.1 из корня .aura в .aura/instances/1.20.1.
+    /// </summary>
+    public static void EnsureInstanceMigrated(string rootGameDir)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(rootGameDir) || !Directory.Exists(rootGameDir))
+                return;
+
+            var instancesDir = Path.Combine(rootGameDir, "instances");
+            var instance120 = Path.Combine(instancesDir, GameVersionProfiles.Version120);
+
+            if (Directory.Exists(instance120))
+                return;
+
+            var rootMods = Path.Combine(rootGameDir, "mods");
+            var rootState = Path.Combine(rootGameDir, "pack.state.json");
+
+            if (!Directory.Exists(rootMods) && !File.Exists(rootState))
+                return;
+
+            Directory.CreateDirectory(instance120);
+            LogLauncherEvent($"[MIGRATION] Начата миграция одиночного инстанса 1.20.1 в {instance120}");
+
+            var foldersToMove = new[]
+            {
+                "mods", "config", "shaderpacks", "resourcepacks",
+                "schematics", "saves", "CustomSkinLoader", "tlm_custom_pack", "logs"
+            };
+
+            foreach (var folder in foldersToMove)
+            {
+                var src = Path.Combine(rootGameDir, folder);
+                var dst = Path.Combine(instance120, folder);
+                if (Directory.Exists(src) && !Directory.Exists(dst))
+                {
+                    try
+                    {
+                        Directory.Move(src, dst);
+                        LogLauncherEvent($"[MIGRATION] Перемещена папка {folder} в инстанс 1.20.1");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogLauncherEvent($"[MIGRATION-COPY] Сбой Move для {folder}, копирование: {ex.Message}");
+                        CopyDirectory(src, dst);
+                    }
+                }
+            }
+
+            var filesToMove = new[] { "pack.state.json", "options.txt", "servers.dat" };
+            foreach (var file in filesToMove)
+            {
+                var src = Path.Combine(rootGameDir, file);
+                var dst = Path.Combine(instance120, file);
+                if (File.Exists(src) && !File.Exists(dst))
+                {
+                    try
+                    {
+                        File.Move(src, dst);
+                        LogLauncherEvent($"[MIGRATION] Перемещен файл {file} в инстанс 1.20.1");
+                    }
+                    catch
+                    {
+                        File.Copy(src, dst, true);
+                    }
+                }
+            }
+
+            LogLauncherEvent("[MIGRATION] Миграция 1.20.1 успешно завершена.");
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[MIGRATION-ERROR] Сбой миграции: {ex.Message}");
+        }
+    }
+
+    private static void CopyDirectory(string sourceDir, string targetDir)
+    {
+        Directory.CreateDirectory(targetDir);
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var targetFile = Path.Combine(targetDir, Path.GetFileName(file));
+            File.Copy(file, targetFile, true);
+        }
+        foreach (var subDir in Directory.GetDirectories(sourceDir))
+        {
+            var targetSubDir = Path.Combine(targetDir, Path.GetFileName(subDir));
+            CopyDirectory(subDir, targetSubDir);
+        }
+    }
+
+    /// <summary>
+    /// Локальная проверка готовности окружения (Fabric profile, vanilla jar, Java runtime) без сети.
+    /// </summary>
+    public bool CheckEnvironmentInstalled(string gameDir, string? version = null)
+    {
+        try
+        {
+            var fullGameDir = ResolveMinecraftDirectory(gameDir);
+            var mcVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
+            var targetInstanceDir = ResolveInstanceDirectory(fullGameDir, mcVersion);
+            var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
+            var fabricId = $"fabric-loader-{fabricLoader}-{mcVersion}";
+            var fabricJson = Path.Combine(fullGameDir, "versions", fabricId, $"{fabricId}.json");
+            var vanillaJar = Path.Combine(fullGameDir, "versions", mcVersion, $"{mcVersion}.jar");
+            var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
+            var javaRuntime = ResolveJavaRuntime(fullGameDir, minJava);
+
+            return File.Exists(fabricJson) && File.Exists(vanillaJar) && !string.IsNullOrWhiteSpace(javaRuntime);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Определение уже запущенной игры при старте лаунчера через Win32_Process в System.Management.
+    /// </summary>
+    public Process? FindRunningGameProcess(string gameDir)
+    {
+        try
+        {
+            var fullGameDir = ResolveMinecraftDirectory(gameDir);
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = 'javaw.exe' OR Name = 'java.exe'");
+            using var results = searcher.Get();
+            foreach (ManagementObject obj in results)
+            {
+                var cmdLine = obj["CommandLine"]?.ToString();
+                if (!string.IsNullOrEmpty(cmdLine) &&
+                    cmdLine.Contains(fullGameDir, StringComparison.OrdinalIgnoreCase))
+                {
+                    var pid = Convert.ToInt32(obj["ProcessId"]);
+                    try
+                    {
+                        var proc = Process.GetProcessById(pid);
+                        if (!proc.HasExited)
+                        {
+                            AttachRunningProcess(proc);
+                            return proc;
+                        }
+                    }
+                    catch
+                    {
+                        // Процесс мог уже завершиться
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[WMI: ERROR] Ошибка при поиске процесса игры: {ex.Message}");
+        }
+        return null;
+    }
+
+    private void AttachRunningProcess(Process proc)
+    {
+        _gameProcess = proc;
+        try
+        {
+            proc.EnableRaisingEvents = true;
+            proc.Exited += (s, e) =>
+            {
+                int exitCode = 0;
+                try { exitCode = proc.ExitCode; } catch { }
+                _gameProcess = null;
+                LogLauncherEvent($"[EXIT] Ранее запущенная игра (PID {proc.Id}) завершилась с кодом {exitCode}");
+                GameExited?.Invoke(this, exitCode);
+            };
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[ATTACH: ERROR] Ошибка привязки к процессу: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Корректно завершает запущенный процесс игры:
+    /// Сначала вызывает CloseMainWindow (дает игре шанс сохранить мир и закрыться),
+    /// при превышении таймаута принудительно убивает процесс.
+    /// </summary>
+    public async Task<bool> StopGameProcessAsync(int timeoutMs = 6000)
+    {
+        var proc = _gameProcess;
+        if (proc == null || proc.HasExited)
+        {
+            return true;
+        }
+
+        try
+        {
+            LogLauncherEvent($"[STOP-GAME] Запрос корректного завершения процесса игры (PID {proc.Id})...");
+            if (proc.CloseMainWindow())
+            {
+                using var cts = new CancellationTokenSource(timeoutMs);
+                try
+                {
+                    await proc.WaitForExitAsync(cts.Token);
+                    LogLauncherEvent($"[STOP-GAME] Процесс игры (PID {proc.Id}) успешно завершён через CloseMainWindow");
+                    return true;
+                }
+                catch (OperationCanceledException)
+                {
+                    LogLauncherEvent($"[STOP-GAME] Процесс игры не завершился за {timeoutMs} мс после CloseMainWindow, выполняем принудительное завершение.");
+                }
+            }
+
+            if (!proc.HasExited)
+            {
+                proc.Kill();
+                await proc.WaitForExitAsync();
+                LogLauncherEvent($"[STOP-GAME] Процесс игры принудительно завершён (Kill)");
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[STOP-GAME: ERROR] Ошибка при остановке процесса игры: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Если перед первым запуском в GameDir нет options.txt, создает его с дефолтными настройками.
+    /// Не перезаписывает, если файл уже существует.
+    /// </summary>
+    public static void EnsureDefaultOptions(string gameDir, string? graphicsPreset = null)
+    {
+        try
+        {
+            var optionsPath = Path.Combine(gameDir, "options.txt");
+            if (!File.Exists(optionsPath))
+            {
+                Directory.CreateDirectory(gameDir);
+                var content = "version:3465\nlang:ru_ru\nguiScale:2\nfullscreen:true\n";
+                File.WriteAllText(optionsPath, content, new UTF8Encoding(false));
+                LogLauncherEvent($"[OPTIONS] Создан файл настроек по умолчанию (options.txt): {optionsPath}");
+                ApplyGraphicsPreset(gameDir, graphicsPreset ?? "Medium");
+            }
+            else if (!string.IsNullOrWhiteSpace(graphicsPreset) && !string.Equals(graphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
+            {
+                var optionsShaders = Path.Combine(gameDir, "optionsshaders.txt");
+                if (!File.Exists(optionsShaders))
+                {
+                    ApplyGraphicsPreset(gameDir, graphicsPreset);
+                }
+            }
+            EnsureDefaultResourcePacksEnabled(gameDir);
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[OPTIONS: ERROR] Ошибка создания options.txt: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Парсинг списка в формате Minecraft options.txt (например, resourcePacks:["vanilla","fabric","file/pack.zip"]).
+    /// </summary>
+    public static List<string> ParseOptionsList(string rawLine)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrWhiteSpace(rawLine))
+        {
+            return list;
+        }
+
+        int colonIdx = rawLine.IndexOf(':');
+        string content = colonIdx >= 0 ? rawLine.Substring(colonIdx + 1).Trim() : rawLine.Trim();
+
+        if (content.StartsWith('[') && content.EndsWith(']'))
+        {
+            content = content.Substring(1, content.Length - 2);
+        }
+
+        var matches = Regex.Matches(content, @"""((?:[^""\\]|\\.)*)""");
+        foreach (Match m in matches)
+        {
+            var val = m.Groups[1].Value.Replace("\\\"", "\"").Replace("\\\\", "\\");
+            list.Add(val);
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// Форматирование списка в формат массива Minecraft options.txt.
+    /// </summary>
+    public static string FormatOptionsList(IEnumerable<string> items)
+    {
+        var formatted = items.Select(i =>
+        {
+            var escaped = i.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return $"\"{escaped}\"";
+        });
+        return $"[{string.Join(",", formatted)}]";
+    }
+
+    /// <summary>
+    /// Файлы, исключённые из сборки модов (удаляются перед запуском при наличии).
+    /// </summary>
+    public static readonly string[] DroppedModpackFiles = new[]
+    {
+        "resourcepacks/Transparent-GUI-White-Border.zip"
+    };
+
+    /// <summary>
+    /// Автоматическое обнаружение и включение всех ресурспаков из папки resourcepacks в options.txt
+    /// с дублированием в incompatibleResourcePacks перед запуском клиента.
+    /// </summary>
+    public static void EnsureDefaultResourcePacksEnabled(string gameDir)
+    {
+        if (string.IsNullOrWhiteSpace(gameDir))
+        {
+            return;
+        }
+
+        try
+        {
+            // Удаление исключённых из сборки файлов
+            foreach (var droppedRelPath in DroppedModpackFiles)
+            {
+                try
+                {
+                    var fullDroppedPath = Path.Combine(gameDir, droppedRelPath.Replace('/', Path.DirectorySeparatorChar));
+                    if (File.Exists(fullDroppedPath))
+                    {
+                        File.Delete(fullDroppedPath);
+                        LogLauncherEvent($"[PACK] removed {droppedRelPath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogLauncherEvent($"[PACK: ERROR] Не удалось удалить {droppedRelPath}: {ex.Message}");
+                }
+            }
+
+            var rpDir = Path.Combine(gameDir, "resourcepacks");
+            var foundPacks = new List<string>();
+
+            if (Directory.Exists(rpDir))
+            {
+                foreach (var file in Directory.GetFiles(rpDir, "*.zip"))
+                {
+                    foundPacks.Add(Path.GetFileName(file));
+                }
+
+                foreach (var dir in Directory.GetDirectories(rpDir))
+                {
+                    if (File.Exists(Path.Combine(dir, "pack.mcmeta")))
+                    {
+                        foundPacks.Add(Path.GetFileName(dir));
+                    }
+                }
+            }
+
+            // Стабильный алфавитный порядок для новых ресурспаков
+            foundPacks.Sort(StringComparer.OrdinalIgnoreCase);
+
+            var optionsPath = Path.Combine(gameDir, "options.txt");
+            Directory.CreateDirectory(gameDir);
+
+            List<string> lines;
+            if (File.Exists(optionsPath))
+            {
+                lines = File.ReadAllLines(optionsPath, Encoding.UTF8).ToList();
+            }
+            else
+            {
+                lines = new List<string>
+                {
+                    "version:3465",
+                    "lang:ru_ru",
+                    "guiScale:2",
+                    "fullscreen:true"
+                };
+            }
+
+            // 1. Обработка resourcePacks:[...]
+            int rpLineIndex = lines.FindIndex(l => l.StartsWith("resourcePacks:", StringComparison.Ordinal));
+            List<string> currentPacks = rpLineIndex >= 0
+                ? ParseOptionsList(lines[rpLineIndex])
+                : new List<string>();
+
+            // Удаляем исключённые из сборки ресурспаки из списков options.txt
+            foreach (var droppedRelPath in DroppedModpackFiles)
+            {
+                var packFileName = Path.GetFileName(droppedRelPath);
+                var packEntry = $"file/{packFileName}";
+                currentPacks.RemoveAll(p => string.Equals(p, packEntry, StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(p, packFileName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Гарантируем "vanilla"
+            if (!currentPacks.Contains("vanilla", StringComparer.OrdinalIgnoreCase))
+            {
+                currentPacks.Insert(0, "vanilla");
+            }
+
+            // Гарантируем "fabric" (или "Fabric Mods")
+            if (!currentPacks.Contains("fabric", StringComparer.OrdinalIgnoreCase) &&
+                !currentPacks.Contains("Fabric Mods", StringComparer.OrdinalIgnoreCase))
+            {
+                int vanillaIdx = currentPacks.FindIndex(p => string.Equals(p, "vanilla", StringComparison.OrdinalIgnoreCase));
+                int insertIdx = vanillaIdx >= 0 ? vanillaIdx + 1 : 0;
+                currentPacks.Insert(insertIdx, "fabric");
+            }
+
+            // Добавляем все найденные ресурспаки из resourcepacks/, сохраняя существующие позиции
+            foreach (var packName in foundPacks)
+            {
+                var packEntry = $"file/{packName}";
+                if (!currentPacks.Contains(packEntry, StringComparer.OrdinalIgnoreCase))
+                {
+                    currentPacks.Add(packEntry);
+                }
+            }
+
+            var newRpLine = $"resourcePacks:{FormatOptionsList(currentPacks)}";
+            if (rpLineIndex >= 0)
+            {
+                lines[rpLineIndex] = newRpLine;
+            }
+            else
+            {
+                lines.Add(newRpLine);
+            }
+
+            // 2. Обработка incompatibleResourcePacks:[...]
+            int incompLineIndex = lines.FindIndex(l => l.StartsWith("incompatibleResourcePacks:", StringComparison.Ordinal));
+            List<string> incompPacks = incompLineIndex >= 0
+                ? ParseOptionsList(lines[incompLineIndex])
+                : new List<string>();
+
+            // Удаляем исключённые из сборки ресурспаки из incompatibleResourcePacks
+            foreach (var droppedRelPath in DroppedModpackFiles)
+            {
+                var packFileName = Path.GetFileName(droppedRelPath);
+                var packEntry = $"file/{packFileName}";
+                incompPacks.RemoveAll(p => string.Equals(p, packEntry, StringComparison.OrdinalIgnoreCase) ||
+                                           string.Equals(p, packFileName, StringComparison.OrdinalIgnoreCase));
+            }
+
+            // Продублировать все ресурспаки из resourcepacks/ в incompatibleResourcePacks
+            foreach (var packName in foundPacks)
+            {
+                var packEntry = $"file/{packName}";
+                if (!incompPacks.Contains(packEntry, StringComparer.OrdinalIgnoreCase))
+                {
+                    incompPacks.Add(packEntry);
+                }
+            }
+
+            var newIncompLine = $"incompatibleResourcePacks:{FormatOptionsList(incompPacks)}";
+            if (incompLineIndex >= 0)
+            {
+                lines[incompLineIndex] = newIncompLine;
+            }
+            else
+            {
+                lines.Add(newIncompLine);
+            }
+
+            File.WriteAllLines(optionsPath, lines, new UTF8Encoding(false));
+            LogLauncherEvent($"[OPTIONS] Синхронизированы ресурспаки в options.txt (активно: {currentPacks.Count}, несовместимых: {incompPacks.Count})");
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[OPTIONS: ERROR] Ошибка при обновлении ресурспаков в options.txt: {ex.Message}");
+        }
+    }
+
+    public static void LogGameLaunchEvent(string gameDir, string message)
+    {
+        LogLauncherEvent(message);
+        try
+        {
+            var logsDir = Path.Combine(gameDir, "logs");
+            Directory.CreateDirectory(logsDir);
+            var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
+            File.AppendAllText(gameLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+        }
+        catch { }
+    }
+
+    public static void ApplyGraphicsPreset(string gameDir, string? preset, IGraphicsPresetService? presetService = null, bool persistConfig = false)
+    {
+        if (string.IsNullOrWhiteSpace(gameDir))
+        {
+            return;
+        }
+
+        try
+        {
+            var service = presetService ?? new GraphicsPresetService(new InMemoryConfigService(), new WorkshopService());
+            string targetKey = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "Balanced", StringComparison.OrdinalIgnoreCase)
+                ? service.AutoDetectPreset()
+                : preset;
+
+            if (string.Equals(targetKey, "Custom", StringComparison.OrdinalIgnoreCase) ||
+                service.GetPreset(targetKey) == null)
+            {
+                return;
+            }
+            service.ApplyPreset(gameDir, targetKey, persistConfig: persistConfig);
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[OPTIONS: ERROR] Не удалось применить профиль графики '{preset}': {ex.Message}");
+        }
+    }
+
+    public static void EnsureDefaultLspConfig(string gameDir)
+    {
+        try
+        {
+            var configDir = Path.Combine(gameDir, "config");
+            var lspPath = Path.Combine(configDir, "lsp.json");
+            Directory.CreateDirectory(configDir);
+
+            if (!File.Exists(lspPath))
+            {
+                var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
+                File.WriteAllText(lspPath, content, new UTF8Encoding(false));
+                LogLauncherEvent($"[CONFIG] Создан файл конфигурации по умолчанию (lsp.json): {lspPath}");
+            }
+            else
+            {
+                var existingText = File.ReadAllText(lspPath);
+                try
+                {
+                    var doc = System.Text.Json.Nodes.JsonNode.Parse(existingText)?.AsObject();
+                    if (doc != null)
+                    {
+                        bool changed = false;
+                        if (doc["enablePreference"]?.GetValue<bool>() != true) { doc["enablePreference"] = true; changed = true; }
+                        if (doc["defaultPort"]?.GetValue<int>() != 25565) { doc["defaultPort"] = 25565; changed = true; }
+                        if (doc["onlineMode"]?.GetValue<bool>() != false) { doc["onlineMode"] = false; changed = true; }
+
+                        if (changed)
+                        {
+                            File.WriteAllText(lspPath, doc.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+                            LogLauncherEvent($"[CONFIG] Обновлен lsp.json (onlineMode: false, port 25565): {lspPath}");
+                        }
+                    }
+                }
+                catch
+                {
+                    var content = "{\n  \"enablePreference\": true,\n  \"gameMode\": \"SURVIVAL\",\n  \"allowCheat\": false,\n  \"defaultPort\": 25565,\n  \"onlineMode\": false,\n  \"fixUUID\": true,\n  \"allowPVP\": true,\n  \"maxPlayer\": 8,\n  \"playersAlwaysOffline\": []\n}\n";
+                    File.WriteAllText(lspPath, content, new UTF8Encoding(false));
+                    LogLauncherEvent($"[CONFIG] Перезаписан поврежденный lsp.json: {lspPath}");
+                }
+            }
+
+            EnsureE4allConfig(configDir);
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[CONFIG: ERROR] Ошибка создания lsp.json: {ex.Message}");
+        }
+    }
+
+    private static void EnsureE4allConfig(string configDir)
+    {
+        if (!LobbyService.UseE4allTunnel)
+        {
+            return;
+        }
+
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var flagPath = Path.Combine(appData, ".aura", "dialtone.on");
+            bool dialtoneEnabled = File.Exists(flagPath);
+            var dialtoneTag = dialtoneEnabled ? "dialtone=ON (flag)" : "dialtone=OFF (default)";
+            LogLauncherEvent($"[CONFIG] Настройка e4all: {dialtoneTag}");
+
+            var e4allDirs = new[] { configDir, Path.Combine(configDir, "e4all") };
+            foreach (var dir in e4allDirs)
+            {
+                Directory.CreateDirectory(dir);
+                var tomlPath = Path.Combine(dir, "e4all.toml");
+                if (File.Exists(tomlPath))
+                {
+                    var text = File.ReadAllText(tomlPath);
+                    bool changed = false;
+
+                    if (text.Contains("offlineMode = false"))
+                    {
+                        text = text.Replace("offlineMode = false", "offlineMode = true");
+                        changed = true;
+                    }
+                    if (dialtoneEnabled)
+                    {
+                        if (text.Contains("dialtoneHostEnabled = false"))
+                        {
+                            text = text.Replace("dialtoneHostEnabled = false", "dialtoneHostEnabled = true");
+                            changed = true;
+                        }
+                        if (text.Contains("dialtonePlayerEnabled = false"))
+                        {
+                            text = text.Replace("dialtonePlayerEnabled = false", "dialtonePlayerEnabled = true");
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        if (text.Contains("dialtoneHostEnabled = true"))
+                        {
+                            text = text.Replace("dialtoneHostEnabled = true", "dialtoneHostEnabled = false");
+                            changed = true;
+                        }
+                        if (text.Contains("dialtonePlayerEnabled = true"))
+                        {
+                            text = text.Replace("dialtonePlayerEnabled = true", "dialtonePlayerEnabled = false");
+                            changed = true;
+                        }
+                    }
+                    if (text.Contains("voiceP2PEnabled = true"))
+                    {
+                        text = text.Replace("voiceP2PEnabled = true", "voiceP2PEnabled = false");
+                        changed = true;
+                    }
+                    if (text.Contains("loginReadyTimeoutMs = 15000"))
+                    {
+                        text = text.Replace("loginReadyTimeoutMs = 15000", "loginReadyTimeoutMs = 45000");
+                        changed = true;
+                    }
+
+                    if (changed)
+                    {
+                        File.WriteAllText(tomlPath, text, new UTF8Encoding(false));
+                        LogLauncherEvent($"[CONFIG] Оптимизирован {tomlPath} (offlineMode=true, {dialtoneTag}, voice=false, timeout=45s)");
+                    }
+                }
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Распаковка нативных библиотек (LWJGL и др.) в папку &lt;GameDir&gt;\versions\&lt;version&gt;\natives,
+    /// на которую указывает -Djava.library.path.
+    /// </summary>
+    public static void EnsureNativesExtracted(string gameDir, string versionName)
+    {
+        try
+        {
+            var nativesDir = Path.Combine(gameDir, "versions", versionName, "natives");
+            Directory.CreateDirectory(nativesDir);
+
+            var libDir = Path.Combine(gameDir, "libraries");
+            if (!Directory.Exists(libDir))
+                return;
+
+            string pattern = Environment.Is64BitOperatingSystem
+                ? "*natives-windows.jar"
+                : "*natives-windows-x86.jar";
+
+            var nativeJars = Directory.GetFiles(libDir, pattern, SearchOption.AllDirectories);
+            foreach (var jar in nativeJars)
+            {
+                try
+                {
+                    using var zip = ZipFile.OpenRead(jar);
+                    foreach (var entry in zip.Entries)
+                    {
+                        if (entry.Name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var destPath = Path.Combine(nativesDir, entry.Name);
+                            if (!File.Exists(destPath) || new FileInfo(destPath).Length != entry.Length)
+                            {
+                                entry.ExtractToFile(destPath, overwrite: true);
+                                LogLauncherEvent($"[NATIVES] Извлечена библиотека {entry.Name} из {Path.GetFileName(jar)}");
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogLauncherEvent($"[NATIVES: ERROR] Ошибка распаковки {jar}: {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[NATIVES: ERROR] Ошибка подготовки natives: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Парсер аргументов командной строки с учетом кавычек.
+    /// </summary>
+    public static List<string> ParseCommandLineArguments(string commandLine)
+    {
+        var tokens = new List<string>();
+        if (string.IsNullOrWhiteSpace(commandLine))
+            return tokens;
+
+        var sb = new StringBuilder();
+        bool inQuotes = false;
+        for (int i = 0; i < commandLine.Length; i++)
+        {
+            char c = commandLine[i];
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (char.IsWhiteSpace(c) && !inQuotes)
+            {
+                if (sb.Length > 0)
+                {
+                    tokens.Add(sb.ToString());
+                    sb.Clear();
+                }
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        if (sb.Length > 0)
+        {
+            tokens.Add(sb.ToString());
+        }
+        return tokens;
+    }
+
+    /// <summary>
+    /// Форматирование аргумента для Java argfile: аргументы с пробелами оборачиваются в кавычки,
+    /// внутри кавычек экранируются обратный слэш (\ -> \\) и кавычки (" -> \").
+    /// </summary>
+    public static string FormatArgForJavaArgFile(string token)
+    {
+        if (token.Contains(' ') || token.Contains('\t'))
+        {
+            var escaped = token.Replace(@"\", @"\\").Replace("\"", "\\\"");
+            return $"\"{escaped}\"";
+        }
+        return token;
+    }
+
+    /// <summary>
+    /// Поиск установленной Java (17+ или 21+).
+    /// Приоритет отдается локальной Java в &lt;GameDir&gt;\runtime, затем системным путям.
+    /// </summary>
+    public string? ResolveJavaRuntime(string gameDir, int minMajorVersion = 17)
+    {
+        var candidates = new List<string>();
+
+        // 1. Приоритетный путь Mojang Java 21 (java-runtime-delta), если требуется >= 21
+        var deltaDefault = Path.Combine(gameDir, "runtime", "windows-x64", "java-runtime-delta", "bin", "javaw.exe");
+        if (File.Exists(deltaDefault))
+        {
+            candidates.Add(deltaDefault);
+        }
+
+        var deltaAlt = Path.Combine(gameDir, "runtime", "java-runtime-delta", "windows", "java-runtime-delta", "bin", "javaw.exe");
+        if (File.Exists(deltaAlt))
+        {
+            candidates.Add(deltaAlt);
+        }
+
+        // 2. Приоритетный путь Mojang Java 17 (java-runtime-gamma) в папке игры
+        var gammaDefault = Path.Combine(gameDir, "runtime", "windows-x64", "java-runtime-gamma", "bin", "javaw.exe");
+        if (File.Exists(gammaDefault))
+        {
+            candidates.Add(gammaDefault);
+        }
+
+        var gammaAlt = Path.Combine(gameDir, "runtime", "java-runtime-gamma", "windows", "java-runtime-gamma", "bin", "javaw.exe");
+        if (File.Exists(gammaAlt))
+        {
+            candidates.Add(gammaAlt);
+        }
+
+        // Поиск любых других javaw.exe внутри <GameDir>\runtime
+        var runtimeDir = Path.Combine(gameDir, "runtime");
+        if (Directory.Exists(runtimeDir))
+        {
+            try
+            {
+                var found = Directory.GetFiles(runtimeDir, "javaw.exe", SearchOption.AllDirectories);
+                foreach (var f in found)
+                {
+                    if (!candidates.Contains(f))
+                    {
+                        candidates.Add(f);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // 3. Системные переменные окружения и директории (запасной вариант)
+        var javaHome = Environment.GetEnvironmentVariable("JAVA_HOME");
+        if (!string.IsNullOrWhiteSpace(javaHome))
+        {
+            candidates.Add(Path.Combine(javaHome, "bin", "javaw.exe"));
+        }
+
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        if (Directory.Exists(Path.Combine(programFiles, "Eclipse Adoptium")))
+        {
+            foreach (var dir in Directory.GetDirectories(Path.Combine(programFiles, "Eclipse Adoptium")))
+            {
+                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
+            }
+        }
+        if (Directory.Exists(Path.Combine(programFiles, "Microsoft")))
+        {
+            foreach (var dir in Directory.GetDirectories(Path.Combine(programFiles, "Microsoft"), "jdk*"))
+            {
+                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
+            }
+        }
+        if (Directory.Exists(Path.Combine(programFiles, "Java")))
+        {
+            foreach (var dir in Directory.GetDirectories(Path.Combine(programFiles, "Java"), "jdk*"))
+            {
+                candidates.Add(Path.Combine(dir, "bin", "javaw.exe"));
+            }
+        }
+
+        // Системный javaw в PATH
+        candidates.Add("javaw.exe");
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate == "javaw.exe" || File.Exists(candidate))
+            {
+                var major = GetJavaMajorVersion(candidate);
+                if (major >= minMajorVersion)
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Определение мажорной версии Java через чтение release-файла или запуск javaw -version.
+    /// </summary>
+    public static int GetJavaMajorVersion(string javaExecutable)
+    {
+        try
+        {
+            // Вариант 1: Быстрое чтение файла release в корне JRE
+            if (javaExecutable != "javaw.exe" && File.Exists(javaExecutable))
+            {
+                var binDir = Path.GetDirectoryName(javaExecutable);
+                var jreDir = binDir != null ? Directory.GetParent(binDir)?.FullName : null;
+                if (!string.IsNullOrEmpty(jreDir))
+                {
+                    var releasePath = Path.Combine(jreDir, "release");
+                    if (File.Exists(releasePath))
+                    {
+                        var lines = File.ReadAllLines(releasePath);
+                        foreach (var line in lines)
+                        {
+                            if (line.StartsWith("JAVA_VERSION=", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var verStr = line.Split('=')[1].Trim('"', ' ', '\'');
+                                var match = Regex.Match(verStr, @"^(?:1\.)?(\d+)");
+                                if (match.Success && int.TryParse(match.Groups[1].Value, out int ver))
+                                {
+                                    return ver;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Вариант 2: Запуск java/javaw -version и чтение вывода ошибки (stderr)
+            var psi = new ProcessStartInfo
+            {
+                FileName = javaExecutable,
+                Arguments = "-version",
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return 0;
+
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit(3000);
+
+            var versionMatch = Regex.Match(stderr, @"(?:version\s+""(?:1\.)?(\d+))");
+            if (versionMatch.Success && int.TryParse(versionMatch.Groups[1].Value, out int parsedVer))
+            {
+                return parsedVer;
+            }
+        }
+        catch { }
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Генерация детерминированного Offline UUID v3 (MD5 от UTF-8 строки "OfflinePlayer:" + nick).
+    /// </summary>
+    public static string GenerateOfflineUuid(string nickname)
+    {
+        var rawString = "OfflinePlayer:" + (nickname ?? string.Empty).Trim();
+        var bytes = Encoding.UTF8.GetBytes(rawString);
+        var hash = MD5.HashData(bytes);
+
+        // Установка версии 3 (биты 4-7 шестого байта = 0011)
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x30);
+        // Установка варианта RFC 4122 (биты 6-7 восьмого байта = 10)
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
+
+        // Формирование строки в big-endian, как Java UUID.nameUUIDFromBytes:
+        // байты 0-3 (8 hex), 4-5 (4 hex), 6-7 (4 hex, начинается с 3), 8-9 (4 hex, начинается с 8/9/a/b), 10-15 (12 hex)
+        return $"{Convert.ToHexString(hash, 0, 4)}-{Convert.ToHexString(hash, 4, 2)}-{Convert.ToHexString(hash, 6, 2)}-{Convert.ToHexString(hash, 8, 2)}-{Convert.ToHexString(hash, 10, 6)}".ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// Автоматическая проверка и загрузка недостающего окружения Minecraft (5 этапов):
+    /// <summary>
+    /// Автоустановка и верификация всех этапов игрового окружения:
+    /// 1. Minecraft (Клиент и базовый манифест)
+    /// 2. Java (Официальный Mojang JRE: java-runtime-gamma для 1.20.1, java-runtime-delta для 1.21.1)
+    /// 3. Fabric (Профиль и загрузчик Fabric)
+    /// 4. Библиотеки (Объединенные библиотеки Vanilla и Fabric)
+    /// 5. Ресурсы (Индекс ассетов и файлы объектов)
+    /// </summary>
+    public async Task EnsureInstalledAsync(
+        string gameDir,
+        IProgress<InstallProgressReport>? progress = null,
+        Action<string>? onLogReceived = null,
+        CancellationToken cancellationToken = default,
+        string? version = null)
+    {
+        var mcVersion = GameVersionProfiles.NormalizeVersion(version ?? _configService?.CurrentConfig?.SelectedVersion);
+        var targetInstanceDir = ResolveInstanceDirectory(gameDir, mcVersion);
+        var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
+        var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
+        var javaTitle = minJava >= 21 ? "Java 21" : "Java 17";
+        var javaRuntimeName = GameVersionProfiles.GetJavaRuntimeComponent(mcVersion);
+
+        LogLauncherEvent($"[INSTALL] Начало проверки/установки окружения Minecraft {mcVersion} в {gameDir}");
+        var mcPath = new MinecraftPath(gameDir);
+        var launcher = new MinecraftLauncher(mcPath);
+        var rules = new RulesEvaluatorContext(LauncherOSRule.Current);
+
+        var clientExtractor = launcher.FileExtractors.OfType<ClientFileExtractor>().FirstOrDefault() ?? new ClientFileExtractor();
+        var libExtractor = launcher.FileExtractors.OfType<LibraryFileExtractor>().FirstOrDefault() ?? new LibraryFileExtractor("client", launcher.RulesEvaluator);
+        var assetExtractor = launcher.FileExtractors.OfType<AssetFileExtractor>().FirstOrDefault() ?? new AssetFileExtractor(_httpClient);
+        var javaExtractor = launcher.FileExtractors.OfType<JavaFileExtractor>().FirstOrDefault() ?? new JavaFileExtractor(_httpClient, launcher.JavaPathResolver);
+        var logExtractor = launcher.FileExtractors.OfType<LogFileExtractor>().FirstOrDefault() ?? new LogFileExtractor();
+
+        // Этап 1: Minecraft (базовый манифест и client.jar)
+        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 1/5: Проверка Minecraft {mcVersion}...");
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = $"Minecraft {mcVersion}",
+            StageIndex = 1,
+            TotalStages = 5,
+            Percentage = 0,
+            DetailText = $"Проверка клиента Minecraft {mcVersion}..."
+        });
+
+        var vanillaVersion = await RetryAsync(async () =>
+            await launcher.GetVersionAsync(mcVersion, cancellationToken),
+            $"Загрузка манифеста Minecraft {mcVersion}", onLogReceived, cancellationToken);
+
+        var clientFiles = (await clientExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
+        var logFiles = (await logExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
+        var stage1Files = clientFiles.Concat(logFiles).ToList();
+
+        await InstallGameFilesStageAsync(
+            launcher, stage1Files, $"Minecraft {mcVersion}", 1, 5, progress, onLogReceived, cancellationToken);
+
+        // Этап 2: Java (Mojang runtime)
+        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 2/5: Проверка {javaTitle}...");
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = javaTitle,
+            StageIndex = 2,
+            TotalStages = 5,
+            Percentage = 20,
+            DetailText = $"Проверка среды выполнения {javaTitle}..."
+        });
+
+        var existingJava = ResolveJavaRuntime(gameDir, minJava);
+        bool hasLocalJava = !string.IsNullOrWhiteSpace(existingJava) && existingJava.StartsWith(gameDir, StringComparison.OrdinalIgnoreCase);
+
+        if (!hasLocalJava)
+        {
+            onLogReceived?.Invoke($"[AURA-INSTALL] Локальная {javaTitle} не найдена в runtime. Загрузка {javaRuntimeName} от Mojang...");
+            var javaFiles = (await javaExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
+            await InstallGameFilesStageAsync(
+                launcher, javaFiles, javaTitle, 2, 5, progress, onLogReceived, cancellationToken);
+        }
+        else
+        {
+            onLogReceived?.Invoke($"[AURA-INSTALL] Найдена готовая {javaTitle} в runtime: {existingJava}");
+            progress?.Report(new InstallProgressReport
+            {
+                Stage = javaTitle,
+                StageIndex = 2,
+                TotalStages = 5,
+                Percentage = 40,
+                DetailText = $"{javaTitle} готова"
+            });
+        }
+
+        // Этап 3: Fabric (профиль загрузчика)
+        onLogReceived?.Invoke($"[AURA-INSTALL] Этап 3/5: Проверка профиля Fabric Loader {fabricLoader}...");
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = "Fabric",
+            StageIndex = 3,
+            TotalStages = 5,
+            Percentage = 40,
+            DetailText = $"Проверка профиля Fabric Loader {fabricLoader}..."
+        });
+
+        var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoader}-{mcVersion}");
+        var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoader}-{mcVersion}.json");
+
+        if (!File.Exists(fabricJson))
+        {
+            onLogReceived?.Invoke($"[AURA-INSTALL] Загрузка профиля Fabric с meta.fabricmc.net...");
+            var fabricInstaller = new FabricInstaller(_httpClient);
+            await RetryAsync(async () =>
+            {
+                await fabricInstaller.Install(mcVersion, fabricLoader, mcPath);
+                return true;
+            }, "Загрузка профиля Fabric", onLogReceived, cancellationToken);
+        }
+
+        await EnsureFabricClientJarAsync(gameDir, fabricLoader, mcVersion, onLogReceived, cancellationToken);
+
+        var fabricVersionName = $"fabric-loader-{fabricLoader}-{mcVersion}";
+        var fabricVersion = await RetryAsync(async () =>
+            await launcher.GetVersionAsync(fabricVersionName, cancellationToken),
+            "Чтение профиля Fabric", onLogReceived, cancellationToken);
+
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = "Fabric",
+            StageIndex = 3,
+            TotalStages = 5,
+            Percentage = 60,
+            DetailText = "Профиль Fabric загружен"
+        });
+
+        // Этап 4: Библиотеки (Vanilla + Fabric)
+        onLogReceived?.Invoke("[AURA-INSTALL] Этап 4/5: Проверка библиотек игры и Fabric...");
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = "Библиотеки",
+            StageIndex = 4,
+            TotalStages = 5,
+            Percentage = 60,
+            DetailText = "Проверка библиотек..."
+        });
+
+        var vanillaLibs = await libExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken);
+        var fabricLibs = await libExtractor.Extract(mcPath, fabricVersion, rules, cancellationToken);
+        var allLibraries = vanillaLibs.Concat(fabricLibs)
+            .GroupBy(f => f.Path)
+            .Select(g => g.First())
+            .ToList();
+
+        await InstallGameFilesStageAsync(
+            launcher, allLibraries, "Библиотеки", 4, 5, progress, onLogReceived, cancellationToken);
+
+        // Этап 5: Ресурсы (ассеты Minecraft 1.20.1)
+        onLogReceived?.Invoke("[AURA-INSTALL] Этап 5/5: Проверка ресурсов (ассетов)...");
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = "Ресурсы",
+            StageIndex = 5,
+            TotalStages = 5,
+            Percentage = 80,
+            DetailText = "Проверка ассетов Minecraft..."
+        });
+
+        var assets = (await assetExtractor.Extract(mcPath, vanillaVersion, rules, cancellationToken)).ToList();
+        await InstallGameFilesStageAsync(
+            launcher, assets, "Ресурсы", 5, 5, progress, onLogReceived, cancellationToken);
+
+        progress?.Report(new InstallProgressReport
+        {
+            Stage = "Ресурсы",
+            StageIndex = 5,
+            TotalStages = 5,
+            Percentage = 100,
+            DetailText = "Все компоненты установлены!"
+        });
+
+        EnsureNativesExtracted(gameDir, fabricVersionName);
+
+        LogLauncherEvent("[INSTALL] Окружение Minecraft и Fabric успешно проверено/установлено.");
+        onLogReceived?.Invoke("[AURA-INSTALL] Установка окружения успешно завершена.");
+    }
+
+    /// <summary>
+    /// Потокобезопасная установка пачки файлов этапа с расчетом скорости и обработкой разрывов сети (до 3 попыток).
+    /// </summary>
+    private static async Task InstallGameFilesStageAsync(
+        MinecraftLauncher launcher,
+        IEnumerable<GameFile> files,
+        string stageName,
+        int stageIndex,
+        int totalStages,
+        IProgress<InstallProgressReport>? progress,
+        Action<string>? onLogReceived,
+        CancellationToken cancellationToken)
+    {
+        var fileList = files.ToList();
+        if (fileList.Count == 0) return;
+
+        var sw = Stopwatch.StartNew();
+        long lastBytes = 0;
+        long lastTime = 0;
+        string speedStr = string.Empty;
+        string currentDetail = string.Empty;
+
+        var fileProg = new SyncProgress<InstallerProgressChangedEventArgs>(e =>
+        {
+            currentDetail = $"{e.Name} ({e.ProgressedTasks}/{e.TotalTasks})";
+        });
+
+        var byteProg = new SyncProgress<ByteProgress>(bp =>
+        {
+            if (bp.TotalBytes > 0)
+            {
+                double stagePct = (double)bp.ProgressedBytes / bp.TotalBytes * 100.0;
+                long elapsed = sw.ElapsedMilliseconds;
+                if (elapsed - lastTime >= 400)
+                {
+                    long deltaBytes = bp.ProgressedBytes - lastBytes;
+                    double seconds = (elapsed - lastTime) / 1000.0;
+                    if (seconds > 0)
+                    {
+                        double bytesPerSec = deltaBytes / seconds;
+                        double mbPerSec = bytesPerSec / (1024.0 * 1024.0);
+                        speedStr = mbPerSec >= 1.0
+                            ? $"{mbPerSec:F1} МБ/с"
+                            : $"{(bytesPerSec / 1024.0):F0} КБ/с";
+                    }
+                    lastBytes = bp.ProgressedBytes;
+                    lastTime = elapsed;
+                }
+
+                double stageWeight = 100.0 / totalStages;
+                double overallPct = (stageIndex - 1) * stageWeight + (stagePct * stageWeight / 100.0);
+
+                progress?.Report(new InstallProgressReport
+                {
+                    Stage = stageName,
+                    StageIndex = stageIndex,
+                    TotalStages = totalStages,
+                    Percentage = Math.Clamp(overallPct, 0, 100),
+                    FormattedSpeed = speedStr,
+                    DetailText = currentDetail
+                });
+            }
+        });
+
+        int maxRetries = 3;
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await launcher.GameInstaller.Install(fileList, fileProg, byteProg, cancellationToken);
+                break;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (attempt >= maxRetries)
+                {
+                    throw new InvalidOperationException(
+                        $"Сбой сети на этапе \"{stageName}\" после {maxRetries} попыток. Проверьте интернет-соединение. Ошибка: {ex.Message}", ex);
+                }
+
+                onLogReceived?.Invoke($"[AURA-INSTALL] Сбой сети ({stageName}, попытка {attempt}/{maxRetries}): {ex.Message}. Повтор через 2с...");
+                await Task.Delay(2000, cancellationToken);
+            }
+        }
+    }
+
+    private static async Task<T> RetryAsync<T>(
+        Func<Task<T>> action,
+        string operationName,
+        Action<string>? onLogReceived,
+        CancellationToken cancellationToken,
+        int maxRetries = 3)
+    {
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return await action();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (attempt >= maxRetries)
+                {
+                    throw new InvalidOperationException($"Ошибка операции \"{operationName}\" после {maxRetries} попыток: {ex.Message}", ex);
+                }
+
+                onLogReceived?.Invoke($"[AURA-RETRY] Попытка {attempt}/{maxRetries} для \"{operationName}\" не удалась: {ex.Message}. Повтор...");
+                await Task.Delay(2000, cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException($"Не удалось выполнить \"{operationName}\"");
+    }
+
+    /// <summary>
+    /// Запуск процесса игры с гарантированной установкой окружения и сохранением логов.
+    /// </summary>
+    public async Task<Process> LaunchGameAsync(
+        LauncherConfig config,
+        Action<string>? onLogReceived = null,
+        Action<int, string>? onGameExited = null,
+        IProgress<InstallProgressReport>? installProgress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        var nickResult = NicknameValidator.Validate(config.Nickname);
+        if (!nickResult.IsValid)
+        {
+            LogLauncherEvent("[LAUNCH] Невалидный никнейм игрока. Запуск отменен.");
+            throw new InvalidOperationException($"Игровой никнейм не соответствует правилам (3-16 символов, A-Z, 0-9, _): {nickResult.Error}");
+        }
+
+        var rootGameDir = ResolveMinecraftDirectory(config.GameDir);
+        var mcVersion = GameVersionProfiles.NormalizeVersion(config.SelectedVersion);
+        var targetInstanceDir = ResolveInstanceDirectory(rootGameDir, mcVersion);
+        LogLauncherEvent($"[LAUNCH] Запуск игры Minecraft {mcVersion} для пользователя '{config.Nickname}', RAM: {config.RamMb} MB, GameDir: {targetInstanceDir}");
+
+        // 0. Настройки игры по умолчанию (options.txt, lsp.json) перед первым запуском
+        EnsureDefaultOptions(targetInstanceDir, config.GraphicsPreset);
+        EnsureDefaultLspConfig(targetInstanceDir);
+        _musicBridgeService?.WriteConfigFile(targetInstanceDir);
+
+        // 1. Автоматическая проверка и докачка недостающих компонентов окружения
+        await EnsureInstalledAsync(rootGameDir, installProgress, onLogReceived, cancellationToken, mcVersion);
+
+        // 2. Определение пути к Java (17+ для 1.20.1, 21+ для 1.21.1)
+        var minJava = GameVersionProfiles.GetMinJavaVersion(mcVersion);
+        var javaTitle = minJava >= 21 ? "Java 21" : "Java 17";
+        var javaPath = ResolveJavaRuntime(rootGameDir, minJava);
+        if (string.IsNullOrWhiteSpace(javaPath))
+        {
+            throw new InvalidOperationException($"Не найдена {javaTitle}+ для запуска игры Minecraft {mcVersion}.");
+        }
+        onLogReceived?.Invoke($"[AURA-JAVA] Исполняемый файл {javaTitle}: {javaPath}");
+
+        // 3. Детерминированный offline UUID
+        var playerUuid = GenerateOfflineUuid(config.Nickname);
+        onLogReceived?.Invoke($"[AURA-UUID] Сгенерирован детерминированный Offline UUID: {playerUuid}");
+        LogLauncherEvent($"[LAUNCH] Ник: {config.Nickname}, Offline UUID: {playerUuid}, Java: {javaPath}");
+
+        // 4. Подготовка параметров запуска CmlLib.Core
+        var fabricLoader = ResolveFabricLoaderVersion(targetInstanceDir, mcVersion);
+        await EnsureFabricClientJarAsync(rootGameDir, fabricLoader, mcVersion, onLogReceived, cancellationToken);
+        var mcPath = new MinecraftPath(rootGameDir);
+        var launcher = new MinecraftLauncher(mcPath);
+        var fabricVersionName = $"fabric-loader-{fabricLoader}-{mcVersion}";
+
+        // Гарантируем распаковку нативных библиотек в папку, на которую указывает -Djava.library.path
+        EnsureNativesExtracted(rootGameDir, fabricVersionName);
+
+        var launchOptions = new MLaunchOption
+        {
+            JavaPath = javaPath,
+            MaximumRamMb = config.RamMb,
+            MinimumRamMb = Math.Min(1024, config.RamMb),
+            Session = new MSession(config.Nickname, "0", playerUuid)
+            {
+                UserType = "legacy"
+            },
+            ExtraJvmArguments = BuildJvmArguments(config.JvmArgs, targetInstanceDir, javaPath)
+        };
+
+        LogGameLaunchEvent(targetInstanceDir, $"[LAUNCH: JVM] Итоговые JVM-аргументы: {string.Join(" ", launchOptions.ExtraJvmArguments.Select(a => a.ToString()))}, RAM: {config.RamMb} MB");
+
+        var process = await launcher.CreateProcessAsync(fabricVersionName, launchOptions);
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.CreateNoWindow = true;
+
+        // Генерация Java @argsFile
+        var rawArgs = process.StartInfo.Arguments;
+        var tokens = ParseCommandLineArguments(rawArgs);
+
+        // Убираем аргумент --fullscreen (игра прочитает из options.txt)
+        tokens.RemoveAll(t => t.Equals("--fullscreen", StringComparison.OrdinalIgnoreCase));
+
+        // Подменяем --gameDir на targetInstanceDir для изоляции модов, конфигов и сохранений
+        if (!string.Equals(rootGameDir, targetInstanceDir, StringComparison.OrdinalIgnoreCase))
+        {
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Equals("--gameDir", StringComparison.OrdinalIgnoreCase) && i + 1 < tokens.Count)
+                {
+                    tokens[i + 1] = targetInstanceDir;
+                    break;
+                }
+            }
+        }
+
+        // Если задан адрес сервера для быстрого подключения (P2P LAN / лобби)
+        if (!string.IsNullOrWhiteSpace(config.QuickPlayMultiplayer))
+        {
+            tokens.Add("--quickPlayMultiplayer");
+            tokens.Add(config.QuickPlayMultiplayer.Trim());
+        }
+        else if (!string.IsNullOrWhiteSpace(config.QuickPlaySingleplayer))
+        {
+            tokens.Add("--quickPlaySingleplayer");
+            tokens.Add(config.QuickPlaySingleplayer.Trim());
+        }
+
+        var formattedLines = new List<string>();
+        var maskedLinesForLog = new List<string>();
+        bool nextIsToken = false;
+        bool nextIsClasspath = false;
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+
+            if (nextIsClasspath)
+            {
+                // Аргумент classpath всегда оборачивается в кавычки с экранированием обратных слэшей
+                var escapedCp = token.Replace(@"\", @"\\").Replace("\"", "\\\"");
+                var quotedCp = $"\"{escapedCp}\"";
+                formattedLines.Add(quotedCp);
+                maskedLinesForLog.Add(quotedCp);
+                nextIsClasspath = false;
+                continue;
+            }
+
+            if (token.Equals("-cp", StringComparison.OrdinalIgnoreCase) ||
+                token.Equals("-classpath", StringComparison.OrdinalIgnoreCase) ||
+                token.Equals("--class-path", StringComparison.OrdinalIgnoreCase))
+            {
+                formattedLines.Add(token);
+                maskedLinesForLog.Add(token);
+                nextIsClasspath = true;
+                continue;
+            }
+
+            var formatted = FormatArgForJavaArgFile(token);
+            formattedLines.Add(formatted);
+
+            if (nextIsToken)
+            {
+                maskedLinesForLog.Add("\"***\"");
+                nextIsToken = false;
+            }
+            else
+            {
+                if (token.Equals("--accessToken", StringComparison.OrdinalIgnoreCase))
+                {
+                    nextIsToken = true;
+                    maskedLinesForLog.Add(formatted);
+                }
+                else if (token.StartsWith("--accessToken=", StringComparison.OrdinalIgnoreCase))
+                {
+                    maskedLinesForLog.Add("--accessToken=\"***\"");
+                }
+                else
+                {
+                    maskedLinesForLog.Add(formatted);
+                }
+            }
+        }
+
+        var argsFilePath = Path.Combine(targetInstanceDir, "argsFile.txt");
+        await File.WriteAllLinesAsync(argsFilePath, formattedLines, new UTF8Encoding(false), cancellationToken);
+
+        // Запись содержимого argsFile в launcher.log с маскировкой accessToken
+        var maskedArgsContent = string.Join(Environment.NewLine, maskedLinesForLog);
+        LogLauncherEvent($"[ARGSFILE]\n{maskedArgsContent}");
+        onLogReceived?.Invoke($"[AURA-ARGSFILE] Записан файл аргументов: {argsFilePath}");
+
+        // Передача аргумента @argsFile
+        process.StartInfo.ArgumentList.Clear();
+        process.StartInfo.Arguments = argsFilePath.Contains(' ') ? $"@\"{argsFilePath}\"" : $"@{argsFilePath}";
+
+        LogLauncherEvent($"[ARGS] {process.StartInfo.FileName} {process.StartInfo.Arguments}");
+        onLogReceived?.Invoke($"[AURA-ARGS] {process.StartInfo.FileName} {process.StartInfo.Arguments}");
+
+        // 5. Настройка логирования в файл <targetInstanceDir>\logs\launcher-game.log
+        var logsDir = Path.Combine(targetInstanceDir, "logs");
+        Directory.CreateDirectory(logsDir);
+        var gameLogPath = Path.Combine(logsDir, "launcher-game.log");
+
+        // Ротация вместо стирания: вывод Java прошлой попытки — улика сбоя и не должна
+        // уничтожаться следующим запуском. Имя архива уникально (stamp + ticks): повторный
+        // запуск в ту же секунду не должен приводить к пропуску ротации, а Move без
+        // overwrite-режима не перезапишет уже существующий архив.
+        try
+        {
+            if (File.Exists(gameLogPath))
+            {
+                string stamp = File.GetLastWriteTime(gameLogPath).ToString("yyyyMMdd-HHmmss");
+                string archivePath = Path.Combine(logsDir, $"launcher-game-{stamp}-{DateTime.UtcNow.Ticks:x8}.log");
+                File.Move(gameLogPath, archivePath);
+
+                // Чистим только собственные архивы ротации (launcher-game-*.log), держим последние 5
+                var archives = new DirectoryInfo(logsDir)
+                    .GetFiles("launcher-game-*.log")
+                    .OrderByDescending(f => f.LastWriteTimeUtc)
+                    .ToList();
+                foreach (var extra in archives.Skip(5))
+                {
+                    try { extra.Delete(); } catch { }
+                }
+            }
+        }
+        catch { }
+
+        // Ротация не удалась (файл занят сторонним процессом) — не открываем launcher-game.log
+        // на запись: FileMode.Create стёр бы единственный непрочитанный лог прошлой попытки.
+        // Текущая сессия в этом случае пишется под уникальным именем.
+        string sessionLogPath = gameLogPath;
+        if (File.Exists(gameLogPath))
+        {
+            sessionLogPath = Path.Combine(logsDir, $"launcher-game-{DateTime.Now:yyyyMMdd-HHmmss}-{DateTime.UtcNow.Ticks:x8}.log");
+        }
+
+        var gameLogWriter = new StreamWriter(new FileStream(sessionLogPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+        {
+            AutoFlush = true
+        };
+
+        process.OutputDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+            {
+                gameLogWriter.WriteLine(e.Data);
+                onLogReceived?.Invoke(e.Data);
+            }
+        };
+
+        process.ErrorDataReceived += (s, e) =>
+        {
+            if (e.Data != null)
+            {
+                gameLogWriter.WriteLine("[STDERR] " + e.Data);
+                onLogReceived?.Invoke("[STDERR] " + e.Data);
+            }
+        };
+
+        // Гарантированное применение настроек пресета графики перед стартом клиента
+        if (!string.IsNullOrWhiteSpace(config.GraphicsPreset) && !string.Equals(config.GraphicsPreset, "Custom", StringComparison.OrdinalIgnoreCase))
+        {
+            ApplyGraphicsPreset(targetInstanceDir, config.GraphicsPreset);
+        }
+        else
+        {
+            EnsureDefaultResourcePacksEnabled(targetInstanceDir);
+        }
+
+        try
+        {
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+        catch (Exception ex)
+        {
+            _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
+            gameLogWriter.Dispose();
+            LogLauncherEvent($"[LAUNCH: START-ERROR] Не удалось запустить процесс Java: {ex.Message}");
+            throw new InvalidOperationException($"Не удалось запустить процесс Java: {ex.Message}", ex);
+        }
+
+        _gameProcess = process;
+
+        LogLauncherEvent($"[LAUNCH] Игровой процесс запущен (PID {process.Id})");
+        onLogReceived?.Invoke($"[AURA-PROCESS] Игровой процесс запущен с PID {process.Id}");
+
+        // Отслеживание завершения игры
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await process.WaitForExitAsync();
+                // Синхронный WaitForExit после асинхронного догружает остатки stdout/stderr
+                // (последние строки перед выходом JVM) до того, как лог будет прочитан анализатором
+                process.WaitForExit();
+                int exitCode = process.ExitCode;
+                gameLogWriter.WriteLine($"[LAUNCHER] Процесс игры завершён: код {exitCode}, {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                await gameLogWriter.FlushAsync();
+                gameLogWriter.Dispose();
+
+                _gameProcess = null;
+
+                LogLauncherEvent($"[EXIT] Игра (PID {process.Id}) завершилась с кодом выхода {exitCode}");
+                _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
+                GameExited?.Invoke(this, exitCode);
+                onGameExited?.Invoke(exitCode, sessionLogPath);
+            }
+            catch (Exception ex)
+            {
+                _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
+                _gameProcess = null;
+                LogLauncherEvent($"[EXIT-ERROR] Ошибка при ожидании процесса игры: {ex.Message}");
+            }
+        });
+
+        return process;
+    }
+
+    /// <summary>
+    /// Обеспечивает корректность профиля Fabric и наличие клиентского jar в classpath:
+    /// 1. Добавляет "jar": "<mcVersion>" в fabric-loader-*.json (если meta.fabricmc.net не включила его).
+    /// 2. Гарантирует наличие fabric-loader-*.jar (копия vanilla <mcVersion>.jar).
+    /// </summary>
+    private static async Task EnsureFabricClientJarAsync(string gameDir, string fabricLoaderVersion, string minecraftVersion, Action<string>? onLogReceived, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var vanillaDir = Path.Combine(gameDir, "versions", minecraftVersion);
+            var vanillaJar = Path.Combine(vanillaDir, $"{minecraftVersion}.jar");
+
+            var fabricDir = Path.Combine(gameDir, "versions", $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}");
+            var fabricJson = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}.json");
+            var fabricJar = Path.Combine(fabricDir, $"fabric-loader-{fabricLoaderVersion}-{minecraftVersion}.jar");
+
+            // 1. Патч JSON профиля Fabric (добавление поля "jar": "<mcVersion>", если отсутствует)
+            if (File.Exists(fabricJson))
+            {
+                var jsonText = await File.ReadAllTextAsync(fabricJson, cancellationToken);
+                if (!jsonText.Contains("\"jar\"", StringComparison.OrdinalIgnoreCase))
+                {
+                    try
+                    {
+                        var node = System.Text.Json.Nodes.JsonNode.Parse(jsonText);
+                        if (node is System.Text.Json.Nodes.JsonObject obj)
+                        {
+                            obj["jar"] = minecraftVersion;
+                            await File.WriteAllTextAsync(fabricJson, obj.ToJsonString(), cancellationToken);
+                            LogLauncherEvent($"[FABRIC-FIX] Добавлено 'jar': '{minecraftVersion}' в {fabricJson}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogLauncherEvent($"[FABRIC-FIX: WARN] Не удалось обновить JSON профиля: {ex.Message}");
+                    }
+                }
+            }
+
+            // 2. Копирование <mcVersion>.jar в fabric-loader-*.jar, если файл отсутствует или размер отличается
+            if (File.Exists(vanillaJar))
+            {
+                Directory.CreateDirectory(fabricDir);
+                bool needsCopy = !File.Exists(fabricJar);
+                if (!needsCopy)
+                {
+                    var vInfo = new FileInfo(vanillaJar);
+                    var fInfo = new FileInfo(fabricJar);
+                    if (vInfo.Length != fInfo.Length || vInfo.Length == 0)
+                    {
+                        needsCopy = true;
+                    }
+                }
+
+                if (needsCopy)
+                {
+                    File.Copy(vanillaJar, fabricJar, true);
+                    onLogReceived?.Invoke($"[AURA-INSTALL] Синхронизирован клиентский JAR ({minecraftVersion}) для Fabric Loader.");
+                    LogLauncherEvent($"[FABRIC-FIX] Скопирован {vanillaJar} -> {fabricJar}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[FABRIC-FIX: ERROR] Ошибка синхронизации Fabric JAR: {ex.Message}");
+        }
+    }
+
+    public static string? CustomLogDirectory { get; set; }
+
+    public static bool IsValidCdsArchive(string? path)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+            var fi = new FileInfo(path);
+            // Hotspot base classes.jsa is typically 10-30MB; header alone is >= 4KB.
+            // A zero-byte or corrupted file must never be accepted as a valid CDS archive.
+            if (fi.Length <= 4096) return false;
+
+            // Verify HotSpot CDS header magic number
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var header = new byte[4];
+            if (fs.Read(header, 0, 4) < 4) return false;
+            uint magic = BitConverter.ToUInt32(header, 0);
+
+            // Hotspot CDS magic: 0xF00BABA2 (modern OpenJDK) or 0xD0022F00 (legacy)
+            if (magic != 0xF00BABA2 && magic != 0xD0022F00 && magic != 0xD0022F01)
+            {
+                return false;
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool VerifyArchiveWithJvm(string? javaPath, string? archivePath, int timeoutMs = 3000)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(javaPath) || !File.Exists(javaPath)) return false;
+            if (string.IsNullOrWhiteSpace(archivePath) || !IsValidCdsArchive(archivePath)) return false;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = javaPath,
+                Arguments = $"-Xshare:on -XX:SharedArchiveFile=\"{archivePath}\" -version",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            using var proc = Process.Start(psi);
+            if (proc == null) return false;
+
+            var stdout = proc.StandardOutput.ReadToEndAsync();
+            var stderr = proc.StandardError.ReadToEndAsync();
+
+            bool exited = proc.WaitForExit(timeoutMs);
+            if (!exited)
+            {
+                try { proc.Kill(entireProcessTree: true); proc.WaitForExit(1000); } catch { }
+                return false;
+            }
+
+            try { Task.WaitAll(new[] { stdout, stderr }, 1000); } catch { }
+            return proc.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool EnsureBaseCdsArchive(string? javaPath, CancellationToken cancellationToken = default, int timeoutMs = 20000)
+    {
+        if (string.IsNullOrWhiteSpace(javaPath) || !File.Exists(javaPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            var binDir = Path.GetDirectoryName(javaPath);
+            if (string.IsNullOrEmpty(binDir)) return false;
+
+            string[] possiblePaths =
+            {
+                Path.Combine(binDir, "server", "classes.jsa"),
+                Path.Combine(binDir, "..", "lib", "server", "classes.jsa"),
+                Path.Combine(binDir, "client", "classes.jsa")
+            };
+
+            if (possiblePaths.Any(IsValidCdsArchive))
+            {
+                return true;
+            }
+
+            // Remove any 0-byte or corrupted archives so dump can recreate cleanly
+            foreach (var p in possiblePaths)
+            {
+                try
+                {
+                    if (File.Exists(p) && !IsValidCdsArchive(p))
+                    {
+                        File.Delete(p);
+                    }
+                }
+                catch { }
+            }
+
+            // If base archive is missing, attempt to generate it with java.exe -Xshare:dump
+            string dumpExe = Path.Combine(binDir, "java.exe");
+            if (!File.Exists(dumpExe)) dumpExe = javaPath;
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = dumpExe,
+                Arguments = "-Xshare:dump",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            Process? proc = null;
+            try
+            {
+                proc = Process.Start(psi);
+                if (proc == null) return false;
+
+                // Asynchronously read stdout and stderr to prevent pipe buffer deadlocks
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
+
+                bool exited = false;
+                if (cancellationToken.CanBeCanceled)
+                {
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    var waitTask = proc.WaitForExitAsync(linkedCts.Token);
+                    var timeoutTask = Task.Delay(timeoutMs);
+                    var finished = Task.WhenAny(waitTask, timeoutTask).GetAwaiter().GetResult();
+                    exited = (finished == waitTask && !cancellationToken.IsCancellationRequested);
+                }
+                else
+                {
+                    exited = proc.WaitForExit(timeoutMs);
+                }
+
+                if (!exited || cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(3000);
+                    }
+                    catch { }
+                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump timed out after {timeoutMs}ms or was cancelled; process killed");
+                    return false;
+                }
+
+                try
+                {
+                    Task.WaitAll(new[] { stdoutTask, stderrTask }, 2000);
+                }
+                catch { }
+
+                if (proc.ExitCode != 0)
+                {
+                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump failed with exit code {proc.ExitCode}");
+                    return false;
+                }
+
+                if (possiblePaths.Any(IsValidCdsArchive))
+                {
+                    LogLauncherEvent("[LAUNCH: CDS] Успешно сгенерирован базовый архив CDS classes.jsa");
+                    return true;
+                }
+            }
+            finally
+            {
+                try
+                {
+                    if (proc != null && !proc.HasExited)
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(1000);
+                    }
+                }
+                catch { }
+                proc?.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            LogLauncherEvent($"[LAUNCH: CDS: WARN] Не удалось проверить/сгенерировать базовый архив CDS: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static MArgument[] BuildJvmArguments(string? jvmArgs, string targetInstanceDir, string? javaPath = null)
+    {
+        var list = new List<MArgument>
+        {
+            new MArgument("-DFabricMcEmu= net.minecraft.client.main.Main "),
+            new MArgument("-XX:+UnlockExperimentalVMOptions"),
+            new MArgument("-Dmodernfix.mixin.perf.dynamic_resources=true")
+        };
+
+        try
+        {
+            bool hasBaseCds = EnsureBaseCdsArchive(javaPath);
+            if (hasBaseCds)
+            {
+                string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
+                if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
+                {
+                    list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
+                }
+                else
+                {
+                    list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
+                }
+            }
+            else
+            {
+                LogLauncherEvent("[LAUNCH: CDS] Base CDS archive not available, skipping AppCDS arguments");
+            }
+        }
+        catch { }
+
+        if (!string.IsNullOrWhiteSpace(jvmArgs))
+        {
+            var tokens = jvmArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var t in tokens)
+            {
+                if (t.Equals("-XX:+UnlockExperimentalVMOptions", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                list.Add(new MArgument(t));
+            }
+        }
+        else
+        {
+            list.Add(new MArgument("-XX:+UseG1GC"));
+            list.Add(new MArgument("-XX:+ParallelRefProcEnabled"));
+            list.Add(new MArgument("-XX:G1ReservePercent=15"));
+            list.Add(new MArgument("-XX:G1HeapRegionSize=32M"));
+            list.Add(new MArgument("-XX:MaxGCPauseMillis=50"));
+            list.Add(new MArgument("-XX:+AlwaysPreTouch"));
+        }
+
+        return list.ToArray();
+    }
+
+    /// <summary>
+    /// Логирование событий самого лаунчера в %AppData%\Aura\launcher.log.
+    /// </summary>
+    public static void LogLauncherEvent(string message)
+    {
+        try
+        {
+            string logDir;
+            if (!string.IsNullOrEmpty(CustomLogDirectory))
+            {
+                logDir = CustomLogDirectory;
+            }
+            else
+            {
+                var envDir = Environment.GetEnvironmentVariable("AURA_LOG_DIR");
+                if (!string.IsNullOrEmpty(envDir))
+                {
+                    logDir = envDir;
+                }
+                else
+                {
+                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    logDir = Path.Combine(appData, "Aura");
+                }
+            }
+            Directory.CreateDirectory(logDir);
+            var logPath = Path.Combine(logDir, "launcher.log");
+            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+        }
+        catch { }
+    }
+}
