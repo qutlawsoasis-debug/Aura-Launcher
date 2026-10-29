@@ -104,7 +104,16 @@ public final class QuickMenuScreen extends Screen {
 
     public void setMusicTab(int tab) {
         this.musicTab = tab;
+        if (tab == 1) {
+            this.scroll = 220;
+        } else {
+            this.scroll = 0;
+        }
         triggerSearchAsync(tab == 1 ? searchText : "");
+    }
+
+    public void setMusicScroll(int s) {
+        this.scroll = Math.max(0, s);
     }
 
     public void setKaraokeExpanded(boolean expanded) {
@@ -117,6 +126,11 @@ public final class QuickMenuScreen extends Screen {
 
     public void setSearchQuery(String query) {
         this.searchText = query != null ? query : "";
+        this.searching = true;
+        var src = MusicSourceProvider.get();
+        if (src != null && src.available()) {
+            this.cachedTracks = src.search(this.searchText);
+        }
         triggerSearchAsync(this.searchText);
     }
 
@@ -375,7 +389,7 @@ public final class QuickMenuScreen extends Screen {
         if (clipBottom <= clipTop) return 1.0f;
         if (itemY + itemH <= clipTop || itemY >= clipBottom) return 0.0f;
         float topFade = scroll <= 0 ? 1.0f : Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
-        float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + itemH)) / 16.0f));
+        float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + Math.min(20.0f, itemH))) / 16.0f));
         return Math.max(0.0f, Math.min(1.0f, Math.min(topFade, bottomFade)));
     }
 
@@ -718,8 +732,16 @@ public final class QuickMenuScreen extends Screen {
             int sColor = musicTab == 1 ? 0xF2FFFFFF : 0x99FFFFFF;
             text("Поиск", x + 2 + segW + (segW - sW) * 0.5f, segY + 8, 14, sColor, musicTab == 1 ? 600 : 500, segFade);
         }
-        controls.add(new Control(x, segY, segW + 2, 32, "tabQueue", () -> { musicTab = 0; triggerSearchAsync(""); }, null));
-        controls.add(new Control(x + segW + 2, segY, segW + 2, 32, "tabSearch", () -> { musicTab = 1; triggerSearchAsync(searchText); }, null));
+        controls.add(new Control(x, segY, segW + 2, 32, "tabQueue", () -> {
+            musicTab = 0;
+            scroll = 0;
+            triggerSearchAsync("");
+        }, null));
+        controls.add(new Control(x + segW + 2, segY, segW + 2, 32, "tabSearch", () -> {
+            musicTab = 1;
+            scroll = Math.max(scroll, 220);
+            triggerSearchAsync(searchText);
+        }, null));
 
         float listY = segY + 40;
 
@@ -803,6 +825,7 @@ public final class QuickMenuScreen extends Screen {
             });
             ky += 38;
 
+            boolean kEnabled = c.karaoke;
             slider(x, ky, w, "Задержка", c.lyricsOffsetMs, -500, 500, v -> {
                 int rounded = (int) Math.round(v / 10.0) * 10;
                 c.lyricsOffsetMs = rounded;
@@ -810,21 +833,21 @@ public final class QuickMenuScreen extends Screen {
             }, v -> {
                 int iv = (int) Math.round(v / 10.0) * 10;
                 return (iv > 0 ? "+" : "") + iv + " мс";
-            });
+            }, kEnabled);
             ky += 38;
 
             slider(x, ky, w, "Размер текста", c.karaokeSize, 0.75, 1.50, v -> {
                 double rounded = Math.round(v * 100.0) / 100.0;
                 c.karaokeSize = rounded;
                 KaraokeConfig.get().setSize((float) rounded);
-            }, v -> Math.round(v * 100) + " %");
+            }, v -> Math.round(v * 100) + " %", kEnabled);
             ky += 38;
 
             slider(x, ky, w, "Слов максимум", c.karaokeMaxWords, 1, 6, v -> {
                 int rounded = (int) Math.round(v);
                 c.karaokeMaxWords = rounded;
                 KaraokeConfig.get().setMaxWords(rounded);
-            }, v -> String.valueOf((int) Math.round(v)));
+            }, v -> String.valueOf((int) Math.round(v)), kEnabled);
             ky += 38;
 
             toggle(x, ky, w, "Только когда стою", () -> c.karaokeOnlyStanding, v -> {
@@ -881,19 +904,26 @@ public final class QuickMenuScreen extends Screen {
     }
 
     private void slider(float x, float y, float w, String label, double value, double min, double max, DoubleConsumer set, Function<Double, String> format) {
+        slider(x, y, w, label, value, min, max, set, format, true);
+    }
+
+    private void slider(float x, float y, float w, String label, double value, double min, double max, DoubleConsumer set, Function<Double, String> format, boolean enabled) {
         float rowFade = edgeFade(y, 36);
         if (rowFade <= 0.01f) return;
-        text(label, x, y + 1, 18, 0xFFFFFFFF, 400, rowFade);
+        int labelColor = enabled ? 0xEBFFFFFF : 0x66FFFFFF;
+        int labelWeight = enabled ? 500 : 400;
+        text(label, x, y + 1, 18, labelColor, labelWeight, rowFade);
         if (format != null) {
             String display = format.apply(value);
             if (display != null && !display.isEmpty()) {
-                text(display, x + w - AuraRenderer.textWidth(display, 15), y + 2, 15, 0xFFFFFFFF, 500, rowFade);
+                text(display, x + w - AuraRenderer.textWidth(display, 15), y + 2, 15, enabled ? 0xEBFFFFFF : 0x66FFFFFF, 500, rowFade);
             }
         }
         float trackW = w - 8, t = (float) ((value - min) / (max - min));
         rect(x + 4, y + 26, trackW, 3, 1.5f, 0x80767680, 0, rowFade);
-        rect(x + 4, y + 26, trackW * t, 3, 1.5f, ACCENT, 0, rowFade);
-        rect(x + 4 + trackW * t - 8, y + 20, 16, 15, 7.5f, 0xFFFFFFFF, 0x1AFFFFFF, rowFade);
+        rect(x + 4, y + 26, trackW * t, 3, 1.5f, enabled ? ACCENT : 0x80767680, 0, rowFade);
+        rect(x + 4 + trackW * t - 8, y + 20, 16, 15, 7.5f, enabled ? 0xFFFFFFFF : 0x99FFFFFF, 0x1AFFFFFF, rowFade);
+        if (!enabled) return;
         DoubleConsumer change = normalized -> {
             set.accept(min + normalized * (max - min));
             QuickMenuConfig.save();
@@ -902,7 +932,7 @@ public final class QuickMenuScreen extends Screen {
     }
 
     private void row(float x, float y, float w, String label, float fade) {
-        text(label, x, y + 7, 18, 0xFFFFFFFF, 400, fade);
+        text(label, x, y + 7, 18, 0xEBFFFFFF, 500, fade);
         rect(x, y + 35, w, 1, 0, 0x16767680, 0, fade);
     }
 
