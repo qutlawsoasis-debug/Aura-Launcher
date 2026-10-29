@@ -36,10 +36,12 @@ public class FabricGameLaunchService : IGameLaunchService
     public const string MinecraftVersion = "1.20.1";
 
     private readonly IConfigService? _configService;
+    private readonly IMusicBridgeService? _musicBridgeService;
 
-    public FabricGameLaunchService(IConfigService? configService = null)
+    public FabricGameLaunchService(IConfigService? configService = null, IMusicBridgeService? musicBridgeService = null)
     {
         _configService = configService;
+        _musicBridgeService = musicBridgeService;
     }
 
     public static string ResolveFabricLoaderVersion(string gameDir, string? version = null)
@@ -1365,6 +1367,7 @@ public class FabricGameLaunchService : IGameLaunchService
         // 0. Настройки игры по умолчанию (options.txt, lsp.json) перед первым запуском
         EnsureDefaultOptions(targetInstanceDir, config.GraphicsPreset);
         EnsureDefaultLspConfig(targetInstanceDir);
+        _musicBridgeService?.WriteConfigFile(targetInstanceDir);
 
         // 1. Автоматическая проверка и докачка недостающих компонентов окружения
         await EnsureInstalledAsync(rootGameDir, installProgress, onLogReceived, cancellationToken, mcVersion);
@@ -1597,6 +1600,7 @@ public class FabricGameLaunchService : IGameLaunchService
         }
         catch (Exception ex)
         {
+            _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
             gameLogWriter.Dispose();
             LogLauncherEvent($"[LAUNCH: START-ERROR] Не удалось запустить процесс Java: {ex.Message}");
             throw new InvalidOperationException($"Не удалось запустить процесс Java: {ex.Message}", ex);
@@ -1624,11 +1628,13 @@ public class FabricGameLaunchService : IGameLaunchService
                 _gameProcess = null;
 
                 LogLauncherEvent($"[EXIT] Игра (PID {process.Id}) завершилась с кодом выхода {exitCode}");
+                _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
                 GameExited?.Invoke(this, exitCode);
                 onGameExited?.Invoke(exitCode, sessionLogPath);
             }
             catch (Exception ex)
             {
+                _musicBridgeService?.DeleteConfigFile(targetInstanceDir);
                 _gameProcess = null;
                 LogLauncherEvent($"[EXIT-ERROR] Ошибка при ожидании процесса игры: {ex.Message}");
             }

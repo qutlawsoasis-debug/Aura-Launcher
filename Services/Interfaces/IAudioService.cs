@@ -31,4 +31,6 @@ public interface IAudioService : IDisposable
     void Previous();
     void Seek(TimeSpan position);
     void Stop();
+    void Enqueue(AudioTrack track) { }
+    bool PlayTrack(string trackIdOrTitle) => false;
 }
