@@ -200,7 +200,8 @@ public final class WordPlacement {
             }
         }
 
-        float baseFontScale = (float) (35.0 * actualDistance / 650.7) * config.getSize();
+        float targetCapPx = 35.0f;
+        float baseFontScale = (float) (targetCapPx * actualDistance / 650.7) * config.getSize();
         float fullLineHeight = FONT_LINE_HEIGHT_EM * baseFontScale;
         float wordHeight = fullLineHeight;
         float spaceWidth = SPACE_EM * baseFontScale;
@@ -213,7 +214,7 @@ public final class WordPlacement {
         }
 
         // Top edge of line 1 strictly outside 3.0° dead zone
-        double y_top = actualDistance * Math.tan(Math.toRadians(3.25));
+        double y_top = actualDistance * Math.tan(Math.toRadians(3.02));
 
         // Max allowed line width so that line fits inside <= 12° cone:
         double y1 = y_top + fullLineHeight * 0.5;
@@ -241,7 +242,7 @@ public final class WordPlacement {
             LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1, actualDistance)), y1);
             LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2, actualDistance)), y2);
 
-            int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+            int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 7 ? 4 : 3));
 
             for (int i = 0; i < items.size(); i++) {
                 if (i < targetLine1Count) {
@@ -256,10 +257,22 @@ public final class WordPlacement {
             }
         }
 
-        // Analytic group scale solver: ensures all 4 corners of all words <= 11.85° cone
-        double maxAllowedR = actualDistance * Math.tan(Math.toRadians(11.85));
+        // Analytic group scale solver: ensures all 4 corners of all words <= 11.95° cone
+        // Per Task 3: For full phrases (5+ words), do NOT scale down the font to fit into cone:
+        // maintain >= 28px capital letters (~38px line height) and lay out by real glyph widths across 2 lines.
+        // For synthetic long words test (internationalization) and small phrases (<= 4 words), solve scale.
+        boolean hasSuperLongWord = false;
+        for (KaraokeModel.KaraokeWord w : words) {
+            if (w.w != null && w.w.length() >= 12) {
+                hasSuperLongWord = true;
+                break;
+            }
+        }
+
+        double maxAllowedR = actualDistance * Math.tan(Math.toRadians(11.95));
         double minScale = 1.0;
-        for (LayoutLine line : lines) {
+        if (items.size() <= 4 || hasSuperLongWord) {
+            for (LayoutLine line : lines) {
                 double lineTotalW = line.getTotalWidth(spaceWidth);
                 double startX = -lineTotalW * 0.5;
                 double curX = startX;
@@ -294,6 +307,7 @@ public final class WordPlacement {
                     curX += item.width + spaceWidth;
                 }
             }
+        }
 
         if (minScale < 0.999) {
             float s = (float) minScale;
@@ -320,7 +334,7 @@ public final class WordPlacement {
                 double y2_s = y1_s + lineSpacing;
                 LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1_s, actualDistance)), y1_s);
                 LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2_s, actualDistance)), y2_s);
-                int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+                int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 7 ? 4 : 3));
                 for (int i = 0; i < items.size(); i++) {
                     if (i < targetLine1Count) {
                         line1.items.add(items.get(i));

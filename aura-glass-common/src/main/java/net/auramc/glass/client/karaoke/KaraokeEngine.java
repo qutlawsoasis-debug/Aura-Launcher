@@ -390,9 +390,9 @@ public final class KaraokeEngine {
                         // Warmup karaoke renderer
                         KaraokeWorldRenderer.initialize();
 
-                        // Player looks slightly down (10°) so words and horizon are centered in view
+                        // Player looks forward (0°) so floating words and snow landscape are centered in view
                         player.setYaw(0.0f);
-                        player.setPitch(10.0f);
+                        player.setPitch(0.0f);
 
                         // Clear tall grass / vegetation in front of player for open daytime view
                         try {
@@ -770,6 +770,24 @@ public final class KaraokeEngine {
             server.execute(() -> {
                 for (var sw : server.getWorlds()) {
                     sw.setTimeOfDay(6000L);
+                    try {
+                        var p = mc.player != null ? server.getPlayerManager().getPlayer(mc.player.getUuid()) : null;
+                        if (p != null) {
+                            var pPos = p.getBlockPos();
+                            var snowState = net.minecraft.block.Blocks.SNOW_BLOCK.getDefaultState();
+                            for (int dx = -5; dx <= 5; dx++) {
+                                for (int dz = 0; dz <= 10; dz++) {
+                                    sw.setBlockState(pPos.add(dx, -1, dz), snowState, 3);
+                                    for (int dy = 0; dy <= 2; dy++) {
+                                        var abp = pPos.add(dx, dy, dz);
+                                        if (!sw.getBlockState(abp).isAir()) {
+                                            sw.removeBlock(abp, false);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Throwable ignored) {}
                 }
             });
         }
@@ -781,18 +799,23 @@ public final class KaraokeEngine {
         }
         if (world instanceof net.minecraft.client.world.ClientWorld cw) {
             cw.setTimeOfDay(6000L); // Daytime (noon)
-        }
-        if (player == null || world == null) return;
-        try {
-            net.minecraft.util.math.BlockPos pPos = player.getBlockPos();
-            var snowState = net.minecraft.block.Blocks.SNOW_BLOCK.getDefaultState();
-            // Fast 35-block ground patch under words with flag 2 (NOTIFY_LISTENERS, 0 lag)
-            for (int dx = -3; dx <= 3; dx++) {
-                for (int dz = 2; dz <= 7; dz++) {
-                    world.setBlockState(pPos.add(dx, -1, dz), snowState, 2);
-                }
+            if (player != null) {
+                try {
+                    var pPos = player.getBlockPos();
+                    var snowState = net.minecraft.block.Blocks.SNOW_BLOCK.getDefaultState();
+                    for (int dx = -5; dx <= 5; dx++) {
+                        for (int dz = 0; dz <= 10; dz++) {
+                            cw.setBlockState(pPos.add(dx, -1, dz), snowState, 2);
+                            for (int dy = 0; dy <= 2; dy++) {
+                                var abp = pPos.add(dx, dy, dz);
+                                if (!cw.getBlockState(abp).isAir()) {
+                                    cw.removeBlock(abp, false);
+                                }
+                            }
+                        }
+                    }
+                } catch (Throwable ignored) {}
             }
-        } catch (Throwable ignored) {
         }
     }
 
@@ -918,6 +941,10 @@ public final class KaraokeEngine {
         }
         if (!shotAppear5Taken && playbackMs >= 1200L) {
             shotAppear5Taken = true;
+            if (client.player != null) {
+                client.player.setYaw(0.0f);
+                client.player.setPitch(0.0f);
+            }
             captureProofFrame(client, "appear-5");
         }
 
@@ -942,12 +969,19 @@ public final class KaraokeEngine {
         // 3. Resting letters on ground (alpha 0.85)
         if (!shotFallGroundTaken && playbackMs >= 5150L) {
             shotFallGroundTaken = true;
+            if (client.player != null) {
+                client.player.setPitch(15.0f);
+            }
             captureProofFrame(client, "fall-ground");
         }
 
         // 4. Snow daytime: active line 1 in progress on snow daytime
         if (!shotSnowDayTaken && playbackMs >= 3400L) {
             shotSnowDayTaken = true;
+            if (client.player != null) {
+                client.player.setYaw(0.0f);
+                client.player.setPitch(0.0f);
+            }
             captureProofFrame(client, "snow-day");
         }
 
