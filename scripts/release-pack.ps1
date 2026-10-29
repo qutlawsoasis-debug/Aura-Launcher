@@ -89,38 +89,57 @@ foreach ($fp in $forbiddenRoots) {
     }
 }
 
-# Check git repository root and remote origin
-if (Get-Command git -ErrorAction SilentlyContinue) {
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $gitTopLevel = & git -C $resolvedPackDir rev-parse --show-toplevel 2>$null
-        $topExit = $LASTEXITCODE
-        if ($topExit -eq 0 -and [string]::IsNullOrWhiteSpace($gitTopLevel) -eq $false) {
-            $resolvedGitTopLevel = (Resolve-Path -LiteralPath $gitTopLevel.Trim()).Path.TrimEnd('\')
-            if ($resolvedGitTopLevel -ne $resolvedPackDir) {
-                throw "PackDir '$resolvedPackDir' is not the root of its git repository (root is '$resolvedGitTopLevel')."
-            }
-        }
-    } catch {
-        if ($_.Exception.Message -match "is not the root") { throw }
-    } finally {
-        $ErrorActionPreference = $prevEap
-    }
+# Strict Git environment and repository validation for PackDir (fail-closed, executed before worktree/build/writes)
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    throw "git command is required but not found in PATH."
+}
 
-    $ErrorActionPreference = 'Continue'
-    try {
-        $gitRemoteOrigin = & git -C $resolvedPackDir remote get-url origin 2>$null
-        $remoteExit = $LASTEXITCODE
-        if ($remoteExit -eq 0 -and [string]::IsNullOrWhiteSpace($gitRemoteOrigin) -eq $false) {
-            if ($gitRemoteOrigin -notmatch "Aura-Pack") {
-                throw "PackDir git remote '$gitRemoteOrigin' does not point to an Aura-Pack repository."
-            }
+# 1. Validate PackDir Git root
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$gitTopLevel = & git -C $resolvedPackDir rev-parse --show-toplevel 2>$null
+$topExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+
+if ($topExit -ne 0 -or [string]::IsNullOrWhiteSpace($gitTopLevel)) {
+    throw "Git rev-parse failed on PackDir '$resolvedPackDir' with exit code $topExit. PackDir must be a valid Git repository root."
+}
+$resolvedGitTopLevel = (Resolve-Path -LiteralPath $gitTopLevel.Trim()).Path.TrimEnd('\')
+if ($resolvedGitTopLevel -ne $resolvedPackDir) {
+    throw "Security violation: PackDir '$resolvedPackDir' is not the root of its git repository (root is '$resolvedGitTopLevel')."
+}
+
+# 2. Validate Remote Origin matches exact expected repository: qutlawsoasis-debug/Aura-Pack
+$ErrorActionPreference = 'Continue'
+$gitRemoteOrigin = & git -C $resolvedPackDir remote get-url origin 2>$null
+$remoteExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+
+if ($remoteExit -ne 0 -or [string]::IsNullOrWhiteSpace($gitRemoteOrigin)) {
+    throw "Git remote 'origin' is missing or failed on PackDir '$resolvedPackDir' with exit code $remoteExit."
+}
+
+$trimmedOrigin = $gitRemoteOrigin.Trim()
+$allowedOriginPattern = '^(https?://github\.com/|git@github\.com:|ssh://git@github\.com/)qutlawsoasis-debug/Aura-Pack(\.git)?/?$'
+if ($trimmedOrigin -notmatch $allowedOriginPattern) {
+    throw "Security violation: PackDir git remote '$trimmedOrigin' does not match expected repository 'qutlawsoasis-debug/Aura-Pack'."
+}
+
+# 3. Validate clean Git worktree / index
+$ErrorActionPreference = 'Continue'
+$gitStatus = & git -C $resolvedPackDir status --porcelain 2>$null
+$statusExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+
+if ($statusExit -ne 0) {
+    throw "Git status check failed on PackDir '$resolvedPackDir' with exit code $statusExit."
+}
+if (-not $isDryRun) {
+    if ([string]::IsNullOrWhiteSpace($gitStatus) -eq $false) {
+        $dirtyLines = @($gitStatus -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
+        if ($dirtyLines.Count -gt 0) {
+            throw "PackDir git index/worktree is not clean. Staged or uncommitted changes detected:`n$($dirtyLines -join "`n")"
         }
-    } catch {
-        if ($_.Exception.Message -match "does not point to an Aura-Pack repository") { throw }
-    } finally {
-        $ErrorActionPreference = $prevEap
     }
 }
 
@@ -185,30 +204,7 @@ Assert-SafePathInsidePackDir $manifest120 $resolvedPackDir
 Assert-SafePathInsidePackDir $manifest121 $resolvedPackDir
 Assert-SafePathInsidePackDir $parityScript $resolvedPackDir
 
-# 5. Check worktree/index cleanliness if running in live mode
-if (-not $isDryRun -and (Get-Command git -ErrorAction SilentlyContinue)) {
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    try {
-        $gitStatus = & git -C $resolvedPackDir status --porcelain 2>$null
-        $statusExit = $LASTEXITCODE
-        if ($statusExit -eq 0 -and $gitStatus) {
-            $dirtyLines = @($gitStatus -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
-            if ($dirtyLines.Count -gt 0) {
-                throw "PackDir git index/worktree is not clean. Staged or uncommitted changes detected:`n$($dirtyLines -join "`n")"
-            }
-        }
-    } catch {
-        if ($_.Exception.Message -match "PackDir git index/worktree is not clean") { throw }
-    } finally {
-        $ErrorActionPreference = $prevEap
-    }
-}
-
-# 6. Verify required CLI tools
-if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-    throw "git command is required but not found in PATH."
-}
+# 5. Verify required Java tool
 if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
     throw "java command is required to run GradleWrapperMain."
 }
@@ -493,13 +489,19 @@ try {
         Write-Host "==================================================" -ForegroundColor Magenta
 
         # Fail-closed check: Ensure PackDir git worktree and index are completely clean
-        if (Get-Command git -ErrorAction SilentlyContinue) {
-            $gitStatus = git -C $resolvedPackDir status --porcelain 2>$null
-            if ($LASTEXITCODE -eq 0 -and $gitStatus) {
-                $dirtyLines = @($gitStatus -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
-                if ($dirtyLines.Count -gt 0) {
-                    throw "PackDir git index/worktree is not clean. Refusing to release with existing modifications:`n$($dirtyLines -join "`n")"
-                }
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $gitStatus = & git -C $resolvedPackDir status --porcelain 2>$null
+        $statusExit = $LASTEXITCODE
+        $ErrorActionPreference = $prevEap
+
+        if ($statusExit -ne 0) {
+            throw "Git status check failed on PackDir '$resolvedPackDir' with exit code $statusExit."
+        }
+        if ([string]::IsNullOrWhiteSpace($gitStatus) -eq $false) {
+            $dirtyLines = @($gitStatus -split "`r?`n" | Where-Object { $_.Trim().Length -gt 0 })
+            if ($dirtyLines.Count -gt 0) {
+                throw "PackDir git index/worktree is not clean. Refusing to release with existing modifications:`n$($dirtyLines -join "`n")"
             }
         }
 
