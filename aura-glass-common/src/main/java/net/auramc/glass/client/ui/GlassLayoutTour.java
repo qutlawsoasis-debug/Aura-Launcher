@@ -50,7 +50,7 @@ public final class GlassLayoutTour {
                 }
                 ensureDummyWorld(client);
             }
-            if (timer >= 30 && client.currentScreen instanceof TitleScreen) {
+            if (timer >= 80 && client.currentScreen instanceof TitleScreen) {
                 takeShot(client, "title.png");
                 step = 1;
                 timer = 0;
