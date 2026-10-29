@@ -18,6 +18,7 @@ public final class QuickMenuRuntime {
         net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get().volume((float) QuickMenuConfig.get().musicVolume);
         net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             net.auramc.glass.client.quickmenu.music.MusicArtwork.close();
+            net.auramc.glass.client.quickmenu.music.MusicSourceProvider.close();
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> { while (menu.wasPressed()) toggle(); });
     }

@@ -47,10 +47,7 @@ public final class MusicArtwork {
         return textureUrl(track.coverUrl());
     }
 
-    public static Identifier texture(MusicTrack track) {
-        if (track == null || track.artwork() == null || track.artwork().isBlank()) return null;
-        return textureUrl(track.artwork());
-    }
+
 
     public static Identifier textureUrl(String key) {
         if (key == null || key.isBlank() || key.length() > 4096) return null;

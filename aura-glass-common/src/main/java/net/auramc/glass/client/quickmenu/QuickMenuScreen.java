@@ -15,6 +15,7 @@ import org.lwjgl.glfw.GLFW;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.*;
 import java.util.function.*;
 
 public final class QuickMenuScreen extends Screen {
@@ -24,6 +25,15 @@ public final class QuickMenuScreen extends Screen {
     private static final int[] COLORS = {0xFFFFFF, 0x64D2FF, 0x5FD39A, 0xFFCC66, 0xFF8A7A};
     private final QuickMenuMotion motion = new QuickMenuMotion();
     private final List<Control> controls = new ArrayList<>();
+    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "Aura-QuickMenu-Search");
+        t.setDaemon(true);
+        return t;
+    });
+    private volatile List<Track> cachedTracks = List.of();
+    private String lastSearchedQuery = null;
+    private long searchRequestEpoch = 0;
+
     private int section, focused, scroll;
     private boolean dragging, menuKeyHeld = true, searching;
     private String searchText = "";
@@ -53,6 +63,7 @@ public final class QuickMenuScreen extends Screen {
         var config = QuickMenuConfig.get();
         if (renderedFrames == 0) motion.setOpen(true, System.nanoTime());
         motion.update(System.nanoTime(), width, height, config.centerX, config.bottomY < 0 ? Double.NaN : config.bottomY);
+        triggerSearchAsync(searchText);
     }
 
     public QuickMenuMotion.Geometry geometry() {
@@ -71,6 +82,9 @@ public final class QuickMenuScreen extends Screen {
         section = Math.floorMod(index, SECTIONS.length);
         scroll = 0;
         focused = 0;
+        if (section == 2) {
+            triggerSearchAsync(searchText);
+        }
     }
 
     public void toggle() {
@@ -88,7 +102,43 @@ public final class QuickMenuScreen extends Screen {
     }
 
     @Override
-    public void removed() {}
+    public void removed() {
+        searchExecutor.shutdownNow();
+    }
+
+    private void triggerSearchAsync(String query) {
+        if (Objects.equals(query, lastSearchedQuery)) return;
+        lastSearchedQuery = query;
+        final long epoch = ++searchRequestEpoch;
+        final var src = MusicSourceProvider.get();
+        if (!src.available()) {
+            cachedTracks = List.of();
+            return;
+        }
+        searchExecutor.submit(() -> {
+            try {
+                List<Track> results = src.search(query);
+                if (epoch == searchRequestEpoch) {
+                    cachedTracks = (results != null) ? List.copyOf(results) : List.of();
+                }
+            } catch (Throwable ignored) {}
+        });
+    }
+
+    private float computeBackdropBrightness() {
+        float dayFactor = 0.5f;
+        if (client != null && client.world != null) {
+            long time = client.world.getTimeOfDay() % 24000L;
+            var cfg = QuickMenuConfig.get();
+            if (cfg != null && cfg.visualTime) {
+                time = (long) cfg.timeOfDay % 24000L;
+            }
+            float skyAngle = (float) time / 24000.0f - 0.25f;
+            float sun = (float) Math.cos(skyAngle * 2.0 * Math.PI);
+            dayFactor = Math.max(0.0f, Math.min(1.0f, (sun + 0.25f) / 1.25f));
+        }
+        return dayFactor;
+    }
 
     @Override
     public void render(DrawContext context, int mx, int my, float delta) {
@@ -108,7 +158,7 @@ public final class QuickMenuScreen extends Screen {
         }
         context.draw();
 
-        // Authentic Apple Liquid Glass panel
+        // Authentic Apple Liquid Glass panel with adaptive contrast tone
         if (GlassStyles.quality().needsBackdrop()) {
             QuickMenuRuntime.totalCaptureRequests++;
             GlassRenderer.captureBackdrop();
@@ -126,10 +176,15 @@ public final class QuickMenuScreen extends Screen {
             style.rimOuter = 0.20f;
             style.rimInner = 0.40f;
             style.light = 0.22f;
-            style.tintR = 0.10f;
-            style.tintG = 0.12f;
-            style.tintB = 0.16f;
-            style.tintA = 0.20f; // Liquid Glass translucent tint
+
+            // Adaptive tone: on bright sky / day, darken tone up to rgba(30, 32, 40, 0.45) for contrast >= 4.5:1
+            // On dark night background, keep translucent tint rgba(26, 31, 41, 0.20)
+            float brightness = computeBackdropBrightness();
+            float t = Math.max(0.0f, Math.min(1.0f, (brightness - 0.35f) / 0.45f));
+            style.tintR = 0.10f + (30f / 255f - 0.10f) * t;
+            style.tintG = 0.12f + (32f / 255f - 0.12f) * t;
+            style.tintB = 0.16f + (40f / 255f - 0.16f) * t;
+            style.tintA = 0.20f + 0.25f * t;
         } else {
             style.tintR = 0.08f;
             style.tintG = 0.09f;
@@ -187,7 +242,7 @@ public final class QuickMenuScreen extends Screen {
             context.disableScissor();
             scissorActive = false;
 
-            // Content viewport with 16px soft edge fade and mouse wheel scroll
+            // Content viewport with pure alpha mask soft edge fade (without dark background bars)
             float viewportTop = y + 112;
             float viewportBottom = box.bottom() - 39;
             float viewportH = Math.max(1, viewportBottom - viewportTop);
@@ -206,17 +261,6 @@ public final class QuickMenuScreen extends Screen {
                 else if (section == 1) world(contentX, rowsY, contentW);
                 else if (section == 2) music(context, contentX, rowsY, contentW);
                 else text("Скоро", contentX, rowsY + 14, 20, 0xCCFFFFFF, 400);
-
-                // Soft edge vignette at top and bottom of content viewport (16px)
-                for (int i = 0; i < 8; i++) {
-                    float alphaTop = (1.0f - i / 8.0f) * 0.40f;
-                    int colTop = ((int)(alphaTop * 255) << 24) | 0x10141D;
-                    AuraRenderer.rect(contentX, viewportTop + i * 2, contentW, 2, 0, 0, color(colTop), 0);
-
-                    float alphaBtm = (1.0f - i / 8.0f) * 0.40f;
-                    int colBtm = ((int)(alphaBtm * 255) << 24) | 0x10141D;
-                    AuraRenderer.rect(contentX, viewportBottom - 16 + (7 - i) * 2, contentW, 2, 0, 0, color(colBtm), 0);
-                }
 
                 // macOS-style scroll indicator (thin capsule, appears during scroll)
                 int maxScroll = maxScroll(viewportH);
@@ -259,7 +303,7 @@ public final class QuickMenuScreen extends Screen {
                         rect(focus.x - 2, focus.y - 2, focus.w + 4, focus.h + 4, 9, 0, ACCENT);
                     }
                 }
-                text("F8 — закрыть", x + 24, box.bottom() - 28, 14, 0xCCFFFFFF, 400);
+                text("F8 — закрыть", x + 24, box.bottom() - 28, 14, 0xEEFFFFFF, 500);
                 flushNative();
             }
 
@@ -291,11 +335,12 @@ public final class QuickMenuScreen extends Screen {
         AuraRenderer.flush();
     }
 
+    // Pure alpha mask fading without dark background rectangles
     private float edgeFade(float itemY, float itemH) {
         if (clipBottom <= clipTop) return 1.0f;
         if (itemY + itemH <= clipTop || itemY >= clipBottom) return 0.0f;
-        float topFade = Math.min(1.0f, Math.max(0.0f, (itemY - clipTop + 4.0f) / 20.0f));
-        float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + itemH) + 4.0f) / 20.0f));
+        float topFade = Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
+        float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + itemH)) / 16.0f));
         return Math.max(0.0f, Math.min(1.0f, Math.min(topFade, bottomFade)));
     }
 
@@ -306,8 +351,7 @@ public final class QuickMenuScreen extends Screen {
         } else if (section == 1) {
             contentH = 3 * 44 + 80;
         } else if (section == 2) {
-            var tracks = MusicSourceProvider.get().search(searchText);
-            contentH = 320 + Math.min(10, tracks.size()) * 42 + 20;
+            contentH = 320 + Math.min(10, cachedTracks.size()) * 42 + 20;
         } else {
             contentH = 80;
         }
@@ -357,7 +401,7 @@ public final class QuickMenuScreen extends Screen {
         toggle(x, y += 44, w, "Без осадков", () -> c.clearWeather, v -> c.clearWeather = v);
         float rowFade = edgeFade(y + 52, 14);
         if (rowFade > 0.01f) {
-            text("Меняется только отображение на этом клиенте.", x, y + 52, 13, 0xCCFFFFFF, 400, rowFade);
+            text("Меняется только отображение на этом клиенте.", x, y + 52, 13, 0xDDFFFFFF, 400, rowFade);
         }
     }
 
@@ -400,22 +444,22 @@ public final class QuickMenuScreen extends Screen {
         float textFade = edgeFade(y + 8, 22);
         if (textFade > 0.01f) text(fit(title, w - 104, 22), x + 100, y + 8, 22, 0xFFFFFFFF, 600, textFade);
         float artistFade = edgeFade(y + 38, 16);
-        if (artistFade > 0.01f) text(fit(artist, w - 104, 16), x + 100, y + 38, 16, 0xDDFFFFFF, 400, artistFade);
+        if (artistFade > 0.01f) text(fit(artist, w - 104, 16), x + 100, y + 38, 16, 0xEEFFFFFF, 400, artistFade);
 
         String status;
         int statusColor;
         if (!source.available()) {
             status = "○ Ожидание Aura Launcher...";
-            statusColor = 0xAAFFFFFF;
+            statusColor = 0xDDFFFFFF;
         } else if (now.isPlaying()) {
             status = "● Воспроизведение · Aura Music";
             statusColor = ACCENT;
         } else if (now.isPaused()) {
             status = "⏸ На паузе · Aura Music";
-            statusColor = 0xDDFFFFFF;
+            statusColor = 0xEEFFFFFF;
         } else {
             status = "○ Остановлено · Aura Music";
-            statusColor = 0x88FFFFFF;
+            statusColor = 0xDDFFFFFF;
         }
         float statusFade = edgeFade(y + 62, 14);
         if (statusFade > 0.01f) text(fit(status, w - 104, 14), x + 100, y + 62, 14, statusColor, 400, statusFade);
@@ -441,9 +485,13 @@ public final class QuickMenuScreen extends Screen {
         action(x, y + 276, 120, "Каталог Aura", () -> musicTab = 0);
         action(x + 130, y + 276, 100, "Очередь", () -> musicTab = 1);
 
-        var tracks = source.search(searchText);
+        // Asynchronous cached tracks - no network calls on render thread!
+        var tracks = cachedTracks;
         float ty = y + 318;
-        if (tracks.isEmpty()) {
+        if (!source.available()) {
+            float waitingFade = edgeFade(ty, 15);
+            if (waitingFade > 0.01f) text("Мост Aura Music не подключен.", x, ty, 15, 0xDDFFFFFF, 400, waitingFade);
+        } else if (tracks.isEmpty()) {
             float emptyFade = edgeFade(ty, 15);
             if (emptyFade > 0.01f) text("Нет треков по запросу.", x, ty, 15, 0xDDFFFFFF, 400, emptyFade);
         } else {
@@ -455,9 +503,9 @@ public final class QuickMenuScreen extends Screen {
                 boolean isCurrent = current != null && current.id().equals(track.id());
                 rect(x, rowY, w, 36, 8, isCurrent ? 0x5C767680 : 0x3D767680, isCurrent ? ACCENT : 0x1AFFFFFF, rowFade);
                 text(fit(track.title(), w - 80, 16), x + 12, rowY + 4, 16, 0xFFFFFFFF, isCurrent ? 600 : 500, rowFade);
-                text(fit(track.artist(), w - 80, 13), x + 12, rowY + 20, 13, 0xCCFFFFFF, 400, rowFade);
+                text(fit(track.artist(), w - 80, 13), x + 12, rowY + 20, 13, 0xDDFFFFFF, 400, rowFade);
                 String dur = time(track.durationMs());
-                text(dur, x + w - AuraRenderer.textWidth(dur, 13) - 12, rowY + 11, 13, 0xAAFFFFFF, 400, rowFade);
+                text(dur, x + w - AuraRenderer.textWidth(dur, 13) - 12, rowY + 11, 13, 0xCCFFFFFF, 400, rowFade);
                 controls.add(new Control(x, rowY, w, 36, track.title(), () -> source.playTrack(track), null));
             }
         }
@@ -517,7 +565,7 @@ public final class QuickMenuScreen extends Screen {
         if (format != null) {
             String display = format.apply(value);
             if (display != null && !display.isEmpty()) {
-                text(display, x + w - AuraRenderer.textWidth(display, 15), y + 2, 15, 0xDDFFFFFF, 400, rowFade);
+                text(display, x + w - AuraRenderer.textWidth(display, 15), y + 2, 15, 0xFFFFFFFF, 500, rowFade);
             }
         }
         float trackW = w - 8, t = (float) ((value - min) / (max - min));
@@ -680,6 +728,7 @@ public final class QuickMenuScreen extends Screen {
     public boolean charTyped(char character, int modifiers) {
         if (searching && !Character.isISOControl(character) && searchText.length() < 120) {
             searchText += character;
+            triggerSearchAsync(searchText);
             return true;
         }
         return super.charTyped(character, modifiers);
@@ -712,7 +761,10 @@ public final class QuickMenuScreen extends Screen {
                 return true;
             }
             if (key == GLFW.GLFW_KEY_BACKSPACE) {
-                if (!searchText.isEmpty()) searchText = searchText.substring(0, searchText.length() - 1);
+                if (!searchText.isEmpty()) {
+                    searchText = searchText.substring(0, searchText.length() - 1);
+                    triggerSearchAsync(searchText);
+                }
                 return true;
             }
             if (key == GLFW.GLFW_KEY_ENTER) {
