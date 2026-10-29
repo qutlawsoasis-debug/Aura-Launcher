@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class KaraokeQaNoAudioMixin {
     @Inject(method = "start", at = @At("HEAD"), cancellable = true, require = 0)
     private void aura_noAudio(CallbackInfo ci) {
-        if (Boolean.getBoolean("aura.karaoke.demo") || Boolean.getBoolean("aura.qa.headless")) {
+        if (Boolean.getBoolean("aura.karaoke.demo") || Boolean.getBoolean("aura.qa.headless") || Boolean.getBoolean("aura.maxfps.benchmark")) {
             ci.cancel();
         }
     }

@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class KaraokeQaHiddenWindowMixin {
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lorg/lwjgl/glfw/GLFW;glfwCreateWindow(IILjava/lang/CharSequence;JJ)J"), require = 0)
     private void aura_hideBeforeCreate(CallbackInfo ci) {
-        if (Boolean.getBoolean("aura.karaoke.demo") || Boolean.getBoolean("aura.qa.headless")) {
+        if (Boolean.getBoolean("aura.karaoke.demo") || Boolean.getBoolean("aura.qa.headless") || Boolean.getBoolean("aura.maxfps.benchmark")) {
             GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_FALSE);
             GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
             GLFW.glfwWindowHint(GLFW.GLFW_FOCUSED, GLFW.GLFW_FALSE);

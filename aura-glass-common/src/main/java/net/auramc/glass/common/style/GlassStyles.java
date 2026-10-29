@@ -131,6 +131,7 @@ public final class GlassStyles {
     }
 
     public static Path file() { return path; }
+    public static void setFile(Path p) { path = p; }
 
     private static void validate(Document candidate) {
         if (candidate == null || candidate.quality == null || candidate.presets == null || candidate.states == null)

@@ -21,9 +21,13 @@ public final class QuickMenuConfig {
     public boolean karaoke = true, karaokePhysics = true, karaokeOnlyStanding = false;
     public double karaokeSize = 1.0, karaokeDistance = 5, musicVolume = .5;
     public int karaokeDensity = 1, lyricsOffsetMs = 0, karaokeMaxWords = 4;
-
+    public boolean maxFps;
+    public QuickMenuMaxFps.SavedState maxFpsSavedState;
 
     public static QuickMenuConfig get() { return value; }
+    public static void setConfig(QuickMenuConfig config) { if (config != null) value = config; }
+    public static Path getConfigFile() { return file; }
+    public static void setConfigFile(Path path) { file = path; }
     public static void initialize() {
         file = FabricLoader.getInstance().getConfigDir().resolve("aura-glass/quickmenu.json");
         if (Files.isRegularFile(file)) {
@@ -37,15 +41,19 @@ public final class QuickMenuConfig {
             }
         } else save();
     }
-    public static void save() {
-        if (file == null) return;
+    public static boolean save() {
+        if (file == null) return false;
         try {
             value.validate(); Files.createDirectories(file.getParent());
             Path temporary = file.resolveSibling("quickmenu.json.tmp");
             Files.writeString(temporary, GSON.toJson(value) + "\n", StandardCharsets.UTF_8);
             try { Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
             catch (AtomicMoveNotSupportedException ignored) { Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING); }
-        } catch (Exception error) { System.err.println("[AuraQuickMenu] Config save failed: " + error.getMessage()); }
+            return true;
+        } catch (Exception error) {
+            System.err.println("[AuraQuickMenu] Config save failed: " + error.getMessage());
+            return false;
+        }
     }
     private void validate() {
         zoomFactor = bounded(zoomFactor, 1, 16, 3); brightness = bounded(brightness, -1, 1, -1);

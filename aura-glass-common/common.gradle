@@ -58,6 +58,12 @@ tasks.register('runQuickMenuMusicRegressionTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.quickmenu.music.QuickMenuMusicRegressionTest'
 }
 
+tasks.register('runQuickMenuMaxFpsTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.quickmenu.QuickMenuMaxFpsTest'
+}
+
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
@@ -68,4 +74,5 @@ tasks.named('test') {
     dependsOn 'runGlassInvariantsTest'
     dependsOn 'runQuickMenuMotionTest'
     dependsOn 'runQuickMenuMusicRegressionTest'
+    dependsOn 'runQuickMenuMaxFpsTest'
 }
