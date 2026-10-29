@@ -458,9 +458,14 @@ public class MusicBridgeService : IMusicBridgeService
 
     private async Task HandlePostPlayAsync(HttpListenerResponse response)
     {
-        if (_embedPlayer.CurrentTrack != null)
+        if (_embedPlayer.HasTransport && _embedPlayer.CurrentTrack != null)
         {
-            await _embedPlayer.PlayAsync();
+            bool ok = await _embedPlayer.PlayAsync();
+            if (!ok)
+            {
+                await SendJsonAsync(response, 409, new { ok = false, error = "player_failed", message = "Embed player failed to play" });
+                return;
+            }
         }
         else
         {
@@ -471,9 +476,14 @@ public class MusicBridgeService : IMusicBridgeService
 
     private async Task HandlePostPauseAsync(HttpListenerResponse response)
     {
-        if (_embedPlayer.CurrentTrack != null)
+        if (_embedPlayer.HasTransport && _embedPlayer.CurrentTrack != null)
         {
-            await _embedPlayer.PauseAsync();
+            bool ok = await _embedPlayer.PauseAsync();
+            if (!ok)
+            {
+                await SendJsonAsync(response, 409, new { ok = false, error = "player_failed", message = "Embed player failed to pause" });
+                return;
+            }
         }
         else
         {
@@ -484,9 +494,14 @@ public class MusicBridgeService : IMusicBridgeService
 
     private async Task HandlePostNextAsync(HttpListenerResponse response)
     {
-        if (_embedPlayer.CurrentTrack != null)
+        if (_embedPlayer.HasTransport && _embedPlayer.CurrentTrack != null)
         {
-            await _embedPlayer.NextAsync();
+            bool ok = await _embedPlayer.NextAsync();
+            if (!ok)
+            {
+                await SendJsonAsync(response, 409, new { ok = false, error = "queue_end", message = "No next track in queue" });
+                return;
+            }
         }
         else
         {
@@ -497,9 +512,14 @@ public class MusicBridgeService : IMusicBridgeService
 
     private async Task HandlePostPrevAsync(HttpListenerResponse response)
     {
-        if (_embedPlayer.CurrentTrack != null)
+        if (_embedPlayer.HasTransport && _embedPlayer.CurrentTrack != null)
         {
-            await _embedPlayer.PreviousAsync();
+            bool ok = await _embedPlayer.PreviousAsync();
+            if (!ok)
+            {
+                await SendJsonAsync(response, 409, new { ok = false, error = "queue_start", message = "No previous track in queue" });
+                return;
+            }
         }
         else
         {
@@ -526,9 +546,14 @@ public class MusicBridgeService : IMusicBridgeService
         }
 
         long targetMs = Math.Max(0, ms ?? 0);
-        if (_embedPlayer.CurrentTrack != null)
+        if (_embedPlayer.HasTransport && _embedPlayer.CurrentTrack != null)
         {
-            await _embedPlayer.SeekAsync(targetMs);
+            bool ok = await _embedPlayer.SeekAsync(targetMs);
+            if (!ok)
+            {
+                await SendJsonAsync(response, 409, new { ok = false, error = "player_failed", message = "Embed player seek failed" });
+                return;
+            }
         }
         else
         {
@@ -554,17 +579,27 @@ public class MusicBridgeService : IMusicBridgeService
         }
 
         volume = Math.Clamp(volume, 0.0, 1.0);
-        await _embedPlayer.SetVolumeAsync(volume);
-
-        int percent = (int)Math.Round(volume * 100.0);
-        RunOnUiOrDirect(() =>
+        if (_embedPlayer.HasTransport && _embedPlayer.CurrentTrack != null)
         {
-            _audioService.VolumePercent = percent;
-            if (_audioService.IsMuted && percent > 0)
+            bool ok = await _embedPlayer.SetVolumeAsync(volume);
+            if (!ok)
             {
-                _audioService.IsMuted = false;
+                await SendJsonAsync(response, 409, new { ok = false, error = "player_failed", message = "Embed player set volume failed" });
+                return;
             }
-        });
+        }
+        else
+        {
+            int percent = (int)Math.Round(volume * 100.0);
+            RunOnUiOrDirect(() =>
+            {
+                _audioService.VolumePercent = percent;
+                if (_audioService.IsMuted && percent > 0)
+                {
+                    _audioService.IsMuted = false;
+                }
+            });
+        }
 
         await SendJsonAsync(response, 200, new { ok = true, volume });
     }
@@ -660,7 +695,7 @@ public class MusicBridgeService : IMusicBridgeService
         bool loaded = await _embedPlayer.LoadVideoAsync(resolvedVideoId, finalTitle, finalArtist, coverUrl, finalDuration);
         if (!loaded)
         {
-            await SendJsonAsync(response, 500, new { ok = false, error = "player_failed", message = "Embed player failed to load track" });
+            await SendJsonAsync(response, 503, new { ok = false, error = "player_failed", message = "Embed player failed to load track or transport unavailable" });
             return;
         }
 

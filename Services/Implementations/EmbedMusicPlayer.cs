@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AuraLauncher.Models;
@@ -17,6 +20,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
     private readonly object _lock = new();
     private readonly Stopwatch _stopwatch = new();
     private dynamic? _coreWebView2;
+    private Func<string, Task<string?>>? _customScriptExecutor;
 
     private string _state = "stopped";
     private MusicBridgeTrack? _currentTrack;
@@ -27,11 +31,30 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
     private bool _isReady = false;
     private bool _disposed = false;
 
+    private readonly List<MusicBridgeTrack> _queue = new();
+    private int _currentIndex = -1;
+
     public bool IsActive
     {
         get
         {
             lock (_lock) return _currentTrack != null || _isReady;
+        }
+    }
+
+    public bool HasTransport
+    {
+        get
+        {
+            lock (_lock) return _coreWebView2 != null || _customScriptExecutor != null;
+        }
+    }
+
+    public bool IsReady
+    {
+        get
+        {
+            lock (_lock) return _isReady;
         }
     }
 
@@ -98,12 +121,29 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         }
     }
 
+    public IReadOnlyList<MusicBridgeTrack> Queue
+    {
+        get
+        {
+            lock (_lock) return _queue.ToList();
+        }
+    }
+
+    public int CurrentIndex
+    {
+        get
+        {
+            lock (_lock) return _currentIndex;
+        }
+    }
+
     public event Action<string, object?>? CommandDispatched;
     public event Action<MusicBridgeTrack?>? TrackChanged;
     public event Action<string>? StateChanged;
 
-    public EmbedMusicPlayer()
+    public EmbedMusicPlayer(Func<string, Task<string?>>? customScriptExecutor = null)
     {
+        _customScriptExecutor = customScriptExecutor;
         _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
@@ -112,8 +152,36 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         lock (_lock)
         {
             _coreWebView2 = coreWebView2;
+            _isReady = false;
         }
         FabricGameLaunchService.LogLauncherEvent("[EMBED-PLAYER] Attached WebView2 to embed music player");
+
+        if (_coreWebView2 != null)
+        {
+            _ = Task.Run(async () =>
+            {
+                string initScript = """
+                (function() {
+                    const IFRAME_ID = 'aura-yt-embed-frame';
+                    const CHANNEL = 'aura-music';
+                    if (!window.__auraMusicHostAdapterInstalled) {
+                        window.__auraMusicHostAdapterInstalled = true;
+                        window.addEventListener('message', function(event) {
+                            try {
+                                var d = event.data;
+                                if (d && d.source === 'aura-yt-embed' && d.channel === CHANNEL) {
+                                    if (window.chrome && window.chrome.webview) {
+                                        window.chrome.webview.postMessage(typeof d === 'string' ? d : JSON.stringify(d));
+                                    }
+                                }
+                            } catch (e) {}
+                        });
+                    }
+                })();
+                """;
+                await ExecuteScriptOnUiAsync(initScript);
+            });
+        }
     }
 
     public void HandleEmbedMessage(string rawJson)
@@ -133,6 +201,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             string evt = root.TryGetProperty("event", out var evProp) ? evProp.GetString() ?? "" : "";
             string videoId = root.TryGetProperty("videoId", out var vidProp) ? vidProp.GetString() ?? "" : "";
 
+            string? newStateToNotify = null;
             lock (_lock)
             {
                 switch (evt)
@@ -148,13 +217,17 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                         }
                         if (root.TryGetProperty("duration", out var durProp) && durProp.TryGetDouble(out double dur))
                         {
-                            _durationMs = (long)(dur * 1000.0);
+                            _durationMs = (long)Math.Round(dur * 1000.0);
                         }
 
                         _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                         if (_state == "playing")
                         {
                             _stopwatch.Restart();
+                        }
+                        else
+                        {
+                            _stopwatch.Reset();
                         }
 
                         if (_currentTrack != null && _durationMs > 0 && _currentTrack.DurationMs != _durationMs)
@@ -167,15 +240,19 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                         int stateCode = root.TryGetProperty("state", out var scProp) && scProp.TryGetInt32(out int sc) ? sc : -1;
                         if (stateCode == 1) // YT.PlayerState.PLAYING
                         {
+                            CommitElapsedTimeLocked();
                             _state = "playing";
                             _stopwatch.Restart();
                             _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                            newStateToNotify = _state;
                         }
                         else if (stateCode == 2) // YT.PlayerState.PAUSED
                         {
+                            CommitElapsedTimeLocked();
                             _state = "paused";
-                            _stopwatch.Stop();
+                            _stopwatch.Reset();
                             _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                            newStateToNotify = _state;
                         }
                         else if (stateCode == 0) // YT.PlayerState.ENDED
                         {
@@ -183,6 +260,13 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                             _stopwatch.Reset();
                             _currentTimeSeconds = 0;
                             _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                            newStateToNotify = _state;
+
+                            // Auto-advance queue if next track exists
+                            _ = Task.Run(async () =>
+                            {
+                                try { await NextAsync(); } catch { }
+                            });
                         }
                         break;
 
@@ -190,12 +274,16 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
                     case "unavailable":
                         _state = "stopped";
                         _stopwatch.Reset();
+                        newStateToNotify = _state;
                         FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: WARN] Embed error for video '{videoId}'");
                         break;
                 }
             }
 
-            StateChanged?.Invoke(_state);
+            if (newStateToNotify != null)
+            {
+                StateChanged?.Invoke(newStateToNotify);
+            }
         }
         catch (Exception ex)
         {
@@ -207,10 +295,11 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
     {
         lock (_lock)
         {
-            if (_state == "playing")
+            long baseMs = (long)Math.Round(_currentTimeSeconds * 1000.0);
+            if (_state == "playing" && _stopwatch.IsRunning)
             {
                 long elapsed = _stopwatch.ElapsedMilliseconds;
-                long pos = (long)(_currentTimeSeconds * 1000.0) + elapsed;
+                long pos = baseMs + elapsed;
                 if (_durationMs > 0 && pos > _durationMs) pos = _durationMs;
                 updatedAtUnixMs = _lastUpdatedAtUnixMs + elapsed;
                 return Math.Max(0, pos);
@@ -218,69 +307,181 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             else
             {
                 updatedAtUnixMs = _lastUpdatedAtUnixMs > 0 ? _lastUpdatedAtUnixMs : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                return Math.Max(0, (long)(_currentTimeSeconds * 1000.0));
+                return Math.Max(0, baseMs);
             }
+        }
+    }
+
+    private void CommitElapsedTimeLocked()
+    {
+        if (_state == "playing" && _stopwatch.IsRunning)
+        {
+            long elapsed = _stopwatch.ElapsedMilliseconds;
+            _currentTimeSeconds += elapsed / 1000.0;
+            if (_durationMs > 0 && (_currentTimeSeconds * 1000.0) > _durationMs)
+            {
+                _currentTimeSeconds = _durationMs / 1000.0;
+            }
+            _lastUpdatedAtUnixMs += elapsed;
+            _stopwatch.Reset();
         }
     }
 
     public async Task<bool> LoadVideoAsync(string videoId, string? title = null, string? artist = null, string? coverUrl = null, long durationMs = 0)
     {
         if (string.IsNullOrWhiteSpace(videoId)) return false;
-
-        lock (_lock)
+        if (!HasTransport)
         {
-            _currentTimeSeconds = 0.0;
-            _durationMs = durationMs;
-            _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            _stopwatch.Reset();
-            _state = "playing";
-            _stopwatch.Start();
-
-            string effectiveTitle = !string.IsNullOrWhiteSpace(title) ? title : videoId;
-            string effectiveArtist = !string.IsNullOrWhiteSpace(artist) ? artist : "Aura";
-            CurrentTrack = new MusicBridgeTrack(videoId, effectiveArtist, effectiveTitle, durationMs, coverUrl);
+            FabricGameLaunchService.LogLauncherEvent("[EMBED-PLAYER: WARN] LoadVideoAsync rejected: No transport attached");
+            return false;
         }
 
-        var payload = new { videoId, startSeconds = 0 };
-        return await DispatchCommandAsync("load", payload);
+        string effTitle = !string.IsNullOrWhiteSpace(title) ? title : videoId;
+        string effArtist = !string.IsNullOrWhiteSpace(artist) ? artist : "Aura";
+        var track = new MusicBridgeTrack(videoId, effArtist, effTitle, durationMs, coverUrl);
+
+        return await QueueTrackAsync(track, playNow: true);
+    }
+
+    public async Task<bool> QueueTrackAsync(MusicBridgeTrack track, bool playNow = true)
+    {
+        if (!HasTransport)
+        {
+            FabricGameLaunchService.LogLauncherEvent("[EMBED-PLAYER: WARN] QueueTrackAsync rejected: No transport attached");
+            return false;
+        }
+
+        int targetIndex;
+        lock (_lock)
+        {
+            _queue.Add(track);
+            if (playNow || _currentIndex == -1)
+            {
+                _currentIndex = _queue.Count - 1;
+                targetIndex = _currentIndex;
+            }
+            else
+            {
+                return true; // Added to queue, current track continues
+            }
+        }
+
+        return await PlayTrackAtIndexAsync(targetIndex);
+    }
+
+    private async Task<bool> PlayTrackAtIndexAsync(int index)
+    {
+        MusicBridgeTrack track;
+        lock (_lock)
+        {
+            if (index < 0 || index >= _queue.Count) return false;
+            track = _queue[index];
+            _currentTrack = track;
+            _currentTimeSeconds = 0.0;
+            _durationMs = track.DurationMs;
+            _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _stopwatch.Reset();
+        }
+
+        TrackChanged?.Invoke(track);
+
+        var payload = new { videoId = track.Id, startSeconds = 0 };
+        bool dispatched = await DispatchCommandAsync("load", payload);
+        if (!dispatched)
+        {
+            lock (_lock)
+            {
+                _state = "stopped";
+            }
+            return false;
+        }
+        return true;
     }
 
     public async Task<bool> PlayAsync()
     {
+        if (!HasTransport) return false;
+
         lock (_lock)
         {
             if (_currentTrack == null) return false;
+            CommitElapsedTimeLocked();
             _state = "playing";
             _stopwatch.Restart();
             _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         }
-        return await DispatchCommandAsync("play", new { });
+
+        StateChanged?.Invoke("playing");
+        return await DispatchCommandAsync("play", null);
     }
 
     public async Task<bool> PauseAsync()
     {
+        if (!HasTransport) return false;
+
         lock (_lock)
         {
+            CommitElapsedTimeLocked();
             _state = "paused";
-            _stopwatch.Stop();
-            _lastUpdatedAtUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            _stopwatch.Reset();
         }
-        return await DispatchCommandAsync("pause", new { });
+
+        StateChanged?.Invoke("paused");
+        return await DispatchCommandAsync("pause", null);
     }
 
-    public Task<bool> NextAsync()
+    public async Task<bool> NextAsync()
     {
-        // Future playlist queue advancement in embed player
-        return Task.FromResult(true);
+        if (!HasTransport) return false;
+
+        int nextIndex;
+        lock (_lock)
+        {
+            if (_currentIndex + 1 >= _queue.Count)
+            {
+                return false; // Reached end of queue
+            }
+            _currentIndex++;
+            nextIndex = _currentIndex;
+        }
+
+        return await PlayTrackAtIndexAsync(nextIndex);
     }
 
-    public Task<bool> PreviousAsync()
+    public async Task<bool> PreviousAsync()
     {
-        return SeekAsync(0);
+        if (!HasTransport) return false;
+
+        int prevIndex;
+        bool doSeek = false;
+        lock (_lock)
+        {
+            if (_currentIndex < 0 || _queue.Count == 0) return false;
+
+            if (CurrentTimeSeconds > 3.0 || _currentIndex == 0)
+            {
+                doSeek = true;
+                prevIndex = _currentIndex;
+            }
+            else
+            {
+                _currentIndex--;
+                prevIndex = _currentIndex;
+            }
+        }
+
+        if (doSeek)
+        {
+            return await SeekAsync(0);
+        }
+
+        return await PlayTrackAtIndexAsync(prevIndex);
     }
 
     public async Task<bool> SeekAsync(long positionMs)
     {
+        if (!HasTransport) return false;
+
         double seconds = Math.Max(0, positionMs / 1000.0);
         lock (_lock)
         {
@@ -290,48 +491,149 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
             {
                 _stopwatch.Restart();
             }
+            else
+            {
+                _stopwatch.Reset();
+            }
         }
+
         return await DispatchCommandAsync("seek", new { seconds });
     }
 
     public async Task<bool> SetVolumeAsync(double volume)
     {
+        if (!HasTransport) return false;
+
         double clamped = Math.Clamp(volume, 0.0, 1.0);
         lock (_lock)
         {
             _volume = clamped;
         }
+
         return await DispatchCommandAsync("volume", new { value = clamped * 100.0 });
     }
 
-    private async Task<bool> DispatchCommandAsync(string op, object payload)
+    private string BuildCommandJson(string op, object? payload)
     {
-        CommandDispatched?.Invoke(op, payload);
-
-        if (_coreWebView2 != null)
+        var dict = new Dictionary<string, object?>
         {
-            try
+            ["source"] = "aura-yt-host",
+            ["channel"] = "aura-music",
+            ["op"] = op
+        };
+
+        if (payload != null)
+        {
+            var props = payload.GetType().GetProperties();
+            foreach (var prop in props)
             {
-                var msg = new
-                {
-                    source = "aura-yt-host",
-                    channel = "aura-music",
-                    op,
-                    data = payload
-                };
-                string json = JsonSerializer.Serialize(msg, _jsonOptions);
-                string script = $"window.postMessage({json}, '*');";
-                await _coreWebView2.ExecuteScriptAsync(script);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: ERROR] Script dispatch error: {ex.Message}");
-                return false;
+                dict[prop.Name] = prop.GetValue(payload);
             }
         }
 
-        return true;
+        return JsonSerializer.Serialize(dict, _jsonOptions);
+    }
+
+    private async Task<bool> DispatchCommandAsync(string op, object? payload)
+    {
+        CommandDispatched?.Invoke(op, payload);
+
+        if (!HasTransport)
+        {
+            return false;
+        }
+
+        string cmdJson = BuildCommandJson(op, payload);
+        string script = $"(function(){{var f=document.getElementById('aura-yt-embed-frame')||document.querySelector('iframe[src*=\"embed/player.html\"]');if(!f){{f=document.createElement('iframe');f.id='aura-yt-embed-frame';f.style.display='none';f.allow='autoplay; encrypted-media';var p=window.location.origin||'http://127.0.0.1';f.src='https://lobby-api.vercel.app/embed/player.html?channel=aura-music&parentOrigin='+encodeURIComponent(p);document.body.appendChild(f);}}if(f&&f.contentWindow){{f.contentWindow.postMessage({cmdJson},'*');return true;}}return false;}})();";
+
+        string? res = await ExecuteScriptOnUiAsync(script);
+        return res != null;
+    }
+
+    private static object? GetUiDispatcher()
+    {
+        try
+        {
+            var appType = Type.GetType("System.Windows.Application, PresentationFramework");
+            if (appType != null)
+            {
+                var currentProp = appType.GetProperty("Current", BindingFlags.Public | BindingFlags.Static);
+                var appInstance = currentProp?.GetValue(null);
+                if (appInstance != null)
+                {
+                    var dispProp = appType.GetProperty("Dispatcher", BindingFlags.Public | BindingFlags.Instance);
+                    return dispProp?.GetValue(appInstance);
+                }
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    private async Task<string?> ExecuteScriptOnUiAsync(string script)
+    {
+        if (_customScriptExecutor != null)
+        {
+            return await _customScriptExecutor(script);
+        }
+
+        if (_coreWebView2 == null) return null;
+
+        bool isRealWebView = _coreWebView2?.GetType().Name == "CoreWebView2";
+        if (isRealWebView)
+        {
+            dynamic? dispatcher = GetUiDispatcher();
+            if (dispatcher != null)
+            {
+                bool checkAccess = true;
+                try { checkAccess = (bool)dispatcher.CheckAccess(); } catch { }
+
+                if (!checkAccess)
+                {
+                    try
+                    {
+                        var op = dispatcher.InvokeAsync(new Func<Task<string?>>(async () =>
+                        {
+                            try
+                            {
+                                return (string?)await _coreWebView2?.ExecuteScriptAsync(script);
+                            }
+                            catch
+                            {
+                                return null;
+                            }
+                        }));
+                        return await op.Task.Unwrap();
+                    }
+                    catch (Exception ex)
+                    {
+                        FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: ERROR] ExecuteScript failed on UI thread: {ex.Message}");
+                        return null;
+                    }
+                }
+            }
+        }
+
+        try
+        {
+            var method = _coreWebView2?.GetType().GetMethod("ExecuteScriptAsync", new[] { typeof(string) });
+            if (method != null)
+            {
+                var taskObj = method.Invoke(_coreWebView2, new object[] { script }) as Task;
+                if (taskObj != null)
+                {
+                    await taskObj;
+                    var resultProp = taskObj.GetType().GetProperty("Result");
+                    return resultProp?.GetValue(taskObj)?.ToString() ?? "null";
+                }
+            }
+            return null;
+        }
+        catch (Exception ex)
+        {
+            FabricGameLaunchService.LogLauncherEvent($"[EMBED-PLAYER: ERROR] ExecuteScript failed: {ex.Message}");
+            return null;
+        }
     }
 
     public void Dispose()
@@ -340,5 +642,7 @@ public class EmbedMusicPlayer : IEmbedMusicPlayer
         _disposed = true;
         _stopwatch.Stop();
         _coreWebView2 = null;
+        _customScriptExecutor = null;
+        _queue.Clear();
     }
 }

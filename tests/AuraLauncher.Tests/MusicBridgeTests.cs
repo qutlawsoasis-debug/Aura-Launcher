@@ -19,6 +19,7 @@ public class MusicBridgeTests : IDisposable
 {
     private readonly TestAudioService _audioService;
     private readonly TestLobbyApiClient _lobbyApiClient;
+    private readonly FakeCoreWebView _fakeCore;
     private readonly EmbedMusicPlayer _embedPlayer;
     private readonly MusicBridgeService _bridge;
     private readonly HttpClient _client;
@@ -27,7 +28,9 @@ public class MusicBridgeTests : IDisposable
     {
         _audioService = new TestAudioService();
         _lobbyApiClient = new TestLobbyApiClient();
+        _fakeCore = new FakeCoreWebView();
         _embedPlayer = new EmbedMusicPlayer();
+        _embedPlayer.AttachWebView(_fakeCore);
         _bridge = new MusicBridgeService(_audioService, _lobbyApiClient, _embedPlayer);
         _bridge.Start();
 
@@ -41,6 +44,7 @@ public class MusicBridgeTests : IDisposable
     {
         _client.Dispose();
         _bridge.Dispose();
+        _embedPlayer.Dispose();
     }
 
     private void SetAuthToken(string? token)
@@ -474,6 +478,7 @@ public class MusicBridgeTests : IDisposable
     public async Task EmbedPlayer_TimeUpdateContract_AdvancingPositionPrecisionWithin30Ms()
     {
         using var player = new EmbedMusicPlayer();
+        player.AttachWebView(new FakeCoreWebView());
         await player.LoadVideoAsync("dQw4w9WgXcQ", "Test Track", "Test Artist", null, 180000);
 
         // 1. Simulate iframe postMessage: ready
@@ -514,6 +519,7 @@ public class MusicBridgeTests : IDisposable
     public async Task EmbedPlayer_MultipleSteps_MeasurementErrorWithin30Ms()
     {
         using var player = new EmbedMusicPlayer();
+        player.AttachWebView(new FakeCoreWebView());
         await player.LoadVideoAsync("dQw4w9WgXcQ", "Track", "Artist", null, 300000);
         player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"stateChange","state":1,"videoId":"dQw4w9WgXcQ"}""");
         player.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"timeUpdate","currentTime":15.0,"duration":300.0,"videoId":"dQw4w9WgXcQ"}""");
@@ -531,6 +537,178 @@ public class MusicBridgeTests : IDisposable
 
             Assert.True(diff <= 30, $"At step {i}, diff {diff}ms exceeded 30ms (actual={actualAdvancement}, expected={expectedAdvancement})");
         }
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_MatchesQaProbeCriteria_NoRollbackAndNoFalseSuccess()
+    {
+        // 1. Without WebView/transport, LoadVideoAsync must return false!
+        using var p = new EmbedMusicPlayer();
+        bool loadWithoutTransport = await p.LoadVideoAsync("abcdefghijk");
+        Assert.False(loadWithoutTransport);
+        Assert.Equal("stopped", p.State);
+
+        // 2. Time update and pause: NO ROLLBACK!
+        p.HandleEmbedMessage("""{"source":"aura-yt-embed","event":"stateChange","state":1}""");
+        p.HandleEmbedMessage("""{"source":"aura-yt-embed","event":"timeUpdate","currentTime":10.0}""");
+        await Task.Delay(100);
+        long before = p.GetExactPositionMs(out _);
+        await p.PauseAsync();
+        long after = p.GetExactPositionMs(out _);
+        long rollbackMs = before - after;
+        Assert.True(rollbackMs <= 0, $"Pause caused rollback of {rollbackMs} ms (before={before}, after={after})");
+
+        // 3. Attach transport, load video, inspect dispatched script
+        var core = new FakeCoreWebView();
+        p.AttachWebView(core);
+        bool loadWithTransport = await p.LoadVideoAsync("abcdefghijk");
+        Assert.True(loadWithTransport);
+        Assert.Contains("contentWindow.postMessage", core.LastScript);
+        Assert.Contains("\"op\":\"load\"", core.LastScript);
+        Assert.Contains("\"videoId\":\"abcdefghijk\"", core.LastScript);
+        Assert.DoesNotContain("\"data\":{", core.LastScript); // Must be flat!
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_ProtocolReceiver_ValidatesContractAndAdvances()
+    {
+        // Model player.html message receiver
+        string? receivedOp = null;
+        string? receivedVideoId = null;
+        double? receivedSeconds = null;
+        double? receivedValue = null;
+        bool receiverError = false;
+
+        using var player = new EmbedMusicPlayer(script =>
+        {
+            // Extract postMessage argument from script
+            var match = System.Text.RegularExpressions.Regex.Match(script, @"postMessage\((\{.*\}),\s*'\*'\)");
+            if (match.Success)
+            {
+                using var doc = JsonDocument.Parse(match.Groups[1].Value);
+                var root = doc.RootElement;
+                if (root.GetProperty("source").GetString() != "aura-yt-host" ||
+                    root.GetProperty("channel").GetString() != "aura-music")
+                {
+                    receiverError = true;
+                }
+                receivedOp = root.GetProperty("op").GetString();
+                if (root.TryGetProperty("videoId", out var vid)) receivedVideoId = vid.GetString();
+                if (root.TryGetProperty("seconds", out var sec)) receivedSeconds = sec.GetDouble();
+                if (root.TryGetProperty("value", out var val)) receivedValue = val.GetDouble();
+            }
+            return Task.FromResult<string?>("true");
+        });
+
+        // 1. Load command dispatch
+        bool loadOk = await player.LoadVideoAsync("abcdefghijk", "Title", "Artist");
+        Assert.True(loadOk);
+        Assert.False(receiverError);
+        Assert.Equal("load", receivedOp);
+        Assert.Equal("abcdefghijk", receivedVideoId);
+
+        // 2. Seek command dispatch
+        bool seekOk = await player.SeekAsync(45000);
+        Assert.True(seekOk);
+        Assert.Equal("seek", receivedOp);
+        Assert.Equal(45.0, receivedSeconds);
+
+        // 3. Volume command dispatch
+        bool volOk = await player.SetVolumeAsync(0.75);
+        Assert.True(volOk);
+        Assert.Equal("volume", receivedOp);
+        Assert.Equal(75.0, receivedValue);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_QueueNavigation_MultipleTracksAndEndHandling()
+    {
+        var core = new FakeCoreWebView();
+        using var p = new EmbedMusicPlayer();
+        p.AttachWebView(core);
+
+        var track1 = new MusicBridgeTrack("id_track_001", "Artist 1", "Song 1", 180000, null);
+        var track2 = new MusicBridgeTrack("id_track_002", "Artist 2", "Song 2", 200000, null);
+        var track3 = new MusicBridgeTrack("id_track_003", "Artist 3", "Song 3", 220000, null);
+
+        // Queue 3 tracks
+        Assert.True(await p.QueueTrackAsync(track1, playNow: true));
+        Assert.True(await p.QueueTrackAsync(track2, playNow: false));
+        Assert.True(await p.QueueTrackAsync(track3, playNow: false));
+
+        Assert.Equal(3, p.Queue.Count);
+        Assert.Equal(0, p.CurrentIndex);
+        Assert.Equal("id_track_001", p.CurrentTrack?.Id);
+
+        // Next -> track 2
+        Assert.True(await p.NextAsync());
+        Assert.Equal(1, p.CurrentIndex);
+        Assert.Equal("id_track_002", p.CurrentTrack?.Id);
+
+        // Next -> track 3
+        Assert.True(await p.NextAsync());
+        Assert.Equal(2, p.CurrentIndex);
+        Assert.Equal("id_track_003", p.CurrentTrack?.Id);
+
+        // Next at end of queue -> returns false!
+        Assert.False(await p.NextAsync());
+        Assert.Equal(2, p.CurrentIndex);
+
+        // Previous -> track 2
+        Assert.True(await p.PreviousAsync());
+        Assert.Equal(1, p.CurrentIndex);
+        Assert.Equal("id_track_002", p.CurrentTrack?.Id);
+
+        // Previous -> track 1
+        Assert.True(await p.PreviousAsync());
+        Assert.Equal(0, p.CurrentIndex);
+        Assert.Equal("id_track_001", p.CurrentTrack?.Id);
+    }
+
+    [Fact]
+    public async Task EmbedPlayer_PauseResumeRepeatedPlay_PreservesTimeContinuity()
+    {
+        var core = new FakeCoreWebView();
+        using var p = new EmbedMusicPlayer();
+        p.AttachWebView(core);
+        await p.LoadVideoAsync("abcdefghijk", "Title", "Artist", null, 300000);
+
+        p.HandleEmbedMessage("""{"source":"aura-yt-embed","event":"stateChange","state":1}""");
+        p.HandleEmbedMessage("""{"source":"aura-yt-embed","event":"timeUpdate","currentTime":20.0}""");
+
+        await Task.Delay(50);
+        long posBeforePause = p.GetExactPositionMs(out _);
+        await p.PauseAsync();
+        long posAfterPause = p.GetExactPositionMs(out _);
+        Assert.True(Math.Abs(posBeforePause - posAfterPause) <= 5);
+
+        // Resume without new timeUpdate
+        await p.PlayAsync();
+        await Task.Delay(50);
+        long posAfterResume = p.GetExactPositionMs(out _);
+        Assert.True(posAfterResume > posAfterPause, "Position must advance after resume");
+
+        // Repeated play without new timeUpdate
+        long posBeforeRepeatedPlay = p.GetExactPositionMs(out _);
+        await p.PlayAsync();
+        long posAfterRepeatedPlay = p.GetExactPositionMs(out _);
+        Assert.True(posAfterRepeatedPlay >= posBeforeRepeatedPlay, "Repeated play must not lose progress");
+    }
+
+    [Fact]
+    public async Task PostQueue_WithoutTransport_Returns503ServiceUnavailable()
+    {
+        using var isolatedPlayer = new EmbedMusicPlayer(); // no transport
+        using var isolatedBridge = new MusicBridgeService(_audioService, _lobbyApiClient, isolatedPlayer);
+        isolatedBridge.Start();
+
+        using var client = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{isolatedBridge.Port}/") };
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", isolatedBridge.Token);
+
+        var content = new StringContent("""{"trackId": "dQw4w9WgXcQ", "title": "Never Gonna Give You Up", "artist": "Rick Astley"}""", Encoding.UTF8, "application/json");
+        var response = await client.PostAsync("/queue", content);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 
     [Fact]
@@ -617,6 +795,9 @@ public class MusicBridgeTests : IDisposable
         var queueResp = await _client.PostAsync("/queue", queueContent);
         Assert.Equal(HttpStatusCode.OK, queueResp.StatusCode);
 
+        // Simulate iframe player confirming playback start
+        _embedPlayer.HandleEmbedMessage("""{"source":"aura-yt-embed","channel":"aura-music","event":"stateChange","state":1,"videoId":"dQw4w9WgXcQ"}""");
+
         // 3. Verify embed player is now playing
         Assert.NotNull(_embedPlayer.CurrentTrack);
         Assert.Equal("dQw4w9WgXcQ", _embedPlayer.CurrentTrack.Id);
@@ -634,6 +815,16 @@ public class MusicBridgeTests : IDisposable
     #endregion
 
     #region Helper Test Classes
+
+    public class FakeCoreWebView
+    {
+        public string LastScript { get; set; } = "";
+        public Task<string> ExecuteScriptAsync(string script)
+        {
+            LastScript = script;
+            return Task.FromResult("true");
+        }
+    }
 
     private class TestAudioService : IAudioService
     {
