@@ -6,7 +6,7 @@ import net.minecraft.client.gui.widget.ClickableWidget;
 
 public final class GlassLabels {
     private GlassLabels(){}
-    public static void prepare(ParentElement root){if(GlassFrameHooks.styledScreen())visit(root,0);}
+    public static void prepare(ParentElement root){if(GlassFrameHooks.styledScreen()){visit(root,0);GlassGroups.prepare(root);}}
     private static void visit(ParentElement root,int depth){
         if(depth>32)return;
         var children=root.children();

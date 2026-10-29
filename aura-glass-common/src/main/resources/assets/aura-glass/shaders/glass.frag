@@ -56,10 +56,63 @@ vec3 backdrop(vec2 uv, float frost) {
     return dim*(c0*weights.x+c1*weights.y+c2*weights.z+c3*weights.w);
 }
 
+// REGULAR is one outer optical layer. Fill quads return before any backdrop sample.
+void regularMaterial(float d,float aa) {
+    float coverage=1.0-smoothstep(-aa*.5,aa*.5,d);
+    float kind=-profileShape.x;
+    float edge=1.0-smoothstep(0.0,1.0/extra.w+aa,max(-d,0.0));
+    if(kind>=2.0 || Quality==0){
+        float border=kind>=3.0?.10:lighting.z;
+        float alpha=clamp(tint.a,0.0,1.0)*opacity*coverage;
+        vec3 fill=tint.rgb;
+        if(kind>=2.0 && profileShape.y>=0.0 && profileShape.z>=0.0){
+            vec2 cursor=point-profileShape.yz;
+            float glow=exp(-dot(cursor,cursor)/max(1.0,extent.y*extent.y*2.0));
+            fill=mix(fill,vec3(1),.06*glow);
+        }
+        float a=alpha+border*edge*coverage*opacity*(1.0-alpha);
+        vec3 rgb=fill*alpha+vec3(border*edge*coverage*opacity*(1.0-alpha));
+        fragColor=vec4(rgb,a);return;
+    }
+    vec2 uv=gl_FragCoord.xy/FramebufferSize;
+    vec2 centerUv=uv+vec2(extent*.5-point)*vec2(1,-1)*extra.w/FramebufferSize;
+    vec2 spread=extent*.3*extra.w/FramebufferSize;
+    vec3 a=backdrop(centerUv+spread,1.5),b=backdrop(centerUv-spread,1.5);
+    float ambient=dot((a+b)*.5,vec3(.2126,.7152,.0722));
+    float adaptation=smoothstep(.08,.65,ambient);
+    float textureVariation=length(a-b);
+    if(d>0.0){
+        float shadow=exp(-.5*pow(d/4.0,2.0))*(.16+.16*adaptation+.15*textureVariation)*opacity;
+        fragColor=vec4(0,0,0,shadow);return;
+    }
+    float eps=.5;
+    vec2 n=normalize(vec2(sdf(point+vec2(eps,0))-sdf(point-vec2(eps,0)),
+                          sdf(point+vec2(0,eps))-sdf(point-vec2(0,eps)))+vec2(.00001));
+    float bevel=clamp(lens.y,2.0,3.0);
+    float slope=pow(1.0-clamp(-d/bevel,0.0,1.0),1.5);
+    vec2 shift=vec2(n.x,-n.y)*lens.x*bevel*slope*extra.w/FramebufferSize;
+    vec3 base=Quality>0?backdrop(uv-shift,optical.y):vec3(.18);
+    float saturation=finish.x;
+    base=mix(vec3(dot(base,vec3(.2126,.7152,.0722))),base,saturation);
+    vec3 adaptiveTint=mix(vec3(.23,.24,.27),tint.rgb,adaptation);
+    float tintAlpha=mix(max(tint.a,.48),max(tint.a,.68),adaptation);
+    vec3 color=mix(base,adaptiveTint,tintAlpha);
+    // The Regular control layer reserves contrast for white text and light internal fills.
+    color*=min(1.0,.27/max(max(color.r,color.g),max(color.b,.001)));
+    float vertical=clamp(point.y/max(extent.y,1.0),0.0,1.0);
+    float sheen=vertical<.4?mix(.16,.04,vertical/.4):mix(.04,.02,(vertical-.4)/.6);
+    color=mix(color,vec3(1),sheen);
+    float top=max(-n.y,0.0)*edge;
+    color=mix(color,vec3(1),clamp(.40*top+lighting.z*edge*(1.0-top),0.0,1.0));
+    float alpha=coverage*opacity;
+    fragColor=vec4(color*alpha,alpha);
+}
+
 void main() {
     float d = sdf(point);
     float aa = max(fwidth(d), .0001);
     float coverage = 1.0 - smoothstep(-aa * .5, aa * .5, d);
+    if(profileShape.x<0.0){regularMaterial(d,aa);return;}
     if (coverage <= 0.0) discard;
     if (Quality == 0) {
         float rim = (1.0 - smoothstep(.5, 1.5 + aa, max(-d, 0.0))) * lighting.z;
@@ -106,12 +159,6 @@ void main() {
                      backdrop(uv - offset, optical.y).g,
                      backdrop(uv - offset + split, optical.y).b);
         else color = backdrop(uv, optical.y);
-        // Compact controls share a broad backdrop tone; edge refraction contributes detail.
-        if (extent.y <= 26.0 && extent.x <= 400.0) {
-            vec3 group = (textureLod(Backdrop3,vec2(.35,.4),0.0).rgb + textureLod(Backdrop3,vec2(.65,.4),0.0).rgb
-                        + textureLod(Backdrop3,vec2(.35,.6),0.0).rgb + textureLod(Backdrop3,vec2(.65,.6),0.0).rgb) * (.25*(1.0-.25*Modal));
-            color = mix(group,color,.22);
-        }
         float luma = dot(color, vec3(.2126, .7152, .0722));
         color = mix(vec3(luma), color, finish.x);
     }

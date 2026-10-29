@@ -30,11 +30,11 @@ public final class GlassFrameHooks {
         if(!styledScreen() || client.currentScreen instanceof TitleScreen)return;
         if(client.world==null) {
             AuraUiRenderer.renderMenuPanoramaBackground(context,client,client.getWindow().getScaledWidth(),client.getWindow().getScaledHeight());
-            context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);return;
+            context.draw();GlassRenderer.captureBackdrop(true);if(!GlassStyles.regular())GlassRenderer.modalBackground(1);GlassGroups.draw(context);return;
         }
         float elapsed=Math.max(0,Math.min(1,(System.nanoTime()-modalStarted)/200_000_000f));
         float progress=1-(1-elapsed)*(1-elapsed)*(1-elapsed);
-        context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(progress);
+        context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(progress);GlassGroups.draw(context);
 
     }
     public static boolean styledScreen() {
@@ -56,7 +56,7 @@ public final class GlassFrameHooks {
     public static void endNativeContent(){nativeContentDepth=Math.max(0,nativeContentDepth-1);}
     public static void titleBackdrop(DrawContext context){
         if(!styledScreen())return;
-        context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);
+        context.draw();GlassRenderer.captureBackdrop(true);if(!GlassStyles.regular())GlassRenderer.modalBackground(1);GlassGroups.draw(context);
     }
 
     public static void afterBackground(DrawContext context) {
@@ -79,7 +79,7 @@ public final class GlassFrameHooks {
             var style = GlassStyles.get(GlassPreset.PANEL);
             style.refraction = .9f; style.bevel = 40; style.frost = .35f;
             style.rimOuter = 1.2f; style.light = .9f; style.dispersion = .12f;
-            GlassRenderer.draw(x, y, w, h, style, 1);
+            GlassRenderer.drawSurface(GlassFrameHooks.class,x, y, w, h, style, 1);
             GlassRenderer.foreground(() -> context.drawText(client.textRenderer,
                     "F6: " + GlassRenderer.effectiveQuality() + (GlassRenderer.hasBackdrop() ? " GLASS" : " LOW"), (int) x + 8, (int) y + 8, 0xFFFFFFFF, false));
         }

@@ -13,6 +13,7 @@ import net.minecraft.text.OrderedText;
 
 public final class GlassTooltip {
     private static final int PAD=6;
+    private static final Object GROUP=new Object();
     private GlassTooltip(){}
     private static ClickableWidget hovered(ParentElement parent,int x,int y,int depth,boolean focused){
         if(depth>16)return null;
@@ -51,7 +52,7 @@ public final class GlassTooltip {
         var style=GlassStyles.frame(GlassPreset.SELECTED_DARK);
         style.tintR=.06f;style.tintG=.07f;style.tintB=.09f;style.tintA=.9f;
         style.frost=3;style.refraction=0;style.radius=5;style.light=.2f;
-        GlassRenderer.draw(x,y,width+2*PAD,height+2*PAD,style,1);
+        GlassRenderer.drawSurface(GROUP,x,y,width+2*PAD,height+2*PAD,style,1);
         GlassRenderer.flush();
         boolean old=GlassScreenText.beginSelected(true);
         try{

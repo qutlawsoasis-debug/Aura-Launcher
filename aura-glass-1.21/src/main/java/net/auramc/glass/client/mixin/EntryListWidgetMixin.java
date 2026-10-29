@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(EntryListWidget.class)
-public abstract class EntryListWidgetMixin {
+public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui.GlassListViewport {
     
     @Shadow protected abstract EntryListWidget.Entry getEntryAtPosition(double x,double y);
     @Shadow protected abstract EntryListWidget.Entry getEntry(int index);
@@ -18,6 +18,8 @@ public abstract class EntryListWidgetMixin {
     @Shadow protected abstract void renderDecorations(DrawContext c,int mx,int my);
     @Shadow protected abstract int getMaxPosition();
     @Shadow protected abstract int getScrollbarX();
+    public int aura_glassTop(){return ((EntryListWidget<?>)(Object)this).getY();}
+    public int aura_glassBottom(){var self=(EntryListWidget<?>)(Object)this;return self.getY()+self.getHeight();}
     @Shadow private boolean renderHeader;
     @Shadow private EntryListWidget.Entry hoveredEntry;
     @Unique private final int[] aura_bounds=new int[2];
@@ -39,14 +41,6 @@ public abstract class EntryListWidgetMixin {
         aura_left=l;aura_top=t;aura_right=r;aura_bottom=b;
         aura_context=c;aura_mouseX=mx;aura_mouseY=my;
         hoveredEntry=mx>=l && mx<r && my>=t && my<b?getEntryAtPosition(mx,my):null;
-        int screenW=net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaledWidth();
-        int panelL=Math.max(12,Math.max(l,self.getRowLeft()-8)),panelR=Math.min(screenW-12,Math.min(r,self.getRowLeft()+self.getRowWidth()+8));
-        int panelBottom=Math.min(b,t+Math.max(24,getMaxPosition()+8));
-        if(self instanceof net.minecraft.client.gui.widget.OptionListWidget){
-            int[] content=net.auramc.glass.client.ui.GlassListBounds.widgets(self,aura_bounds);
-            if(content[0]<content[1]){panelL=Math.max(panelL,content[0]-8);panelR=Math.min(panelR,content[1]+8);}
-            GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.frame(GlassPreset.PANEL),1);
-        }else GlassRenderer.draw(panelL,t,panelR-panelL,panelBottom-t,GlassStyles.frame(GlassPreset.PANEL),1);
         if(renderHeader)GlassRenderer.foreground(aura_header);
         renderList(c,mx,my,delta);
         int max=self.getMaxScroll();
