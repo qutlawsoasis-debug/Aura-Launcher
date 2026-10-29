@@ -31,7 +31,9 @@
     "TextureDeletionMixin",
     "AuraHudMixin",
     "ExtraMenuWidgetMixin",
-    "WorldRendererMixin"
+    "WorldRendererMixin",
+    "ClientPlayerInteractionManagerMixin",
+    "ClientPlayerEntityMixin"
   ],
   "injectors": {
     "defaultRequire": 0

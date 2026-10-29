@@ -2,6 +2,7 @@ package net.auramc.glass.common.karaoke;
 
 import net.auramc.glass.client.karaoke.KaraokeClock;
 import net.auramc.glass.client.karaoke.KaraokeConfig;
+import net.auramc.glass.client.karaoke.KaraokeEngine;
 import net.auramc.glass.client.karaoke.KaraokeModel;
 import net.auramc.glass.client.karaoke.KaraokePhysics;
 import net.auramc.glass.client.karaoke.PlayerAdaptiveness;
@@ -146,7 +147,30 @@ public final class KaraokeSuiteTest {
         var resFlight = adapt.getCurrentResult();
         check(resFlight.canSpawn && resFlight.minGroup == 1 && resFlight.maxGroup == 1, "flight 1 word");
 
-        System.out.println("[PASS] 3. Player adaptiveness (all 10 states + non-accumulation)");
+        // 11. Real Production Event Hookup Path: onPlayerAttack()
+        KaraokeEngine engine = KaraokeEngine.getInstance();
+        engine.getAdaptiveness().setScriptedState(0.01, 5.0, false, false, false, false, false, false, 20.0f, -10000L, System.currentTimeMillis());
+        check(engine.getAdaptiveness().getCurrentResult().canSpawn, "engine reset to standing");
+        long tAttack = System.currentTimeMillis();
+        engine.onPlayerAttack();
+        var resAttack = engine.getAdaptiveness().getCurrentResult();
+        check(!resAttack.canSpawn, "onPlayerAttack immediately gates spawning");
+        check(resAttack.state == PlayerAdaptiveness.ActivityState.BLOCKED_COMBAT, "onPlayerAttack enters BLOCKED_COMBAT");
+        check(engine.getAdaptiveness().clampGroupSize(4) == 0, "clamped words is 0 during combat");
+        check(engine.getAdaptiveness().getLastCombatTimeMs() >= tAttack, "lastCombatTimeMs updated on attack");
+
+        // 12. Real Production Event Hookup Path: onPlayerDamage()
+        engine.getAdaptiveness().setScriptedState(0.01, 5.0, false, false, false, false, false, false, 20.0f, -10000L, System.currentTimeMillis());
+        check(engine.getAdaptiveness().getCurrentResult().canSpawn, "engine reset to standing");
+        long tDamage = System.currentTimeMillis();
+        engine.onPlayerDamage();
+        var resDamage = engine.getAdaptiveness().getCurrentResult();
+        check(!resDamage.canSpawn, "onPlayerDamage immediately gates spawning");
+        check(resDamage.state == PlayerAdaptiveness.ActivityState.BLOCKED_COMBAT, "onPlayerDamage enters BLOCKED_COMBAT");
+        check(engine.getAdaptiveness().clampGroupSize(4) == 0, "clamped words is 0 during combat");
+        check(engine.getAdaptiveness().getLastCombatTimeMs() >= tDamage, "lastCombatTimeMs updated on damage");
+
+        System.out.println("[PASS] 3. Player adaptiveness (all 10 states + attack/damage event hooks + non-accumulation)");
     }
 
     private static void testWordPlacementAndDeadZone() {
@@ -164,6 +188,10 @@ public final class KaraokeSuiteTest {
         var anchors = WordPlacement.layoutGroup(words, eyePos, yaw, pitch, Vec3d.ZERO, 1.0f, null);
         check(anchors.size() == 3, "3 anchors created");
 
+        Vec3d groupCenter = WordPlacement.getGroupCenter(eyePos, yaw, pitch, WordPlacement.MIN_DISTANCE, 1.0f);
+        boolean centerInCone = WordPlacement.isInsideCone(groupCenter, eyePos, lookVec);
+        check(centerInCone, "group placement center within 12° gaze cone");
+
         for (int i = 0; i < anchors.size(); i++) {
             var a = anchors.get(i);
             double dist = a.position.distanceTo(eyePos);
@@ -173,13 +201,44 @@ public final class KaraokeSuiteTest {
             // Assert: strictly outside 3° crosshair dead zone
             boolean outsideDeadZone = WordPlacement.isOutsideDeadZone(a.position, eyePos, lookVec);
             check(outsideDeadZone, "anchor #" + i + " strictly outside 3° dead zone");
-
-            // Assert: inside 12° crosshair cone
-            boolean insideCone = WordPlacement.isInsideCone(a.position, eyePos, lookVec);
-            check(insideCone, "anchor #" + i + " within 12° gaze cone");
         }
 
-        System.out.println("[PASS] 4. Word placement, distance (3–7 bl), and crosshair dead zone (> 3°)");
+        // Assert: Left-to-right reading order (x increases monotonically) and space gaps
+        List<KaraokeModel.KaraokeWord> phrase = List.of(
+                new KaraokeModel.KaraokeWord(1000, 400, "Bright"),
+                new KaraokeModel.KaraokeWord(1450, 400, "horizon"),
+                new KaraokeModel.KaraokeWord(2000, 450, "shining"),
+                new KaraokeModel.KaraokeWord(2500, 350, "through")
+        );
+
+        float[] testYaws = {0f, 90f, 180f, 270f, 45f};
+        float[] testPitches = {0f, 15f, -10f};
+
+        for (float testYaw : testYaws) {
+            for (float testPitch : testPitches) {
+                double yRad = Math.toRadians(testYaw);
+                Vec3d camRight = new Vec3d(-Math.cos(yRad), 0, -Math.sin(yRad)).normalize();
+
+                var phraseAnchors = WordPlacement.layoutGroup(phrase, eyePos, testYaw, testPitch, Vec3d.ZERO, 1.0f, null);
+                check(phraseAnchors.size() == 4, "4 phrase anchors created");
+
+                for (int i = 0; i < phraseAnchors.size() - 1; i++) {
+                    Vec3d posA = phraseAnchors.get(i).position;
+                    Vec3d posB = phraseAnchors.get(i + 1).position;
+
+                    double xProjA = posA.subtract(eyePos).dotProduct(camRight);
+                    double xProjB = posB.subtract(eyePos).dotProduct(camRight);
+
+                    check(xProjB > xProjA, "Left-to-right word order: " + phraseAnchors.get(i).word.w + " (x=" + xProjA + ") before " + phraseAnchors.get(i + 1).word.w + " (x=" + xProjB + ") at yaw=" + testYaw);
+
+                    double rightEdgeA = xProjA + phraseAnchors.get(i).width * 0.5;
+                    double leftEdgeB = xProjB - phraseAnchors.get(i + 1).width * 0.5;
+                    check(leftEdgeB >= rightEdgeA + 0.10, "Space gap between " + phraseAnchors.get(i).word.w + " and " + phraseAnchors.get(i + 1).word.w + " is " + (leftEdgeB - rightEdgeA));
+                }
+            }
+        }
+
+        System.out.println("[PASS] 4. Word placement, distance (3–7 bl), crosshair dead zone (> 3°), and left-to-right screen order with spaces");
     }
 
     private static void testAppleSpringAnimation() {

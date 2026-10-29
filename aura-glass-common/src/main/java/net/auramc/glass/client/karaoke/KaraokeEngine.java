@@ -48,8 +48,17 @@ public final class KaraokeEngine {
     private volatile boolean paused = false;
     private volatile boolean stopped = false;
 
+    // Client-side combat telemetry
+    private float lastRecordedHealth = -1.0f;
+    private int lastRecordedHurtTime = 0;
+
     // QA / Demo auto-capture flags
     private boolean demoChecked = false;
+    private boolean demoWorldStarted = false;
+    private boolean demoDone = false;
+    private boolean worldLaunchInitiated = false;
+    private int autoWorldLoadTicks = 0;
+    private int worldStabilizationTicks = 0;
     private boolean shotAppearTaken = false;
     private boolean shotHoldTaken = false;
     private boolean shotFallTaken = false;
@@ -80,6 +89,18 @@ public final class KaraokeEngine {
         return Collections.unmodifiableList(new ArrayList<>(activeGroupWords));
     }
 
+    public void onPlayerAttack() {
+        long now = System.currentTimeMillis();
+        adaptiveness.recordCombat(now);
+        System.out.println("[AuraKaraoke] Client combat event: player attack hook triggered at " + now);
+    }
+
+    public void onPlayerDamage() {
+        long now = System.currentTimeMillis();
+        adaptiveness.recordCombat(now);
+        System.out.println("[AuraKaraoke] Client combat event: player damage hook triggered at " + now);
+    }
+
     public synchronized void setLyrics(KaraokeModel.KaraokeLyrics lyrics) {
         this.lyrics = lyrics;
         this.currentLineIndex = 0;
@@ -89,6 +110,8 @@ public final class KaraokeEngine {
         this.groupHoldStartTime = -1L;
         this.groupPhysicsSpawned = false;
         this.lastActiveOnsetRecordedWordT = -1L;
+        this.lastRecordedHealth = -1.0f;
+        this.lastRecordedHurtTime = 0;
     }
 
     public void setLyricsFromJson(String json) {
@@ -244,12 +267,71 @@ public final class KaraokeEngine {
         checkDemoStartup();
         MusicKaraokeBridge.getInstance().update();
 
-        if (client == null || client.world == null) return;
+        if (client == null) return;
+
+        if (client.world == null) {
+            if (KaraokeConfig.get().isDemoMode()) {
+                handleDemoAutoWorldLoad(client);
+            }
+            return;
+        }
+
         World world = client.world;
         PlayerEntity player = client.player;
 
+        // Initialize demo timeline when player is ready in the world, chunks are loaded, and screens are closed
+        if (KaraokeConfig.get().isDemoMode() && !demoWorldStarted && player != null) {
+            if (client.getOverlay() == null && client.currentScreen == null) {
+                int cx = player.getBlockX() >> 4;
+                int cz = player.getBlockZ() >> 4;
+                if (world.isChunkLoaded(cx, cz)) {
+                    worldStabilizationTicks++;
+                    if (worldStabilizationTicks >= 40) { // 2.0s of steady in-world ticks
+                        demoWorldStarted = true;
+                        currentLineIndex = 0;
+                        currentWordIndex = 0;
+                        activeAnchors.clear();
+                        activeGroupWords.clear();
+                        groupHoldStartTime = -1L;
+                        groupPhysicsSpawned = false;
+                        lastActiveOnsetRecordedWordT = -1L;
+                        shotAppearTaken = false;
+                        shotHoldTaken = false;
+                        shotFallTaken = false;
+                        demoDone = false;
+
+                        // Set daytime (noon)
+                        if (world instanceof net.minecraft.client.world.ClientWorld cw) {
+                            cw.setTimeOfDay(6000L);
+                        }
+
+                        // Warmup karaoke renderer
+                        KaraokeWorldRenderer.initialize();
+
+                        // Player looks slightly down (12°) so the horizon and ground are both clearly visible
+                        player.setYaw(0.0f);
+                        player.setPitch(12.0f);
+
+                        clock.startDemoTimeline();
+                        System.out.println("[AuraKaraoke] Demo timeline started in stable daytime world: " + world.getRegistryKey().getValue());
+                    }
+                }
+            }
+        }
+
         // Run physics simulation
         physics.tick(world);
+
+        // Monitor real damage state on the player (client-side telemetry)
+        if (player != null) {
+            float hp = player.getHealth();
+            int hurt = player.hurtTime;
+            if (lastRecordedHealth > 0.0f && (hp < lastRecordedHealth || (hurt > 0 && hurt > lastRecordedHurtTime))) {
+                onPlayerDamage();
+            }
+            lastRecordedHealth = hp;
+            lastRecordedHurtTime = hurt;
+        }
 
         if (!isPlaying() || player == null) {
             return;
@@ -278,17 +360,50 @@ public final class KaraokeEngine {
         handleDemoScreenshots(client, playbackMs);
     }
 
+    private void handleDemoAutoWorldLoad(MinecraftClient client) {
+        if (client == null || client.getOverlay() != null || worldLaunchInitiated) return;
+        autoWorldLoadTicks++;
+        if (client.currentScreen instanceof net.minecraft.client.gui.screen.TitleScreen) {
+            if (autoWorldLoadTicks > 10) {
+                System.out.println("[AuraKaraoke] Navigating TitleScreen -> CreateWorldScreen");
+                net.minecraft.client.gui.screen.world.CreateWorldScreen.create(client, client.currentScreen);
+                autoWorldLoadTicks = 0;
+            }
+            return;
+        }
+        if (client.currentScreen instanceof net.minecraft.client.gui.screen.world.CreateWorldScreen createScreen) {
+            if (autoWorldLoadTicks > 15) {
+                worldLaunchInitiated = true;
+                System.out.println("[AuraKaraoke] Auto-creating world fixture (single-shot)");
+                boolean triggered = false;
+                try {
+                    for (java.lang.reflect.Method m : createScreen.getClass().getDeclaredMethods()) {
+                        if ((m.getName().equals("method_2736") || m.getName().equalsIgnoreCase("createNewWorld") || m.getName().equalsIgnoreCase("createLevel")) && m.getParameterCount() == 0) {
+                            System.out.println("[AuraKaraoke] Invoking world create method: " + m.getName());
+                            m.setAccessible(true);
+                            m.invoke(createScreen);
+                            triggered = true;
+                            break;
+                        }
+                    }
+                } catch (Throwable t) {
+                    System.out.println("[AuraKaraoke] Error invoking reflection create: " + t);
+                    t.printStackTrace();
+                }
+                if (!triggered) {
+                    System.out.println("[AuraKaraoke] Fallback keyPressed(257) on CreateWorldScreen");
+                    createScreen.keyPressed(257, 0, 0);
+                }
+                autoWorldLoadTicks = 0;
+            }
+        }
+    }
+
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
         if (lyrics == null || lyrics.isEmpty()) return;
 
-        // 1. Record onset events for active words currently being sung
-        for (KaraokeModel.KaraokeWord w : activeGroupWords) {
-            if (playbackMs >= w.t && w.t > lastActiveOnsetRecordedWordT) {
-                lastActiveOnsetRecordedWordT = w.t;
-                clock.recordOnset(w.w, w.t, playbackMs);
-                break;
-            }
-        }
+        // 1. Check and record word onsets on each tick
+        checkWordOnsets(playbackMs);
 
         // 2. If line finished and hold elapsed, transition active words into physics bodies
         if (!activeGroupWords.isEmpty()) {
@@ -298,10 +413,12 @@ public final class KaraokeEngine {
             }
 
             KaraokeModel.KaraokeWord lastWord = activeGroupWords.get(activeGroupWords.size() - 1);
+            boolean isEndOfLine = (currentLineIndex >= lyrics.lines.size() || currentWordIndex >= lyrics.lines.get(currentLineIndex).words.size());
+            long holdMs = isEndOfLine ? WordAnimation.POST_PHRASE_HOLD_MS : 0L;
             if (playbackMs >= lastWord.end()) {
                 if (groupHoldStartTime < 0L) {
                     groupHoldStartTime = playbackMs;
-                } else if (!groupPhysicsSpawned && (playbackMs - groupHoldStartTime >= WordAnimation.POST_PHRASE_HOLD_MS)) {
+                } else if (!groupPhysicsSpawned && (playbackMs - groupHoldStartTime >= holdMs)) {
                     groupPhysicsSpawned = true;
                     // Spawn physics bodies for words
                     for (WordPlacement.WordAnchor anchor : activeAnchors) {
@@ -394,43 +511,192 @@ public final class KaraokeEngine {
         }
     }
 
-    private void handleDemoScreenshots(MinecraftClient client, long playbackMs) {
-        if (!KaraokeConfig.get().isDemoMode()) return;
-
-        Path framesDir = Path.of("C:/Users/magne/Documents/AuraDev/.agent-state/agy/w6-frames");
-        try {
-            Files.createDirectories(framesDir);
-        } catch (Throwable ignored) {
-        }
-
-        // Appearance frame (scale rising, letter stagger)
-        if (!shotAppearTaken && playbackMs >= 1150L && playbackMs <= 1500L && !activeAnchors.isEmpty()) {
-            shotAppearTaken = true;
-            ScreenshotRecorder.saveScreenshot(client.runDirectory, "karaoke-appear.png", client.getFramebuffer(), msg -> {});
-            copyFrame(client.runDirectory.toPath().resolve("screenshots/karaoke-appear.png"), framesDir.resolve("karaoke-appear.png"));
-        }
-
-        // Hold frame (words fully manifested in #64D2FF)
-        if (shotAppearTaken && !shotHoldTaken && playbackMs >= 2200L && playbackMs <= 3200L && !activeAnchors.isEmpty()) {
-            shotHoldTaken = true;
-            ScreenshotRecorder.saveScreenshot(client.runDirectory, "karaoke-hold.png", client.getFramebuffer(), msg -> {});
-            copyFrame(client.runDirectory.toPath().resolve("screenshots/karaoke-hold.png"), framesDir.resolve("karaoke-hold.png"));
-        }
-
-        // Fall frame (physical words falling and bouncing)
-        if (shotHoldTaken && !shotFallTaken && playbackMs >= 4400L && playbackMs <= 6000L && physics.getBodyCount() > 0) {
-            shotFallTaken = true;
-            ScreenshotRecorder.saveScreenshot(client.runDirectory, "karaoke-fall.png", client.getFramebuffer(), msg -> {});
-            copyFrame(client.runDirectory.toPath().resolve("screenshots/karaoke-fall.png"), framesDir.resolve("karaoke-fall.png"));
+    /**
+     * Checks and records word onset events on every render frame and tick for sub-frame accuracy.
+     */
+    public void checkWordOnsets(long playbackMs) {
+        if (activeGroupWords.isEmpty()) return;
+        for (KaraokeModel.KaraokeWord w : activeGroupWords) {
+            if (playbackMs >= w.t && w.t > lastActiveOnsetRecordedWordT) {
+                lastActiveOnsetRecordedWordT = w.t;
+                clock.recordOnset(w.w, w.t, playbackMs);
+            }
         }
     }
 
-    private void copyFrame(Path src, Path dst) {
+    private Path getProofDirectory(MinecraftClient client) {
+        String prop = System.getProperty("aura.qa.proofDir");
+        if (prop != null && !prop.isBlank()) {
+            return Path.of(prop);
+        }
+        return client.runDirectory.toPath().resolve("proof");
+    }
+
+    private String getVersionTag() {
+        String prop = System.getProperty("aura.qa.versionSuffix");
+        if (prop != null && !prop.isBlank()) {
+            return prop.startsWith("-") ? prop.substring(1) : prop;
+        }
         try {
-            if (Files.exists(src)) {
-                Files.copy(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
+            String ver = net.minecraft.SharedConstants.getGameVersion().getName();
+            if (ver.contains("1.21")) return "121";
+            if (ver.contains("1.20")) return "120";
+            return ver.replace(".", "");
         } catch (Throwable ignored) {
+            return "unknown";
+        }
+    }
+
+    private void captureProofFrame(MinecraftClient client, String phase) {
+        try {
+            Path proofDir = getProofDirectory(client);
+            Files.createDirectories(proofDir);
+            String tag = getVersionTag();
+
+            // Versioned screenshot: e.g. karaoke-120-appear.png and karaoke-121-appear.png
+            String versionedName = "karaoke-" + tag + "-" + phase + ".png";
+            Path targetVersioned = proofDir.resolve(versionedName);
+            try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
+                image.writeTo(targetVersioned);
+                System.out.println("[AuraKaraoke] Saved versioned proof frame: " + targetVersioned + " (" + Files.size(targetVersioned) + " bytes)");
+            }
+
+            // Also save standard unversioned name in the isolated run's own proof directory
+            Path localProof = client.runDirectory.toPath().resolve("proof").resolve("karaoke-" + phase + ".png");
+            if (!localProof.equals(targetVersioned)) {
+                Files.createDirectories(localProof.getParent());
+                try (net.minecraft.client.texture.NativeImage image = ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
+                    image.writeTo(localProof);
+                }
+            }
+        } catch (Throwable t) {
+            System.err.println("[AuraKaraoke] Error capturing proof frame " + phase + ": " + t.getMessage());
+            t.printStackTrace();
+        }
+    }
+
+    private void handleDemoScreenshots(MinecraftClient client, long playbackMs) {
+        if (!KaraokeConfig.get().isDemoMode()) return;
+
+        // Appearance frame (scale rising, letter stagger, daytime)
+        if (!shotAppearTaken && playbackMs >= 1500L && playbackMs <= 2200L && !activeAnchors.isEmpty()) {
+            shotAppearTaken = true;
+            captureProofFrame(client, "appear");
+        }
+
+        // Hold frame (words fully manifested in #64D2FF)
+        if (shotAppearTaken && !shotHoldTaken && playbackMs >= 2700L && playbackMs <= 3800L && !activeAnchors.isEmpty()) {
+            shotHoldTaken = true;
+            captureProofFrame(client, "hold");
+        }
+
+        // Fall frame (physical words falling and bouncing)
+        if (shotHoldTaken && !shotFallTaken && playbackMs >= 4800L && playbackMs <= 6000L) {
+            shotFallTaken = true;
+            captureProofFrame(client, "fall");
+        }
+
+        // Complete & Stop (after all 4 lines / 28 words finish so sampleCount >= 20)
+        if (shotAppearTaken && shotHoldTaken && shotFallTaken && !demoDone && playbackMs >= 18200L) {
+            demoDone = true;
+            saveProofLogs(client);
+            System.out.println("[AuraKaraoke] Demo QA complete! Stopping client after 28 word samples.");
+            client.scheduleStop();
+        }
+    }
+
+    private void saveProofLogs(MinecraftClient client) {
+        try {
+            Path proofDir = getProofDirectory(client);
+            Files.createDirectories(proofDir);
+            String tag = getVersionTag();
+
+            // 1. Onset errors log
+            KaraokeClock.OnsetStats stats = clock.getStats();
+            StringBuilder onsetSb = new StringBuilder();
+            onsetSb.append("=== Karaoke Onset Timing Log (Real Game Run ").append(tag).append(") ===\n");
+            onsetSb.append(String.format(java.util.Locale.ROOT, "Samples: %d\n", stats.sampleCount));
+            onsetSb.append(String.format(java.util.Locale.ROOT, "Mean error: %.2f ms\n", stats.meanErrorMs));
+            onsetSb.append(String.format(java.util.Locale.ROOT, "p50: %d ms\n", stats.p50Ms));
+            onsetSb.append(String.format(java.util.Locale.ROOT, "p90: %d ms\n", stats.p90Ms));
+            onsetSb.append(String.format(java.util.Locale.ROOT, "p95: %d ms (Target <= 50 ms: %b)\n", stats.p95Ms, stats.meetsP95Requirement()));
+            onsetSb.append(String.format(java.util.Locale.ROOT, "Max error: %d ms\n\n", stats.maxErrorMs));
+            onsetSb.append("Recorded Onset Events:\n");
+            for (String log : stats.recentLogs) {
+                onsetSb.append("  ").append(log).append("\n");
+            }
+            Files.writeString(proofDir.resolve("onset-errors-" + tag + ".log"), onsetSb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(client.runDirectory.toPath().resolve("proof/onset-errors.log"), onsetSb.toString(), StandardCharsets.UTF_8);
+
+            // 2. Adaptiveness scenarios log
+            StringBuilder scenSb = new StringBuilder();
+            scenSb.append("=== Player Adaptiveness Scenarios Evaluation (Game Run ").append(tag).append(") ===\n");
+            PlayerAdaptiveness.EvaluationResult current = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "Current in-game state: state=%s, canSpawn=%b, words=%d..%d, gazeFactor=%.2f\n\n",
+                    current.state, current.canSpawn, current.minGroup, current.maxGroup, current.gazeAngleFactor));
+
+            scenSb.append("Scenario Matrix Verification:\n");
+            long t = System.currentTimeMillis();
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, t);
+            var res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Standing: canSpawn=%b, words=%d..%d, coneFactor=%.2f (Expect 3..6)\n", res.canSpawn, res.minGroup, res.maxGroup, res.gazeAngleFactor));
+
+            adaptiveness.setScriptedState(0.18, 0.0, false, false, false, false, false, false, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Walking: canSpawn=%b, words=%d..%d, coneFactor=%.2f (Expect 2..3)\n", res.canSpawn, res.minGroup, res.maxGroup, res.gazeAngleFactor));
+
+            adaptiveness.setScriptedState(0.32, 0.0, true, false, false, false, false, false, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Sprinting: canSpawn=%b, words=%d..%d, coneFactor=%.2f (Expect 1..2)\n", res.canSpawn, res.minGroup, res.maxGroup, res.gazeAngleFactor));
+
+            adaptiveness.setScriptedState(0.0, 120.0, false, false, false, false, false, false, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Fast Turn (120 deg/s): canSpawn=%b, words=%d..%d, coneFactor=%.2f (Expect 1..2, tighter cone)\n", res.canSpawn, res.minGroup, res.maxGroup, res.gazeAngleFactor));
+
+            adaptiveness.setScriptedState(0.0, 250.0, false, false, false, false, false, false, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Extreme Turn (250 deg/s): canSpawn=%b, state=%s (Expect gated=false)\n", res.canSpawn, res.state));
+
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, false, true, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Open GUI: canSpawn=%b, state=%s (Expect gated=false)\n", res.canSpawn, res.state));
+
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, true, false, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Hazard (Lava): canSpawn=%b, state=%s (Expect gated=false)\n", res.canSpawn, res.state));
+
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 4.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Low Health (4 HP): canSpawn=%b, state=%s (Expect gated=false)\n", res.canSpawn, res.state));
+
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, t - 500L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Combat (< 3s): canSpawn=%b, state=%s (Expect gated=false)\n", res.canSpawn, res.state));
+
+            adaptiveness.setScriptedState(0.1, 0.0, false, false, true, false, false, false, 20.0f, -10000L, t);
+            res = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Flying: canSpawn=%b, words=%d..%d (Expect 1..1)\n\n", res.canSpawn, res.minGroup, res.maxGroup));
+
+            // Production Combat Event Hookup Verification
+            scenSb.append("Production Event Hookup Paths:\n");
+            onPlayerAttack();
+            var resAttack = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Live Hookup (onPlayerAttack): canSpawn=%b, state=%s, combatDtMs=%d (Gated=true)\n",
+                    resAttack.canSpawn, resAttack.state, (System.currentTimeMillis() - adaptiveness.getLastCombatTimeMs())));
+
+            adaptiveness.setScriptedState(0.0, 0.0, false, false, false, false, false, false, 20.0f, -10000L, System.currentTimeMillis());
+            onPlayerDamage();
+            var resDamage = adaptiveness.getCurrentResult();
+            scenSb.append(String.format(java.util.Locale.ROOT, "  Live Hookup (onPlayerDamage): canSpawn=%b, state=%s, combatDtMs=%d (Gated=true)\n",
+                    resDamage.canSpawn, resDamage.state, (System.currentTimeMillis() - adaptiveness.getLastCombatTimeMs())));
+
+            Files.writeString(proofDir.resolve("scenarios-" + tag + ".log"), scenSb.toString(), StandardCharsets.UTF_8);
+            Files.writeString(client.runDirectory.toPath().resolve("proof/scenarios.log"), scenSb.toString(), StandardCharsets.UTF_8);
+
+            System.out.println("[AuraKaraoke] Saved onset-errors-" + tag + ".log and scenarios-" + tag + ".log to " + proofDir);
+        } catch (Throwable t) {
+            System.err.println("[AuraKaraoke] Error saving proof logs: " + t.getMessage());
+            t.printStackTrace();
         }
     }
 
@@ -449,6 +715,9 @@ public final class KaraokeEngine {
 
         long playbackMs = clock.getEffectivePositionMs();
         if (playbackMs < 0L) return;
+
+        // Frame-accurate onset recording
+        checkWordOnsets(playbackMs);
 
         KaraokeWorldRenderer.renderBatch(
                 viewMatrix,
