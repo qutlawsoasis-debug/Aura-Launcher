@@ -3,6 +3,7 @@ package net.auramc.glass.client.mixin;
 import net.auramc.glass.client.ui.GlassFrameHooks;
 import net.auramc.glass.common.render.GlassRenderer;
 import net.auramc.glass.common.style.*;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.EntryListWidget;
 import org.spongepowered.asm.mixin.*;
@@ -56,18 +57,24 @@ public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui
             if (raw.getSelectedOrNull() == null && !raw.children().isEmpty()) {
                 raw.setSelected((net.minecraft.client.gui.widget.EntryListWidget.Entry) raw.children().get(0));
             }
-            float listX = self.getRowLeft() - 8;
+            int screenW = MinecraftClient.getInstance().getWindow().getScaledWidth();
             float listW = self.getRowWidth() + 16;
+            float listX = (screenW - listW) / 2.0f;
             float listY = t;
             float listH = b - t;
             var listBacking = GlassStyles.frame(GlassPreset.PANEL);
-            listBacking.asFill();
+            listBacking.asSurface();
             listBacking.radius = 12;
-            listBacking.tintR = 118f / 255f;
-            listBacking.tintG = 118f / 255f;
-            listBacking.tintB = 128f / 255f;
-            listBacking.tintA = 0.50f;
-            GlassRenderer.draw(listX, listY, listW, listH, listBacking, 1.0f);
+            listBacking.bevel = 2;
+            listBacking.refraction = 0.20f;
+            listBacking.dispersion = 0.005f;
+            listBacking.frost = 2.5f;
+            listBacking.rimOuter = 0.22f;
+            listBacking.tintR = 28f / 255f;
+            listBacking.tintG = 28f / 255f;
+            listBacking.tintB = 30f / 255f;
+            listBacking.tintA = 0.30f;
+            GlassRenderer.drawSurface(this, listX, listY, listW, listH, listBacking, 1.0f);
         }
 
         if(renderHeader)GlassRenderer.foreground(aura_header);
@@ -83,7 +90,9 @@ public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui
             scrollStyle.radius = 1.5f;
             scrollStyle.rimOuter = 0;
             scrollStyle.refraction = 0;
-            GlassRenderer.draw(getScrollbarX()+1.5f,y,3.0f,h,scrollStyle,1.0f);
+            int screenW = MinecraftClient.getInstance().getWindow().getScaledWidth();
+            float scrollX = (screenW + self.getRowWidth()) / 2.0f + 2.0f;
+            GlassRenderer.draw(scrollX, y, 3.0f, h, scrollStyle, 1.0f);
         }
         GlassRenderer.foreground(aura_decorations);ci.cancel();
     }
@@ -94,7 +103,12 @@ public abstract class EntryListWidgetMixin implements net.auramc.glass.client.ui
         int l=aura_left,t=aura_top,r=aura_right,b=aura_bottom;
         if(!((Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget) && isSelectedEntry(index)){
             int yy=Math.max(t,y),hh=Math.min(b,y+h)-yy;
-            if(hh>0)GlassRenderer.draw(x,yy,w,hh,net.auramc.glass.client.ui.GlassListBounds.rowStyle(true),1.0f);
+            if(hh>0){
+                int screenW = MinecraftClient.getInstance().getWindow().getScaledWidth();
+                float rowW = w;
+                float rowX = (screenW - rowW) / 2.0f;
+                GlassRenderer.draw(rowX, yy, rowW, hh, net.auramc.glass.client.ui.GlassListBounds.rowStyle(true), 1.0f);
+            }
         }
         net.auramc.glass.client.ui.GlassEntryPaint.draw(c,entry,index,x,y,w,h,mx,my,hovered,delta,l,t,r,b,isSelectedEntry(index),
                 (Object)this instanceof net.minecraft.client.gui.widget.OptionListWidget);

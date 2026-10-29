@@ -33,6 +33,7 @@ public final class BlurService {
     private final int[] scratchTextures = new int[5], scratchFbos = new int[5];
     private final int[] widths = new int[5];
     private final int[] heights = new int[5];
+    private final java.nio.ByteBuffer ambientPixel = java.nio.ByteBuffer.allocateDirect(4);
     private int program, vao, width, height, sourceLocation, texelLocation, kernelLocation;
     private boolean captured, attempted, failedForScreen, activeLogged, inactiveLogged;
     private static final int LEVELS = 3;
@@ -200,6 +201,24 @@ public final class BlurService {
         }
     }
     private void check(String operation) { int error = gl.getError(); if (error != GL_NO_ERROR) throw new IllegalStateException(operation + " GL error 0x" + Integer.toHexString(error) + " (" + error + ")"); }
+
+    public float sampleAmbient(float u, float v) {
+        if (!captured || program == 0 || fbos[LEVELS] == 0 || widths[LEVELS] <= 0 || heights[LEVELS] <= 0) return 0.2f;
+        int px = Math.max(0, Math.min(widths[LEVELS] - 1, (int)(u * widths[LEVELS])));
+        int py = Math.max(0, Math.min(heights[LEVELS] - 1, (int)((1.0f - v) * heights[LEVELS])));
+        int prevFbo = gl.getInteger(GL_READ_FRAMEBUFFER_BINDING);
+        gl.bindFramebuffer(GL_READ_FRAMEBUFFER, fbos[LEVELS]);
+        ambientPixel.clear();
+        gl.readPixels(px, py, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, ambientPixel);
+        if (prevFbo != fbos[LEVELS]) {
+            gl.bindFramebuffer(GL_READ_FRAMEBUFFER, prevFbo);
+        }
+        int r = ambientPixel.get(0) & 0xFF;
+        int g = ambientPixel.get(1) & 0xFF;
+        int b = ambientPixel.get(2) & 0xFF;
+        return (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255.0f;
+    }
+
     public int fbo(int level) { return fbos[Math.max(0, Math.min(LEVELS, level))]; }
     public int fboWidth(int level) { return widths[Math.max(0, Math.min(LEVELS, level))]; }
     public int fboHeight(int level) { return heights[Math.max(0, Math.min(LEVELS, level))]; }
@@ -282,6 +301,7 @@ public final class BlurService {
         void bindBuffer(int target, int buffer);
         int getInteger(int pname);
         int getError();
+        void readPixels(int x, int y, int width, int height, int format, int type, java.nio.ByteBuffer pixels);
         default void clearSampler(int unit) { GuiRenderState.clearSampler(unit); }
         default void restoreRenderState(int fbo, int width, int height) { GuiRenderState.restore(fbo, width, height); }
     }
@@ -331,5 +351,6 @@ public final class BlurService {
         @Override public void bindBuffer(int target, int buffer) { glBindBuffer(target, buffer); }
         @Override public int getInteger(int pname) { return glGetInteger(pname); }
         @Override public int getError() { return glGetError(); }
+        @Override public void readPixels(int x, int y, int width, int height, int format, int type, java.nio.ByteBuffer pixels) { glReadPixels(x, y, width, height, format, type, pixels); }
     }
 }

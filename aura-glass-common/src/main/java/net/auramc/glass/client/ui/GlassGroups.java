@@ -4,6 +4,7 @@ import net.auramc.glass.common.render.GlassRenderer;
 import net.auramc.glass.common.style.GlassPreset;
 import net.auramc.glass.common.style.GlassStyles;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.ParentElement;
 import net.minecraft.client.gui.DrawContext;
@@ -117,11 +118,18 @@ public final class GlassGroups {
     }
 
     private static void layoutPreparedWidgets(boolean hasTitle, boolean hasTabs, boolean isAlert) {
-        for (int i = 0; i < widgetCount; i++) {
-            for (int j = 0; j < i; j++) {
-                if (near(i, j)) PARENT[find(i)] = find(j);
+        if (isAlert) {
+            for (int i = 1; i < widgetCount; i++) {
+                PARENT[find(i)] = find(0);
+            }
+        } else {
+            for (int i = 0; i < widgetCount; i++) {
+                for (int j = 0; j < i; j++) {
+                    if (near(i, j)) PARENT[find(i)] = find(j);
+                }
             }
         }
+
         for (int i = 0; i < widgetCount; i++) {
             int rootIndex = find(i);
             Group group = null;
@@ -276,6 +284,27 @@ public final class GlassGroups {
             clipBottom = Math.min(clipBottom, list.aura_glassBottom());
         }
         if (depth > 32 || widgetCount == MAX_WIDGETS) return;
+        if (depth == 0 && root instanceof GameMenuScreen) {
+            ClickableWidget openToLan = null;
+            ClickableWidget configBtn = null;
+            for (var child : root.children()) {
+                if (child instanceof ClickableWidget w) {
+                    String cn = w.getClass().getName();
+                    if (cn.contains("ConfigButton") || cn.contains("supplementaries")) {
+                        configBtn = w;
+                    } else if (w.getMessage() != null) {
+                        String txt = w.getMessage().getString().toLowerCase();
+                        if (txt.contains("open to lan") || txt.contains("открыть для сети") || txt.contains("share to lan")) {
+                            openToLan = w;
+                        }
+                    }
+                }
+            }
+            if (openToLan != null && configBtn != null && configBtn.getX() > openToLan.getX()) {
+                openToLan.setWidth(74);
+                configBtn.setX(openToLan.getX() + 74 + 4);
+            }
+        }
         var children = root.children();
 
         // Requirement 6: Notice / Confirm / Experimental screens: text + buttons in ONE group
@@ -476,12 +505,40 @@ public final class GlassGroups {
         }
         if (screen != client.currentScreen) return;
         if (width != client.getWindow().getScaledWidth() || height != client.getWindow().getScaledHeight()) return;
+        long now = System.nanoTime();
         for (int i = 0; i < groupCount; i++) {
             Group group = GROUPS[i];
             int w = group.right - group.left;
             int h = group.bottom - group.top;
             if (w <= 0 || h <= 0) continue;
             boolean large = w * (long) h >= 12000;
+
+            float cx = (group.left + group.right) * 0.5f / width;
+            float cy = (group.top + group.bottom) * 0.5f / height;
+            float ambient = net.auramc.glass.common.render.BlurService.get().sampleAmbient(cx, cy);
+            group.ambient = ambient;
+
+            if (ambient > 0.60f) {
+                group.isLight = true;
+            } else if (ambient < 0.50f) {
+                group.isLight = false;
+            }
+
+            if (group.lastTimeNanos == 0) {
+                group.lastTimeNanos = now;
+                group.lightProgress = group.isLight ? 1.0f : 0.0f;
+            } else {
+                float dt = Math.min(0.040f, (now - group.lastTimeNanos) / 1_000_000_000.0f);
+                group.lastTimeNanos = now;
+                float target = group.isLight ? 1.0f : 0.0f;
+                float step = dt / 0.200f;
+                if (group.lightProgress < target) {
+                    group.lightProgress = Math.min(target, group.lightProgress + step);
+                } else if (group.lightProgress > target) {
+                    group.lightProgress = Math.max(target, group.lightProgress - step);
+                }
+            }
+
             var style = GlassStyles.frame(GlassPreset.PANEL);
             style.asSurface();
             style.radius = group.isTabGroup ? 12 : 14;
@@ -494,7 +551,15 @@ public final class GlassGroups {
             style.light = 0;
             style.rimOuter = .22f;
             style.rimInner = 0;
-            style.frost = 1.5f;
+            style.frost = 2.5f;
+            style.saturation = 1.9f;
+
+            float t = group.lightProgress;
+            style.tintR = (28f + (255f - 28f) * t) / 255.0f;
+            style.tintG = (28f + (255f - 28f) * t) / 255.0f;
+            style.tintB = (30f + (255f - 30f) * t) / 255.0f;
+            style.tintA = 0.30f;
+
             if (group.isTabGroup) {
                 GlassRenderer.drawSurface(group, group.left, 6, w, 24, style, 1);
             } else {
@@ -503,13 +568,56 @@ public final class GlassGroups {
         }
     }
 
+    public static int textColorForGroup(Group group) {
+        if (group == null) return 0xEBFFFFFF;
+        float t = group.lightProgress;
+        if (t < 0.50f) {
+            float k = t <= 0.30f ? 0.0f : (t - 0.30f) / 0.20f;
+            int alpha = Math.round(235 - 18 * k);
+            return (alpha << 24) | 0x00FFFFFF;
+        } else {
+            float k = t >= 0.70f ? 1.0f : (t - 0.50f) / 0.20f;
+            int alpha = Math.round(200 + 17 * k);
+            return (alpha << 24);
+        }
+    }
+
+    public static Group groupAt(float x, float y) {
+        if (!GlassStyles.regular() || screen == null) return null;
+        for (int i = 0; i < groupCount; i++) {
+            Group g = GROUPS[i];
+            if (x >= g.left && x <= g.right && y >= g.top && y <= g.bottom) return g;
+        }
+        return null;
+    }
+
+    public static boolean insideAnyGroup(float x, float y) {
+        return groupAt(x, y) != null;
+    }
+
+    public static Group groupForWidget(ClickableWidget widget) {
+        if (!GlassStyles.regular() || screen == null || widget == null) return null;
+        for (int i = 0; i < widgetCount; i++) {
+            if (WIDGETS[i] == widget) {
+                int root = find(i);
+                for (int j = 0; j < groupCount; j++) {
+                    if (GROUPS[j].root == root) return GROUPS[j];
+                }
+            }
+        }
+        return groupAt(widget.getX(), widget.getY());
+    }
+
     public static int count() { return groupCount; }
     public static int left(int index) { return GROUPS[index].left; }
     public static int right(int index) { return GROUPS[index].right; }
     public static int top(int index) { return GROUPS[index].top; }
     public static int bottom(int index) { return GROUPS[index].bottom; }
-    public static float lightProgress(int index) { return 0.0f; }
+    public static Group get(int index) { return index >= 0 && index < groupCount ? GROUPS[index] : null; }
+    public static float ambient(int index) { return index >= 0 && index < groupCount ? GROUPS[index].ambient : 0.2f; }
+    public static float lightProgress(int index) { return index >= 0 && index < groupCount ? GROUPS[index].lightProgress : 0f; }
     public static float lightProgress() { return 0.0f; }
+    public static boolean isLight(int index) { return index >= 0 && index < groupCount && GROUPS[index].isLight; }
 
     public static boolean owns(Object widget) {
         if (screen != MinecraftClient.getInstance().currentScreen) return false;
@@ -517,12 +625,16 @@ public final class GlassGroups {
         return false;
     }
 
-    private static final class Group {
+    public static final class Group {
         int root;
         int left;
         int top;
         int right;
         int bottom;
         boolean isTabGroup;
+        public boolean isLight;
+        public float lightProgress;
+        public long lastTimeNanos;
+        public float ambient = 0.2f;
     }
 }

@@ -58,17 +58,17 @@ public final class KaraokeClock {
     }
 
     public long getRawPositionMs() {
-        if (clockSupplier != null) {
-            try {
-                return clockSupplier.getAsLong();
-            } catch (Throwable ignored) {
-            }
-        }
         if (demoStartTime >= 0L) {
             if (demoPaused) {
                 return demoPauseOffset;
             }
             return System.currentTimeMillis() - demoStartTime;
+        }
+        if (clockSupplier != null) {
+            try {
+                return clockSupplier.getAsLong();
+            } catch (Throwable ignored) {
+            }
         }
         return -1L;
     }

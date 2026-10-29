@@ -33,7 +33,7 @@ public final class GlassScreenText {
 
     public static boolean draw(DrawContext c,TextRenderer font,String text,int x,int y,int color,boolean shadow){
         if(text==null)return false;
-        if(y <= 60 && isScreenTitle(text, y)){
+        if(y <= 80 && isScreenTitle(text, y)){
             return drawScreenTitle(c, font, text, null);
         }
         if(isLanScanningText(text)){
@@ -43,14 +43,31 @@ public final class GlassScreenText {
             int a = (int)((color >>> 24 == 0 ? 255 : color >>> 24) * 0.60f);
             color = (a << 24) | (color & 0x00FFFFFF);
         }
+        if(net.auramc.glass.common.style.GlassStyles.regular() && GlassGroups.insideAnyGroup(x,y)){
+            shadow=false;
+            GlassGroups.Group g=GlassGroups.groupAt(x,y);
+            int modeColor=GlassGroups.textColorForGroup(g);
+            if(GlassActiveField.isPlaceholder()){
+                color=(Math.round(255*0.45f)<<24)|(modeColor&0xFFFFFF);
+            }else if(GlassActiveField.isActive()&&"_".equals(text)){
+                color=0xFF64D2FF;
+            }else if((color&0xFFFFFF)!=0x00283A){
+                int a=(color>>>24);
+                if(a>0 && a<=128){
+                    int modeAlpha=(modeColor>>>24);
+                    color=(Math.round(modeAlpha*0.30f)<<24)|(modeColor&0xFFFFFF);
+                }else{
+                    color=modeColor;
+                }
+            }
+        }
         Command command=command(c,font,x,y,color,shadow);if(command==null)return false;
         command.text=text;command.ordered=null;command.width=font.getWidth(text);GlassRenderer.foreground(command);return true;
     }
     public static boolean draw(DrawContext c,TextRenderer font,OrderedText text,int x,int y,int color,boolean shadow){
-        if(!allowed()||text==null)return false;
-        FONT_PROBE.custom=false;text.accept(FONT_PROBE);if(FONT_PROBE.custom)return false;
+        if(text==null)return false;
         String str = extractString(text);
-        if(y <= 60 && isScreenTitle(str, y)){
+        if(y <= 80 && isScreenTitle(str, y)){
             return drawScreenTitle(c, font, str, text);
         }
         if(isLanScanningText(str)){
@@ -60,12 +77,30 @@ public final class GlassScreenText {
             int a = (int)((color >>> 24 == 0 ? 255 : color >>> 24) * 0.60f);
             color = (a << 24) | (color & 0x00FFFFFF);
         }
+        if(!allowed())return false;
+        FONT_PROBE.custom=false;text.accept(FONT_PROBE);if(FONT_PROBE.custom)return false;
+        if(net.auramc.glass.common.style.GlassStyles.regular() && GlassGroups.insideAnyGroup(x,y)){
+            shadow=false;
+            GlassGroups.Group g=GlassGroups.groupAt(x,y);
+            int modeColor=GlassGroups.textColorForGroup(g);
+            if(GlassActiveField.isPlaceholder()){
+                color=(Math.round(255*0.45f)<<24)|(modeColor&0xFFFFFF);
+            }else if((color&0xFFFFFF)!=0x00283A){
+                int a=(color>>>24);
+                if(a>0 && a<=128){
+                    int modeAlpha=(modeColor>>>24);
+                    color=(Math.round(modeAlpha*0.30f)<<24)|(modeColor&0xFFFFFF);
+                }else{
+                    color=modeColor;
+                }
+            }
+        }
         Command command=command(c,font,x,y,color,shadow);if(command==null)return false;
         command.text=null;command.ordered=text;command.width=font.getWidth(text);GlassRenderer.foreground(command);return true;
     }
 
     private static boolean isScreenTitle(String str, int y) {
-        if(str == null || str.isEmpty() || y > 60) return false;
+        if(str == null || str.isEmpty() || y > 80) return false;
         var client = net.minecraft.client.MinecraftClient.getInstance();
         if(client == null || client.currentScreen == null) return false;
         var current = client.currentScreen;
@@ -73,14 +108,15 @@ public final class GlassScreenText {
         var titleText = current.getTitle();
         if(titleText == null) return false;
         String titleStr = titleText.getString();
-        return titleStr != null && (titleStr.equals(str) || titleStr.equalsIgnoreCase(str.trim()));
+        return titleStr != null && (titleStr.trim().equalsIgnoreCase(str.trim()) || titleStr.contains(str) || str.contains(titleStr));
     }
 
     private static boolean isLanScanningText(String str) {
         if(str == null) return false;
         var client = net.minecraft.client.MinecraftClient.getInstance();
         if(client == null || !(client.currentScreen instanceof net.minecraft.client.gui.screen.multiplayer.MultiplayerScreen)) return false;
-        return str.contains("локальн") || str.contains("LAN") || str.contains("Scanning") || str.contains("searching");
+        String lower = str.toLowerCase();
+        return lower.contains("локальн") || lower.contains("lan") || lower.contains("scanning") || lower.contains("searching") || lower.contains("поиск");
     }
 
     private static boolean drawLanScanningText(DrawContext c, TextRenderer font, String str, OrderedText ordered) {
@@ -88,7 +124,7 @@ public final class GlassScreenText {
         float screenW = client != null && client.getWindow() != null ? client.getWindow().getScaledWidth() : GlassGroups.width();
         float textW = ordered != null ? font.getWidth(ordered) : font.getWidth(str);
         float textX = (screenW - textW) * 0.5f;
-        float textY = client != null && client.currentScreen != null ? client.currentScreen.height * 0.45f : 100f;
+        float textY = client != null && client.currentScreen != null ? (client.currentScreen.height - 32) * 0.5f : 100f;
         c.getMatrices().push();
         GlassGlyphText.beginVanillaGlyph();
         try {
@@ -121,7 +157,8 @@ public final class GlassScreenText {
         float scale = 1.5f;
         float textW = (ordered != null ? font.getWidth(ordered) : font.getWidth(str)) * scale;
         float titleX = (screenW - textW) * 0.5f;
-        float titleY = 8.0f;
+        int topY = GlassGroups.topGroupY();
+        float titleY = Math.max(8.0f, topY - 23.5f);
 
         c.getMatrices().push();
         c.getMatrices().translate(titleX, titleY, 0);
@@ -148,7 +185,8 @@ public final class GlassScreenText {
     private static boolean allowed(){return GlassFrameHooks.styledScreen()&&!GlassGlyphText.vanillaGlyph()&&AuraRenderer.isReady();}
     private static Command command(DrawContext c,TextRenderer font,int x,int y,int color,boolean shadow){
         if(!allowed()||cursor==COMMANDS.length)return null;
-        Command command=COMMANDS[cursor++];command.c=c;command.font=font;command.x=x;command.y=y;command.color=entryText?entryColor(color):color;command.shadow=shadow;command.selected=selectedText;command.slot=-1;command.baseSize=9;
+        int finalColor=(net.auramc.glass.common.style.GlassStyles.regular()&&GlassGroups.insideAnyGroup(x,y))?color:(entryText?entryColor(color):color);
+        Command command=COMMANDS[cursor++];command.c=c;command.font=font;command.x=x;command.y=y;command.color=finalColor;command.shadow=shadow;command.selected=selectedText;command.slot=-1;command.baseSize=9;
         command.matrix.set(c.getMatrices().peek().getPositionMatrix());return command;
     }
     private static final class FontProbe implements CharacterVisitor {
