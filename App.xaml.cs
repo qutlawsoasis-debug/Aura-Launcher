@@ -652,7 +652,10 @@ public partial class App : Application
         services.AddSingleton<IConfigService, JsonConfigService>();
         services.AddSingleton<ILauncherUpdateService, LauncherUpdateService>();
         services.AddSingleton<IPackUpdateService, PackUpdateService>();
-        services.AddSingleton<IGameLaunchService, FabricGameLaunchService>();
+        services.AddSingleton<IMusicBridgeService, MusicBridgeService>();
+        services.AddSingleton<IGameLaunchService>(sp => new FabricGameLaunchService(
+            sp.GetService<IConfigService>(),
+            sp.GetService<IMusicBridgeService>()));
         services.AddSingleton<IPrewarmGameService, PrewarmGameService>();
         services.AddSingleton<IGameSessionService>(sp => new GameSessionService(
             sp.GetRequiredService<IGameLaunchService>(),
@@ -954,6 +957,13 @@ public partial class App : Application
             var anthemService = Services?.GetService<IAnthemService>();
             anthemService?.Stop();
             anthemService?.Dispose();
+        }
+        catch { }
+
+        try
+        {
+            var musicBridge = Services?.GetService<IMusicBridgeService>();
+            musicBridge?.Dispose();
         }
         catch { }
 
