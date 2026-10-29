@@ -14,9 +14,11 @@ import net.auramc.glass.client.quickmenu.music.MusicSourceProvider;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -28,7 +30,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * 3. On MusicClock epoch increase (seek / track change / resynchronization): resets shown and flying words.
  * 4. Playback state management:
  *    - PAUSED: new words do not appear, existing hanging words remain in place.
- *    - STOPPED: all words dissolve, pending requests invalidated, generation bumped.
+ *    - STOPPED: all words dissolve, engine remains stopped, lyrics cached for when playback starts.
  * 5. When bridge is unavailable (MusicSource.available() == false): zero threads / polling beyond W5,
  *    shares MusicSourceProvider.get() with F8 quick menu.
  */
@@ -51,6 +53,13 @@ public final class MusicKaraokeBridge implements AutoCloseable {
 
     private long requestGeneration = 0L;
     private CompletableFuture<Optional<Lyrics>> currentLyricsFuture = null;
+
+    /**
+     * Cache of parsed KaraokeLyrics per trackId.
+     * Preserves lyrics loaded during cold startup (e.g. while iframe is still STOPPED)
+     * so that when PLAYING/PAUSED starts, karaoke activates without discarding or re-requesting.
+     */
+    private final Map<String, KaraokeModel.KaraokeLyrics> lyricsCache = new ConcurrentHashMap<>();
 
     /**
      * Immutable container for lyrics delivered from background HTTP/worker threads.
@@ -114,6 +123,7 @@ public final class MusicKaraokeBridge implements AutoCloseable {
             if (active) {
                 // Source transitioned to unavailable: silence karaoke and reset state
                 invalidatePendingRequests();
+                lyricsCache.clear();
                 engine.resetWords();
                 engine.setLyrics(null);
                 engine.setStopped(true);
@@ -161,7 +171,7 @@ public final class MusicKaraokeBridge implements AutoCloseable {
 
         // 3. Playback state transitions
         if (currentState != lastState) {
-            handleStateTransition(lastState, currentState);
+            handleStateTransition(lastState, currentState, track);
             lastState = currentState;
         }
 
@@ -251,9 +261,22 @@ public final class MusicKaraokeBridge implements AutoCloseable {
             return;
         }
 
+        // Cache lyrics per track ID regardless of current playback state (cold start support)
+        if (pending.lyrics != null && pending.lyrics.synced && !pending.lyrics.lines.isEmpty()) {
+            lyricsCache.put(pending.trackId, pending.lyrics);
+        } else {
+            lyricsCache.remove(pending.trackId);
+        }
+
         // Validate source availability and playback state:
         // If playback is STOPPED or source is offline, NEVER un-stop engine!
         if (!isSourceAvailable || currentState == PlaybackState.STOPPED) {
+            if (pending.lyrics != null && pending.lyrics.synced) {
+                engine.setLyrics(pending.lyrics);
+            } else {
+                engine.setLyrics(null);
+            }
+            engine.setStopped(true);
             return;
         }
 
@@ -275,22 +298,45 @@ public final class MusicKaraokeBridge implements AutoCloseable {
         }
     }
 
-    private void handleStateTransition(PlaybackState oldState, PlaybackState newState) {
+    private void handleStateTransition(PlaybackState oldState, PlaybackState newState, Track currentTrack) {
         switch (newState) {
             case PLAYING -> {
+                if (engine.getLyrics() == null) {
+                    KaraokeModel.KaraokeLyrics lyrics = lyricsCache.get(this.lastTrackId);
+                    if (lyrics != null && lyrics.synced && !lyrics.lines.isEmpty()) {
+                        engine.setLyrics(lyrics);
+                        long currentPos = clock.positionMs();
+                        engine.seekTo(currentPos);
+                    } else if (currentTrack != null && !currentTrack.isEmpty()
+                            && (currentLyricsFuture == null || currentLyricsFuture.isDone())) {
+                        loadLyricsForTrack(currentTrack);
+                    }
+                }
                 if (engine.getLyrics() != null && engine.getLyrics().synced) {
                     engine.setStopped(false);
+                } else {
+                    engine.setStopped(true);
                 }
                 engine.setPaused(false);
             }
             case PAUSED -> {
+                if (engine.getLyrics() == null) {
+                    KaraokeModel.KaraokeLyrics lyrics = lyricsCache.get(this.lastTrackId);
+                    if (lyrics != null && lyrics.synced && !lyrics.lines.isEmpty()) {
+                        engine.setLyrics(lyrics);
+                        long currentPos = clock.positionMs();
+                        engine.seekTo(currentPos);
+                    }
+                }
                 if (engine.getLyrics() != null && engine.getLyrics().synced) {
                     engine.setStopped(false);
+                } else {
+                    engine.setStopped(true);
                 }
                 engine.setPaused(true);
             }
             case STOPPED -> {
-                invalidatePendingRequests();
+                // Playback stopped: all words dissolve and engine stops
                 engine.setStopped(true);
                 engine.setPaused(false);
                 engine.dissolveAll();
@@ -301,6 +347,7 @@ public final class MusicKaraokeBridge implements AutoCloseable {
     @Override
     public synchronized void close() {
         invalidatePendingRequests();
+        lyricsCache.clear();
         engine.resetWords();
         engine.setLyrics(null);
         engine.setStopped(true);

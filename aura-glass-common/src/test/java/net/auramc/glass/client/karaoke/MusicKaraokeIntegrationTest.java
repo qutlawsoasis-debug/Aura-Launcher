@@ -93,6 +93,12 @@ public final class MusicKaraokeIntegrationTest {
             testReverseCompletionOrder_B_Then_A(tempDir);
             testOldRequestErrorAfterNewRequestSuccess(tempDir);
             testForwardCompletionOrder_A_Then_B(tempDir);
+            testColdStartup_LyricsCompletedBeforePlaying(tempDir);
+            testColdStartup_LyricsCompletedAfterPlaying(tempDir);
+            testStopResumeSameTrackId(tempDir);
+            testPauseResumeSameTrackId(tempDir);
+            testSourceLossAndRecovery(tempDir);
+            testErrorHandlingAndRecovery(tempDir);
 
             System.out.println("=== ALL MUSIC-KARAOKE INTEGRATION TESTS PASSED ===");
         } catch (Throwable t) {
@@ -469,18 +475,24 @@ public final class MusicKaraokeIntegrationTest {
         source.stop();
         bridge.update(virtualTime.get());
         check(engine.isStopped(), "engine is stopped after source.stop()");
-        check(bridge.getRequestGeneration() == 2L, "generation bumped to 2 on STOP");
 
         // 3. Late lyrics completion fires on background thread
         Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
         controlledClient.future.complete(java.util.Optional.of(lyrics));
 
-        // 4. Client tick runs: late completion MUST NOT un-stop the engine!
+        // 4. Client tick runs: late completion MUST NOT un-stop the engine while source is STOPPED!
         bridge.update(virtualTime.get());
-        check(engine.isStopped(), "engine MUST remain stopped even after late lyrics completion! (qaBridgeProbe fix)");
-        check(engine.getLyrics() == null, "stale lyrics not applied to stopped engine");
+        check(engine.isStopped(), "engine MUST remain stopped even after late lyrics completion while STOPPED");
+        check(!engine.isPlaying(), "engine is not playing while source is stopped");
 
-        System.out.println("[PASS] 9. Delayed lyrics completion after STOP: engine remains stopped");
+        // 5. Resume playing same track: engine activates and un-stops without new request!
+        source.play();
+        bridge.update(virtualTime.get());
+        check(!engine.isStopped(), "engine un-stopped when resumed playing");
+        check(engine.getLyrics() != null, "lyrics present on play");
+        check(engine.isPlaying(), "engine is playing after resume");
+
+        System.out.println("[PASS] 9. Delayed lyrics completion after STOP: engine remains stopped, activates on PLAY");
     }
 
     private static void testDelayedCompletionAfterTrackChange(Path tempDir) {
@@ -753,6 +765,224 @@ public final class MusicKaraokeIntegrationTest {
         public java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>> getLyricsAsync(String artist, String title, double durationSec) {
             return getOrCreateFuture(title);
         }
+    }
+
+
+    private static void testColdStartup_LyricsCompletedBeforePlaying(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(120_000L);
+        Track track = new Track("cold_start_A", "Cold Artist", "Cold Song A", 180_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        // Start in STOPPED state before any bridge updates (simulating W4 cold start before iframe plays)
+        source.stop();
+        check(source.now().isStopped(), "source initially stopped");
+
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+        Path cacheDir = tempDir.resolve("cache_cold_1");
+        MultiControlledLyricsClient client = new MultiControlledLyricsClient(cacheDir);
+        var future = client.getOrCreateFuture("Cold Song A");
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, client, engine);
+
+        // 1. Tick 1 in STOPPED: discovers current track, initiates request
+        bridge.update(virtualTime.get());
+        check("cold_start_A".equals(bridge.getLastTrackId()), "track cold_start_A discovered in STOPPED");
+        check(engine.isStopped(), "engine stopped during cold startup");
+
+        // 2. Lyrics complete while STILL in STOPPED state
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        future.complete(java.util.Optional.of(lyrics));
+
+        // 3. Tick 2 in STOPPED: lyrics arrive and are cached, BUT engine remains stopped!
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine MUST remain stopped while source is STOPPED");
+        check(!engine.isPlaying(), "engine is NOT playing while source is STOPPED");
+
+        // 4. Iframe / webview starts playing track A
+        source.play();
+        check(source.now().isPlaying(), "source transitioned to PLAYING");
+
+        // 5. Tick 3 in PLAYING: cached lyrics are immediately applied and engine un-stopped!
+        bridge.update(virtualTime.get());
+        check(!engine.isStopped(), "engine un-stopped upon PLAYING transition");
+        check(engine.getLyrics() != null, "lyricsPresent=true after PLAYING transition (cold start fix)");
+        check(engine.isPlaying(), "engine is actively playing karaoke");
+
+        System.out.println("[PASS] 17. Cold startup (lyrics complete before PLAYING): lyrics cached and applied on PLAY");
+    }
+
+    private static void testColdStartup_LyricsCompletedAfterPlaying(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(130_000L);
+        Track track = new Track("cold_start_B", "Cold Artist", "Cold Song B", 180_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        source.stop();
+
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+        Path cacheDir = tempDir.resolve("cache_cold_2");
+        MultiControlledLyricsClient client = new MultiControlledLyricsClient(cacheDir);
+        var future = client.getOrCreateFuture("Cold Song B");
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, client, engine);
+
+        // 1. Tick in STOPPED: initiates request
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine stopped initially");
+
+        // 2. Playback starts before lyrics complete
+        source.play();
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine still stopped waiting for pending lyrics");
+
+        // 3. Lyrics complete while PLAYING
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        future.complete(java.util.Optional.of(lyrics));
+
+        // 4. Tick in PLAYING: lyrics applied
+        bridge.update(virtualTime.get());
+        check(!engine.isStopped(), "engine un-stopped once lyrics arrive in PLAYING");
+        check(engine.getLyrics() != null, "lyrics present");
+        check(engine.isPlaying(), "engine is playing");
+
+        System.out.println("[PASS] 18. Cold startup (lyrics complete after PLAYING): lyrics cleanly activate");
+    }
+
+    private static void testStopResumeSameTrackId(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(140_000L);
+        Track track = new Track("resume_track", "Artist", "Resume Track", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_resume");
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        String sha1 = LyricsClient.computeSha1("Artist", "Resume Track");
+        LyricsClient lyricsClient = new LyricsClient("http://127.0.0.1:9999", cacheDir, null);
+        lyricsClient.writeCacheEntry(cacheDir.resolve(sha1 + ".json"), false, lyrics);
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, lyricsClient, engine);
+
+        // 1. Start and play
+        bridge.update(virtualTime.get());
+        check(engine.isPlaying(), "playing initially");
+
+        // 2. Stop playback -> engine dissolves and stops
+        source.stop();
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine is stopped after stop");
+        check(!engine.isPlaying(), "not playing after stop");
+
+        // 3. Resume same track -> engine reactivates without re-fetching lyrics
+        source.play();
+        bridge.update(virtualTime.get());
+        check(!engine.isStopped(), "engine un-stopped upon resume");
+        check(engine.isPlaying(), "engine playing after resume of same track");
+        check(engine.getLyrics() != null, "lyrics retained on resume");
+
+        System.out.println("[PASS] 19. Stop and resume same track: lyrics retained and engine reactivated");
+    }
+
+    private static void testPauseResumeSameTrackId(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(150_000L);
+        Track track = new Track("pause_resume", "Artist", "Pause Resume Track", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_pause_res");
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        String sha1 = LyricsClient.computeSha1("Artist", "Pause Resume Track");
+        LyricsClient lyricsClient = new LyricsClient("http://127.0.0.1:9999", cacheDir, null);
+        lyricsClient.writeCacheEntry(cacheDir.resolve(sha1 + ".json"), false, lyrics);
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, lyricsClient, engine);
+
+        bridge.update(virtualTime.get());
+        check(engine.isPlaying(), "engine playing");
+
+        // Pause
+        source.pause();
+        bridge.update(virtualTime.get());
+        check(engine.isPaused(), "engine paused");
+        check(!engine.isStopped(), "engine not stopped during pause");
+
+        // Unpause / play
+        source.play();
+        bridge.update(virtualTime.get());
+        check(!engine.isPaused(), "engine unpaused");
+        check(engine.isPlaying(), "engine playing again");
+
+        System.out.println("[PASS] 20. Pause and resume: state transitions cleanly preserved");
+    }
+
+    private static void testSourceLossAndRecovery(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(160_000L);
+        Track track = new Track("loss_recovery", "Artist", "Loss Recovery Track", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_loss_rec");
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        String sha1 = LyricsClient.computeSha1("Artist", "Loss Recovery Track");
+        LyricsClient lyricsClient = new LyricsClient("http://127.0.0.1:9999", cacheDir, null);
+        lyricsClient.writeCacheEntry(cacheDir.resolve(sha1 + ".json"), false, lyrics);
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, lyricsClient, engine);
+
+        bridge.update(virtualTime.get());
+        check(engine.isPlaying(), "engine playing initially");
+
+        // Source disconnects
+        source.setAvailable(false);
+        bridge.update(virtualTime.get());
+        check(!bridge.isActive(), "bridge inactive on disconnect");
+        check(engine.isStopped(), "engine stopped on disconnect");
+
+        // Source reconnects
+        source.setAvailable(true);
+        bridge.update(virtualTime.get());
+        check(bridge.isActive(), "bridge active again on reconnect");
+        check(!engine.isStopped(), "engine un-stopped after reconnect and reload");
+        check(engine.isPlaying(), "engine playing after recovery");
+
+        System.out.println("[PASS] 21. Source loss and recovery: clean teardown and seamless recovery");
+    }
+
+    private static void testErrorHandlingAndRecovery(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(170_000L);
+        Track trackA = new Track("err_A", "Artist A", "Title A", 120_000L, "");
+        Track trackB = new Track("err_B", "Artist B", "Title B", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(trackA, trackB), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_err_rec");
+        MultiControlledLyricsClient client = new MultiControlledLyricsClient(cacheDir);
+        var futureA = client.getOrCreateFuture("Title A");
+        var futureB = client.getOrCreateFuture("Title B");
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, client, engine);
+
+        // 1. Track A fails
+        bridge.update(virtualTime.get());
+        futureA.completeExceptionally(new java.io.IOException("503 Service Unavailable"));
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine stopped on error");
+        check(engine.getLyrics() == null, "no lyrics on error");
+
+        // 2. Switch to Track B, which succeeds
+        source.next();
+        bridge.update(virtualTime.get());
+        Lyrics lyricsB = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        futureB.complete(java.util.Optional.of(lyricsB));
+        bridge.update(virtualTime.get());
+
+        check(!engine.isStopped(), "engine active on Track B");
+        check(engine.getLyrics() != null, "Track B lyrics present");
+        check(engine.isPlaying(), "playing Track B");
+
+        System.out.println("[PASS] 22. Error handling and recovery: graceful failure and clean recovery on next track");
     }
 
 }
