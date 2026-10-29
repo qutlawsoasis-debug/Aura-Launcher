@@ -47,10 +47,12 @@ public final class GlassFrameHooks {
                 || screen instanceof net.minecraft.client.gui.screen.ingame.StructureBlockScreen
                 || screen instanceof net.minecraft.client.gui.screen.ingame.JigsawBlockScreen;
         // Screen's runtime package is named in development and net.minecraft in production.
-        return net.auramc.glass.common.ui.MenuScope.applies(screen.getClass().getName(),
+        boolean applies = net.auramc.glass.common.ui.MenuScope.applies(screen.getClass().getName(),
                 net.minecraft.client.gui.screen.Screen.class.getPackageName(), ingame,
                 screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>,
                 screen instanceof net.minecraft.client.gui.screen.ChatScreen);
+        if(!applies && screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen) applies = true;
+        return applies;
     }
     public static void beginNativeContent(){nativeContentDepth++;}
     public static void endNativeContent(){nativeContentDepth=Math.max(0,nativeContentDepth-1);}
@@ -63,7 +65,7 @@ public final class GlassFrameHooks {
         var screen = MinecraftClient.getInstance().currentScreen;
         if (screen == null) return;
         String name = screen.getClass().getName();
-        if (!name.startsWith(net.minecraft.client.gui.screen.Screen.class.getPackageName() + ".") && !name.startsWith("net.auramc.glass.")) return;
+        if (!name.startsWith(net.minecraft.client.gui.screen.Screen.class.getPackageName() + ".") && !name.startsWith("net.auramc.glass.") && !(screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen)) return;
         if (!styledScreen() && !GlassDiagnostics.panelEnabled()) return;
         context.draw();
         GlassRenderer.captureBackdrop();
