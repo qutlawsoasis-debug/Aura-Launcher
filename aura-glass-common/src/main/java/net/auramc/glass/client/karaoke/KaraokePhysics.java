@@ -140,6 +140,12 @@ public final class KaraokePhysics {
         bodies.clear();
     }
 
+    public synchronized void dissolveAll() {
+        for (PhysicalWord b : bodies) {
+            b.dissolving = true;
+        }
+    }
+
     public synchronized List<PhysicalWord> getBodies() {
         return new ArrayList<>(bodies);
     }

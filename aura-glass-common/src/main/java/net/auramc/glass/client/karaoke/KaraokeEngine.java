@@ -45,13 +45,16 @@ public final class KaraokeEngine {
     private boolean groupPhysicsSpawned = false;
     private long lastActiveOnsetRecordedWordT = -1L;
 
+    private volatile boolean paused = false;
+    private volatile boolean stopped = false;
+
     // QA / Demo auto-capture flags
     private boolean demoChecked = false;
     private boolean shotAppearTaken = false;
     private boolean shotHoldTaken = false;
     private boolean shotFallTaken = false;
 
-    private KaraokeEngine() {}
+    public KaraokeEngine() {}
 
     public KaraokeClock getClock() {
         return clock;
@@ -65,7 +68,19 @@ public final class KaraokeEngine {
         return physics;
     }
 
-    public void setLyrics(KaraokeModel.KaraokeLyrics lyrics) {
+    public KaraokeModel.KaraokeLyrics getLyrics() {
+        return lyrics;
+    }
+
+    public synchronized int getActiveAnchorCount() {
+        return activeAnchors.size();
+    }
+
+    public synchronized List<KaraokeModel.KaraokeWord> getActiveGroupWords() {
+        return Collections.unmodifiableList(new ArrayList<>(activeGroupWords));
+    }
+
+    public synchronized void setLyrics(KaraokeModel.KaraokeLyrics lyrics) {
         this.lyrics = lyrics;
         this.currentLineIndex = 0;
         this.currentWordIndex = 0;
@@ -84,11 +99,86 @@ public final class KaraokeEngine {
         clock.setClockSupplier(supplier);
     }
 
+    public boolean isPaused() {
+        return paused;
+    }
+
+    public void setPaused(boolean paused) {
+        this.paused = paused;
+    }
+
+    public boolean isStopped() {
+        return stopped;
+    }
+
+    public void setStopped(boolean stopped) {
+        this.stopped = stopped;
+    }
+
     public boolean isPlaying() {
         if (!KaraokeConfig.get().isEnabled()) return false;
         if (lyrics == null || lyrics.isEmpty()) return false;
+        if (stopped) return false;
         long pos = clock.getEffectivePositionMs();
         return pos >= 0L;
+    }
+
+    public synchronized void resetWords() {
+        this.activeAnchors.clear();
+        this.activeGroupWords.clear();
+        this.groupHoldStartTime = -1L;
+        this.groupPhysicsSpawned = false;
+        this.lastActiveOnsetRecordedWordT = -1L;
+        this.physics.clear();
+    }
+
+    public synchronized void seekTo(long positionMs) {
+        resetWords();
+        if (lyrics == null || lyrics.isEmpty()) {
+            currentLineIndex = 0;
+            currentWordIndex = 0;
+            return;
+        }
+        currentLineIndex = 0;
+        currentWordIndex = 0;
+        for (int i = 0; i < lyrics.lines.size(); i++) {
+            KaraokeModel.KaraokeLine line = lyrics.lines.get(i);
+            if (positionMs > line.end() + 1000L) {
+                currentLineIndex = i + 1;
+            } else {
+                currentLineIndex = i;
+                for (int j = 0; j < line.words.size(); j++) {
+                    KaraokeModel.KaraokeWord w = line.words.get(j);
+                    if (positionMs > w.end()) {
+                        currentWordIndex = j + 1;
+                    } else {
+                        currentWordIndex = j;
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    public synchronized void dissolveAll() {
+        if (!activeAnchors.isEmpty()) {
+            for (WordPlacement.WordAnchor anchor : activeAnchors) {
+                physics.spawnBody(
+                        anchor.word.w,
+                        anchor.position,
+                        anchor.width,
+                        anchor.height,
+                        anchor.yaw,
+                        anchor.pitch
+                );
+            }
+            activeAnchors.clear();
+            activeGroupWords.clear();
+            groupHoldStartTime = -1L;
+            groupPhysicsSpawned = false;
+        }
+        physics.dissolveAll();
     }
 
     public void checkDemoStartup() {
@@ -132,8 +222,19 @@ public final class KaraokeEngine {
         if (json != null) {
             KaraokeConfig.get().setDemoMode(true);
             setLyricsFromJson(json);
+            this.stopped = false;
+            this.paused = false;
             clock.startDemoTimeline();
         }
+    }
+
+    /**
+     * Headless ticking logic for testing without Minecraft world.
+     */
+    public void tickHeadless(long playbackMs) {
+        physics.tick(null);
+        if (!isPlaying()) return;
+        updateLyricsTimeline(playbackMs, null, null);
     }
 
     /**
@@ -141,6 +242,7 @@ public final class KaraokeEngine {
      */
     public void tick(MinecraftClient client) {
         checkDemoStartup();
+        MusicKaraokeBridge.getInstance().update();
 
         if (client == null || client.world == null) return;
         World world = client.world;
@@ -179,8 +281,22 @@ public final class KaraokeEngine {
     private void updateLyricsTimeline(long playbackMs, PlayerEntity player, World world) {
         if (lyrics == null || lyrics.isEmpty()) return;
 
-        // If line finished and hold elapsed, transition active words into physics bodies
+        // 1. Record onset events for active words currently being sung
+        for (KaraokeModel.KaraokeWord w : activeGroupWords) {
+            if (playbackMs >= w.t && w.t > lastActiveOnsetRecordedWordT) {
+                lastActiveOnsetRecordedWordT = w.t;
+                clock.recordOnset(w.w, w.t, playbackMs);
+                break;
+            }
+        }
+
+        // 2. If line finished and hold elapsed, transition active words into physics bodies
         if (!activeGroupWords.isEmpty()) {
+            if (paused) {
+                // In pause: existing words remain hanging and do not fall
+                return;
+            }
+
             KaraokeModel.KaraokeWord lastWord = activeGroupWords.get(activeGroupWords.size() - 1);
             if (playbackMs >= lastWord.end()) {
                 if (groupHoldStartTime < 0L) {
@@ -205,7 +321,7 @@ public final class KaraokeEngine {
             }
         }
 
-        // Check if we need to advance to next line
+        // 3. Check if we need to advance to next line
         while (currentLineIndex < lyrics.lines.size()) {
             KaraokeModel.KaraokeLine line = lyrics.lines.get(currentLineIndex);
             if (playbackMs > line.end() + 1000L) {
@@ -221,12 +337,17 @@ public final class KaraokeEngine {
         KaraokeModel.KaraokeLine currentLine = lyrics.lines.get(currentLineIndex);
         if (currentWordIndex >= currentLine.words.size()) return;
 
-        // Next word candidate
+        // 4. Next word candidate
         KaraokeModel.KaraokeWord nextWord = currentLine.words.get(currentWordIndex);
         long preRollTarget = nextWord.t - KaraokeClock.PREROLL_MS;
 
         // Check if pre-roll threshold reached and no group currently active
         if (playbackMs >= preRollTarget && activeGroupWords.isEmpty()) {
+            if (paused || stopped) {
+                // In pause or stop: new words do not appear
+                return;
+            }
+
             PlayerAdaptiveness.EvaluationResult eval = adaptiveness.getCurrentResult();
             if (!eval.canSpawn) {
                 // Condition blocks reading (combat, GUI, hazard, extreme turn)
@@ -251,13 +372,17 @@ public final class KaraokeEngine {
                 group.add(currentLine.words.get(currentWordIndex + i));
             }
 
-            Vec3d eyePos = player.getCameraPosVec(1.0f);
+            Vec3d eyePos = (player != null) ? player.getCameraPosVec(1.0f) : new Vec3d(0, 64, 0);
+            float yaw = (player != null) ? player.getYaw() : 0.0f;
+            float pitch = (player != null) ? player.getPitch() : 0.0f;
+            Vec3d vel = (player != null) ? player.getVelocity() : Vec3d.ZERO;
+
             activeAnchors = WordPlacement.layoutGroup(
                     group,
                     eyePos,
-                    player.getYaw(),
-                    player.getPitch(),
-                    player.getVelocity(),
+                    yaw,
+                    pitch,
+                    vel,
                     eval.gazeAngleFactor,
                     world
             );
@@ -266,15 +391,6 @@ public final class KaraokeEngine {
             currentWordIndex += groupSize;
             groupHoldStartTime = -1L;
             groupPhysicsSpawned = false;
-        }
-
-        // Record onset events for active words
-        for (KaraokeModel.KaraokeWord w : activeGroupWords) {
-            if (playbackMs >= w.t && w.t > lastActiveOnsetRecordedWordT) {
-                lastActiveOnsetRecordedWordT = w.t;
-                clock.recordOnset(w.w, w.t, playbackMs);
-                break;
-            }
         }
     }
 
@@ -322,7 +438,11 @@ public final class KaraokeEngine {
      * In-world render call from WorldRenderer hook.
      */
     public void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
-        if (!isPlaying()) return;
+        boolean hasActive = !activeAnchors.isEmpty();
+        boolean hasBodies = physics.getBodyCount() > 0;
+        if (!hasActive && !hasBodies) {
+            if (!isPlaying()) return;
+        }
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client == null || client.world == null) return;
