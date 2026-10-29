@@ -18,4 +18,5 @@ public interface ILobbyApiClient
     Task<bool> LeaveLobbyAsync(string code, string playerName, CancellationToken cancellationToken = default);
     Task<bool> KickPlayerAsync(string code, string hostToken, string playerName, CancellationToken cancellationToken = default);
     Task<TunnelConfigResponse?> GetTunnelConfigAsync(CancellationToken cancellationToken = default);
+    Task<string> SearchMusicRawAsync(string query, CancellationToken cancellationToken = default) => Task.FromResult("[]");
 }
