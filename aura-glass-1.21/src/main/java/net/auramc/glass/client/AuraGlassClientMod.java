@@ -11,7 +11,7 @@ import net.auramc.glass.client.ui.GlassDebugOverlay;
 public final class AuraGlassClientMod implements ClientModInitializer {
     @Override public void onInitializeClient() {
         GlassStyles.initialize(FabricLoader.getInstance().getConfigDir());
-        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client->{GlassStyles.poll();net.auramc.glass.common.render.MenuResources.prepare(client);if(client.currentScreen!=null)net.auramc.glass.client.ui.GlassLabels.prepare(client.currentScreen);});
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(client->{GlassStyles.poll();net.auramc.glass.common.render.MenuResources.prepare(client);if(client.currentScreen!=null)net.auramc.glass.client.ui.GlassLabels.prepare(client.currentScreen);net.auramc.glass.client.karaoke.KaraokeEngine.getInstance().tick(client);});
         GlassDebugOverlay.initialize();
         net.auramc.glass.common.hud.HudRuntime.initialize(()->net.minecraft.client.MinecraftClient.getInstance().inGameHud.getDebugHud().shouldShowDebugHud());
         net.auramc.glass.client.ui.GlassGalleryActions.initialize(net.auramc.glass.client.gui.GlassGallery121::new);
