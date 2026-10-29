@@ -52,6 +52,7 @@ public final class KaraokeSettingsTest {
         testDisabledKaraokeZeroWordsAndZeroEngineWork();
         testOnlyStandingSuppressesWordSpawningOnMove();
         testOnlyStandingTransitionWithActiveWords();
+        testResumeInsidePreviousGroupWithMaxWords();
         testKaraokeSizeBounds();
         testConfigImmediateApplyWithoutRelog();
 
@@ -412,6 +413,66 @@ public final class KaraokeSettingsTest {
         // Clean up
         KaraokeConfig.get().setOnlyStanding(false);
         System.out.println("[PASS] 7. Transition standing -> running/jumping/flying and mid-run toggle properly clears active words");
+    }
+
+    private static void testResumeInsidePreviousGroupWithMaxWords() {
+        System.out.println("Running testResumeInsidePreviousGroupWithMaxWords...");
+        var c = QuickMenuConfig.get();
+        c.karaoke = true;
+        c.karaokeOnlyStanding = true;
+        c.karaokeMaxWords = 4;
+        c.lyricsOffsetMs = 0;
+
+        KaraokeEngine e = new KaraokeEngine();
+        e.setClockSupplier(() -> 1000L);
+        e.setLyricsFromJson("{\"lines\":[{\"t\":1000,\"text\":\"one two three four five\",\"words\":[{\"t\":1000,\"d\":1000,\"w\":\"one\"},{\"t\":2000,\"d\":1000,\"w\":\"two\"},{\"t\":3000,\"d\":1000,\"w\":\"three\"},{\"t\":4000,\"d\":1000,\"w\":\"four\"},{\"t\":5000,\"d\":1000,\"w\":\"five\"}]}]}");
+        e.setStopped(false);
+        e.setPaused(false);
+
+        PlayerAdaptiveness a = e.getAdaptiveness();
+        long now = 200_000L;
+
+        // 1. Standing at 1000: group with words spawned
+        a.setScriptedState(0, 0, false, false, false, false, false, false, 20f, -10000L, now);
+        e.tickHeadless(1000L);
+        check(e.getActiveAnchorCount() == 3, "standing at 1000 spawns 3 anchors (one, two, three)");
+        check(e.getActiveGroupWords().get(0).w.equals("one"), "first word is one");
+
+        // 2. Running at 1100: active words cleared
+        a.setScriptedState(0.3, 0, true, false, false, false, false, false, 20f, -10000L, now + 100L);
+        e.tickHeadless(1100L);
+        check(e.getActiveAnchorCount() == 0, "running at 1100 clears active anchors");
+
+        // 3. Running through word one's expiration at 2100
+        e.tickHeadless(2100L);
+        check(e.getActiveAnchorCount() == 0, "running at 2100 maintains zero anchors");
+
+        // 4. Stopping at 2200 inside previous multi-word group: MUST resume on current word "two"
+        a.setScriptedState(0, 0, false, false, false, false, false, false, 20f, -10000L, now + 200L);
+        e.tickHeadless(2200L);
+        check(e.getActiveAnchorCount() > 0, "stopping at 2200 resumes word display");
+        check(e.getActiveGroupWords().get(0).w.equals("two"), "resumes exactly on current word 'two' (actual: " + e.getActiveGroupWords().get(0).w + ")");
+        check(!e.getActiveGroupWords().stream().anyMatch(w -> w.w.equals("one")), "expired word 'one' is NOT repeated");
+
+        // 5. Test another transition with maxWords=6: stop inside word "four" at 4200
+        c.karaokeMaxWords = 6;
+        a.setScriptedState(0.3, 0, true, false, false, false, false, false, 20f, -10000L, now + 300L);
+        e.tickHeadless(2500L);
+        check(e.getActiveAnchorCount() == 0, "running at 2500 clears anchors");
+        e.tickHeadless(3500L);
+        e.tickHeadless(4100L);
+
+        // Stop at 4200: word "four" is active (4000..5000)
+        a.setScriptedState(0, 0, false, false, false, false, false, false, 20f, -10000L, now + 400L);
+        e.tickHeadless(4200L);
+        check(e.getActiveAnchorCount() > 0, "stopping at 4200 resumes word display");
+        check(e.getActiveGroupWords().get(0).w.equals("four"), "resumes exactly on current word 'four' (actual: " + e.getActiveGroupWords().get(0).w + ")");
+        check(!e.getActiveGroupWords().stream().anyMatch(w -> w.w.equals("one") || w.w.equals("two") || w.w.equals("three")), "prior words are NOT repeated");
+
+        // Cleanup
+        c.karaokeOnlyStanding = false;
+        c.karaokeMaxWords = 4;
+        System.out.println("[PASS] 8. Resume inside previous group with maxWords=4/6 selects exact active word without repeat");
     }
 
     private static void check(boolean condition, String message) {

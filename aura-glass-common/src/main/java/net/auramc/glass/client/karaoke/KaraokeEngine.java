@@ -158,33 +158,42 @@ public final class KaraokeEngine {
         this.physics.clear();
     }
 
-    public synchronized void seekTo(long positionMs) {
-        resetWords();
+    public synchronized void resyncTimelinePosition(long playbackMs) {
         if (lyrics == null || lyrics.isEmpty()) {
             currentLineIndex = 0;
             currentWordIndex = 0;
             return;
         }
-        currentLineIndex = 0;
-        currentWordIndex = 0;
-        for (int i = 0; i < lyrics.lines.size(); i++) {
-            KaraokeModel.KaraokeLine line = lyrics.lines.get(i);
-            if (positionMs > line.end() + 1000L) {
-                currentLineIndex = i + 1;
+        int lineIdx = 0;
+        while (lineIdx < lyrics.lines.size()) {
+            KaraokeModel.KaraokeLine line = lyrics.lines.get(lineIdx);
+            if (playbackMs > line.end() + 1000L && lineIdx + 1 < lyrics.lines.size()) {
+                lineIdx++;
             } else {
-                currentLineIndex = i;
-                for (int j = 0; j < line.words.size(); j++) {
-                    KaraokeModel.KaraokeWord w = line.words.get(j);
-                    if (positionMs > w.end()) {
-                        currentWordIndex = j + 1;
-                    } else {
-                        currentWordIndex = j;
-                        break;
-                    }
-                }
                 break;
             }
         }
+        currentLineIndex = lineIdx;
+        if (currentLineIndex >= lyrics.lines.size()) {
+            currentWordIndex = 0;
+            return;
+        }
+        KaraokeModel.KaraokeLine currentLine = lyrics.lines.get(currentLineIndex);
+        int wordIdx = 0;
+        while (wordIdx < currentLine.words.size()) {
+            KaraokeModel.KaraokeWord w = currentLine.words.get(wordIdx);
+            if (playbackMs > w.end()) {
+                wordIdx++;
+            } else {
+                break;
+            }
+        }
+        currentWordIndex = wordIdx;
+    }
+
+    public synchronized void seekTo(long positionMs) {
+        resetWords();
+        resyncTimelinePosition(positionMs);
     }
 
     public synchronized void dissolveAll() {
@@ -469,24 +478,14 @@ public final class KaraokeEngine {
             if (!activeAnchors.isEmpty() || physics.getBodyCount() > 0) {
                 resetWords();
             }
-            while (currentLineIndex < lyrics.lines.size()) {
-                KaraokeModel.KaraokeLine line = lyrics.lines.get(currentLineIndex);
-                while (currentWordIndex < line.words.size()) {
-                    KaraokeModel.KaraokeWord w = line.words.get(currentWordIndex);
-                    if (playbackMs > w.end()) {
-                        currentWordIndex++;
-                    } else {
-                        break;
-                    }
-                }
-                if (currentWordIndex >= line.words.size() && playbackMs > line.end() + 1000L) {
-                    currentLineIndex++;
-                    currentWordIndex = 0;
-                } else {
-                    break;
-                }
-            }
+            resyncTimelinePosition(playbackMs);
             return;
+        }
+
+        // If no group is currently active, ensure cursor is resynced to playbackMs
+        // so that any interrupted or prematurely cleared group resumes from the current unexpired word
+        if (activeGroupWords.isEmpty()) {
+            resyncTimelinePosition(playbackMs);
         }
 
         // 1. Check and record word onsets on each tick
