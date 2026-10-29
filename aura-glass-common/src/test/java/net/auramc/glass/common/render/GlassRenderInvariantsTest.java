@@ -26,6 +26,7 @@ public final class GlassRenderInvariantsTest {
         testCaptureAutoRecoveryOnViewportChange();
         testCloseReleasesAllResources();
         testMenuClosedAndFlatModePolicies();
+        testSampleAmbient();
 
         System.out.println("\nAll Aura Glass production rendering invariants PASSED successfully!");
     }
@@ -171,6 +172,18 @@ public final class GlassRenderInvariantsTest {
         System.out.println("PASS: Menu closed blocks screen capture hooks; LOW and OFF modes strictly disallow backdrop captures.");
     }
 
+    private static void testSampleAmbient() {
+        System.out.println("\n--- [Audit 7: Sample Ambient Reads Pixel via GlBackend] ---");
+        ObservableGlMock gl = new ObservableGlMock();
+        BlurService service = new BlurService(gl);
+        service.prepare(1, 1920, 1080);
+        service.beginFrame("screen", "1.20.1");
+        service.capture(1, 1920, 1080);
+        float lum = service.sampleAmbient(0.5f, 0.5f);
+        check(lum >= 0.0f && lum <= 1.0f, "Ambient luminance must be in [0, 1], got: " + lum);
+        System.out.println("PASS: sampleAmbient readback via GlBackend executes cleanly.");
+    }
+
     private static void check(boolean ok, String msg) {
         if (!ok) throw new AssertionError("Invariant verification failed: " + msg);
     }
@@ -287,6 +300,7 @@ public final class GlassRenderInvariantsTest {
         @Override public void bindBuffer(int target, int buffer) {}
         @Override public int getInteger(int pname) { return 0; /* 0 samples MSAA */ }
         @Override public int getError() { return 0; /* GL_NO_ERROR */ }
+        @Override public void readPixels(int x, int y, int width, int height, int format, int type, java.nio.ByteBuffer pixels) {}
         @Override public void clearSampler(int unit) {}
         @Override public void restoreRenderState(int fbo, int width, int height) {}
     }
