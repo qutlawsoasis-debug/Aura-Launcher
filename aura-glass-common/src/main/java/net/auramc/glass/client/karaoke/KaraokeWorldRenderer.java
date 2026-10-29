@@ -54,12 +54,14 @@ public final class KaraokeWorldRenderer {
     private static double lastRenderTimeMs = 0.0;
 
     // Luminance & adaptive contrast state
+    private static Object lastSampledWorld = null;
     private static long lastSampleTick = -1L;
     private static long lastSampleTimeMs = 0L;
     private static long lastFrameTimeMs = 0L;
     private static boolean isLightBackground = false;
     private static float lightProgress = 0.0f; // 0.0 = dark, 1.0 = light (300 ms smooth transition)
     private static float lastSampledLuminance = 0.0f;
+    private static int luminanceSampleCallCount = 0;
 
     private KaraokeWorldRenderer() {}
 
@@ -79,6 +81,42 @@ public final class KaraokeWorldRenderer {
         return lastSampledLuminance;
     }
 
+    public static int getLuminanceSampleCallCount() {
+        return luminanceSampleCallCount;
+    }
+
+    /**
+     * Strict rate limit gate for background luminance sampling:
+     * - When world is active: strictly once per >= 4 game ticks. NO wall-time bypass during pause / low TPS.
+     * - Resets on world transition or time rewind.
+     * - Fallback to 50ms tick-equivalent only when world is null (headless).
+     */
+    public static boolean checkAndTickSampleGate(Object worldRef, long currentTick, long nowMs) {
+        if (worldRef != null) {
+            if (lastSampledWorld != worldRef || currentTick < lastSampleTick) {
+                lastSampleTick = -1L;
+                lastSampledWorld = worldRef;
+            }
+            if (lastSampleTick < 0 || (currentTick - lastSampleTick >= 4L)) {
+                lastSampleTick = currentTick;
+                lastSampleTimeMs = nowMs;
+                lastSampledWorld = worldRef;
+                luminanceSampleCallCount++;
+                return true;
+            }
+            return false;
+        } else {
+            long fallbackTick = nowMs / 50L;
+            if (lastSampleTick < 0 || (fallbackTick - lastSampleTick >= 4L)) {
+                lastSampleTick = fallbackTick;
+                lastSampleTimeMs = nowMs;
+                luminanceSampleCallCount++;
+                return true;
+            }
+            return false;
+        }
+    }
+
     /**
      * For unit tests / scripted testing without an active OpenGL viewport.
      */
@@ -93,12 +131,14 @@ public final class KaraokeWorldRenderer {
     }
 
     public static void resetState() {
+        lastSampledWorld = null;
         lastSampleTick = -1L;
         lastSampleTimeMs = 0L;
         lastFrameTimeMs = 0L;
         isLightBackground = false;
         lightProgress = 0.0f;
         lastSampledLuminance = 0.0f;
+        luminanceSampleCallCount = 0;
     }
 
     public static void updateTransition(long nowMs) {
@@ -366,13 +406,8 @@ public final class KaraokeWorldRenderer {
         long nowMs = System.currentTimeMillis();
         long currentTick = (world != null) ? world.getTime() : (nowMs / 50L);
 
-        // Sample strictly once every 4 ticks (>= 4 ticks or >= 200 ms)
-        boolean shouldSample = (lastSampleTick < 0) || (currentTick - lastSampleTick >= 4L) || (nowMs - lastSampleTimeMs >= 200L);
-
-        if (shouldSample) {
-            lastSampleTick = currentTick;
-            lastSampleTimeMs = nowMs;
-
+        // Strict rate limit gate: once per >= 4 game ticks when world is active (no wall-time bypass)
+        if (checkAndTickSampleGate(world, currentTick, nowMs)) {
             float sampledLuma = sampleScreenLuminance(viewMatrix, projMatrix, camera, activeAnchors, world);
             lastSampledLuminance = sampledLuma;
 

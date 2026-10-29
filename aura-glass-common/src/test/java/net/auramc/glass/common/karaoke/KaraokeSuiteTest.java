@@ -41,6 +41,7 @@ public final class KaraokeSuiteTest {
         testClockAndOnsetStats();
         testWordRectangleNonIntersection();
         testAdaptiveContrastAndHaloHysteresis();
+        testLuminanceSamplingGateRateLimit();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -643,6 +644,71 @@ public final class KaraokeSuiteTest {
 
         System.out.println("[PASS] 9. Adaptive contrast: luminance hysteresis (>0.60 light, <0.50 dark), 300ms transition, colors (#64D2FF / #0A84FF), sharp halo (0.03 em blur), and falling word halo fade");
     }
+    private static void testLuminanceSamplingGateRateLimit() {
+        KaraokeWorldRenderer.resetState();
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 0, "sample count starts at 0");
+
+        Object testWorld = new Object();
+        long tick = 100L;
+        long wallTime = 10000L;
+
+        // 1. Initial frame at tick 100: must sample
+        boolean s1 = KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime);
+        check(s1, "initial frame must sample");
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 1, "sample count is 1 after initial sample");
+
+        // 2. 100 render frames at stationary tick 100: must NOT sample (0 additional samples)
+        for (int frame = 0; frame < 100; frame++) {
+            wallTime += 16L; // 60 FPS frame time
+            boolean sampled = KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime);
+            check(!sampled, "stationary tick must not sample on frame " + frame);
+        }
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 1, "sample count remains 1 across 100 frames at same tick");
+
+        // 3. Pause simulation: wall time passes 500 ms, but tick remains stationary
+        wallTime += 500L;
+        boolean pauseSample = KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime);
+        check(!pauseSample, "stationary tick must not sample even after 500ms wall time (pause)");
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 1, "sample count remains 1 during pause");
+
+        // 4. Low TPS simulation (e.g. 5 TPS = 200 ms per tick):
+        // Advance tick 101 (+200ms wall): delta = 1 tick < 4 -> must NOT sample
+        tick = 101L; wallTime += 200L;
+        check(!KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime), "tick 101 (+1) must not sample");
+
+        // Advance tick 102 (+200ms wall): delta = 2 ticks < 4 -> must NOT sample
+        tick = 102L; wallTime += 200L;
+        check(!KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime), "tick 102 (+2) must not sample");
+
+        // Advance tick 103 (+200ms wall): delta = 3 ticks < 4 -> must NOT sample
+        tick = 103L; wallTime += 200L;
+        check(!KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime), "tick 103 (+3) must not sample");
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 1, "sample count remains 1 at delta < 4 ticks");
+
+        // Advance tick 104 (+200ms wall): delta = 4 ticks >= 4 -> MUST sample!
+        tick = 104L; wallTime += 200L;
+        check(KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime), "tick 104 (delta=4) must sample");
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 2, "sample count is 2 after 4 ticks");
+
+        // 5. Subsequent frames at tick 104: must NOT sample
+        for (int frame = 0; frame < 50; frame++) {
+            wallTime += 16L;
+            check(!KaraokeWorldRenderer.checkAndTickSampleGate(testWorld, tick, wallTime), "same tick 104 must not sample");
+        }
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 2, "sample count remains 2");
+
+        // 6. World change: new world resets gate and triggers immediate sample
+        Object newWorld = new Object();
+        check(KaraokeWorldRenderer.checkAndTickSampleGate(newWorld, 50L, wallTime), "new world must sample immediately");
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 3, "sample count is 3 on world change");
+
+        // 7. Time jump backwards (/time set): resets gate and triggers sample
+        check(KaraokeWorldRenderer.checkAndTickSampleGate(newWorld, 10L, wallTime + 50L), "time jump backwards must reset gate and sample");
+        check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 4, "sample count is 4 on time reset");
+
+        System.out.println("[PASS] 10. Luminance sampling gate rate limit: strict 4-tick rule, no wall-time bypass during pause/low TPS, 100+ same-tick frames blocked");
+    }
+
     private static void check(boolean condition, String description) {
         if (!condition) {
             throw new AssertionError("Test assertion failed: " + description);
