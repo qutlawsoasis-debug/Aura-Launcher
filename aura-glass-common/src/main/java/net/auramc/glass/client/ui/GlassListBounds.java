@@ -5,6 +5,12 @@ import net.minecraft.client.gui.widget.ClickableWidget;
 import net.minecraft.client.gui.widget.EntryListWidget;
 public final class GlassListBounds {
     private GlassListBounds(){}
+    public static net.auramc.glass.common.style.GlassStyle rowStyle(boolean selected){
+        var style=net.auramc.glass.common.style.GlassStyles.frame(net.auramc.glass.common.style.GlassPreset.PANEL);
+        style.tintR=style.tintG=118/255f;style.tintB=128/255f;style.tintA=selected?.36f:.18f;
+        style.refraction=.05f;style.frost=3;style.radius=5;style.light=.3f;
+        return style;
+    }
     public static int[] widgets(EntryListWidget<?> list,int[] bounds){
         bounds[0]=Integer.MAX_VALUE;bounds[1]=Integer.MIN_VALUE;
         var entries=list.children();

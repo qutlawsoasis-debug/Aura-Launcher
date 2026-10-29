@@ -14,24 +14,6 @@ public final class GlassFrameHooks {
     private static Object modalScreen;
     private static long modalStarted;
     private static int nativeContentDepth;
-    private static final java.util.Set<String> CARDS = cardScreens();
-    private static java.util.Set<String> cardScreens() {
-        var cards = new java.util.HashSet<String>(java.util.Set.of(
-                net.minecraft.client.gui.screen.ProgressScreen.class.getName(),
-                net.minecraft.client.gui.screen.DownloadingTerrainScreen.class.getName(),
-                net.minecraft.client.gui.screen.MessageScreen.class.getName(),
-                net.minecraft.client.gui.screen.DisconnectedScreen.class.getName(),
-                net.minecraft.client.gui.screen.ConfirmScreen.class.getName(),
-                net.minecraft.client.gui.screen.ConfirmLinkScreen.class.getName(),
-                net.minecraft.client.gui.screen.NoticeScreen.class.getName(),
-                net.minecraft.client.gui.screen.world.OptimizeWorldScreen.class.getName()));
-        var mappings = net.fabricmc.loader.api.FabricLoader.getInstance().getMappingResolver();
-        // These screens moved package, changed name, or were introduced in 1.21.
-        for (String id : java.util.List.of("3928", "412", "8897", "405", "5346", "8671", "8816")) {
-            cards.add(mappings.mapClassName("intermediary", "net.minecraft.class_" + id));
-        }
-        return java.util.Set.copyOf(cards);
-    }
     public static boolean modalScreen() {
         var c=MinecraftClient.getInstance(); var screen=c.currentScreen;
         return c.world!=null && screen!=null && !(screen instanceof TitleScreen) && styledScreen();
@@ -48,12 +30,12 @@ public final class GlassFrameHooks {
         if(!styledScreen() || client.currentScreen instanceof TitleScreen)return;
         if(client.world==null) {
             AuraUiRenderer.renderMenuPanoramaBackground(context,client,client.getWindow().getScaledWidth(),client.getWindow().getScaledHeight());
-            context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);card(context);return;
+            context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);return;
         }
         float elapsed=Math.max(0,Math.min(1,(System.nanoTime()-modalStarted)/200_000_000f));
         float progress=1-(1-elapsed)*(1-elapsed)*(1-elapsed);
         context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(progress);
-        card(context);
+
     }
     public static boolean styledScreen() {
         var screen = MinecraftClient.getInstance().currentScreen;
@@ -72,13 +54,6 @@ public final class GlassFrameHooks {
     }
     public static void beginNativeContent(){nativeContentDepth++;}
     public static void endNativeContent(){nativeContentDepth=Math.max(0,nativeContentDepth-1);}
-    private static void card(DrawContext context){
-        var client=MinecraftClient.getInstance();
-        if(!CARDS.contains(client.currentScreen.getClass().getName()))return;
-        float width=Math.min(420,context.getScaledWindowWidth()-24),height=Math.min(240,context.getScaledWindowHeight()-48);
-        GlassRenderer.draw((context.getScaledWindowWidth()-width)*.5f,(context.getScaledWindowHeight()-height)*.5f,width,height,GlassStyles.frame(GlassPreset.PANEL),1);
-        GlassRenderer.flush();
-    }
     public static void titleBackdrop(DrawContext context){
         if(!styledScreen())return;
         context.draw();GlassRenderer.captureBackdrop(true);GlassRenderer.modalBackground(1);

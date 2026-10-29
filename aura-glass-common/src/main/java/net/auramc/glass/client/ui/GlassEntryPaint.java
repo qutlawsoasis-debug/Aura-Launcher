@@ -25,7 +25,8 @@ public final class GlassEntryPaint implements Runnable {
         context.enableScissor(l,t,r,b);
         float[] clip=GlassRenderer.pushClip(l,t,r,b);
         boolean old=GlassScreenText.beginSelected(selected);
+        boolean oldEntry=GlassScreenText.beginEntry();
         try{entry.render(context,index,y,x,w,h,mx,my,hovered,delta);}
-        finally{GlassScreenText.endSelected(old);GlassRenderer.popClip(clip);context.disableScissor();context=null;entry=null;}
+        finally{GlassScreenText.endEntry(oldEntry);GlassScreenText.endSelected(old);GlassRenderer.popClip(clip);context.disableScissor();context=null;entry=null;}
     }
 }
