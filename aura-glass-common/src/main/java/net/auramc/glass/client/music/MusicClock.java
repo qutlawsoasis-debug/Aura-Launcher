@@ -15,6 +15,7 @@ public final class MusicClock {
 
     private volatile boolean seekFlag = false;
     private volatile long seekTargetMs = 0L;
+    private long epoch = 0L;
 
     public MusicClock() {
         this((MusicSource) null, System::currentTimeMillis);
@@ -37,6 +38,10 @@ public final class MusicClock {
         return source;
     }
 
+    public synchronized long epoch() {
+        return epoch;
+    }
+
     public synchronized void update(NowPlaying nowPlaying) {
         this.manualSnapshot = nowPlaying;
     }
@@ -44,6 +49,7 @@ public final class MusicClock {
     public synchronized void seek(long ms) {
         this.seekTargetMs = Math.max(0L, ms);
         this.seekFlag = true;
+        this.epoch++;
         if (source != null) {
             source.seek(ms);
         }
@@ -56,6 +62,7 @@ public final class MusicClock {
         this.lastState = PlaybackState.STOPPED;
         this.seekFlag = false;
         this.seekTargetMs = 0L;
+        this.epoch++;
     }
 
     public long positionMs() {
@@ -84,7 +91,18 @@ public final class MusicClock {
             return Math.round(renderedPositionMs);
         }
 
-        // 2. Paused state: position does not advance with time
+        // 2. Track change: increment epoch and snap to target
+        if (!trackId.equals(lastTrackId)) {
+            lastTrackId = trackId;
+            lastState = np.state();
+            epoch++;
+            long elapsedSinceUpdate = Math.max(0L, nowTimeMs - np.updatedAtUnixMs());
+            renderedPositionMs = clamp(np.positionMs() + (np.isPlaying() ? elapsedSinceUpdate : 0L), durationMs);
+            lastFrameTimeMs = nowTimeMs;
+            return Math.round(renderedPositionMs);
+        }
+
+        // 3. Paused state: position does not advance with time
         if (np.isPaused()) {
             lastState = PlaybackState.PAUSED;
             renderedPositionMs = clamp(np.positionMs(), durationMs);
@@ -92,13 +110,12 @@ public final class MusicClock {
             return Math.round(renderedPositionMs);
         }
 
-        // 3. Playing state: calculate extrapolated target from server
+        // 4. Playing state
         long elapsedSinceUpdate = Math.max(0L, nowTimeMs - np.updatedAtUnixMs());
         double targetMs = clamp(np.positionMs() + elapsedSinceUpdate, durationMs);
 
-        // Track change or resume from stopped/paused: snap to extrapolated target
-        if (!trackId.equals(lastTrackId) || lastState != PlaybackState.PLAYING) {
-            lastTrackId = trackId;
+        // Resume from stopped or paused
+        if (lastState != PlaybackState.PLAYING) {
             lastState = PlaybackState.PLAYING;
             renderedPositionMs = targetMs;
             lastFrameTimeMs = nowTimeMs;
@@ -108,21 +125,27 @@ public final class MusicClock {
         long dt = (lastFrameTimeMs >= 0) ? Math.max(0L, nowTimeMs - lastFrameTimeMs) : 0L;
         lastFrameTimeMs = nowTimeMs;
 
-        // Predicted position continuing along the timeline
-        double predicted = clamp(renderedPositionMs + dt, durationMs);
-        double discrepancy = targetMs - predicted;
+        double discrepancy = targetMs - renderedPositionMs;
 
         if (Math.abs(discrepancy) > 250.0) {
-            // Hard resynchronization when discrepancy exceeds 250 ms
+            // Hard resynchronization on large deviation (> 250 ms)
             renderedPositionMs = targetMs;
-        } else if (Math.abs(discrepancy) <= 40.0) {
-            // Smoothing small jumps <= 40 ms
+            epoch++;
+        } else if (discrepancy < 0.0) {
+            // Negative discrepancy <= 250 ms: DO NOT rollback!
+            // Slow down progression (dt * 0.5) until target converges with rendered position
+            double advanced = renderedPositionMs + dt * 0.5;
+            renderedPositionMs = clamp(advanced, durationMs);
+        } else if (discrepancy <= 40.0) {
+            // Small positive jump <= 40 ms: smooth catch-up
             double smoothFactor = Math.min(1.0, Math.max(0.05, dt / 200.0));
-            renderedPositionMs = clamp(predicted + discrepancy * smoothFactor, durationMs);
+            double advanced = renderedPositionMs + dt + discrepancy * smoothFactor;
+            renderedPositionMs = clamp(advanced, durationMs);
         } else {
-            // Moderate drift (40 < discrepancy <= 250): smooth convergence over ~100 ms
+            // Moderate positive drift (40 < discrepancy <= 250): smooth convergence over ~100 ms
             double moderateFactor = Math.min(1.0, Math.max(0.2, dt / 100.0));
-            renderedPositionMs = clamp(predicted + discrepancy * moderateFactor, durationMs);
+            double advanced = renderedPositionMs + dt + discrepancy * moderateFactor;
+            renderedPositionMs = clamp(advanced, durationMs);
         }
 
         return Math.round(renderedPositionMs);

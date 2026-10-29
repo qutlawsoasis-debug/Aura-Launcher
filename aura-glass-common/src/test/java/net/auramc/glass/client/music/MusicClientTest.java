@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -25,11 +26,17 @@ public final class MusicClientTest {
         testResynchronization();
         System.out.println("2. Resynchronization and smoothing PASS");
 
+        testMonotonicityWithJitter();
+        System.out.println("3. Monotonicity on 1000 frames with ±60ms jitter PASS");
+
+        testEpochCounter();
+        System.out.println("4. Epoch counter on seek, track change and hard resync PASS");
+
         testJsonParsing();
-        System.out.println("3. JSON parsing PASS");
+        System.out.println("5. JSON parsing PASS");
 
         testUnavailableBridge();
-        System.out.println("4. Unavailable bridge and HTTP integration PASS");
+        System.out.println("6. Unavailable bridge and HTTP integration PASS");
 
         System.out.println("All Aura Music Client tests PASSED successfully!");
     }
@@ -110,6 +117,85 @@ public final class MusicClientTest {
         clock.seek(85_000L);
         long posAfterSeek = clock.positionMs();
         check(posAfterSeek == 85_000L, "Immediate hard resync after seek to 85_000");
+    }
+
+    private static void testMonotonicityWithJitter() {
+        AtomicLong mockTime = new AtomicLong(10_000L);
+        MusicClock clock = new MusicClock(mockTime::get);
+
+        Track track = new Track("mono_1", "Aura Test", "Monotonic Flow", 300_000L, "");
+        long initialPos = 10_000L;
+        clock.update(new NowPlaying(PlaybackState.PLAYING, track, initialPos, mockTime.get(), 1.0f));
+
+        Random rng = new Random(42L);
+        long prevPos = clock.positionMs();
+        long serverBaseTime = mockTime.get();
+        long serverBasePos = initialPos;
+
+        // 1000 frames simulated (16 ms each frame, total 16 seconds)
+        for (int frame = 1; frame <= 1000; frame++) {
+            mockTime.addAndGet(16L); // Advance 16 ms per frame
+
+            // Every ~500 ms (every 31 frames), poller reports a new /now snapshot with ±60 ms jitter
+            if (frame % 31 == 0) {
+                long trueServerPos = serverBasePos + (mockTime.get() - serverBaseTime);
+                int noiseMs = rng.nextInt(121) - 60; // [-60, +60] ms noise
+                long noisyPos = Math.max(0L, trueServerPos + noiseMs);
+                clock.update(new NowPlaying(PlaybackState.PLAYING, track, noisyPos, mockTime.get(), 1.0f));
+            }
+
+            long currentPos = clock.positionMs();
+            check(currentPos >= prevPos, "Monotonicity violated at frame " + frame + ": currentPos=" + currentPos + " < prevPos=" + prevPos);
+            prevPos = currentPos;
+        }
+
+        // Verify clock stayed close to true time (total elapsed ~16_000 ms)
+        long totalElapsed = prevPos - initialPos;
+        check(Math.abs(totalElapsed - 16_000L) < 200L, "Clock accurately tracked 16 seconds within drift tolerance (elapsed=" + totalElapsed + ")");
+    }
+
+    private static void testEpochCounter() {
+        AtomicLong mockTime = new AtomicLong(10_000L);
+        MusicClock clock = new MusicClock(mockTime::get);
+
+        Track track1 = new Track("ep_1", "Artist 1", "Song 1", 200_000L, "");
+        clock.update(new NowPlaying(PlaybackState.PLAYING, track1, 0L, mockTime.get(), 1.0f));
+
+        long epoch0 = clock.epoch();
+        clock.positionMs(); // frame 1 triggers track start
+        long epochAfterInit = clock.epoch();
+        check(epochAfterInit > epoch0, "Epoch incremented on initial track detection");
+
+        // Normal playback and small jitter should NOT change epoch
+        for (int i = 0; i < 50; i++) {
+            mockTime.addAndGet(16L);
+            clock.positionMs();
+        }
+        check(clock.epoch() == epochAfterInit, "Epoch remains stable during continuous playback");
+
+        // Small jitter update (±40 ms) does NOT change epoch
+        clock.update(new NowPlaying(PlaybackState.PLAYING, track1, clock.positionMs() + 30L, mockTime.get(), 1.0f));
+        clock.positionMs();
+        check(clock.epoch() == epochAfterInit, "Epoch unchanged on small jitter (<= 250 ms)");
+
+        // Hard jump > 250 ms MUST increment epoch
+        clock.update(new NowPlaying(PlaybackState.PLAYING, track1, clock.positionMs() + 500L, mockTime.get(), 1.0f));
+        clock.positionMs();
+        long epochAfterHardJump = clock.epoch();
+        check(epochAfterHardJump > epochAfterInit, "Epoch incremented on hard jump > 250 ms");
+
+        // Seek MUST increment epoch
+        clock.seek(50_000L);
+        clock.positionMs();
+        long epochAfterSeek = clock.epoch();
+        check(epochAfterSeek > epochAfterHardJump, "Epoch incremented on seek()");
+
+        // Track change MUST increment epoch
+        Track track2 = new Track("ep_2", "Artist 2", "Song 2", 150_000L, "");
+        clock.update(new NowPlaying(PlaybackState.PLAYING, track2, 0L, mockTime.get(), 1.0f));
+        clock.positionMs();
+        long epochAfterTrackChange = clock.epoch();
+        check(epochAfterTrackChange > epochAfterSeek, "Epoch incremented on track change");
     }
 
     private static void testJsonParsing() {
