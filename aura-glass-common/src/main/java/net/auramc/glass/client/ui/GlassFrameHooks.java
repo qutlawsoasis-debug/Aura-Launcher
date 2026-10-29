@@ -38,7 +38,9 @@ public final class GlassFrameHooks {
 
     }
     public static boolean styledScreen() {
-        var screen = MinecraftClient.getInstance().currentScreen;
+        var client = MinecraftClient.getInstance();
+        if (client == null) return false;
+        var screen = client.currentScreen;
         if(screen==null || nativeContentDepth>0 || net.auramc.glass.common.render.MenuResources.stopping())return false;
         boolean ingame = screen instanceof net.minecraft.client.gui.screen.ingame.BookScreen
                 || screen instanceof net.minecraft.client.gui.screen.ingame.BookEditScreen
@@ -70,7 +72,9 @@ public final class GlassFrameHooks {
     }
 
     public static void afterBackground(DrawContext context) {
-        var screen = MinecraftClient.getInstance().currentScreen;
+        var client = MinecraftClient.getInstance();
+        if (client == null) return;
+        var screen = client.currentScreen;
         if (screen == null) return;
         String name = screen.getClass().getName();
         if (!name.startsWith(net.minecraft.client.gui.screen.Screen.class.getPackageName() + ".") && !name.startsWith("net.auramc.glass.") && !(screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen) && !isModScreenStyled(name)) return;
