@@ -190,24 +190,49 @@ public final class MusicKaraokeBridge implements AutoCloseable {
         currentLyricsFuture = lyricsClient.getLyricsAsync(track.artist(), track.title(), durationSec)
                 .thenApply(optLyrics -> {
                     // Running on HTTP completion thread: DO NOT MUTATE KaraokeEngine directly!
-                    // Deliver immutable parsed lyrics DTO to atomic reference.
+                    // Deliver immutable parsed lyrics DTO via atomic generation CAS publishing.
                     if (optLyrics.isPresent()) {
                         Lyrics lyrics = optLyrics.get();
                         if (lyrics.synced() && !lyrics.lines().isEmpty()) {
                             KaraokeModel.KaraokeLyrics kLyrics = convertToKaraokeModel(lyrics);
-                            pendingLyrics.set(new PendingLyrics(generation, trackId, kLyrics));
+                            publishPendingLyrics(new PendingLyrics(generation, trackId, kLyrics));
                             return optLyrics;
                         }
                     }
                     // Missing or unsynced: deliver null lyrics sentinel
-                    pendingLyrics.set(new PendingLyrics(generation, trackId, null));
+                    publishPendingLyrics(new PendingLyrics(generation, trackId, null));
                     return optLyrics;
                 })
                 .exceptionally(ex -> {
                     // On error: deliver null lyrics sentinel
-                    pendingLyrics.set(new PendingLyrics(generation, trackId, null));
+                    publishPendingLyrics(new PendingLyrics(generation, trackId, null));
                     return Optional.empty();
                 });
+    }
+
+    /**
+     * Atomically publishes pending lyrics from background threads.
+     * Prevents stale completions (older generation) from overwriting newer completions
+     * even if they resolve out-of-order before the client thread drains the slot.
+     */
+    private void publishPendingLyrics(PendingLyrics newPending) {
+        if (newPending == null) {
+            return;
+        }
+        // Discard immediately if generation is already older than the current active generation
+        if (newPending.generation < this.requestGeneration) {
+            return;
+        }
+        pendingLyrics.accumulateAndGet(newPending, (current, incoming) -> {
+            if (current == null) {
+                return incoming;
+            }
+            // Newer generation always wins; older generation never overwrites newer
+            if (incoming.generation >= current.generation) {
+                return incoming;
+            }
+            return current;
+        });
     }
 
     private void drainPendingLyrics(PlaybackState currentState, boolean isSourceAvailable) {

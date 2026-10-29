@@ -90,6 +90,9 @@ public final class MusicKaraokeIntegrationTest {
             testDelayedCompletionAfterBridgeLost(tempDir);
             testAsyncCompletionThreadSafetyNoDirectEngineMutation(tempDir);
             testMusicSourceProviderReuseAndNoExtraPollers();
+            testReverseCompletionOrder_B_Then_A(tempDir);
+            testOldRequestErrorAfterNewRequestSuccess(tempDir);
+            testForwardCompletionOrder_A_Then_B(tempDir);
 
             System.out.println("=== ALL MUSIC-KARAOKE INTEGRATION TESTS PASSED ===");
         } catch (Throwable t) {
@@ -488,7 +491,10 @@ public final class MusicKaraokeIntegrationTest {
         MusicClock clock = new MusicClock(source, virtualTime::get);
 
         Path cacheDir = tempDir.resolve("cache_del_track");
-        ControlledLyricsClient controlledClient = new ControlledLyricsClient(cacheDir);
+        MultiControlledLyricsClient controlledClient = new MultiControlledLyricsClient(cacheDir);
+        var futureA = controlledClient.getOrCreateFuture("Title A");
+        var futureB = controlledClient.getOrCreateFuture("Title B");
+
         KaraokeEngine engine = new KaraokeEngine();
         MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, controlledClient, engine);
 
@@ -503,7 +509,7 @@ public final class MusicKaraokeIntegrationTest {
 
         // 3. Late resolution of Track A occurs
         Lyrics lyricsA = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
-        controlledClient.future.complete(java.util.Optional.of(lyricsA));
+        futureA.complete(java.util.Optional.of(lyricsA));
 
         // 4. Client tick update: Track A lyrics MUST NOT apply to Track B!
         bridge.update(virtualTime.get());
@@ -607,6 +613,145 @@ public final class MusicKaraokeIntegrationTest {
         @Override
         public java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>> getLyricsAsync(String artist, String title, double durationSec) {
             return future;
+        }
+    }
+
+
+    private static void testReverseCompletionOrder_B_Then_A(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(90_000L);
+        Track trackA = new Track("probe_track_A", "Artist A", "Title A", 120_000L, "");
+        Track trackB = new Track("probe_track_B", "Artist B", "Title B", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(trackA, trackB), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_order_probe_1");
+        MultiControlledLyricsClient client = new MultiControlledLyricsClient(cacheDir);
+        var futureA = client.getOrCreateFuture("Title A");
+        var futureB = client.getOrCreateFuture("Title B");
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, client, engine);
+
+        // 1. Tick on Track A -> request A pending (gen 1)
+        bridge.update(virtualTime.get());
+        check("probe_track_A".equals(bridge.getLastTrackId()), "track A started");
+        check(bridge.getRequestGeneration() == 1L, "gen 1 on track A");
+
+        // 2. Switch to Track B -> request B pending (gen 2)
+        source.next();
+        bridge.update(virtualTime.get());
+        check("probe_track_B".equals(bridge.getLastTrackId()), "track B started");
+        check(bridge.getRequestGeneration() == 2L, "gen 2 on track B");
+
+        // 3. Independent reverse-completion probe:
+        // Complete B first with current lyrics, THEN complete A with stale lyrics
+        // WITHOUT any intervening bridge.update() ticks!
+        Lyrics lyricsB = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        futureB.complete(java.util.Optional.of(lyricsB));
+
+        Lyrics lyricsA = new Lyrics("source_A", true, List.of());
+        futureA.complete(java.util.Optional.of(lyricsA));
+
+        // 4. Client tick runs: MUST NOT lose Track B's lyrics or revert to stopped!
+        bridge.update(virtualTime.get());
+
+        check("probe_track_B".equals(bridge.getLastTrackId()), "currentTrack=B");
+        check(engine.getLyrics() != null, "lyricsPresent=true for Track B");
+        check(!engine.isStopped(), "stopped=false (Track B is active and playing)");
+        check(engine.isPlaying(), "engine.isPlaying() is true for Track B");
+
+        System.out.println("[PASS] 14. Reverse completion order (B then A): Track B lyrics preserved, not overwritten by stale A");
+    }
+
+    private static void testOldRequestErrorAfterNewRequestSuccess(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(100_000L);
+        Track trackA = new Track("err_track_A", "Artist A", "Title A", 120_000L, "");
+        Track trackB = new Track("err_track_B", "Artist B", "Title B", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(trackA, trackB), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_order_probe_2");
+        MultiControlledLyricsClient client = new MultiControlledLyricsClient(cacheDir);
+        var futureA = client.getOrCreateFuture("Title A");
+        var futureB = client.getOrCreateFuture("Title B");
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, client, engine);
+
+        // 1. Tick Track A (gen 1)
+        bridge.update(virtualTime.get());
+        // 2. Switch to Track B (gen 2)
+        source.next();
+        bridge.update(virtualTime.get());
+
+        // 3. Complete B successfully, then complete A with an error without tick between
+        Lyrics lyricsB = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        futureB.complete(java.util.Optional.of(lyricsB));
+        futureA.completeExceptionally(new java.io.IOException("Network timeout on old track A"));
+
+        // 4. Client tick runs: Track B lyrics must remain intact!
+        bridge.update(virtualTime.get());
+
+        check("err_track_B".equals(bridge.getLastTrackId()), "currentTrack=B");
+        check(engine.getLyrics() != null, "lyricsPresent=true (not nulled out by A's error)");
+        check(!engine.isStopped(), "stopped=false");
+
+        System.out.println("[PASS] 15. Old request error after new request success: Track B lyrics remain intact");
+    }
+
+    private static void testForwardCompletionOrder_A_Then_B(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(110_000L);
+        Track trackA = new Track("fwd_track_A", "Artist A", "Title A", 120_000L, "");
+        Track trackB = new Track("fwd_track_B", "Artist B", "Title B", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(trackA, trackB), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_order_probe_3");
+        MultiControlledLyricsClient client = new MultiControlledLyricsClient(cacheDir);
+        var futureA = client.getOrCreateFuture("Title A");
+        var futureB = client.getOrCreateFuture("Title B");
+
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, client, engine);
+
+        // 1. Tick Track A (gen 1)
+        bridge.update(virtualTime.get());
+        // 2. Switch to Track B (gen 2)
+        source.next();
+        bridge.update(virtualTime.get());
+
+        // 3. Complete A first, then complete B without tick between
+        Lyrics lyricsA = new Lyrics("source_A", true, List.of());
+        futureA.complete(java.util.Optional.of(lyricsA));
+
+        Lyrics lyricsB = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        futureB.complete(java.util.Optional.of(lyricsB));
+
+        // 4. Client tick runs
+        bridge.update(virtualTime.get());
+
+        check("fwd_track_B".equals(bridge.getLastTrackId()), "currentTrack=B");
+        check(engine.getLyrics() != null, "lyricsPresent=true for Track B");
+        check(!engine.isStopped(), "stopped=false for Track B");
+
+        System.out.println("[PASS] 16. Forward completion order (A then B): Track B lyrics safely applied");
+    }
+
+    static class MultiControlledLyricsClient extends LyricsClient {
+        final java.util.Map<String, java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>>> futures =
+                new java.util.concurrent.ConcurrentHashMap<>();
+
+        MultiControlledLyricsClient(Path cacheDir) {
+            super("http://127.0.0.1:9999", cacheDir, null);
+        }
+
+        public java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>> getOrCreateFuture(String title) {
+            return futures.computeIfAbsent(title, k -> new java.util.concurrent.CompletableFuture<>());
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>> getLyricsAsync(String artist, String title, double durationSec) {
+            return getOrCreateFuture(title);
         }
     }
 
