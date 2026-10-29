@@ -38,6 +38,14 @@ public final class AuraRenderer {
 
     public static boolean isReady() { return ready; }
 
+    public static synchronized void ensureFontMetricsLoaded() {
+        if (GLYPHS[0]['A'] != null) return;
+        try (InputStream in = resource("msdf/onest.json")) {
+            loadFontMetrics(in);
+        } catch (Throwable ignored) {
+        }
+    }
+
     /** Called by client initialization on the render thread, never by a draw method. */
     public static void initialize() {
         if (ready || failed) return;
@@ -251,6 +259,7 @@ public final class AuraRenderer {
 
     public static float textWidth(String text, float size, int weight) {
         if (text == null || text.isEmpty()) return 0;
+        ensureFontMetricsLoaded();
         float width = 0;
         int w = weightIndex(weight);
         for (int i = 0; i < text.length(); i++) {
@@ -356,13 +365,16 @@ public final class AuraRenderer {
     public static float atlasWidth() { return atlasWidth; }
     public static float atlasHeight() { return atlasHeight; }
     public static float getKerning(int cp1, int cp2) {
-        if (cp1 <= 0 || cp2 <= 0 || KERNING.isEmpty()) return 0.0f;
+        if (cp1 <= 0 || cp2 <= 0) return 0.0f;
+        ensureFontMetricsLoaded();
+        if (KERNING.isEmpty()) return 0.0f;
         long key = (((long) cp1) << 32) | (((long) cp2) & 0xFFFFFFFFL);
         Float k = KERNING.get(key);
         return k != null ? k : 0.0f;
     }
 
     public static Glyph getGlyph(int weight, int codePoint) {
+        ensureFontMetricsLoaded();
         int w = weightIndex(weight);
         if (codePoint >= 0 && codePoint < GLYPHS[w].length) {
             return GLYPHS[w][codePoint];

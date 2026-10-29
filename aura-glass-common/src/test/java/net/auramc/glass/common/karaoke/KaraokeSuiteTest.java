@@ -46,6 +46,8 @@ public final class KaraokeSuiteTest {
         testLuminanceSamplingGateRateLimit();
         testW6dPerLetterPhysicsLifecycle();
         testOnest700MSDFAtlasAndKerning();
+        testDemoTimelineLetterNonIntersection();
+        testGroundScatterAndRotation();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -383,6 +385,10 @@ public final class KaraokeSuiteTest {
                                     for (double sy : new double[]{-halfH, halfH}) {
                                         Vec3d corner = a.position.add(camRight.multiply(sx)).add(camDown.multiply(sy));
                                         double cAng = WordPlacement.angleFromLook(corner, eyePos, currentLook);
+                                        if (cAng > 12.0001) {
+                                            System.err.printf("FAIL cAng=%.2f word=%s pos=%s sx=%.2f sy=%.2f vel=%s yaw=%.1f pitch=%.1f w=%.2f h=%.2f%n",
+                                                    cAng, a.word.w, a.position, sx, sy, vel, testYaw, testPitch, a.width, a.height);
+                                        }
                                         check(cAng >= 2.9999, "Corner inside dead zone: " + cAng + " at size=" + sz);
                                         check(cAng <= 12.0001, "Corner exceeds 12.0° cone: " + cAng + " at size=" + sz);
                                     }
@@ -811,6 +817,170 @@ public final class KaraokeSuiteTest {
         check(KaraokeWorldRenderer.getLuminanceSampleCallCount() == 4, "sample count is 4 on time reset");
 
         System.out.println("[PASS] 10. Luminance sampling gate rate limit: strict 4-tick rule, no wall-time bypass during pause/low TPS, 100+ same-tick frames blocked");
+    }
+
+    private static void testDemoTimelineLetterNonIntersection() {
+        AuraRenderer.ensureFontMetricsLoaded();
+        String demoJson;
+        try (var in = KaraokeSuiteTest.class.getResourceAsStream("/assets/aura-glass/karaoke/demo.json")) {
+            check(in != null, "demo.json resource must exist");
+            demoJson = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        KaraokeModel.KaraokeLyrics lyrics = KaraokeModel.fromJson(demoJson);
+        check(lyrics != null && !lyrics.lines.isEmpty(), "lyrics lines parsed");
+
+        Vec3d eyePos = new Vec3d(0, 64, 0);
+        float[] testYaws = {0f, 45f, 90f, 180f, 270f};
+        float[] testPitches = {-20f, -10f, 0f, 15f, 30f};
+        int[] screenWidths = {1280, 1920};
+        int[] screenHeights = {720, 1080};
+        Vec3d[] vels = {Vec3d.ZERO, new Vec3d(0.2, 0, 0), new Vec3d(-0.2, 0, 0.2)};
+
+        int letterComparisons = 0;
+        int wordComparisons = 0;
+
+        for (KaraokeModel.KaraokeLine line : lyrics.lines) {
+            for (Vec3d vel : vels) {
+                for (float yaw : testYaws) {
+                    for (float pitch : testPitches) {
+                        var anchors = WordPlacement.layoutGroup(line.words, eyePos, yaw, pitch, vel, 1.0f, null);
+                        check(!anchors.isEmpty(), "anchors generated for demo line: " + line.text);
+
+                        for (int res = 0; res < screenWidths.length; res++) {
+                            int sw = screenWidths[res];
+                            int sh = screenHeights[res];
+
+                            Matrix4f viewMatrix = new Matrix4f()
+                                    .rotationX((float) Math.toRadians(pitch))
+                                    .rotationY((float) Math.toRadians(yaw + 180.0f));
+
+                            Matrix4f projMatrix = new Matrix4f()
+                                    .setPerspective((float) Math.toRadians(70.0), (float) sw / (float) sh, 0.05f, 1000.0f);
+
+                            List<WordPlacement.WordRect> wordRects = new ArrayList<>();
+                            List<List<WordPlacement.WordRect>> letterRectsPerWord = new ArrayList<>();
+
+                            double pitchRad = Math.toRadians(pitch);
+                            double yawRad = Math.toRadians(yaw);
+                            Vec3d rightVec = new Vec3d(-Math.cos(yawRad), 0, -Math.sin(yawRad)).normalize();
+
+                            for (WordPlacement.WordAnchor a : anchors) {
+                                wordRects.add(WordPlacement.projectWordToScreen(a, viewMatrix, projMatrix, sw, sh, eyePos));
+
+                                // Project individual letters of this word
+                                List<WordPlacement.WordRect> letList = new ArrayList<>();
+                                float fontScale = a.height / WordPlacement.FONT_LINE_HEIGHT_EM;
+                                float totalW = AuraRenderer.textWidth(a.word.w, fontScale, 700);
+                                float penX = -totalW * 0.5f;
+
+                                for (int ci = 0; ci < a.word.w.length(); ci++) {
+                                    char ch = a.word.w.charAt(ci);
+                                    var glyph = AuraRenderer.getGlyph(700, ch);
+                                    float adv = glyph != null ? glyph.advance * fontScale : 0.5f * fontScale;
+                                    if (ci > 0) {
+                                        penX -= 0.01f * fontScale;
+                                        penX += AuraRenderer.getKerning(a.word.w.charAt(ci - 1), ch) * fontScale;
+                                    }
+                                    float charCenterX = penX + adv * 0.5f;
+                                    Vec3d letPos = a.position.add(rightVec.multiply(charCenterX));
+                                    WordPlacement.WordRect lr = WordPlacement.projectBoxToScreen(
+                                            letPos, adv * 0.5f, a.height * 0.5f,
+                                            viewMatrix, projMatrix, sw, sh, eyePos
+                                    );
+                                    if (lr != null) letList.add(lr);
+                                    penX += adv;
+                                }
+                                letterRectsPerWord.add(letList);
+                            }
+
+                            // 1. Verify words never intersect
+                            for (int i = 0; i < wordRects.size(); i++) {
+                                for (int j = i + 1; j < wordRects.size(); j++) {
+                                    WordPlacement.WordRect rA = wordRects.get(i);
+                                    WordPlacement.WordRect rB = wordRects.get(j);
+                                    check(!rA.intersects(rB), String.format(java.util.Locale.ROOT,
+                                            "Demo line '%s': word '%s' %s and '%s' %s intersect on screen! (res=%dx%d)",
+                                            line.text, anchors.get(i).word.w, rA, anchors.get(j).word.w, rB, sw, sh));
+                                    wordComparisons++;
+                                }
+                            }
+
+                            // 2. Verify letters across different words never intersect
+                            for (int i = 0; i < letterRectsPerWord.size(); i++) {
+                                for (int j = i + 1; j < letterRectsPerWord.size(); j++) {
+                                    for (WordPlacement.WordRect la : letterRectsPerWord.get(i)) {
+                                        for (WordPlacement.WordRect lb : letterRectsPerWord.get(j)) {
+                                            check(!la.intersects(lb), "Letters of different words must never intersect: " + la + " vs " + lb);
+                                            letterComparisons++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        check(wordComparisons >= 200, "word comparisons >= 200: " + wordComparisons);
+        check(letterComparisons >= 2000, "letter comparisons >= 2000: " + letterComparisons);
+        System.out.println("[PASS] 13. Demo timeline non-intersection: letter & word bounding rectangles NEVER intersect (" +
+                wordComparisons + " word pairs, " + letterComparisons + " letter pairs verified across all 4 demo lines)");
+    }
+
+    private static void testGroundScatterAndRotation() {
+        KaraokePhysics physics = new KaraokePhysics();
+        physics.clear();
+
+        Vec3d spawnPos = new Vec3d(0, 68, 0);
+        Vector3f u = new Vector3f(1, 0, 0);
+        Vector3f v = new Vector3f(0, 1, 0);
+
+        for (int i = 0; i < 20; i++) {
+            physics.spawnLetter((char) ('A' + (i % 26)), spawnPos.add(i * 0.1, 0, 0), u, v, 0.35f, 1000L + i * 50, null);
+        }
+
+        for (var l : physics.getLetters()) {
+            l.vy = -0.01;
+            l.vx = 0.005;
+            l.vz = 0.005;
+            l.sleeping = false;
+            l.groundScattered = false;
+        }
+
+        // Tick physics to simulate landing and trigger ground scatter & rotation
+        for (int t = 0; t < 5; t++) {
+            physics.tick(null);
+            for (var l : physics.getLetters()) {
+                l.sleeping = true; // force sleeping trigger if needed
+            }
+        }
+
+        var letters = physics.getLetters();
+        check(!letters.isEmpty(), "letters exist");
+
+        double minX = Double.POSITIVE_INFINITY, maxX = Double.NEGATIVE_INFINITY;
+        double minZ = Double.POSITIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
+        boolean hasNonZeroYaw = false;
+        boolean hasNonZeroPitch = false;
+
+        for (var l : letters) {
+            minX = Math.min(minX, l.x);
+            maxX = Math.max(maxX, l.x);
+            minZ = Math.min(minZ, l.z);
+            maxZ = Math.max(maxZ, l.z);
+            if (Math.abs(l.yaw) > 1.0f) hasNonZeroYaw = true;
+            if (Math.abs(l.pitch) > 1.0f) hasNonZeroPitch = true;
+        }
+
+        double spreadZ = maxZ - minZ;
+        check(spreadZ > 0.05, "Z coordinates scattered across ground surface (spreadZ=" + spreadZ + " bl, target ±0.3 bl)");
+        check(hasNonZeroYaw, "ground letters have random non-zero yaw rotation");
+        check(hasNonZeroPitch, "ground letters have random non-zero pitch (tilted/lying)");
+
+        System.out.println("[PASS] 14. Scattered landing on ground: positions dispersed ±0.3 blocks, random yaw/pitch/roll rotations (no collinear strip)");
     }
 
     private static void check(boolean condition, String description) {

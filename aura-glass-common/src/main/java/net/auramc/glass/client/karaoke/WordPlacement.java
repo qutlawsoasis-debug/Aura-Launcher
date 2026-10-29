@@ -200,7 +200,7 @@ public final class WordPlacement {
             }
         }
 
-        float baseFontScale = BASE_FONT_SCALE * config.getSize();
+        float baseFontScale = (float) (35.0 * actualDistance / 650.7) * config.getSize();
         float fullLineHeight = FONT_LINE_HEIGHT_EM * baseFontScale;
         float wordHeight = fullLineHeight;
         float spaceWidth = SPACE_EM * baseFontScale;
@@ -215,6 +215,10 @@ public final class WordPlacement {
         // Top edge of line 1 strictly outside 3.0° dead zone
         double y_top = actualDistance * Math.tan(Math.toRadians(3.25));
 
+        // Max allowed line width so that line fits inside <= 12° cone:
+        double y1 = y_top + fullLineHeight * 0.5;
+        double maxLineWidth = 2.0 * actualDistance * Math.tan(Math.toRadians(12.0));
+
         // Check if all items fit on 1 line
         double totalSingleLineWidth = 0.0;
         for (int i = 0; i < items.size(); i++) {
@@ -222,27 +226,23 @@ public final class WordPlacement {
             if (i > 0) totalSingleLineWidth += spaceWidth;
         }
 
-        double y0 = y_top + fullLineHeight * 0.5;
-        double halfW0 = totalSingleLineWidth * 0.5;
-        double maxR0 = Math.sqrt(halfW0 * halfW0 + (y_top + fullLineHeight) * (y_top + fullLineHeight));
-        double maxCorner0 = Math.toDegrees(Math.atan2(maxR0, actualDistance));
-
-        // Per VOZVRAT 5: 2 words must stay on 1 line (scaled if needed); 3+ words wrap to 2 lines
-        boolean fitsOnSingleLine = items.size() <= 2;
+        // Per VOZVRAT 5 & Task 2: 2 short words stay on 1 line; 3+ words wrap to 2 lines
+        boolean fitsOnSingleLine = items.size() <= 2 && totalSingleLineWidth <= maxLineWidth;
 
         List<LayoutLine> lines = new ArrayList<>();
         if (fitsOnSingleLine) {
+            double y0 = y_top + fullLineHeight * 0.5;
             LayoutLine line0 = new LayoutLine(0, Math.toDegrees(Math.atan2(y0, actualDistance)), y0);
             line0.items.addAll(items);
             lines.add(line0);
         } else {
-            double y1 = y_top + fullLineHeight * 0.5;
             double y2 = y1 + lineSpacing;
 
             LayoutLine line1 = new LayoutLine(0, Math.toDegrees(Math.atan2(y1, actualDistance)), y1);
             LayoutLine line2 = new LayoutLine(1, Math.toDegrees(Math.atan2(y2, actualDistance)), y2);
 
             int targetLine1Count = items.size() == 3 ? 2 : (items.size() == 4 ? 2 : (items.size() >= 5 ? 3 : 1));
+
             for (int i = 0; i < items.size(); i++) {
                 if (i < targetLine1Count) {
                     line1.items.add(items.get(i));
@@ -260,40 +260,40 @@ public final class WordPlacement {
         double maxAllowedR = actualDistance * Math.tan(Math.toRadians(11.85));
         double minScale = 1.0;
         for (LayoutLine line : lines) {
-            double lineTotalW = line.getTotalWidth(spaceWidth);
-            double startX = -lineTotalW * 0.5;
-            double curX = startX;
+                double lineTotalW = line.getTotalWidth(spaceWidth);
+                double startX = -lineTotalW * 0.5;
+                double curX = startX;
 
-            for (WordLayoutItem item : line.items) {
-                double centerX = curX + item.width * 0.5;
-                double deltaY_center = line.verticalOffset - y_top;
+                for (WordLayoutItem item : line.items) {
+                    double centerX = curX + item.width * 0.5;
+                    double deltaY_center = line.verticalOffset - y_top;
 
-                double halfW = item.width * 0.5;
-                double halfH = wordHeight * 0.5;
+                    double halfW = item.width * 0.5;
+                    double halfH = wordHeight * 0.5;
 
-                for (double sx : new double[]{-halfW, halfW}) {
-                    for (double sy : new double[]{-halfH, halfH}) {
-                        double cx = centerX + sx;
-                        double deltaY_corner = deltaY_center + sy;
-                        double A = cx * cx + deltaY_corner * deltaY_corner;
-                        if (A > 1e-9) {
-                            double B = 2.0 * y_top * deltaY_corner;
-                            double C = y_top * y_top - maxAllowedR * maxAllowedR;
-                            if (C < 0) {
-                                double disc = B * B - 4.0 * A * C;
-                                if (disc >= 0) {
-                                    double s = (-B + Math.sqrt(disc)) / (2.0 * A);
-                                    if (s > 0 && s < minScale) {
-                                        minScale = s;
+                    for (double sx : new double[]{-halfW, halfW}) {
+                        for (double sy : new double[]{-halfH, halfH}) {
+                            double cx = centerX + sx;
+                            double deltaY_corner = deltaY_center + sy;
+                            double A = cx * cx + deltaY_corner * deltaY_corner;
+                            if (A > 1e-9) {
+                                double B = 2.0 * y_top * deltaY_corner;
+                                double C = y_top * y_top - maxAllowedR * maxAllowedR;
+                                if (C < 0) {
+                                    double disc = B * B - 4.0 * A * C;
+                                    if (disc >= 0) {
+                                        double s = (-B + Math.sqrt(disc)) / (2.0 * A);
+                                        if (s > 0 && s < minScale) {
+                                            minScale = s;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                    curX += item.width + spaceWidth;
                 }
-                curX += item.width + spaceWidth;
             }
-        }
 
         if (minScale < 0.999) {
             float s = (float) minScale;
@@ -589,10 +589,9 @@ public final class WordPlacement {
     public static float estimateWordWidth(String text) {
         if (text == null || text.isEmpty()) return 0.5f;
         try {
-            if (net.auramc.glass.common.render.AuraRenderer.isReady()) {
-                float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f, 700);
-                if (tw > 0.05f) return tw;
-            }
+            net.auramc.glass.common.render.AuraRenderer.ensureFontMetricsLoaded();
+            float tw = net.auramc.glass.common.render.AuraRenderer.textWidth(text, 1.0f, 700);
+            if (tw > 0.05f) return tw;
         } catch (Throwable ignored) {
         }
         return Math.max(0.6f, text.length() * 0.55f);

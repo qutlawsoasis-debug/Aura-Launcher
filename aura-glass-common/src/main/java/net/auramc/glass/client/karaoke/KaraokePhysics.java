@@ -66,6 +66,7 @@ public final class KaraokePhysics {
         public float currentAlpha = 0.70f; // Falling letters alpha 0.70, on ground 0.85 (Return 1)
         public float currentScale = 1.0f;
         public boolean isOccluded = false;
+        public boolean groundScattered = false;
 
         public PhysicalLetter(char ch, Vec3d pos, Vector3f billboardU, Vector3f billboardV, float size, long spawnTimeMs, World world) {
             this.ch = ch;
@@ -92,18 +93,18 @@ public final class KaraokePhysics {
             double upSpeed = (0.6 + RNG.nextDouble() * 0.6) * 0.050;
             // Lateral in billboard plane: ±0.5 bl/s -> ±0.025 bl/tick
             double latSpeed = ((RNG.nextDouble() - 0.5) * 1.0) * 0.050;
-            // Towards player: 0
 
             Vector3f u = billboardU != null ? billboardU : new Vector3f(1, 0, 0);
+
             this.vx = u.x * latSpeed;
             this.vy = upSpeed;
             this.vz = u.z * latSpeed;
 
-            // Rotation: ±90…240°/s -> ±4.5…12.0°/tick (primarily roll / view axis)
+            // Rotation: ±90…240°/s -> ±4.5…12.0°/tick (with 3D tumble)
             float rotSpeed = (float) ((90.0 + RNG.nextDouble() * 150.0) * (RNG.nextBoolean() ? 1.0 : -1.0) * 0.050);
             this.vRoll = rotSpeed;
-            this.vPitch = (float) ((RNG.nextDouble() - 0.5) * 3.0);
-            this.vYaw = (float) ((RNG.nextDouble() - 0.5) * 3.0);
+            this.vPitch = (float) ((RNG.nextDouble() - 0.5) * 8.0);
+            this.vYaw = (float) ((RNG.nextDouble() - 0.5) * 8.0);
 
             this.hasGroundBelow = checkGroundBelow(pos, world, 6);
         }
@@ -130,6 +131,28 @@ public final class KaraokePhysics {
                     px - halfExtent, py - halfExtent, pz - halfDepth,
                     px + halfExtent, py + halfExtent, pz + halfDepth
             );
+        }
+
+        public void applyGroundScatter() {
+            if (groundScattered) return;
+            groundScattered = true;
+            // Task 3: scatter ±0.3 blocks on ground landing, leave random rotation
+            double sx = (RNG.nextDouble() - 0.5) * 0.6; // ±0.3 blocks
+            double sz = (RNG.nextDouble() - 0.5) * 0.6; // ±0.3 blocks
+            this.x += sx;
+            this.z += sz;
+            this.prevX = this.x;
+            this.prevZ = this.z;
+            this.yaw = (float) (RNG.nextDouble() * 360.0);
+            this.pitch = (float) (RNG.nextBoolean() ? -80.0 - RNG.nextDouble() * 20.0 : (RNG.nextDouble() - 0.5) * 40.0);
+            this.roll = (float) ((RNG.nextDouble() - 0.5) * 60.0);
+            this.prevYaw = this.yaw;
+            this.prevPitch = this.pitch;
+            this.prevRoll = this.roll;
+            this.vPitch = 0;
+            this.vYaw = 0;
+            this.vRoll = 0;
+            this.currentAlpha = 0.85f;
         }
 
         public Vec3d getInterpolatedPos(float tickDelta) {
@@ -279,6 +302,9 @@ public final class KaraokePhysics {
                 }
 
                 if (l.sleeping) {
+                    if (!l.groundScattered) {
+                        l.applyGroundScatter();
+                    }
                     l.restTicks++;
                     if (l.restTicks >= GROUND_REST_TICKS) {
                         l.dissolving = true;
@@ -329,7 +355,7 @@ public final class KaraokePhysics {
                         if (Math.abs(l.vy) < 0.02 && Math.abs(l.vx) < 0.015 && Math.abs(l.vz) < 0.015) {
                             l.vy = 0; l.vx = 0; l.vz = 0;
                             l.sleeping = true;
-                            l.currentAlpha = 0.85f;
+                            l.applyGroundScatter();
                         }
                     } else {
                         l.vy = -l.vy * RESTITUTION;
