@@ -31,7 +31,7 @@ public final class QuickMenuScreen extends Screen {
     private static final int[] COLORS = {0xFFFFFF, 0x64D2FF, 0x5FD39A, 0xFFCC66, 0xFF8A7A};
     private final QuickMenuMotion motion = new QuickMenuMotion();
     private final List<Control> controls = new ArrayList<>();
-    private final QuickMenuMusicController musicController = new QuickMenuMusicController();
+    private final QuickMenuMusicController musicController;
 
     private int section, focused, scroll;
     private boolean dragging, menuKeyHeld = true, searching;
@@ -66,7 +66,12 @@ public final class QuickMenuScreen extends Screen {
     }
 
     public QuickMenuScreen() {
+        this(new QuickMenuMusicController());
+    }
+
+    public QuickMenuScreen(QuickMenuMusicController musicController) {
         super(Text.literal("Aura"));
+        this.musicController = musicController != null ? musicController : new QuickMenuMusicController();
     }
 
     @Override
@@ -139,6 +144,10 @@ public final class QuickMenuScreen extends Screen {
         return musicController.snapshot();
     }
 
+    public QuickMenuMotion motion() {
+        return motion;
+    }
+
     public QuickMenuMusicController musicController() {
         return musicController;
     }
@@ -151,7 +160,6 @@ public final class QuickMenuScreen extends Screen {
     public void close() {
         qaHoverProgress = false;
         motion.setOpen(false, System.nanoTime());
-        musicController.close();
     }
 
     @Override

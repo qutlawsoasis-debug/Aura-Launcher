@@ -4,6 +4,7 @@ import net.auramc.glass.client.music.MusicSource;
 import net.auramc.glass.client.music.NowPlaying;
 import net.auramc.glass.client.music.PlaybackState;
 import net.auramc.glass.client.music.Track;
+import net.auramc.glass.client.quickmenu.QuickMenuScreen;
 
 import java.util.Collections;
 import java.util.List;
@@ -36,6 +37,12 @@ public final class QuickMenuMusicRegressionTest {
 
         testLifecycleCloseShutsDownWorker();
         System.out.println("[PASS] 5. Lifecycle close cleanly shuts down background tasks");
+
+        testFailedNewSearchAfterSuccessfulOldSearchDoesNotPublishOldResults();
+        System.out.println("[PASS] 6. Failed new search drops old results and records error state across refresh");
+
+        testCloseReopenReversalPreservesController();
+        System.out.println("[PASS] 7. Close -> reopen reversal preserves controller; removed() stops controller");
 
         System.out.println("=== ALL QUICKMENU MUSIC REGRESSION TESTS PASSED ===");
     }
@@ -176,6 +183,98 @@ public final class QuickMenuMusicRegressionTest {
         check(source.totalIoCalls() == ioAfterClose, "No further IO calls after controller close");
     }
 
+    private static void testFailedNewSearchAfterSuccessfulOldSearchDoesNotPublishOldResults() throws Exception {
+        InstrumentedMusicSource source = new InstrumentedMusicSource();
+        source.available = true;
+        source.queueTracks = List.of(new Track("q1", "Queue Artist", "Queue Track", 180_000L, ""));
+        source.searchTracks = List.of(new Track("old1", "Old Artist", "Old Track", 120_000L, ""));
+
+        try (QuickMenuMusicController controller = new QuickMenuMusicController(() -> source)) {
+            awaitCondition(() -> !controller.snapshot().queue().isEmpty(), 3000, "Initial queue loaded");
+
+            // 1. Successful search for old query
+            controller.requestSearch("oldQuery");
+            awaitCondition(() -> !controller.snapshot().searchResults().isEmpty()
+                    && "oldQuery".equals(controller.snapshot().searchQuery()), 3000, "Old search results populated");
+
+            QuickMenuMusicSnapshot oldSnap = controller.snapshot();
+            check(oldSnap.searchResults().size() == 1, "Should have 1 old search result");
+            check("old1".equals(oldSnap.searchResults().get(0).id()), "Old result track ID must be old1");
+            check(!oldSnap.hasSearchError(), "Old search must not have error");
+
+            // 2. New search that fails with exception
+            source.searchException = new RuntimeException("Simulated network search failure");
+            controller.requestSearch("newQuery");
+
+            // Trigger refresh immediately (as QA described: "после неудачного нового поиска и refresh")
+            controller.triggerRefreshAsync();
+
+            // Wait for new query to be reflected in snapshot with error state
+            awaitCondition(() -> "newQuery".equals(controller.snapshot().searchQuery())
+                    && controller.snapshot().hasSearchError(), 3000, "Failed search updates error state");
+
+            QuickMenuMusicSnapshot failedSnap = controller.snapshot();
+            check("newQuery".equals(failedSnap.searchQuery()), "Search query must be newQuery");
+            check(failedSnap.searchResults().isEmpty(), "Failed new search must yield EMPTY search results, never old results");
+            check(failedSnap.hasSearchError(), "Failed search must set searchError=true");
+            check(failedSnap.queue().size() == 1, "Queue must remain intact in snapshot");
+
+            // 3. Repeat refresh: pollBackground must still NOT restore old results
+            controller.triggerRefreshAsync();
+            Thread.sleep(80);
+
+            QuickMenuMusicSnapshot refreshedSnap = controller.snapshot();
+            check("newQuery".equals(refreshedSnap.searchQuery()), "Query remains newQuery");
+            check(refreshedSnap.searchResults().isEmpty(), "pollBackground must NEVER publish old results under new query");
+            check(refreshedSnap.hasSearchError(), "pollBackground must preserve search error state");
+            check(refreshedSnap.queue().size() == 1, "Queue must remain intact after refresh");
+        }
+    }
+
+    private static void testCloseReopenReversalPreservesController() throws Exception {
+        InstrumentedMusicSource source = new InstrumentedMusicSource();
+        source.available = true;
+        source.queueTracks = List.of(new Track("q1", "Queue Artist", "Queue Track", 180_000L, ""));
+        source.searchTracks = List.of(new Track("s1", "Artist", "Song", 200_000L, ""));
+
+        QuickMenuMusicController controller = new QuickMenuMusicController(() -> source);
+        QuickMenuScreen screen = new QuickMenuScreen(controller);
+
+        awaitCondition(() -> !controller.snapshot().queue().isEmpty(), 3000, "Initial queue loaded");
+
+        // 1. User starts closing the screen (close() called during close animation)
+        screen.close();
+
+        // Screen motion is marked closed (animating close), but controller MUST NOT be closed yet!
+        check(!screen.motion().isOpen(), "Screen motion must be marked closed");
+        check(!controller.isClosed(), "close() must NOT shut down controller yet (needed for reversal)");
+
+        // 2. User quickly reopens (F8 reversal on the same screen)
+        screen.motion().setOpen(true, System.nanoTime());
+        check(screen.motion().isOpen(), "Screen motion is now reopened via reversal");
+        check(!controller.isClosed(), "Controller must remain active and running during reversal");
+
+        // 3. Perform search and refresh on the reversed screen
+        screen.setSearchQuery("reversalQuery");
+        awaitCondition(() -> "reversalQuery".equals(controller.snapshot().searchQuery())
+                && !controller.snapshot().searchResults().isEmpty(), 3000, "Search must work after reversal");
+
+        screen.musicController().triggerRefreshAsync();
+        Thread.sleep(50);
+        check(!controller.isClosed(), "Controller is still running after refresh");
+
+        // 4. Finally, when screen is removed from Minecraft (animation settled / removed() called)
+        screen.removed();
+        check(controller.isClosed(), "removed() MUST shut down controller once screen is disposed");
+
+        // Further requests after removed() are ignored
+        int ioAfterRemoved = source.totalIoCalls();
+        controller.requestSearch("ignoredAfterRemoved");
+        controller.triggerRefreshAsync();
+        Thread.sleep(50);
+        check(source.totalIoCalls() == ioAfterRemoved, "No IO calls after removed()");
+    }
+
     private static void awaitCondition(Condition condition, long timeoutMs, String description) throws Exception {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
@@ -201,6 +300,7 @@ public final class QuickMenuMusicRegressionTest {
     private static final class InstrumentedMusicSource implements MusicSource {
         volatile boolean available = true;
         volatile int ioDelayMs = 0;
+        volatile RuntimeException searchException = null;
         volatile List<Track> queueTracks = Collections.emptyList();
         volatile List<Track> searchTracks = Collections.emptyList();
 
@@ -248,6 +348,9 @@ public final class QuickMenuMusicRegressionTest {
         public List<Track> search(String q) {
             searchCalls.incrementAndGet();
             simulateIoDelay();
+            if (searchException != null) {
+                throw searchException;
+            }
             if (!available) return Collections.emptyList();
             return searchTracks;
         }

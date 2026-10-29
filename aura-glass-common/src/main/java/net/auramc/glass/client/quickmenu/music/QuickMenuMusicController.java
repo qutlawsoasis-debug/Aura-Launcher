@@ -50,40 +50,78 @@ public final class QuickMenuMusicController implements AutoCloseable {
         );
     }
 
+    public boolean isClosed() {
+        return closed;
+    }
+
+    public long currentSearchEpoch() {
+        return searchEpoch.get();
+    }
+
+    public String activeSearchQuery() {
+        return activeSearchQuery;
+    }
+
     /**
      * Obtains the current immutable snapshot.
      * Pure cached in-memory read: strictly 0 IO, safe for render loop.
+     * Validates that search results match current epoch/query upon reading.
      */
     public QuickMenuMusicSnapshot snapshot() {
-        return snapshot;
+        QuickMenuMusicSnapshot current = this.snapshot;
+        long currentEpoch = searchEpoch.get();
+        String currentQuery = activeSearchQuery;
+        if (current.searchEpoch() == currentEpoch && Objects.equals(current.searchQuery(), currentQuery)) {
+            return current;
+        }
+        return new QuickMenuMusicSnapshot(
+                current.queue(),
+                Collections.emptyList(),
+                currentQuery,
+                currentEpoch,
+                false
+        );
     }
 
     /**
      * Asynchronously requests search results for the given query without blocking caller.
      * Older pending searches are coalesced and discarded.
+     * Failed searches record error state and yield empty results (never stale results).
      */
     public void requestSearch(String query) {
         if (closed) return;
         final String target = (query != null) ? query : "";
-        this.activeSearchQuery = target;
         final long epoch = searchEpoch.incrementAndGet();
+        this.activeSearchQuery = target;
+
+        if (target.isEmpty()) {
+            this.snapshot = new QuickMenuMusicSnapshot(this.snapshot.queue(), Collections.emptyList(), "", epoch, false);
+            return;
+        }
+
+        // Immediately update snapshot to clear out old search results for the new query/epoch
+        this.snapshot = new QuickMenuMusicSnapshot(this.snapshot.queue(), Collections.emptyList(), target, epoch, false);
 
         executor.execute(() -> {
-            if (closed || epoch != searchEpoch.get()) return;
+            if (closed || epoch != searchEpoch.get() || !target.equals(activeSearchQuery)) return;
             MusicSource src = sourceSupplier.get();
             if (src == null || !src.available()) {
-                if (!closed && epoch == searchEpoch.get()) {
-                    snapshot = new QuickMenuMusicSnapshot(snapshot.queue(), Collections.emptyList(), target);
+                if (!closed && epoch == searchEpoch.get() && target.equals(activeSearchQuery)) {
+                    snapshot = new QuickMenuMusicSnapshot(snapshot.queue(), Collections.emptyList(), target, epoch, false);
                 }
                 return;
             }
 
             try {
-                List<Track> results = target.isEmpty() ? Collections.emptyList() : src.search(target);
-                if (closed || epoch != searchEpoch.get()) return;
+                List<Track> results = src.search(target);
+                if (closed || epoch != searchEpoch.get() || !target.equals(activeSearchQuery)) return;
                 List<Track> safeResults = (results != null) ? results : Collections.emptyList();
-                snapshot = new QuickMenuMusicSnapshot(snapshot.queue(), safeResults, target);
-            } catch (Throwable ignored) {
+                snapshot = new QuickMenuMusicSnapshot(snapshot.queue(), safeResults, target, epoch, false);
+            } catch (Throwable t) {
+                // Ошибка нового поиска -> пустой список + состояние ошибки, не старые результаты
+                if (!closed && epoch == searchEpoch.get() && target.equals(activeSearchQuery)) {
+                    snapshot = new QuickMenuMusicSnapshot(snapshot.queue(), Collections.emptyList(), target, epoch, true);
+                }
             }
         });
     }
@@ -115,15 +153,23 @@ public final class QuickMenuMusicController implements AutoCloseable {
             List<Track> queue = src.queue();
             List<Track> safeQueue = (queue != null) ? queue : Collections.emptyList();
 
-            String query = activeSearchQuery;
-            List<Track> currentSearch = snapshot.searchResults();
-            if (!query.isEmpty() && (currentSearch.isEmpty() || searchEpoch.get() == 0)) {
-                List<Track> s = src.search(query);
-                currentSearch = (s != null) ? s : Collections.emptyList();
+            QuickMenuMusicSnapshot current = this.snapshot;
+            long curEpoch = searchEpoch.get();
+            String curQuery = activeSearchQuery;
+
+            List<Track> safeSearch;
+            boolean curError;
+            // При публикации - принимать только если query/epoch совпадают с текущими
+            if (current.searchEpoch() == curEpoch && Objects.equals(current.searchQuery(), curQuery)) {
+                safeSearch = current.searchResults();
+                curError = current.searchError();
+            } else {
+                safeSearch = Collections.emptyList();
+                curError = false;
             }
 
             if (!closed) {
-                snapshot = new QuickMenuMusicSnapshot(safeQueue, currentSearch, query);
+                snapshot = new QuickMenuMusicSnapshot(safeQueue, safeSearch, curQuery, curEpoch, curError);
             }
         } catch (Throwable ignored) {
         }
