@@ -1,4 +1,6 @@
-package net.auramc.glass.client.quickmenu;
+package net.auramc.glass.client.quickmenu.mixin;
+
+import net.auramc.glass.client.quickmenu.*;
 
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.world.World;

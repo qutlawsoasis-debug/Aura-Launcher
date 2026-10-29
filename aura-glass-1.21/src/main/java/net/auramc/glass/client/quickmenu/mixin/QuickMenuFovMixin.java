@@ -1,4 +1,6 @@
-package net.auramc.glass.client.quickmenu;
+package net.auramc.glass.client.quickmenu.mixin;
+
+import net.auramc.glass.client.quickmenu.*;
 
 import net.minecraft.client.render.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;

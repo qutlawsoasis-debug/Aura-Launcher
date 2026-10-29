@@ -1,4 +1,6 @@
-package net.auramc.glass.client.quickmenu;
+package net.auramc.glass.client.quickmenu.mixin;
+
+import net.auramc.glass.client.quickmenu.*;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
