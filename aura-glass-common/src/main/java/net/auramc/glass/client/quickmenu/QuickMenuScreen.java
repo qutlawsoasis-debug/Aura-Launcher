@@ -11,6 +11,8 @@ import net.minecraft.text.Text;
 import net.auramc.glass.client.music.*;
 import net.auramc.glass.client.karaoke.KaraokeConfig;
 import net.auramc.glass.client.quickmenu.music.MusicSourceProvider;
+import net.auramc.glass.client.quickmenu.music.MusicArtwork;
+import net.auramc.glass.common.render.GlassSpring;
 
 import org.lwjgl.glfw.GLFW;
 import java.time.LocalTime;
@@ -39,6 +41,17 @@ public final class QuickMenuScreen extends Screen {
     private boolean dragging, menuKeyHeld = true, searching;
     private String searchText = "";
     private int musicTab;
+    private boolean karaokeExpanded;
+    public static boolean qaHoverProgress = false;
+    private Track currentPlayingTrack;
+    private Track previousPlayingTrack;
+    private long trackTransitionStart;
+    private boolean lastWasPlaying;
+    private long playPauseTransitionTime;
+    private int pressedControl = -1;
+    private final net.auramc.glass.common.render.GlassSpring prevSpring = new net.auramc.glass.common.render.GlassSpring(0.25f, 0.85f);
+    private final net.auramc.glass.common.render.GlassSpring playSpring = new net.auramc.glass.common.render.GlassSpring(0.25f, 0.85f);
+    private final net.auramc.glass.common.render.GlassSpring nextSpring = new net.auramc.glass.common.render.GlassSpring(0.25f, 0.85f);
     private double dragX, dragY;
     private long lastHeaderClick, renderedFrames, lastScrollTime;
     private Control pressed;
@@ -84,8 +97,26 @@ public final class QuickMenuScreen extends Screen {
         scroll = 0;
         focused = 0;
         if (section == 2) {
-            triggerSearchAsync(searchText);
+            triggerSearchAsync(musicTab == 1 ? searchText : "");
         }
+    }
+
+    public void setMusicTab(int tab) {
+        this.musicTab = tab;
+        triggerSearchAsync(tab == 1 ? searchText : "");
+    }
+
+    public void setKaraokeExpanded(boolean expanded) {
+        this.karaokeExpanded = expanded;
+    }
+
+    public void setQaHoverProgress(boolean hover) {
+        qaHoverProgress = hover;
+    }
+
+    public void setSearchQuery(String query) {
+        this.searchText = query != null ? query : "";
+        triggerSearchAsync(this.searchText);
     }
 
     public void toggle() {
@@ -94,6 +125,7 @@ public final class QuickMenuScreen extends Screen {
 
     @Override
     public void close() {
+        qaHoverProgress = false;
         motion.setOpen(false, System.nanoTime());
     }
 
@@ -352,7 +384,16 @@ public final class QuickMenuScreen extends Screen {
         } else if (section == 1) {
             contentH = 3 * 44 + 80;
         } else if (section == 2) {
-            contentH = 544 + Math.min(10, cachedTracks.size()) * 42 + 20;
+            var src = MusicSourceProvider.get();
+            if (!src.available()) {
+                contentH = 80;
+            } else {
+                float header = 314;
+                int listCount = musicTab == 0 ? (src.queue() != null ? src.queue().size() : 0) : cachedTracks.size();
+                float tabContent = (musicTab == 1 ? 48 : 0) + Math.min(10, listCount) * 52;
+                float karaoke = 32 + (karaokeExpanded ? 5 * 38 + 12 : 0);
+                contentH = header + tabContent + karaoke + 24;
+            }
         } else {
             contentH = 80;
         }
@@ -406,164 +447,387 @@ public final class QuickMenuScreen extends Screen {
         }
     }
 
-    private void music(DrawContext context, float x, float y, float w) {
-        var c = QuickMenuConfig.get();
-        var source = MusicSourceProvider.get();
-        var now = source.now();
-        var current = now.track();
-        String title;
-        String artist;
-        if (!source.available()) {
-            title = "Aura Music: launcher is not running";
-            artist = "Aura Music: лаунчер не запущен";
-        } else {
-            title = current == null ? "Ничего не играет" : current.title();
-            artist = current == null ? "Выберите трек из каталога" : current.artist();
+    private void noteGlyph(float cx, float cy, float size, int color, float fade) {
+        float s = size / 40.0f;
+        rect(cx - 10 * s, cy + 8 * s, 13 * s, 10 * s, 5 * s, color, 0, fade);
+        rect(cx + 8 * s, cy + 3 * s, 13 * s, 10 * s, 5 * s, color, 0, fade);
+        rect(cx - 1 * s, cy - 12 * s, 3 * s, 24 * s, 1.5f * s, color, 0, fade);
+        rect(cx + 17 * s, cy - 17 * s, 3 * s, 24 * s, 1.5f * s, color, 0, fade);
+        rect(cx - 1 * s, cy - 17 * s, 21 * s, 6 * s, 2 * s, color, 0, fade);
+    }
+
+    private void prevIcon(float cx, float cy, float scale, int color, float fade) {
+        float s = scale;
+        float w = 3 * s, h = 18 * s, r = 1.5f * s;
+        rect(cx - 11 * s, cy - h * 0.5f, w, h, r, color, 0, fade);
+        for (int i = 0; i <= 5; i++) {
+            float t = i / 5.0f;
+            float sh = (4 + 14 * t) * s;
+            rect(cx - 8 * s + i * 1.5f * s, cy - sh * 0.5f, 1.6f * s, sh, 0.8f * s, color, 0, fade);
         }
-
-        // Empty artwork in Music: Rounded 84x84 card (radius 10px, fill .24), note glyph with soft blue accent
-        float cardFade = edgeFade(y, 84);
-        if (cardFade > 0.01f) {
-            rect(x, y, 84, 84, 10, 0x3D767680, 0x1AFFFFFF, cardFade);
-            if (current != null) {
-                var cover = net.auramc.glass.client.quickmenu.music.MusicArtwork.texture(current);
-                if (cover != null) {
-                    flushNative();
-                    context.drawTexture(cover, (int) x, (int) y, 0, 0, 84, 84, 84, 84);
-                    context.draw();
-                    AuraRenderer.begin(context.getMatrices().peek().getPositionMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getModelViewMatrix());
-                } else {
-                    int noteColor = 0x8064D2FF;
-                    rect(x + 24, y + 46, 16, 12, 6, noteColor, 0, cardFade);
-                    rect(x + 46, y + 40, 16, 12, 6, noteColor, 0, cardFade);
-                    rect(x + 36, y + 22, 4, 28, 2, noteColor, 0, cardFade);
-                    rect(x + 58, y + 16, 4, 28, 2, noteColor, 0, cardFade);
-                    rect(x + 36, y + 16, 26, 7, 2, noteColor, 0, cardFade);
-                }
-            } else {
-                int noteColor = 0x5C767680;
-                rect(x + 24, y + 46, 16, 12, 6, noteColor, 0, cardFade);
-                rect(x + 46, y + 40, 16, 12, 6, noteColor, 0, cardFade);
-                rect(x + 36, y + 22, 4, 28, 2, noteColor, 0, cardFade);
-                rect(x + 58, y + 16, 4, 28, 2, noteColor, 0, cardFade);
-                rect(x + 36, y + 16, 26, 7, 2, noteColor, 0, cardFade);
-            }
-        }
-
-        float textFade = edgeFade(y + 8, 22);
-        if (textFade > 0.01f) text(fit(title, w - 104, 22), x + 100, y + 8, 22, 0xFFFFFFFF, 600, textFade);
-        float artistFade = edgeFade(y + 38, 16);
-        if (artistFade > 0.01f) text(fit(artist, w - 104, 16), x + 100, y + 38, 16, 0xEEFFFFFF, 400, artistFade);
-
-        String status;
-        int statusColor;
-        if (!source.available()) {
-            status = "○ Aura Music: launcher is not running";
-            statusColor = 0xDDFFFFFF;
-        } else if (now.isPlaying()) {
-            status = "● Воспроизведение · Aura Music";
-            statusColor = ACCENT;
-        } else if (now.isPaused()) {
-            status = "⏸ На паузе · Aura Music";
-            statusColor = 0xEEFFFFFF;
-        } else {
-            status = "○ Остановлено · Aura Music";
-            statusColor = 0xDDFFFFFF;
-        }
-        float statusFade = edgeFade(y + 62, 14);
-        if (statusFade > 0.01f) text(fit(status, w - 104, 14), x + 100, y + 62, 14, statusColor, 400, statusFade);
-
-        long duration = current == null ? 0 : current.durationMs();
-        long pos = now.currentPositionMs();
-
-        // Number formatting: Track position ONLY "0:45 / 3:14" (no duplicate number on right)
-        slider(x, y + 100, w, "Позиция · " + time(pos) + " / " + time(duration), pos, 0, Math.max(1, duration), v -> source.seek((long) v), null);
-
-        action(x, y + 144, 76, "Назад", source::prev);
-        action(x + 88, y + 144, 110, now.isPlaying() ? "Пауза" : "Играть", now.isPlaying() ? source::pause : source::play);
-        action(x + 210, y + 144, 76, "Далее", source::next);
-
-        // Volume formatted as percentage "50 %"
-        slider(x, y + 188, w, "Громкость", now.volume(), 0, 1, v -> {
-            source.volume((float) v);
-            c.musicVolume = v;
-        }, v -> Math.round(v * 100) + " %");
-
-        // Karaoke settings block (Apple glass style)
-        float ky = y + 232;
-        float headerFade = edgeFade(ky, 24);
-        if (headerFade > 0.01f) {
-            text("Караоке", x, ky + 4, 18, 0xFFFFFFFF, 600, headerFade);
-        }
-        ky += 30;
-
-        toggle(x, ky, w, "Караоке в мире", () -> c.karaoke, v -> {
-            c.karaoke = v;
-            KaraokeConfig.get().setEnabled(v);
-        });
-        ky += 38;
-
-        slider(x, ky, w, "Задержка", c.lyricsOffsetMs, -500, 500, v -> {
-            int rounded = (int) Math.round(v / 10.0) * 10;
-            c.lyricsOffsetMs = rounded;
-            KaraokeConfig.get().setTimingOffsetMs(rounded);
-        }, v -> {
-            int iv = (int) Math.round(v / 10.0) * 10;
-            return (iv > 0 ? "+" : "") + iv + " мс";
-        });
-        ky += 38;
-
-        slider(x, ky, w, "Размер текста", c.karaokeSize, 0.75, 1.50, v -> {
-            double rounded = Math.round(v * 100.0) / 100.0;
-            c.karaokeSize = rounded;
-            KaraokeConfig.get().setSize((float) rounded);
-        }, v -> Math.round(v * 100) + " %");
-        ky += 38;
-
-        slider(x, ky, w, "Слов максимум", c.karaokeMaxWords, 1, 6, v -> {
-            int rounded = (int) Math.round(v);
-            c.karaokeMaxWords = rounded;
-            KaraokeConfig.get().setMaxWords(rounded);
-        }, v -> String.valueOf((int) Math.round(v)));
-        ky += 38;
-
-        toggle(x, ky, w, "Только когда стою", () -> c.karaokeOnlyStanding, v -> {
-            c.karaokeOnlyStanding = v;
-            KaraokeConfig.get().setOnlyStanding(v);
-        });
-        ky += 46;
-
-        action(x, ky, w, searching ? "Поиск: " + searchText : searchText.isBlank() ? "Поиск в каталоге Aura..." : ("Поиск: " + searchText), () -> searching = true);
-
-        action(x, ky + 40, 120, "Каталог Aura", () -> musicTab = 0);
-        action(x + 130, ky + 40, 100, "Очередь", () -> musicTab = 1);
-
-        // Asynchronous cached tracks - no network calls on render thread!
-        var tracks = cachedTracks;
-        float ty = ky + 82;
-        if (!source.available()) {
-            float waitingFade = edgeFade(ty, 15);
-            if (waitingFade > 0.01f) text("Aura Music: launcher is not running", x, ty, 15, 0xDDFFFFFF, 400, waitingFade);
-        } else if (tracks.isEmpty()) {
-            float emptyFade = edgeFade(ty, 15);
-            if (emptyFade > 0.01f) text("Нет треков по запросу.", x, ty, 15, 0xDDFFFFFF, 400, emptyFade);
-        } else {
-            for (int i = 0; i < Math.min(10, tracks.size()); i++) {
-                var track = tracks.get(i);
-                float rowY = ty + i * 42;
-                float rowFade = edgeFade(rowY, 36);
-                if (rowFade <= 0.01f) continue;
-                boolean isCurrent = current != null && current.id().equals(track.id());
-                rect(x, rowY, w, 36, 8, isCurrent ? 0x5C767680 : 0x3D767680, isCurrent ? ACCENT : 0x1AFFFFFF, rowFade);
-                text(fit(track.title(), w - 80, 16), x + 12, rowY + 4, 16, 0xFFFFFFFF, isCurrent ? 600 : 500, rowFade);
-                text(fit(track.artist(), w - 80, 13), x + 12, rowY + 20, 13, 0xDDFFFFFF, 400, rowFade);
-                String dur = time(track.durationMs());
-                text(dur, x + w - AuraRenderer.textWidth(dur, 13) - 12, rowY + 11, 13, 0xCCFFFFFF, 400, rowFade);
-                controls.add(new Control(x, rowY, w, 36, track.title(), () -> source.playTrack(track), null));
-            }
+        for (int i = 0; i <= 5; i++) {
+            float t = i / 5.0f;
+            float sh = (4 + 14 * t) * s;
+            rect(cx + i * 1.5f * s, cy - sh * 0.5f, 1.6f * s, sh, 0.8f * s, color, 0, fade);
         }
     }
 
+    private void nextIcon(float cx, float cy, float scale, int color, float fade) {
+        float s = scale;
+        for (int i = 0; i <= 5; i++) {
+            float t = (5 - i) / 5.0f;
+            float sh = (4 + 14 * t) * s;
+            rect(cx - 8 * s + i * 1.5f * s, cy - sh * 0.5f, 1.6f * s, sh, 0.8f * s, color, 0, fade);
+        }
+        for (int i = 0; i <= 5; i++) {
+            float t = (5 - i) / 5.0f;
+            float sh = (4 + 14 * t) * s;
+            rect(cx + i * 1.5f * s, cy - sh * 0.5f, 1.6f * s, sh, 0.8f * s, color, 0, fade);
+        }
+        float w = 3 * s, h = 18 * s, r = 1.5f * s;
+        rect(cx + 8 * s, cy - h * 0.5f, w, h, r, color, 0, fade);
+    }
+
+    private void playIcon(float cx, float cy, float scale, int color, float fade) {
+        float s = scale;
+        float startX = cx - 7 * s;
+        for (int i = 0; i <= 9; i++) {
+            float t = (9 - i) / 9.0f;
+            float sh = (4 + 20 * t) * s;
+            rect(startX + i * 1.8f * s, cy - sh * 0.5f, 1.9f * s, sh, 0.95f * s, color, 0, fade);
+        }
+    }
+
+    private void pauseIcon(float cx, float cy, float scale, int color, float fade) {
+        float s = scale;
+        float w = 5 * s, h = 22 * s, r = 2.5f * s;
+        rect(cx - 7 * s, cy - h * 0.5f, w, h, r, color, 0, fade);
+        rect(cx + 2 * s, cy - h * 0.5f, w, h, r, color, 0, fade);
+    }
+
+    private void speakerIcon(float x, float y, boolean loud, int color, float fade) {
+        rect(x + 1, y + 5, 3, 6, 1, color, 0, fade);
+        rect(x + 4, y + 4, 2, 8, 1, color, 0, fade);
+        rect(x + 6, y + 2.5f, 2.5f, 11, 1, color, 0, fade);
+        if (loud) {
+            rect(x + 10.5f, y + 4.5f, 1.5f, 7, 0.75f, color, 0, fade);
+            rect(x + 13.5f, y + 2.5f, 1.5f, 11, 0.75f, color, 0, fade);
+        } else {
+            rect(x + 10.5f, y + 6, 1.5f, 4, 0.75f, color, 0, fade);
+        }
+    }
+
+    private void magnifierIcon(float x, float y, int color, float fade) {
+        rect(x + 1, y + 1, 10, 10, 5, 0, color, fade);
+        rect(x + 9, y + 9, 4, 1.8f, 0.9f, color, 0, fade);
+        rect(x + 11, y + 11, 3.5f, 1.8f, 0.9f, color, 0, fade);
+    }
+
+    private void equalizerIcon(float x, float y, float w, float h, int color, float fade) {
+        long t = System.currentTimeMillis();
+        float b1 = 0.3f + 0.7f * (float) Math.abs(Math.sin(t * 0.007));
+        float b2 = 0.2f + 0.8f * (float) Math.abs(Math.sin(t * 0.010 + 1.2));
+        float b3 = 0.4f + 0.6f * (float) Math.abs(Math.sin(t * 0.008 + 2.4));
+        float barW = 2.5f, gap = 2.0f;
+        rect(x, y + h * (1.0f - b1), barW, h * b1, 1.25f, color, 0, fade);
+        rect(x + barW + gap, y + h * (1.0f - b2), barW, h * b2, 1.25f, color, 0, fade);
+        rect(x + (barW + gap) * 2, y + h * (1.0f - b3), barW, h * b3, 1.25f, color, 0, fade);
+    }
+
+    private void music(DrawContext context, float x, float y, float w) {
+        var c = QuickMenuConfig.get();
+        var source = MusicSourceProvider.get();
+
+        // 8. No Bridge Fallback (MusicSource.available() == false)
+        if (!source.available()) {
+            float viewportTop = geometry().y() + 112;
+            float viewportBottom = geometry().bottom() - 39;
+            float viewportH = Math.max(1, viewportBottom - viewportTop);
+            float noteCy = viewportTop + viewportH * 0.40f;
+            float cx = x + w * 0.5f;
+            float fade = edgeFade(noteCy - 24, 48);
+            if (fade > 0.01f) {
+                noteGlyph(cx, noteCy, 48, 0x66FFFFFF, fade);
+                String msg = "Откройте Aura Launcher, чтобы управлять музыкой";
+                float tw = AuraRenderer.textWidth(msg, 15);
+                text(msg, cx - tw * 0.5f, noteCy + 36, 15, 0x99FFFFFF, 400, fade);
+            }
+            return;
+        }
+
+        var now = source.now();
+        Track activeTrack = now.track();
+
+        // 9. Track Change Transition: 250ms crossfade between previous and current
+        if (currentPlayingTrack == null) {
+            currentPlayingTrack = activeTrack;
+        } else if (activeTrack != null && !activeTrack.id().equals(currentPlayingTrack.id())) {
+            previousPlayingTrack = currentPlayingTrack;
+            currentPlayingTrack = activeTrack;
+            trackTransitionStart = System.currentTimeMillis();
+        }
+        long trackTransElapsed = System.currentTimeMillis() - trackTransitionStart;
+        float trackCrossfade = trackTransitionStart > 0 && trackTransElapsed < 250
+                ? trackTransElapsed / 250.0f : 1.0f;
+        if (trackCrossfade >= 1.0f) previousPlayingTrack = null;
+
+        // 1. Now Playing Card: artwork 128x128, radius 20, shadow 0 8 24 rgba(0,0,0,.35)
+        float cardFade = edgeFade(y, 128);
+        if (cardFade > 0.01f) {
+            // Shadow 0 8 24 rgba(0,0,0,.35)
+            AuraRenderer.shadow(x, y + 8, 128, 128, 20, color(0x59000000, cardFade));
+
+            var cover = currentPlayingTrack != null ? MusicArtwork.texture(currentPlayingTrack) : null;
+            if (cover != null) {
+                flushNative();
+                context.drawTexture(cover, (int) x, (int) y, 0, 0, 128, 128, 128, 128);
+                context.draw();
+                AuraRenderer.begin(context.getMatrices().peek().getPositionMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getModelViewMatrix());
+            } else {
+                rect(x, y, 128, 128, 20, 0x3D767680, 0, cardFade);
+                noteGlyph(x + 64, y + 64, 40, 0x80FFFFFF, cardFade);
+            }
+
+            // Right of artwork: title (22px 600 white 0.95), artist (17px 400 white 0.60), source (13px #64D2FF 0.90)
+            float textX = x + 144;
+            float maxW = w - 144;
+            String title = currentPlayingTrack == null ? "Ничего не играет" : currentPlayingTrack.title();
+            String artist = currentPlayingTrack == null ? "Выберите трек из очереди" : currentPlayingTrack.artist();
+            text(fit(title, maxW, 22), textX, y + 26, 22, 0xF2FFFFFF, 600, cardFade);
+            text(fit(artist, maxW, 17), textX, y + 58, 17, 0x99FFFFFF, 400, cardFade);
+            text("Aura Music", textX, y + 86, 13, 0xE664D2FF, 400, cardFade);
+        }
+
+        long dur = currentPlayingTrack != null ? currentPlayingTrack.durationMs() : 0;
+        long pos = now.currentPositionMs();
+        float progressNorm = dur > 0 ? Math.max(0.0f, Math.min(1.0f, pos / (float) dur)) : 0.0f;
+
+        // 2. Full-width Progress Bar
+        float progY = y + 146;
+        float progFade = edgeFade(progY, 26);
+        boolean hoverProg = qaHoverProgress || (mouseX >= x && mouseX <= x + w && mouseY >= progY - 6 && mouseY <= progY + 16);
+        boolean activeProg = hoverProg || (pressed != null && "progress".equals(pressed.label()));
+        float trackH = activeProg ? 8.0f : 4.0f;
+        float trackR = activeProg ? 4.0f : 2.0f;
+        float trackY = progY + (4.0f - trackH) * 0.5f;
+
+        if (progFade > 0.01f) {
+            rect(x, trackY, w, trackH, trackR, 0x5C767680, 0, progFade);
+            rect(x, trackY, w * progressNorm, trackH, trackR, 0xEBFFFFFF, 0, progFade);
+            if (activeProg) {
+                float thumbCx = x + w * progressNorm;
+                rect(thumbCx - 7, progY + 2 - 7, 14, 14, 7, 0xFFFFFFFF, 0, progFade);
+            }
+            String elapsedStr = time(pos);
+            long rem = Math.max(0, dur - pos);
+            String remStr = "−" + time(rem);
+            float remW = AuraRenderer.textWidth(remStr, 13);
+            text(elapsedStr, x, progY + 14, 13, 0x8CFFFFFF, 400, progFade);
+            text(remStr, x + w - remW, progY + 14, 13, 0x8CFFFFFF, 400, progFade);
+        }
+        controls.add(new Control(x, progY - 6, w, 20, "progress", () -> {}, norm -> source.seek((long) (norm * dur)), false, progressNorm));
+
+        // 3. Centered Control Icons (Prev 28px, Play/Pause 44px, Next 28px, white 0.95, spacing 40px)
+        float cx = x + w * 0.5f;
+        float ctrlCy = progY + 48;
+        float ctrlFade = edgeFade(ctrlCy - 22, 44);
+
+        boolean playing = now.isPlaying();
+        if (playing != lastWasPlaying) {
+            lastWasPlaying = playing;
+            playPauseTransitionTime = System.currentTimeMillis();
+        }
+        long playTransElapsed = System.currentTimeMillis() - playPauseTransitionTime;
+        float playTrans = playPauseTransitionTime > 0 && playTransElapsed < 150
+                ? playTransElapsed / 150.0f : 1.0f;
+        float playAlpha = playing ? playTrans : (1.0f - playTrans);
+        float pauseAlpha = playing ? (1.0f - playTrans) : playTrans;
+
+        long nano = System.nanoTime();
+        float prevScale = 1.0f - 0.08f * prevSpring.approach(pressedControl == 0 ? 1.0f : 0.0f, nano);
+        float playScale = 1.0f - 0.08f * playSpring.approach(pressedControl == 1 ? 1.0f : 0.0f, nano);
+        float nextScale = 1.0f - 0.08f * nextSpring.approach(pressedControl == 2 ? 1.0f : 0.0f, nano);
+
+        float prevCx = cx - 76;
+        float nextCx = cx + 76;
+
+        boolean hoverPrev = Math.hypot(mouseX - prevCx, mouseY - ctrlCy) <= 22;
+        boolean hoverPlay = Math.hypot(mouseX - cx, mouseY - ctrlCy) <= 30;
+        boolean hoverNext = Math.hypot(mouseX - nextCx, mouseY - ctrlCy) <= 22;
+
+        if (ctrlFade > 0.01f) {
+            if (hoverPrev) rect(prevCx - 22, ctrlCy - 22, 44, 44, 22, 0x1FFFFFFF, 0, ctrlFade);
+            if (hoverPlay) rect(cx - 30, ctrlCy - 30, 60, 60, 30, 0x1FFFFFFF, 0, ctrlFade);
+            if (hoverNext) rect(nextCx - 22, ctrlCy - 22, 44, 44, 22, 0x1FFFFFFF, 0, ctrlFade);
+
+            prevIcon(prevCx, ctrlCy, prevScale, color(0xF2FFFFFF, ctrlFade), ctrlFade);
+            if (playAlpha > 0.01f) playIcon(cx, ctrlCy, playScale, color(0xF2FFFFFF, playAlpha * ctrlFade), ctrlFade * playAlpha);
+            if (pauseAlpha > 0.01f) pauseIcon(cx, ctrlCy, playScale, color(0xF2FFFFFF, pauseAlpha * ctrlFade), ctrlFade * pauseAlpha);
+            nextIcon(nextCx, ctrlCy, nextScale, color(0xF2FFFFFF, ctrlFade), ctrlFade);
+        }
+        controls.add(new Control(prevCx - 22, ctrlCy - 22, 44, 44, "prev", source::prev, null));
+        controls.add(new Control(cx - 30, ctrlCy - 30, 60, 60, "playPause", () -> {
+            if (now.isPlaying()) source.pause(); else source.play();
+        }, null));
+        controls.add(new Control(nextCx - 22, ctrlCy - 22, 44, 44, "next", source::next, null));
+
+        // 4. Volume Row
+        float volY = ctrlCy + 36;
+        float volFade = edgeFade(volY, 20);
+        float sliderX = x + 26;
+        float sliderW = w - 52;
+        float vol = now.volume();
+        boolean hoverVol = mouseX >= sliderX - 4 && mouseX <= sliderX + sliderW + 4 && mouseY >= volY - 4 && mouseY <= volY + 16;
+        boolean activeVol = hoverVol || (pressed != null && "volume".equals(pressed.label()));
+        float volH = activeVol ? 8.0f : 4.0f;
+        float volR = activeVol ? 4.0f : 2.0f;
+        float volTrackY = volY + (4.0f - volH) * 0.5f;
+
+        if (volFade > 0.01f) {
+            speakerIcon(x + 2, volY - 2, false, color(0x99FFFFFF, volFade), volFade);
+            rect(sliderX, volTrackY, sliderW, volH, volR, 0x5C767680, 0, volFade);
+            rect(sliderX, volTrackY, sliderW * vol, volH, volR, 0xEBFFFFFF, 0, volFade);
+            if (activeVol) {
+                float vThumbX = sliderX + sliderW * vol;
+                rect(vThumbX - 7, volY + 2 - 7, 14, 14, 7, 0xFFFFFFFF, 0, volFade);
+            }
+            speakerIcon(x + w - 18, volY - 2, true, color(0x99FFFFFF, volFade), volFade);
+        }
+        controls.add(new Control(sliderX, volY - 4, sliderW, 16, "volume", () -> {}, v -> {
+            source.volume((float) v);
+            c.musicVolume = v;
+        }, false, vol));
+
+        // 6. Segmented Tabs «Очередь | Поиск»
+        float segY = volY + 26;
+        float segFade = edgeFade(segY, 32);
+        float segW = (w - 4) * 0.5f;
+        if (segFade > 0.01f) {
+            rect(x, segY, w, 32, 9, 0x3D767680, 0, segFade);
+            float activePillX = musicTab == 0 ? x + 2 : x + 2 + segW;
+            rect(activePillX, segY + 2, segW, 28, 7, 0x2EFFFFFF, 0, segFade);
+
+            float qW = AuraRenderer.textWidth("Очередь", 14);
+            text("Очередь", x + 2 + (segW - qW) * 0.5f, segY + 8, 14, musicTab == 0 ? 0xF2FFFFFF : 0x99FFFFFF, musicTab == 0 ? 600 : 500, segFade);
+
+            float sW = AuraRenderer.textWidth("Поиск", 14);
+            text("Поиск", x + 2 + segW + (segW - sW) * 0.5f, segY + 8, 14, musicTab == 1 ? 0xF2FFFFFF : 0x99FFFFFF, musicTab == 1 ? 600 : 500, segFade);
+        }
+        controls.add(new Control(x, segY, segW + 2, 32, "tabQueue", () -> { musicTab = 0; triggerSearchAsync(""); }, null));
+        controls.add(new Control(x + segW + 2, segY, segW + 2, 32, "tabSearch", () -> { musicTab = 1; triggerSearchAsync(searchText); }, null));
+
+        float listY = segY + 40;
+
+        // 5. Search Field if in search tab
+        if (musicTab == 1) {
+            float sBoxFade = edgeFade(listY, 40);
+            if (sBoxFade > 0.01f) {
+                rect(x, listY, w, 40, 10, 0x3D767680, 0, sBoxFade);
+                magnifierIcon(x + 12, listY + 12, color(0x73FFFFFF, sBoxFade), sBoxFade);
+                if (searchText.isEmpty() && !searching) {
+                    text("Поиск в Aura Music", x + 36, listY + 12, 14, 0x73FFFFFF, 400, sBoxFade);
+                } else {
+                    String cursor = searching && (System.currentTimeMillis() % 1000 < 500) ? "|" : "";
+                    text(searchText + cursor, x + 36, listY + 12, 14, 0xF2FFFFFF, 400, sBoxFade);
+                }
+            }
+            controls.add(new Control(x, listY, w, 40, "searchBox", () -> searching = true, null));
+            listY += 48;
+        }
+
+        // List of tracks (Queue or Search Results)
+        List<Track> tracks = (musicTab == 0 && source.available()) ? source.queue() : cachedTracks;
+        if (tracks == null) tracks = List.of();
+        if (tracks.isEmpty() && source.available()) {
+            if (lastSearchedQuery == null) triggerSearchAsync("");
+        }
+
+        for (int i = 0; i < Math.min(10, tracks.size()); i++) {
+            var track = tracks.get(i);
+            float rowY = listY + i * 52;
+            float rowFade = edgeFade(rowY, 52);
+            if (rowFade <= 0.01f) continue;
+
+            boolean hoverRow = mouseX >= x && mouseX <= x + w && mouseY >= rowY && mouseY <= rowY + 52;
+            if (hoverRow) {
+                rect(x, rowY, w, 52, 10, 0x0FFFFFFF, 0, rowFade);
+            }
+
+            var rowCover = MusicArtwork.texture(track);
+            if (rowCover != null) {
+                flushNative();
+                context.drawTexture(rowCover, (int) (x + 6), (int) (rowY + 6), 0, 0, 40, 40, 40, 40);
+                context.draw();
+                AuraRenderer.begin(context.getMatrices().peek().getPositionMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getModelViewMatrix());
+            } else {
+                rect(x + 6, rowY + 6, 40, 40, 8, 0x3D767680, 0, rowFade);
+                noteGlyph(x + 26, rowY + 26, 16, 0x80FFFFFF, rowFade);
+            }
+
+            boolean isCurrent = currentPlayingTrack != null && currentPlayingTrack.id().equals(track.id());
+            float titleX = x + 54;
+            if (isCurrent) {
+                equalizerIcon(x + 54, rowY + 20, 14, 14, ACCENT, rowFade);
+                titleX = x + 74;
+            }
+
+            text(fit(track.title(), w - (titleX - x) - 60, 15), titleX, rowY + 10, 15, 0xEBFFFFFF, isCurrent ? 600 : 500, rowFade);
+            text(fit(track.artist(), w - (titleX - x) - 60, 13), titleX, rowY + 30, 13, 0x8CFFFFFF, 400, rowFade);
+
+            String durStr = time(track.durationMs());
+            float dw = AuraRenderer.textWidth(durStr, 13);
+            text(durStr, x + w - dw - 12, rowY + 20, 13, 0x8CFFFFFF, 400, rowFade);
+
+            controls.add(new Control(x, rowY, w, 52, track.title(), () -> source.playTrack(track), null));
+        }
+
+        // 7. Karaoke Foldable Block at bottom
+        float ky = listY + Math.min(10, tracks.size()) * 52 + 16;
+        float kFade = edgeFade(ky, 30);
+        if (kFade > 0.01f) {
+            String kTitle = "Караоке " + (karaokeExpanded ? "˅" : "›");
+            text(kTitle, x, ky + 4, 15, 0xF2FFFFFF, 600, kFade);
+        }
+        controls.add(new Control(x, ky, w, 28, "karaokeHeader", () -> karaokeExpanded = !karaokeExpanded, null));
+
+        if (karaokeExpanded) {
+            ky += 32;
+            toggle(x, ky, w, "Караоке в мире", () -> c.karaoke, v -> {
+                c.karaoke = v;
+                KaraokeConfig.get().setEnabled(v);
+            });
+            ky += 38;
+
+            slider(x, ky, w, "Задержка", c.lyricsOffsetMs, -500, 500, v -> {
+                int rounded = (int) Math.round(v / 10.0) * 10;
+                c.lyricsOffsetMs = rounded;
+                KaraokeConfig.get().setTimingOffsetMs(rounded);
+            }, v -> {
+                int iv = (int) Math.round(v / 10.0) * 10;
+                return (iv > 0 ? "+" : "") + iv + " мс";
+            });
+            ky += 38;
+
+            slider(x, ky, w, "Размер текста", c.karaokeSize, 0.75, 1.50, v -> {
+                double rounded = Math.round(v * 100.0) / 100.0;
+                c.karaokeSize = rounded;
+                KaraokeConfig.get().setSize((float) rounded);
+            }, v -> Math.round(v * 100) + " %");
+            ky += 38;
+
+            slider(x, ky, w, "Слов максимум", c.karaokeMaxWords, 1, 6, v -> {
+                int rounded = (int) Math.round(v);
+                c.karaokeMaxWords = rounded;
+                KaraokeConfig.get().setMaxWords(rounded);
+            }, v -> String.valueOf((int) Math.round(v)));
+            ky += 38;
+
+            toggle(x, ky, w, "Только когда стою", () -> c.karaokeOnlyStanding, v -> {
+                c.karaokeOnlyStanding = v;
+                KaraokeConfig.get().setOnlyStanding(v);
+            });
+        }
+    }
     private void action(float x, float y, float w, String label, Runnable action) {
         float rowFade = edgeFade(y, 30);
         if (rowFade <= 0.01f) return;
@@ -726,6 +990,9 @@ public final class QuickMenuScreen extends Screen {
             if (c.contains(x, y) && y > box.y() + (c.navigation ? 44 : 112) && y < box.bottom() - 36) {
                 focused = i;
                 pressed = c;
+                if ("prev".equals(c.label)) pressedControl = 0;
+                else if ("playPause".equals(c.label)) pressedControl = 1;
+                else if ("next".equals(c.label)) pressedControl = 2;
                 if (c.slide != null) c.slide.accept(Math.max(0, Math.min(1, (x - c.x) / c.w)));
                 else c.action.run();
                 return true;
@@ -758,6 +1025,7 @@ public final class QuickMenuScreen extends Screen {
             QuickMenuConfig.save();
         }
         pressed = null;
+        pressedControl = -1;
         return true;
     }
 
@@ -822,6 +1090,9 @@ public final class QuickMenuScreen extends Screen {
             }
             if (key == GLFW.GLFW_KEY_ENTER) {
                 searching = false;
+                if (!cachedTracks.isEmpty()) {
+                    MusicSourceProvider.get().playTrack(cachedTracks.get(0));
+                }
                 return true;
             }
         }
