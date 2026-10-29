@@ -9,10 +9,36 @@ import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.option.GraphicsMode;
 import net.minecraft.client.option.ParticlesMode;
 
+import java.io.File;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class QuickMenuMaxFps {
     private QuickMenuMaxFps() {}
+
+    private static Path optionsPathOverride = null;
+
+    public static void setOptionsPath(Path path) {
+        optionsPathOverride = path;
+    }
+
+    public static Path getOptionsPath(MinecraftClient client, GameOptions opt) {
+        if (optionsPathOverride != null) return optionsPathOverride;
+        try {
+            var f = GameOptions.class.getDeclaredField("optionsFile");
+            f.setAccessible(true);
+            File file = (File) f.get(opt);
+            if (file != null) return file.toPath();
+        } catch (Throwable ignored) {}
+        if (client != null && client.runDirectory != null) {
+            return client.runDirectory.toPath().resolve("options.txt");
+        }
+        return Path.of("options.txt");
+    }
 
     public static class SavedState {
         // Iris Shaders
@@ -168,7 +194,7 @@ public final class QuickMenuMaxFps {
             // 3. Vanilla GameOptions
             if (hasAnyVanillaOptions(state)) {
                 if (client != null && client.options != null) {
-                    if (!rollbackVanillaOptions(client.options, state)) {
+                    if (!rollbackVanillaOptions(client, client.options, state)) {
                         allSuccess = false;
                     }
                     if (client.worldRenderer != null) {
@@ -285,146 +311,275 @@ public final class QuickMenuMaxFps {
     }
 
     public static boolean rollbackVanillaOptions(GameOptions opt, SavedState state) {
-        boolean viewDistSet = false;
-        boolean simDistSet = false;
-        boolean particlesSet = false;
-        boolean cloudSet = false;
-        boolean shadowsSet = false;
-        boolean distScalingSet = false;
-        boolean graphicsSet = false;
-        boolean aoSet = false;
-        boolean mipmapSet = false;
-        boolean biomeSet = false;
-        boolean vsyncSet = false;
+        return rollbackVanillaOptions(null, opt, state);
+    }
 
-        boolean allSuccess = true;
+    public static boolean rollbackVanillaOptions(MinecraftClient client, GameOptions opt, SavedState state) {
+        boolean inMemorySuccess = true;
 
         if (state.hasViewDistance) {
             try {
                 opt.getViewDistance().setValue(state.viewDistance);
-                viewDistSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback viewDistance failed: " + t);
             }
         }
         if (state.hasSimulationDistance) {
             try {
                 opt.getSimulationDistance().setValue(state.simulationDistance);
-                simDistSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback simulationDistance failed: " + t);
             }
         }
         if (state.hasParticles) {
             try {
                 opt.getParticles().setValue(ParticlesMode.valueOf(state.particles));
-                particlesSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback particles failed: " + t);
             }
         }
         if (state.hasCloudRenderMode) {
             try {
                 opt.getCloudRenderMode().setValue(CloudRenderMode.valueOf(state.cloudRenderMode));
-                cloudSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback cloudRenderMode failed: " + t);
             }
         }
         if (state.hasEntityShadows) {
             try {
                 opt.getEntityShadows().setValue(state.entityShadows);
-                shadowsSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback entityShadows failed: " + t);
             }
         }
         if (state.hasEntityDistanceScaling) {
             try {
                 opt.getEntityDistanceScaling().setValue(state.entityDistanceScaling);
-                distScalingSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback entityDistanceScaling failed: " + t);
             }
         }
         if (state.hasGraphicsMode) {
             try {
                 opt.getGraphicsMode().setValue(GraphicsMode.valueOf(state.graphicsMode));
-                graphicsSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback graphicsMode failed: " + t);
             }
         }
         if (state.hasAo) {
             try {
                 opt.getAo().setValue(state.ao);
-                aoSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback ao failed: " + t);
             }
         }
         if (state.hasMipmapLevels) {
             try {
                 opt.getMipmapLevels().setValue(state.mipmapLevels);
-                mipmapSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback mipmapLevels failed: " + t);
             }
         }
         if (state.hasBiomeBlendRadius) {
             try {
                 opt.getBiomeBlendRadius().setValue(state.biomeBlendRadius);
-                biomeSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback biomeBlendRadius failed: " + t);
             }
         }
         if (state.hasEnableVsync) {
             try {
                 opt.getEnableVsync().setValue(state.enableVsync);
-                vsyncSet = true;
             } catch (Throwable t) {
-                allSuccess = false;
+                inMemorySuccess = false;
                 System.err.println("[AuraMaxFps] Rollback enableVsync failed: " + t);
             }
         }
 
-        boolean writeSuccess = false;
         try {
             opt.write();
-            writeSuccess = true;
         } catch (Throwable t) {
-            allSuccess = false;
+            inMemorySuccess = false;
             System.err.println("[AuraMaxFps] opt.write failed: " + t);
         }
 
-        if (writeSuccess) {
-            if (viewDistSet) state.hasViewDistance = false;
-            if (simDistSet) state.hasSimulationDistance = false;
-            if (particlesSet) state.hasParticles = false;
-            if (cloudSet) state.hasCloudRenderMode = false;
-            if (shadowsSet) state.hasEntityShadows = false;
-            if (distScalingSet) state.hasEntityDistanceScaling = false;
-            if (graphicsSet) state.hasGraphicsMode = false;
-            if (aoSet) state.hasAo = false;
-            if (mipmapSet) state.hasMipmapLevels = false;
-            if (biomeSet) state.hasBiomeBlendRadius = false;
-            if (vsyncSet) state.hasEnableVsync = false;
-        } else {
-            allSuccess = false;
+        // QA 4: GameOptions.write() catches and swallows errors internally.
+        // Verify disk contents and clear only verified fields.
+        Path optionsPath = getOptionsPath(client, opt);
+        boolean diskSuccess = verifyAndClearDiskOptions(optionsPath, state);
+
+        return inMemorySuccess && diskSuccess;
+    }
+
+    public static boolean verifyAndClearDiskOptions(Path optionsPath, SavedState state) {
+        if (optionsPath == null || !Files.exists(optionsPath)) {
+            System.err.println("[AuraMaxFps] options.txt not found at " + optionsPath);
+            return false;
         }
 
-        return allSuccess;
+        Map<String, String> disk = new HashMap<>();
+        try {
+            for (String line : Files.readAllLines(optionsPath, StandardCharsets.UTF_8)) {
+                int colon = line.indexOf(':');
+                if (colon > 0) {
+                    disk.put(line.substring(0, colon).trim(), line.substring(colon + 1).trim().replace("\"", ""));
+                }
+            }
+        } catch (Throwable t) {
+            System.err.println("[AuraMaxFps] Failed to read options.txt: " + t);
+            return false;
+        }
+
+        boolean allMatched = true;
+
+        if (state.hasViewDistance) {
+            String val = disk.get("renderDistance");
+            if (val == null) val = disk.get("viewDistance");
+            if (val != null && parseIntSafe(val) == state.viewDistance) {
+                state.hasViewDistance = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk viewDistance mismatch: expected " + state.viewDistance + ", found " + val);
+            }
+        }
+
+        if (state.hasSimulationDistance) {
+            String val = disk.get("simulationDistance");
+            if (val != null && parseIntSafe(val) == state.simulationDistance) {
+                state.hasSimulationDistance = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk simulationDistance mismatch: expected " + state.simulationDistance + ", found " + val);
+            }
+        }
+
+        if (state.hasParticles) {
+            String val = disk.get("particles");
+            int expectedOrdinal = -1;
+            if ("ALL".equalsIgnoreCase(state.particles)) expectedOrdinal = 0;
+            else if ("DECREASED".equalsIgnoreCase(state.particles)) expectedOrdinal = 1;
+            else if ("MINIMAL".equalsIgnoreCase(state.particles)) expectedOrdinal = 2;
+
+            if (val != null && (val.equalsIgnoreCase(state.particles) || (expectedOrdinal >= 0 && parseIntSafe(val) == expectedOrdinal))) {
+                state.hasParticles = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk particles mismatch: expected " + state.particles + ", found " + val);
+            }
+        }
+
+        if (state.hasCloudRenderMode) {
+            String val = disk.get("renderClouds");
+            if (val == null) val = disk.get("cloudRenderMode");
+            boolean match = false;
+            if (val != null) {
+                if ("OFF".equalsIgnoreCase(state.cloudRenderMode) && "false".equalsIgnoreCase(val)) match = true;
+                else if ("FAST".equalsIgnoreCase(state.cloudRenderMode) && "fast".equalsIgnoreCase(val)) match = true;
+                else if ("FANCY".equalsIgnoreCase(state.cloudRenderMode) && ("fancy".equalsIgnoreCase(val) || "true".equalsIgnoreCase(val))) match = true;
+                else if (val.equalsIgnoreCase(state.cloudRenderMode)) match = true;
+            }
+            if (match) {
+                state.hasCloudRenderMode = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk cloudRenderMode mismatch: expected " + state.cloudRenderMode + ", found " + val);
+            }
+        }
+
+        if (state.hasEntityShadows) {
+            String val = disk.get("entityShadows");
+            if (val != null && Boolean.parseBoolean(val) == state.entityShadows) {
+                state.hasEntityShadows = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk entityShadows mismatch: expected " + state.entityShadows + ", found " + val);
+            }
+        }
+
+        if (state.hasEntityDistanceScaling) {
+            String val = disk.get("entityDistanceScaling");
+            if (val != null && Math.abs(parseDoubleSafe(val) - state.entityDistanceScaling) < 0.05) {
+                state.hasEntityDistanceScaling = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk entityDistanceScaling mismatch: expected " + state.entityDistanceScaling + ", found " + val);
+            }
+        }
+
+        if (state.hasGraphicsMode) {
+            String val = disk.get("graphicsMode");
+            int expectedOrdinal = -1;
+            if ("FAST".equalsIgnoreCase(state.graphicsMode)) expectedOrdinal = 0;
+            else if ("FANCY".equalsIgnoreCase(state.graphicsMode)) expectedOrdinal = 1;
+            else if ("FABULOUS".equalsIgnoreCase(state.graphicsMode)) expectedOrdinal = 2;
+
+            if (val != null && (val.equalsIgnoreCase(state.graphicsMode) || (expectedOrdinal >= 0 && parseIntSafe(val) == expectedOrdinal))) {
+                state.hasGraphicsMode = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk graphicsMode mismatch: expected " + state.graphicsMode + ", found " + val);
+            }
+        }
+
+        if (state.hasAo) {
+            String val = disk.get("ao");
+            if (val != null && ("true".equalsIgnoreCase(val) == state.ao || (state.ao && ("1".equals(val) || "2".equals(val))))) {
+                state.hasAo = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk ao mismatch: expected " + state.ao + ", found " + val);
+            }
+        }
+
+        if (state.hasMipmapLevels) {
+            String val = disk.get("mipmapLevels");
+            if (val != null && parseIntSafe(val) == state.mipmapLevels) {
+                state.hasMipmapLevels = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk mipmapLevels mismatch: expected " + state.mipmapLevels + ", found " + val);
+            }
+        }
+
+        if (state.hasBiomeBlendRadius) {
+            String val = disk.get("biomeBlendRadius");
+            if (val != null && parseIntSafe(val) == state.biomeBlendRadius) {
+                state.hasBiomeBlendRadius = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk biomeBlendRadius mismatch: expected " + state.biomeBlendRadius + ", found " + val);
+            }
+        }
+
+        if (state.hasEnableVsync) {
+            String val = disk.get("enableVsync");
+            if (val != null && Boolean.parseBoolean(val) == state.enableVsync) {
+                state.hasEnableVsync = false;
+            } else {
+                allMatched = false;
+                System.err.println("[AuraMaxFps] Disk enableVsync mismatch: expected " + state.enableVsync + ", found " + val);
+            }
+        }
+
+        return allMatched;
+    }
+
+    private static int parseIntSafe(String s) {
+        try { return Integer.parseInt(s.trim()); } catch (Throwable t) { return Integer.MIN_VALUE; }
+    }
+
+    private static double parseDoubleSafe(String s) {
+        try { return Double.parseDouble(s.trim()); } catch (Throwable t) { return Double.NaN; }
     }
 
     private static void captureIris(SavedState state) {

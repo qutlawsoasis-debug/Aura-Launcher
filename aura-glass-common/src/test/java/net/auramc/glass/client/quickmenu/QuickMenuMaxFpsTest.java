@@ -7,6 +7,7 @@ import net.auramc.glass.common.style.GlassStyles;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -34,6 +35,7 @@ public final class QuickMenuMaxFpsTest {
             testMissingOptionalModRollbackPending();
             testVanillaFailurePreservesFlagsOnRestart();
             testGlassSaveFailurePreservesQualityFlag();
+            testSilentVanillaWriteFailurePreservesSnapshot();
             System.out.println("All QuickMenuMaxFps tests PASSED successfully!");
         } finally {
             deleteRecursively(tempDir.toFile());
@@ -360,6 +362,68 @@ public final class QuickMenuMaxFpsTest {
         } finally {
             GlassStyles.setFile(origStylePath);
             Files.deleteIfExists(dummyUnwritableDir);
+        }
+    }
+
+    private static void testSilentVanillaWriteFailurePreservesSnapshot() throws IOException {
+        Path tempDir = Files.createTempDirectory("auratest_silent_fail");
+        Path testConfigFile = tempDir.resolve("quickmenu.json");
+        Path testOptionsFile = tempDir.resolve("options.txt");
+
+        // Write options.txt containing stale/active preset values
+        // Silent failure simulates that opt.write() did not update disk or swallowed an error
+        String staleOptionsContent = "renderDistance:8\n" +
+                                     "simulationDistance:6\n" +
+                                     "particles:2\n" +
+                                     "renderClouds:\"false\"\n" +
+                                     "entityShadows:false\n";
+        Files.writeString(testOptionsFile, staleOptionsContent, StandardCharsets.UTF_8);
+
+        Path origConfig = QuickMenuConfig.getConfigFile();
+        try {
+            QuickMenuConfig.setConfigFile(testConfigFile);
+            QuickMenuMaxFps.setOptionsPath(testOptionsFile);
+
+            var config = QuickMenuConfig.get();
+            config.maxFps = true;
+            QuickMenuMaxFps.SavedState state = new QuickMenuMaxFps.SavedState();
+            state.hasViewDistance = true;
+            state.viewDistance = 16;
+            state.hasSimulationDistance = true;
+            state.simulationDistance = 12;
+            state.hasEntityShadows = true;
+            state.entityShadows = true;
+            config.maxFpsSavedState = state;
+            check(QuickMenuConfig.save(), "Initial snapshot saved");
+
+            // verifyAndClearDiskOptions against the stale file
+            boolean verified = QuickMenuMaxFps.verifyAndClearDiskOptions(testOptionsFile, state);
+            check(!verified, "Verification fails when options.txt was silently not updated by write()");
+            check(state.hasViewDistance, "hasViewDistance remains true after silent disk write failure");
+            check(state.hasSimulationDistance, "hasSimulationDistance remains true after silent disk write failure");
+            check(state.hasEntityShadows, "hasEntityShadows remains true after silent disk write failure");
+            check(QuickMenuMaxFps.hasAnyVanillaOptions(state), "hasAnyVanillaOptions remains true");
+
+            // Now simulate successful write updating options.txt to restored values
+            String restoredOptionsContent = "renderDistance:16\n" +
+                                           "simulationDistance:12\n" +
+                                           "particles:0\n" +
+                                           "renderClouds:\"fancy\"\n" +
+                                           "entityShadows:true\n";
+            Files.writeString(testOptionsFile, restoredOptionsContent, StandardCharsets.UTF_8);
+
+            boolean verifiedSuccess = QuickMenuMaxFps.verifyAndClearDiskOptions(testOptionsFile, state);
+            check(verifiedSuccess, "Verification succeeds when options.txt matches restored values");
+            check(!state.hasViewDistance, "hasViewDistance cleared after successful verification");
+            check(!state.hasSimulationDistance, "hasSimulationDistance cleared after successful verification");
+            check(!state.hasEntityShadows, "hasEntityShadows cleared after successful verification");
+            check(!QuickMenuMaxFps.hasAnyVanillaOptions(state), "hasAnyVanillaOptions is false when all verified");
+
+            System.out.println("[PASS] 14. Silent GameOptions write failure preserves recovery snapshot on disk");
+        } finally {
+            QuickMenuMaxFps.setOptionsPath(null);
+            QuickMenuConfig.setConfigFile(origConfig);
+            deleteRecursively(tempDir.toFile());
         }
     }
 
