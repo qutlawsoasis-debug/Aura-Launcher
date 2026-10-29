@@ -3182,7 +3182,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-        clipLeft = box.x() + 8;
+        clipLeft = box.x();
 
 
 
@@ -3214,7 +3214,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-        clipRight = box.x() + box.width() - 8;
+        clipRight = box.x() + box.width();
 
 
 
@@ -3230,7 +3230,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-        clipBottom = box.bottom() - 8;
+        clipBottom = box.bottom();
 
 
 
@@ -4142,7 +4142,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-        context.enableScissor((int) Math.ceil(box.x() + 8), (int) Math.ceil(box.y() + 8), (int) (box.x() + box.width() - 8), (int) (box.bottom() - 8));
+        context.enableScissor((int) Math.floor(box.x()), (int) Math.floor(box.y()), (int) Math.ceil(box.x() + box.width()), (int) Math.ceil(box.bottom()));
 
 
 
@@ -4559,150 +4559,17 @@ public final class QuickMenuScreen extends Screen {
 
 
             float navWidth = 200 * s;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             float navH = 36 * s;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            float pillX = x + 8 * s;
+            float pillW = navWidth - 16 * s;
             for (int i = 0; i < SECTIONS.length; i++) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                 final int item = i;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                 float ny = y + 60 * s + i * 42 * s;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
                 boolean active = i == section;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                rect(x + 20 * s, ny, navWidth - 16 * s, navH, 8 * s, active ? 0x5C767680 : 0x00767680, active ? 0x1AFFFFFF : 0);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                icon(i, x + 30 * s, ny + 10 * s, active ? ACCENT : 0xDDFFFFFF, s);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                text(SECTIONS[i], x + 56 * s, ny + 9 * s, 15 * s, 0xFFFFFFFF, active ? 600 : 400);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-                controls.add(new Control(x + 20 * s, ny, navWidth - 16 * s, navH, SECTIONS[i], () -> selectSection(item), null, true, 0));
+                rect(pillX, ny, pillW, navH, 10 * s, active ? 0x5C767680 : 0x00767680, active ? 0x1AFFFFFF : 0);
+                icon(i, pillX + 12 * s, ny + 10 * s, active ? ACCENT : 0xDDFFFFFF, s);
+                text(SECTIONS[i], pillX + 38 * s, ny + 9 * s, 15 * s, 0xFFFFFFFF, active ? 600 : 400);
+                controls.add(new Control(pillX, ny, pillW, navH, SECTIONS[i], () -> selectSection(item), null, true, 0));
 
 
 
@@ -5694,7 +5561,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-                clipLeft = box.x() + 8;
+                clipLeft = box.x();
 
 
 
@@ -5726,7 +5593,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-                clipRight = box.x() + box.width() - 8;
+                clipRight = box.x() + box.width();
 
 
 
@@ -5742,7 +5609,7 @@ public final class QuickMenuScreen extends Screen {
 
 
 
-                clipBottom = box.bottom() - 8;
+                clipBottom = box.bottom();
 
 
 
