@@ -11,7 +11,9 @@ import net.minecraft.text.Style;
 import org.joml.Matrix4f;
 
 public final class GlassScreenText {
-    private static boolean selectedText;
+    private static boolean selectedText,entryText;
+    public static boolean beginEntry(){boolean old=entryText;entryText=true;return old;}
+    public static void endEntry(boolean old){entryText=old;}
     private static final Command[] COMMANDS=new Command[8192];
     private static final FontProbe FONT_PROBE=new FontProbe();
     private static final GlyphMask WIDTH_MASK=new GlyphMask();
@@ -40,10 +42,14 @@ public final class GlassScreenText {
         Command command=command(c,font,x,y,color,shadow);if(command==null)return false;
         command.text=null;command.ordered=text;command.width=font.getWidth(text);GlassRenderer.foreground(command);return true;
     }
+    private static int entryColor(int color){
+        int r=(color>>16)&255,g=(color>>8)&255,b=color&255;
+        return Math.max(r,Math.max(g,b))-Math.min(r,Math.min(g,b))<12 && r<220?0xB3FFFFFF:color;
+    }
     private static boolean allowed(){return GlassFrameHooks.styledScreen()&&!GlassGlyphText.vanillaGlyph()&&AuraRenderer.isReady();}
     private static Command command(DrawContext c,TextRenderer font,int x,int y,int color,boolean shadow){
         if(!allowed()||cursor==COMMANDS.length)return null;
-        Command command=COMMANDS[cursor++];command.c=c;command.font=font;command.x=x;command.y=y;command.color=color;command.shadow=shadow;command.selected=selectedText;command.slot=-1;command.baseSize=9;
+        Command command=COMMANDS[cursor++];command.c=c;command.font=font;command.x=x;command.y=y;command.color=entryText?entryColor(color):color;command.shadow=shadow;command.selected=selectedText;command.slot=-1;command.baseSize=9;
         command.matrix.set(c.getMatrices().peek().getPositionMatrix());return command;
     }
     private static final class FontProbe implements CharacterVisitor {
@@ -81,8 +87,7 @@ public final class GlassScreenText {
                 finally{GlassGlyphText.endVanillaGlyph();position.set(glyphMatrix);}
                 AuraRenderer.begin(position,RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix());
             }else{
-                if(selected){for(int dx=-1;dx<=1;dx++)for(int dy=-1;dy<=1;dy++)if(dx!=0||dy!=0)AuraRenderer.glyph(point,pen+dx*.75f,y+dy*.75f,size,Math.min(230,alpha)<<24,weight);}
-                else if(shadow && slot<0)AuraRenderer.glyph(point,pen+.5f,y+.5f,size,(alpha/3)<<24,weight);
+                if(shadow && slot<0)AuraRenderer.glyph(point,pen+.5f,y+.5f,size,(alpha/3)<<24,weight);
                 if(slot>=0)AuraRenderer.adaptiveGlyph(slot,point,pen,y,size,rgba,weight);else AuraRenderer.glyph(point,pen,y,size,rgba,weight);
             }
             if(style.isUnderlined())AuraRenderer.rect(pen,y+size,advance,Math.max(.5f,size/9),0,0,rgba,0);

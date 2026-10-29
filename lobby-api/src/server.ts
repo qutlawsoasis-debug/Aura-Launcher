@@ -20,6 +20,7 @@ import handleMusicResolve from '../api/music/resolve.js';
 import handleMusicBlocked from '../api/music/blocked.js';
 import handleMusicSearch from '../api/music/search.js';
 import handleMusicList from '../api/music/list.js';
+import handleLyrics from '../api/lyrics.js';
 import handleEmbedPlayer from '../api/embed/player.js';
 import { generateLandingHtml } from './landing.js';
 
@@ -140,6 +141,9 @@ export const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/music/list') {
       return await handleMusicList(req, res);
+    }
+    if (pathname === '/api/lyrics' || pathname === '/api/music/lyrics') {
+      return await handleLyrics(req, res);
     }
 
     // 0. GET /api/tunnel-config

@@ -14,10 +14,7 @@ public abstract class SliderWidgetMixin {
     private void aura_slider(DrawContext c,int mx,int my,float delta,CallbackInfo ci) {
         if(!GlassFrameHooks.styledScreen())return;
         var self=(SliderWidget)(Object)this;
-        int color=AuraNativeSurfaces.button(c,self,self.isHovered(),1);
-        var knob=GlassStyles.frameResolve(GlassPreset.SELECTED_DARK,self.active?self.isFocused()?GlassState.FOCUSED:GlassState.NORMAL:GlassState.DISABLED,1);
-        knob.radius=4;knob.light*=.25f;knob.rimOuter*=.35f;knob.gloss*=.5f;
-        GlassRenderer.draw(self.getX()+(float)value*(self.getWidth()-8),self.getY()+1,8,self.getHeight()-2,knob,1);
-        AuraNativeSurfaces.label(c,self,color);ci.cancel();
+        net.auramc.glass.client.ui.GlassSlider.paint(c,self,value);
+        ci.cancel();
     }
 }

@@ -17,7 +17,8 @@
     ]
   },
   "mixins": [
-    "aura-glass.client.mixins.json"
+    "aura-glass.client.mixins.json",
+    "aura-glass.quickmenu.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.14.21",

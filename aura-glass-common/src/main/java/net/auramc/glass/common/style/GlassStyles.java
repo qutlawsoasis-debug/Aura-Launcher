@@ -48,12 +48,16 @@ public final class GlassStyles {
         } catch (Exception error) { log("Styles reload rejected: " + error.getMessage()); }
     }
 
-    public static GlassStyle get(GlassPreset preset) { return tagged(preset,document.presets.get(preset)); }
+    public static boolean regular(){return !"LIQUID".equals(document.material);}
+    private static Map<GlassPreset,GlassStyle> activePresets(){
+        return regular()?document.presets:document.profiles.get("LIQUID");
+    }
+    public static GlassStyle get(GlassPreset preset) { return tagged(preset,activePresets().get(preset)); }
     public static void beginFrame(){frameCursor=0;}
     private static GlassStyle frameCopy(GlassStyle source){GlassStyle target=FRAME_STYLES[frameCursor++%FRAME_STYLES.length];source.copyInto(target);return target;}
     // Frame styles are borrowed scratch values. Persisted edits must use copy().
     public static GlassStyle frame(GlassPreset preset){
-        GlassStyle value=frameCopy(document.presets.get(preset));
+        GlassStyle value=frameCopy(activePresets().get(preset));
         return preset.name().startsWith("SELECTED_")?value.selectedText(preset==GlassPreset.SELECTED_TINT):value;
     }
     public static GlassStyle frameSelected(){return frame(document.selectedPreset);}
@@ -70,8 +74,11 @@ public final class GlassStyles {
     public static void materialInto(GlassStyle source,GlassQuality quality,GlassStyle target){source.copyInto(target);applyMaterial(target,quality);}
     public static GlassStyle frameMaterial(GlassStyle source){return applyMaterial(frameCopy(source),document.quality);}
     private static GlassStyle applyMaterial(GlassStyle copy,GlassQuality quality){
-        if(copy.isThemeTint()){int rgb=document.theme.rgb;copy.tintR*=((rgb>>16)&255)/255f;copy.tintG*=((rgb>>8)&255)/255f;copy.tintB*=(rgb&255)/255f;}
-        if (quality == GlassQuality.LOW) copy.tintA = Math.max(copy.tintA, .12f);
+        if(!regular() && copy.isThemeTint()){int rgb=document.theme.rgb;copy.tintR*=((rgb>>16)&255)/255f;copy.tintG*=((rgb>>8)&255)/255f;copy.tintB*=(rgb&255)/255f;}
+        if (quality == GlassQuality.LOW) {
+            copy.tintA = Math.max(copy.tintA, .12f);
+            if(regular()&&copy.renderPath()==1){copy.tintR=.12f;copy.tintG=.13f;copy.tintB=.16f;copy.tintA=Math.max(copy.tintA,.90f);}
+        }
         if(quality==GlassQuality.OFF){
             FlatFill fill=document.offFill;
             if(!copy.isSelectedText() && copy.tintA<.5f){copy.tintR=fill.red;copy.tintG=fill.green;copy.tintB=fill.blue;}
@@ -84,7 +91,7 @@ public final class GlassStyles {
     public static GlassQuality quality() { return document.quality; }
     public static void setQuality(GlassQuality quality) { document.quality = quality == null ? GlassQuality.HIGH : quality; }
     public static void update(GlassPreset preset, GlassStyle style) {
-        GlassStyle copy = style.copy(); copy.validate(); document.presets.put(preset, copy);
+        GlassStyle copy = style.copy(); copy.validate(); activePresets().put(preset, copy);
     }
 
     public static GlassStyle resolve(GlassPreset preset, GlassState state, float amount) {
@@ -128,6 +135,16 @@ public final class GlassStyles {
     private static void validate(Document candidate) {
         if (candidate == null || candidate.quality == null || candidate.presets == null || candidate.states == null)
             throw new IllegalArgumentException("quality, presets and states are required");
+        if(candidate.version>5)throw new IllegalArgumentException("unsupported styles version");
+        if(candidate.version==5 && (!"REGULAR".equals(candidate.material)&&!"LIQUID".equals(candidate.material)))throw new IllegalArgumentException("material must be REGULAR or LIQUID");
+        if(candidate.version==5){
+            if(candidate.profiles==null || candidate.profiles.get("LIQUID")==null)throw new IllegalArgumentException("profiles.LIQUID is required");
+            for(GlassPreset preset:GlassPreset.values()){
+                GlassStyle liquid=candidate.profiles.get("LIQUID").get(preset);
+                if(liquid==null)throw new IllegalArgumentException("Missing LIQUID preset "+preset);
+                liquid.validate();
+            }
+        }
         if(candidate.version<4){
             Document fresh=defaults();
             for(GlassPreset preset:new GlassPreset[]{GlassPreset.SELECTED_GLASS,GlassPreset.SELECTED_TINT})candidate.presets.putIfAbsent(preset,fresh.presets.get(preset).copy());
@@ -184,19 +201,13 @@ public final class GlassStyles {
     }
 
     private static boolean upgrade(Document next) {
-        if (next.version >= 4) return false;
-        if (next.version < 2) {
-            Document old = legacyDefaults(), fresh = defaults();
-            try {
-                for (GlassPreset preset : GlassPreset.values()) for (var field : GlassStyle.class.getFields()) {
-                    float value = field.getFloat(next.presets.get(preset));
-                    if (Math.abs(value - field.getFloat(old.presets.get(preset))) < .00001f)
-                        field.setFloat(next.presets.get(preset), field.getFloat(fresh.presets.get(preset)));
-                }
-            } catch (IllegalAccessException impossible) { throw new IllegalStateException(impossible); }
-        }
-        next.version = 4;
-        log("Styles upgraded to version 4; customized fields retained");
+        if(next.version>=5)return false;
+        Document fresh=defaults();
+        next.profiles=new java.util.LinkedHashMap<>();
+        next.profiles.put("LIQUID",next.presets);
+        next.profiles.put("REGULAR",fresh.presets);
+        next.presets=fresh.presets;next.states=fresh.states;next.material="REGULAR";next.version=5;
+        log("Styles upgraded to version 5 REGULAR; quality retained, previous presets available as LIQUID");
         return true;
     }
 
@@ -204,7 +215,8 @@ public final class GlassStyles {
         Document file = GSON.fromJson(Files.readString(path, StandardCharsets.UTF_8), Document.class);
         validate(file); upgrade(file);
         Map<GlassPreset, GlassStyle> result = new EnumMap<>(GlassPreset.class);
-        for (GlassPreset preset : GlassPreset.values()) result.put(preset, tagged(preset,file.presets.get(preset)));
+        Map<GlassPreset,GlassStyle> source="LIQUID".equals(file.material)?file.profiles.get("LIQUID"):file.presets;
+        for (GlassPreset preset : GlassPreset.values()) result.put(preset, tagged(preset,source.get(preset)));
         return result;
     }
 
@@ -220,7 +232,9 @@ public final class GlassStyles {
 
     private static void log(String reason) { if (LOGGED.add(reason)) System.err.println("[AuraGlass] " + reason); }
     private static final class Document {
-        int version = 4;
+        int version = 5;
+        String material="REGULAR";
+        Map<String,Map<GlassPreset,GlassStyle>> profiles=new java.util.LinkedHashMap<>();
         GlassPreset selectedPreset=GlassPreset.SELECTED_TINT;
         Theme theme=new Theme();
         FlatFill offFill=new FlatFill();

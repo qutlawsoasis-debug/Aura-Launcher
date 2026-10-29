@@ -132,6 +132,20 @@ public final class StubMusicSource implements MusicSource {
     }
 
     @Override
+    public synchronized void queue(String trackId) {
+        if (trackId == null) return;
+        for (int i = 0; i < playlist.size(); i++) {
+            if (playlist.get(i).id().equals(trackId)) {
+                trackIndex = i;
+                basePositionMs = 0L;
+                lastStateChangeTimeMs = timeSupplier.getAsLong();
+                state = PlaybackState.PLAYING;
+                break;
+            }
+        }
+    }
+
+    @Override
     public synchronized List<Track> search(String q) {
         if (q == null || q.isBlank()) {
             return Collections.unmodifiableList(playlist);

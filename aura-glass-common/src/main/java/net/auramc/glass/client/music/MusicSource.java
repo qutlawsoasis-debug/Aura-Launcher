@@ -14,4 +14,10 @@ public interface MusicSource {
     boolean available();
 
     default void queue(String trackId) {}
+    default void playTrack(Track track) {
+        if (track != null) {
+            queue(track.id());
+            play();
+        }
+    }
 }
