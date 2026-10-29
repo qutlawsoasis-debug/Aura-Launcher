@@ -82,6 +82,10 @@ public final class MusicArtwork {
             var graphics = thumbnail.createGraphics();
             try {
                 graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                float cornerRadius = targetWidth * (20.0f / 128.0f);
+                graphics.fill(new java.awt.geom.RoundRectangle2D.Float(0, 0, targetWidth, targetHeight, cornerRadius * 2, cornerRadius * 2));
+                graphics.setComposite(java.awt.AlphaComposite.SrcIn);
                 graphics.drawImage(decoded, 0, 0, targetWidth, targetHeight, null);
             } finally { graphics.dispose(); }
             int[] pixels = thumbnail.getRGB(0, 0, targetWidth, targetHeight, null, 0, targetWidth);
@@ -94,6 +98,14 @@ public final class MusicArtwork {
 
     private static byte[] read(String value) throws Exception {
         URI uri = URI.create(value);
+        if ("aura".equalsIgnoreCase(uri.getScheme())) {
+            String sub = (uri.getAuthority() != null ? uri.getAuthority() : "") + uri.getPath();
+            InputStream stream = MusicArtwork.class.getResourceAsStream("/assets/aura-glass/" + sub);
+            if (stream != null) {
+                try (stream) { return bounded(stream); }
+            }
+            throw new IOException("Missing bundled artwork: " + sub);
+        }
         if ("https".equalsIgnoreCase(uri.getScheme())) {
             String host = uri.getHost();
             if (host == null || uri.getUserInfo() != null || uri.getPort() != -1 && uri.getPort() != 443 || uri.getFragment() != null)

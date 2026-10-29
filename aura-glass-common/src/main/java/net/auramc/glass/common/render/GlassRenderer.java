@@ -78,7 +78,7 @@ public final class GlassRenderer {
 
     // Reserved for world overlays. No capture or HUD rendering is requested yet.
     public static void worldBeforeHud() { BackdropRenderer.captureWorldIfRequested(); }
-    public static void modalBackground(float progress) { modalProgress=progress; BackdropRenderer.modal(progress,hasBackdrop()); }
+    public static void modalBackground(float progress) { if (quality == GlassQuality.OFF) return; modalProgress=progress; BackdropRenderer.modal(progress,hasBackdrop()); }
 
     public static void draw(float x, float y, float w, float h, GlassStyle style, float alpha) {
         enqueue(null, x, y, w, h, style, alpha);
@@ -164,11 +164,19 @@ public final class GlassRenderer {
             glUniform1i(instancedLocation, instanced ? 1 : 0);
             glUniform2f(sizeLocation, width, height);
             glUniform1f(modalLocation,modalProgress);
-            for (int unit = 0; unit < 4; unit++) {
-                com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0 + unit); GuiRenderState.clearSampler(unit);
-                com.mojang.blaze3d.platform.GlStateManager._bindTexture(hasBackdrop() ? BlurService.get().texture(unit) : 0);
+            if (hasBackdrop()) {
+                for (int unit = 0; unit < 4; unit++) {
+                    com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0 + unit); GuiRenderState.clearSampler(unit);
+                    com.mojang.blaze3d.platform.GlStateManager._bindTexture(BlurService.get().texture(unit));
+                }
+                com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE4); GuiRenderState.clearSampler(4); com.mojang.blaze3d.platform.GlStateManager._bindTexture(noiseTexture);
+            } else if (quality != GlassQuality.LOW && quality != GlassQuality.OFF) {
+                for (int unit = 0; unit < 4; unit++) {
+                    com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0 + unit); GuiRenderState.clearSampler(unit);
+                    com.mojang.blaze3d.platform.GlStateManager._bindTexture(0);
+                }
+                com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE4); GuiRenderState.clearSampler(4); com.mojang.blaze3d.platform.GlStateManager._bindTexture(noiseTexture);
             }
-            com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE4); GuiRenderState.clearSampler(4); com.mojang.blaze3d.platform.GlStateManager._bindTexture(noiseTexture);
             glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_SCISSOR_TEST);
             glEnable(GL_BLEND); glBlendEquation(GL_FUNC_ADD); glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             if (instanced) glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, PANES.size());

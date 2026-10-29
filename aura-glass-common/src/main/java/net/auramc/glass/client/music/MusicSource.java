@@ -13,6 +13,10 @@ public interface MusicSource {
     List<Track> search(String q);
     boolean available();
 
+    default List<Track> queue() {
+        return search("");
+    }
+
     default void queue(String trackId) {}
     default void playTrack(Track track) {
         if (track != null) {

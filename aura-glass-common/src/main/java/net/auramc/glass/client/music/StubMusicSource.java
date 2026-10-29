@@ -10,7 +10,9 @@ public final class StubMusicSource implements MusicSource {
     private static final List<Track> DEFAULT_PLAYLIST = List.of(
             new Track("stub_1", "Aura Sound Lab", "Liquid Glass Odyssey", 180_000L, "aura://textures/music/odyssey.png"),
             new Track("stub_2", "Cupertino Dreams", "Spring Motion Beats", 210_000L, "aura://textures/music/spring.png"),
-            new Track("stub_3", "Aura Orchestral", "Karaoke Horizon", 150_000L, "aura://textures/music/horizon.png")
+            new Track("stub_3", "Aura Orchestral", "Karaoke Horizon", 150_000L, "aura://textures/music/horizon.png"),
+            new Track("stub_4", "Aura Ambient", "Glass Reflections", 195_000L, "aura://textures/music/crystal.png"),
+            new Track("stub_5", "Aura Sound Lab", "Neon Pulse", 240_000L, "aura://textures/music/pulse.png")
     );
 
     private final List<Track> playlist;
@@ -93,6 +95,12 @@ public final class StubMusicSource implements MusicSource {
             lastStateChangeTimeMs = nowTime;
             state = PlaybackState.PAUSED;
         }
+    }
+
+    public synchronized void stop() {
+        state = PlaybackState.STOPPED;
+        basePositionMs = 0L;
+        lastStateChangeTimeMs = timeSupplier.getAsLong();
     }
 
     @Override

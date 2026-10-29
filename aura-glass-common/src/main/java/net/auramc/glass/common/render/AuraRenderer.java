@@ -198,10 +198,21 @@ public final class AuraRenderer {
         vertex(x - pad, y + h + pad, -pad, h + pad, w, h, radius, 0, -1, color, 0, 0, 0);
     }
 
-    public static boolean hasGlyph(int codePoint) { return ready && codePoint>=0 && codePoint<GLYPHS[0].length && GLYPHS[0][codePoint]!=null; }
-    public static float glyphWidth(int codePoint,float size){return hasGlyph(codePoint)?GLYPHS[0][codePoint].advance*size:0;}
-    public static float glyphWidth(int codePoint,float size,int weight){return hasGlyph(codePoint)?GLYPHS[weightIndex(weight)][codePoint].advance*size:0;}
+    public static char mapChar(char c) {
+        if (c == '−') return '–';
+        if (c == '›') return '>';
+        if (c == '˅' || c == '⌄') return 'v';
+        return c;
+    }
+
+    public static boolean hasGlyph(int codePoint) {
+        codePoint = mapChar((char) codePoint);
+        return ready && codePoint>=0 && codePoint<GLYPHS[0].length && GLYPHS[0][codePoint]!=null;
+    }
+    public static float glyphWidth(int codePoint,float size){return hasGlyph(codePoint)?GLYPHS[0][mapChar((char)codePoint)].advance*size:0;}
+    public static float glyphWidth(int codePoint,float size,int weight){return hasGlyph(codePoint)?GLYPHS[weightIndex(weight)][mapChar((char)codePoint)].advance*size:0;}
     public static void glyph(int codePoint,float x,float y,float size,int color,int weight){
+        codePoint = mapChar((char) codePoint);
         if(!hasGlyph(codePoint))return;
         Glyph g=GLYPHS[weightIndex(weight)][codePoint];
         if(g.visible)quad(x+g.left*size,y+(-ascender+g.top)*size,(g.right-g.left)*size,(g.bottom-g.top)*size,0,0,glyphKind,color,0,g.u0,g.v0,g.u1,g.v1);
@@ -227,9 +238,13 @@ public final class AuraRenderer {
 
     public static float textWidth(String text, float size, int weight) {
         float width = 0;
+        int wIdx = weightIndex(weight);
         for (int i = 0; i < text.length(); i++) {
-            Glyph g = GLYPHS[weightIndex(weight)][text.charAt(i)];
-            if (g != null) width += g.advance * size;
+            char ch = mapChar(text.charAt(i));
+            if (ch < GLYPHS[wIdx].length) {
+                Glyph g = GLYPHS[wIdx][ch];
+                if (g != null) width += g.advance * size;
+            }
         }
         return width;
     }
@@ -241,8 +256,11 @@ public final class AuraRenderer {
     public static void text(String text, float x, float y, float size, int color, int weight) {
         if (!ready) return;
         float pen = x;
+        int wIdx = weightIndex(weight);
         for (int i = 0; i < text.length(); i++) {
-            Glyph g = GLYPHS[weightIndex(weight)][text.charAt(i)];
+            char ch = mapChar(text.charAt(i));
+            if (ch >= GLYPHS[wIdx].length) continue;
+            Glyph g = GLYPHS[wIdx][ch];
             if (g == null) continue;
             if (g.visible) quad(pen + g.left * size, y + (-ascender + g.top) * size,
                     (g.right - g.left) * size, (g.bottom - g.top) * size,
@@ -317,8 +335,22 @@ public final class AuraRenderer {
         texture = vbo = vao = program = 0;
     }
 
-    private static final class Glyph {
-        float advance, left, right, top, bottom, u0, v0, u1, v1;
-        boolean visible;
+    public static int fontTexture() { return texture; }
+    public static float distanceRange() { return distanceRange; }
+    public static float fontAscender() { return ascender; }
+    public static float atlasWidth() { return atlasWidth; }
+    public static float atlasHeight() { return atlasHeight; }
+    public static Glyph getGlyph(int weight, int codePoint) {
+        if (!ready) return null;
+        int w = weightIndex(weight);
+        if (codePoint >= 0 && codePoint < GLYPHS[w].length) {
+            return GLYPHS[w][codePoint];
+        }
+        return null;
+    }
+
+    public static final class Glyph {
+        public float advance, left, right, top, bottom, u0, v0, u1, v1;
+        public boolean visible;
     }
 }
