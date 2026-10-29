@@ -9,9 +9,9 @@ public final class QuickMenuMotion {
     private static final long CONTENT_FADE = 100_000_000L;
     private static final long SECTION_DELAY = 25_000_000L;
     private static final long CONTENT_END = CONTENT_FADE + 2 * SECTION_DELAY;
-    // GlassSpring has omega18 and dampingRatio.72; response=2pi/(18*timeScale), not settling duration.
-    private final GlassSpring heightSpring = new GlassSpring();
-    private final GlassSpring widthSpring = new GlassSpring();
+    // GlassSpring with Apple response 0.35s and damping 0.85
+    private final GlassSpring heightSpring = new GlassSpring(0.35f, 0.85f);
+    private final GlassSpring widthSpring = new GlassSpring(0.35f, 0.85f);
     private long lastTime = Long.MIN_VALUE, changedAt;
     private long heightClock = 1, widthClock = 1;
     private boolean open, initialized, positionSet, openingFromClosed;
@@ -25,6 +25,8 @@ public final class QuickMenuMotion {
                            float contentOpacity, float progress, float anchorX, float anchorY, long contentElapsedNanos) {
         public float bottom() { return y + height; }
         public float centerX() { return x + width * .5f; }
+        public float scale() { return 0.08f + 0.92f * progress; }
+        public float opacity() { return progress; }
         public float sectionOpacity(int section) {
             return smooth(unit((contentElapsedNanos - Math.max(0, section) * SECTION_DELAY) / (float) CONTENT_FADE));
         }
@@ -66,7 +68,7 @@ public final class QuickMenuMotion {
     public Geometry update(long now, int viewportWidth, int viewportHeight,
                            double savedCenterX, double savedBottomY) {
         int screenWidth = Math.max(1, viewportWidth), screenHeight = Math.max(1, viewportHeight);
-        float anchorX = screenWidth * .5f, anchorY = Math.max(0, screenHeight - 24);
+        float anchorX = screenWidth * .5f, anchorY = Math.max(0, screenHeight - 12);
         float targetWidth = Math.min(Math.max(1, screenWidth - 32), Math.max(520, screenWidth * .75f));
         float targetHeight = Math.min(Math.max(1, screenHeight - 48), Math.max(320, screenHeight * .667f));
         if (!initialized) {
@@ -81,11 +83,16 @@ public final class QuickMenuMotion {
             widthSpring.approach(0, widthClock);
             if (open) changedAt = now;
         }
+        if (openingFromClosed) {
+            openingFromClosed = false;
+            displayCenter = startCenter = anchorX;
+            displayBottom = startBottom = anchorY;
+        }
         long elapsed = Math.max(0, now - changedAt);
         long dt = lastTime == Long.MIN_VALUE ? 0 : Math.max(0, Math.min(50_000_000L, now - lastTime));
         lastTime = now;
         boolean heightMoving = open || elapsed >= closeFadeDuration + AXIS_DELAY;
-        boolean widthMoving = open ? !openingFromClosed || elapsed >= AXIS_DELAY : elapsed >= closeFadeDuration;
+        boolean widthMoving = open ? elapsed >= AXIS_DELAY : elapsed >= closeFadeDuration;
         if (heightMoving) heightClock += (long) (dt * (open ? 1.55 : 2.8));
         if (widthMoving) widthClock += (long) (dt * (open ? 1.2 : 2.3));
         heightProgress = unit(heightSpring.approach(open ? 1 : 0, heightClock));
@@ -95,7 +102,7 @@ public final class QuickMenuMotion {
         else if (!open) contentElapsed = Math.max(0, contentElapsed - (long) (dt * 2.5));
         double targetCenter = bound(center * screenWidth, targetWidth * .5 + 16, screenWidth - targetWidth * .5 - 16);
         double targetBottom = Double.isFinite(bottom) ? bottom * screenHeight : anchorY;
-        targetBottom = bound(targetBottom, targetHeight + 16, screenHeight - 16);
+        targetBottom = bound(targetBottom, targetHeight + 16, Math.max(anchorY, screenHeight - 12));
         center = targetCenter / screenWidth;
         if (Double.isFinite(bottom)) bottom = targetBottom / screenHeight;
         if (open) {
@@ -112,11 +119,15 @@ public final class QuickMenuMotion {
             displayBottom = startBottom + (anchorY - startBottom) * phase - arc;
         }
         if (!open && (elapsed >= CLOSE_TIME && progress < .004f || elapsed >= 650_000_000L)) {
+            displayCenter = startCenter = anchorX;
+            displayBottom = startBottom = anchorY;
             geometry = new Geometry(anchorX, anchorY, 0, 0, 0, 0, 0, anchorX, anchorY, 0);
             return geometry;
         }
-        float width = Math.min(targetWidth, 8 + (targetWidth - 8) * widthProgress);
-        float height = Math.min(targetHeight, 8 + (targetHeight - 8) * heightProgress);
+        float scaleX = 0.08f + 0.92f * widthProgress;
+        float scaleY = 0.08f + 0.92f * heightProgress;
+        float width = Math.min(targetWidth, targetWidth * scaleX);
+        float height = Math.min(targetHeight, targetHeight * scaleY);
         double cx = bound(displayCenter, width * .5 + 1, screenWidth - width * .5 - 1);
         double by = bound(displayBottom, height + 1, screenHeight - 1);
         float morph = smooth(unit((progress - .15f) / .75f));

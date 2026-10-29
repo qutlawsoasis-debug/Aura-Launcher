@@ -21,7 +21,7 @@ public final class QuickMenuMotionTest {
         motion.setOpen(true, start);
         for (long t = start; t <= start + 1_000_000_000L; t += STEP) {
             var frame = motion.update(t, W, H, .5, Double.NaN);
-            near(frame.bottom(), H - 24, .001, "bottom stays on anchor while opening");
+            near(frame.bottom(), H - 12, .001, "bottom stays on anchor while opening");
             check(frame.y() >= 0 && frame.x() >= 0, "opening stays inside viewport");
             check(frame.radius() <= Math.min(frame.width(), frame.height()) * .5f, "radius fits current shape");
         }
@@ -36,13 +36,17 @@ public final class QuickMenuMotionTest {
         long start = 1_000_000_000L;
         motion.setOpen(true, start);
         var first = motion.update(start, W, H, .5, Double.NaN);
-        near(first.width(), 8, .001, "initial dot width");
-        near(first.height(), 8, .001, "initial dot height");
-        near(first.radius(), 4, .001, "initial circular dot");
+        float targetWidth = Math.min(Math.max(1, W - 32), Math.max(520, W * .75f));
+        float targetHeight = Math.min(Math.max(1, H - 48), Math.max(320, H * .667f));
+        float initW = targetWidth * 0.08f;
+        float initH = targetHeight * 0.08f;
+        near(first.width(), initW, .001, "initial scale 0.08 width");
+        near(first.height(), initH, .001, "initial scale 0.08 height");
+        near(first.radius(), initH * .5f, .001, "initial rounded capsule");
         for (long t = start + STEP; t < start + 40_000_000L; t += STEP) {
             var frame = motion.update(t, W, H, .5, Double.NaN);
-            near(frame.width(), 8, .001, "width waits40ms");
-            check(frame.height() > 8, "height extends first");
+            near(frame.width(), initW, .001, "width waits40ms");
+            check(frame.height() > initH, "height extends first");
             near(frame.contentOpacity(), 0, .001, "content absent below60percent");
         }
         long t = start + 40_000_000L;
@@ -122,7 +126,7 @@ public final class QuickMenuMotionTest {
         near(motion.geometry().width(), 0, .001, "closed has zero width");
         near(motion.geometry().height(), 0, .001, "closed has zero height");
         near(motion.geometry().x(), W * .5, .001, "closed returns to anchorX");
-        near(motion.geometry().y(), H - 24, .001, "closed returns to anchorY");
+        near(motion.geometry().y(), H - 12, .001, "closed returns to anchorY");
         motion.resetPosition();
         near(motion.centerX(), .5, .001, "doubleclick reset center");
         check(Double.isNaN(motion.bottomY()), "reset bottom tracks viewport anchor");
