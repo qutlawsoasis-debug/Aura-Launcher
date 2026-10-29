@@ -18,7 +18,11 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.lwjgl.opengl.GL33C.*;
 
@@ -55,6 +59,36 @@ public final class KaraokeWorldRenderer {
     private static int vertexCount = 0;
     private static double lastRenderTimeMs = 0.0;
 
+    // Per-line tone state (W6d Task 4)
+    public static final class LineToneState {
+        public boolean isLight = false;
+        public float lightProgress = 0.0f;
+        public float lastSampledLuma = 0.0f;
+        public long lastFrameTimeMs = 0L;
+
+        public void updateTransition(long nowMs) {
+            if (lastFrameTimeMs <= 0L) {
+                lastFrameTimeMs = nowMs;
+                lightProgress = isLight ? 1.0f : 0.0f;
+                return;
+            }
+            float dt = Math.max(0.0f, Math.min(0.5f, (nowMs - lastFrameTimeMs) / 1000.0f));
+            lastFrameTimeMs = nowMs;
+
+            float target = isLight ? 1.0f : 0.0f;
+            if (dt > 0.0f) {
+                float step = dt / 0.300f; // Exactly 300 ms for full transition
+                if (target > lightProgress) {
+                    lightProgress = Math.min(target, lightProgress + step);
+                } else if (target < lightProgress) {
+                    lightProgress = Math.max(target, lightProgress - step);
+                }
+            }
+        }
+    }
+
+    private static final Map<Integer, LineToneState> LINE_TONE_STATES = new ConcurrentHashMap<>();
+
     // Luminance & adaptive contrast state
     private static Object lastSampledWorld = null;
     private static long lastSampleTick = -1L;
@@ -71,16 +105,33 @@ public final class KaraokeWorldRenderer {
         return lastRenderTimeMs;
     }
 
+    public static LineToneState getLineTone(int lineIndex) {
+        return LINE_TONE_STATES.computeIfAbsent(lineIndex, k -> new LineToneState());
+    }
+
+    public static boolean isLightBackground(int lineIndex) {
+        return getLineTone(lineIndex).isLight;
+    }
+
+    public static float getLightProgress(int lineIndex) {
+        return getLineTone(lineIndex).lightProgress;
+    }
+
+    public static float getLastSampledLuminance(int lineIndex) {
+        return getLineTone(lineIndex).lastSampledLuma;
+    }
+
+    // Backward-compatible global getters (reflect line 0)
     public static boolean isLightBackground() {
-        return isLightBackground;
+        return getLineTone(0).isLight;
     }
 
     public static float getLightProgress() {
-        return lightProgress;
+        return getLineTone(0).lightProgress;
     }
 
     public static float getLastSampledLuminance() {
-        return lastSampledLuminance;
+        return getLineTone(0).lastSampledLuma;
     }
 
     public static int getLuminanceSampleCallCount() {
@@ -120,13 +171,24 @@ public final class KaraokeWorldRenderer {
     }
 
     public static void setScriptedLuminance(float luminance, long timeMs) {
-        lastSampledLuminance = luminance;
+        setScriptedLuminance(0, luminance, timeMs);
+    }
+
+    public static void setScriptedLuminance(int lineIndex, float luminance, long timeMs) {
+        LineToneState state = getLineTone(lineIndex);
+        state.lastSampledLuma = luminance;
         if (luminance > 0.60f) {
-            isLightBackground = true;
+            state.isLight = true;
         } else if (luminance < 0.50f) {
-            isLightBackground = false;
+            state.isLight = false;
         }
-        lastFrameTimeMs = timeMs;
+        state.lastFrameTimeMs = timeMs;
+
+        if (lineIndex == 0) {
+            lastSampledLuminance = state.lastSampledLuma;
+            isLightBackground = state.isLight;
+            lastFrameTimeMs = timeMs;
+        }
     }
 
     public static void resetState() {
@@ -138,26 +200,18 @@ public final class KaraokeWorldRenderer {
         lightProgress = 0.0f;
         lastSampledLuminance = 0.0f;
         luminanceSampleCallCount = 0;
+        LINE_TONE_STATES.clear();
     }
 
     public static void updateTransition(long nowMs) {
-        if (lastFrameTimeMs <= 0L) {
-            lastFrameTimeMs = nowMs;
-            lightProgress = isLightBackground ? 1.0f : 0.0f;
-            return;
+        for (LineToneState state : LINE_TONE_STATES.values()) {
+            state.updateTransition(nowMs);
         }
-        float dt = Math.max(0.0f, Math.min(0.5f, (nowMs - lastFrameTimeMs) / 1000.0f));
+        LineToneState l0 = getLineTone(0);
+        l0.updateTransition(nowMs);
+        lightProgress = l0.lightProgress;
+        isLightBackground = l0.isLight;
         lastFrameTimeMs = nowMs;
-
-        float target = isLightBackground ? 1.0f : 0.0f;
-        if (dt > 0.0f) {
-            float step = dt / 0.300f; // Exactly 300 ms for full 0.0 <-> 1.0 transition
-            if (target > lightProgress) {
-                lightProgress = Math.min(target, lightProgress + step);
-            } else if (target < lightProgress) {
-                lightProgress = Math.max(target, lightProgress - step);
-            }
-        }
     }
 
     public static void initialize() {
@@ -361,7 +415,8 @@ public final class KaraokeWorldRenderer {
             // W6d: un-sung words of line are NOT shown in advance!
             if (playbackMs < kw.t) continue;
 
-            int wordColor = WordAnimation.getLetterColor(playbackMs, kw.t, kw.d, lightProgress);
+            float lineProgress = getLightProgress(anchor.lineIndex);
+            int wordColor = WordAnimation.getLetterColor(playbackMs, kw.t, kw.d, lineProgress);
             float fontScale = anchor.height > 0.01f ? (anchor.height / WordPlacement.FONT_LINE_HEIGHT_EM) : (float) (35.0 * (camPos != null && anchor.position != null ? camPos.distanceTo(anchor.position) : WordPlacement.TARGET_DISTANCE) / 650.7) * KaraokeConfig.get().getSize();
 
             float totalW = AuraRenderer.textWidth(kw.w, fontScale, 700);
@@ -492,17 +547,41 @@ public final class KaraokeWorldRenderer {
         long nowMs = System.currentTimeMillis();
         long currentTick = (world != null) ? world.getTime() : (nowMs / 50L);
 
-        // Strict rate limit gate: once per >= 4 game ticks when world is active (no wall-time bypass)
+        // Strict rate limit gate: once per >= 4 game ticks per group (no wall-time bypass)
         if (checkAndTickSampleGate(world, currentTick, nowMs)) {
-            float sampledLuma = sampleScreenLuminance(viewMatrix, projMatrix, camera, activeAnchors, world);
-            lastSampledLuminance = sampledLuma;
-
-            // Hysteresis: > 0.60 is light, < 0.50 is dark, between maintains current state
-            if (sampledLuma > 0.60f) {
-                isLightBackground = true;
-            } else if (sampledLuma < 0.50f) {
-                isLightBackground = false;
+            Map<Integer, List<WordPlacement.WordAnchor>> linesMap = new HashMap<>();
+            for (WordPlacement.WordAnchor a : activeAnchors) {
+                linesMap.computeIfAbsent(a.lineIndex, k -> new ArrayList<>()).add(a);
             }
+
+            if (linesMap.isEmpty()) {
+                float sampledLuma = sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, Collections.emptyList(), world);
+                LineToneState state = getLineTone(0);
+                state.lastSampledLuma = sampledLuma;
+                if (sampledLuma > 0.60f) {
+                    state.isLight = true;
+                } else if (sampledLuma < 0.50f) {
+                    state.isLight = false;
+                }
+            } else {
+                for (Map.Entry<Integer, List<WordPlacement.WordAnchor>> entry : linesMap.entrySet()) {
+                    int lineIdx = entry.getKey();
+                    List<WordPlacement.WordAnchor> lineAnchors = entry.getValue();
+                    float sampledLuma = sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, lineAnchors, world);
+
+                    LineToneState state = getLineTone(lineIdx);
+                    state.lastSampledLuma = sampledLuma;
+                    if (sampledLuma > 0.60f) {
+                        state.isLight = true;
+                    } else if (sampledLuma < 0.50f) {
+                        state.isLight = false;
+                    }
+                }
+            }
+
+            LineToneState l0 = getLineTone(0);
+            lastSampledLuminance = l0.lastSampledLuma;
+            isLightBackground = l0.isLight;
         }
 
         // Smooth 300 ms transition updated every frame
@@ -511,56 +590,84 @@ public final class KaraokeWorldRenderer {
 
     private static float sampleScreenLuminance(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera,
                                                 List<WordPlacement.WordAnchor> activeAnchors, World world) {
+        return sampleScreenLuminanceForLine(viewMatrix, projMatrix, camera, activeAnchors, world);
+    }
+
+    private static float sampleScreenLuminanceForLine(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera,
+                                                      List<WordPlacement.WordAnchor> lineAnchors, World world) {
         try {
             net.minecraft.client.MinecraftClient client = net.minecraft.client.MinecraftClient.getInstance();
             if (client != null && client.getFramebuffer() != null) {
                 int fbWidth = client.getFramebuffer().textureWidth;
                 int fbHeight = client.getFramebuffer().textureHeight;
                 if (fbWidth > 10 && fbHeight > 10) {
-                    int sampleX = fbWidth / 2;
-                    int sampleY = fbHeight / 2;
+                    Vec3d camPos = camera != null ? camera.getPos() : null;
 
-                    if (!activeAnchors.isEmpty() && camera != null) {
-                        double avgX = 0, avgY = 0, avgZ = 0;
-                        for (WordPlacement.WordAnchor a : activeAnchors) {
-                            avgX += a.position.x;
-                            avgY += a.position.y;
-                            avgZ += a.position.z;
+                    if (!lineAnchors.isEmpty() && camPos != null) {
+                        int minX = fbWidth;
+                        int maxX = 0;
+                        int sumY = 0;
+                        int projectedCount = 0;
+
+                        for (WordPlacement.WordAnchor a : lineAnchors) {
+                            if (a.position == null) continue;
+                            Vector3f relPos = new Vector3f(
+                                    (float) (a.position.x - camPos.x),
+                                    (float) (a.position.y - camPos.y),
+                                    (float) (a.position.z - camPos.z)
+                            );
+                            Vector4f clip = new Vector4f(relPos.x, relPos.y, relPos.z, 1.0f);
+                            viewMatrix.transform(clip);
+                            projMatrix.transform(clip);
+
+                            if (clip.w > 0.001f) {
+                                float ndcX = clip.x / clip.w;
+                                float ndcY = clip.y / clip.w;
+                                int sx = (int) Math.max(0, Math.min(fbWidth - 4, (ndcX + 1.0f) * 0.5f * fbWidth));
+                                int sy = (int) Math.max(0, Math.min(fbHeight - 4, (ndcY + 1.0f) * 0.5f * fbHeight));
+
+                                minX = Math.min(minX, sx);
+                                maxX = Math.max(maxX, sx);
+                                sumY += sy;
+                                projectedCount++;
+                            }
                         }
-                        int n = activeAnchors.size();
-                        avgX /= n; avgY /= n; avgZ /= n;
 
-                        Vec3d camPos = camera.getPos();
-                        Vector3f relPos = new Vector3f((float) (avgX - camPos.x), (float) (avgY - camPos.y), (float) (avgZ - camPos.z));
+                        if (projectedCount > 0) {
+                            int avgY = sumY / projectedCount;
+                            int midX = (minX + maxX) / 2;
+                            int leftX = (minX + midX) / 2;
+                            int rightX = (midX + maxX) / 2;
 
-                        Vector4f clip = new Vector4f(relPos.x, relPos.y, relPos.z, 1.0f);
-                        viewMatrix.transform(clip);
-                        projMatrix.transform(clip);
+                            int[] samplePointsX = (minX == maxX) ? new int[]{midX} : new int[]{leftX, midX, rightX};
 
-                        if (clip.w > 0.001f) {
-                            float ndcX = clip.x / clip.w;
-                            float ndcY = clip.y / clip.w;
-                            sampleX = (int) Math.max(0, Math.min(fbWidth - 4, (ndcX + 1.0f) * 0.5f * fbWidth));
-                            sampleY = (int) Math.max(0, Math.min(fbHeight - 4, (ndcY + 1.0f) * 0.5f * fbHeight));
+                            float totalLuma = 0.0f;
+                            int totalPixels = 0;
+
+                            for (int sampleX : samplePointsX) {
+                                int clampedX = Math.max(0, Math.min(fbWidth - 4, sampleX));
+                                int clampedY = Math.max(0, Math.min(fbHeight - 4, avgY));
+
+                                SAMPLE_BUF.clear();
+                                glReadPixels(clampedX, clampedY, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, SAMPLE_BUF);
+
+                                int count = 0;
+                                while (SAMPLE_BUF.hasRemaining() && count < 16) {
+                                    int r = SAMPLE_BUF.get() & 0xFF;
+                                    int g = SAMPLE_BUF.get() & 0xFF;
+                                    int b = SAMPLE_BUF.get() & 0xFF;
+                                    SAMPLE_BUF.get(); // skip A
+                                    // Rec. 709 relative luminance
+                                    totalLuma += (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255.0f;
+                                    count++;
+                                }
+                                totalPixels += count;
+                            }
+
+                            if (totalPixels > 0) {
+                                return totalLuma / totalPixels;
+                            }
                         }
-                    }
-
-                    SAMPLE_BUF.clear();
-                    glReadPixels(sampleX, sampleY, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, SAMPLE_BUF);
-
-                    float totalLuma = 0.0f;
-                    int count = 0;
-                    while (SAMPLE_BUF.hasRemaining() && count < 16) {
-                        int r = SAMPLE_BUF.get() & 0xFF;
-                        int g = SAMPLE_BUF.get() & 0xFF;
-                        int b = SAMPLE_BUF.get() & 0xFF;
-                        SAMPLE_BUF.get(); // skip A
-                        // Rec. 709 relative luminance
-                        totalLuma += (0.2126f * r + 0.7152f * g + 0.0722f * b) / 255.0f;
-                        count++;
-                    }
-                    if (count > 0) {
-                        return totalLuma / count;
                     }
                 }
             }

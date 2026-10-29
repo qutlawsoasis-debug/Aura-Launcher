@@ -48,6 +48,7 @@ public final class KaraokeSuiteTest {
         testOnest700MSDFAtlasAndKerning();
         testDemoTimelineLetterNonIntersection();
         testGroundScatterAndRotation();
+        testPerLineAdaptiveContrast();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -981,6 +982,37 @@ public final class KaraokeSuiteTest {
         check(hasNonZeroPitch, "ground letters have random non-zero pitch (tilted/lying)");
 
         System.out.println("[PASS] 14. Scattered landing on ground: positions dispersed ±0.3 blocks, random yaw/pitch/roll rotations (no collinear strip)");
+    }
+
+    private static void testPerLineAdaptiveContrast() {
+        KaraokeWorldRenderer.resetState();
+
+        // Line 0 over forest (dark background, e.g. 0.25)
+        KaraokeWorldRenderer.setScriptedLuminance(0, 0.25f, 1000L);
+        // Line 1 over snow (light background, e.g. 0.90)
+        KaraokeWorldRenderer.setScriptedLuminance(1, 0.90f, 1000L);
+
+        check(!KaraokeWorldRenderer.isLightBackground(0), "Line 0 is dark background");
+        check(KaraokeWorldRenderer.isLightBackground(1), "Line 1 is light background");
+
+        // After 300 ms transition
+        KaraokeWorldRenderer.updateTransition(1350L);
+        check(KaraokeWorldRenderer.getLightProgress(0) == 0.0f, "Line 0 light progress is 0.0 (dark)");
+        check(KaraokeWorldRenderer.getLightProgress(1) == 1.0f, "Line 1 light progress is 1.0 (light)");
+
+        // Verify colors for Line 0: white sung letters (0xB3FFFFFF) and active #64D2FF
+        int colSung0 = WordAnimation.getLetterColor(5000L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(0));
+        int colActive0 = WordAnimation.getLetterColor(1200L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(0));
+        check(colSung0 == WordAnimation.COLOR_SUNG_DARK, "Line 0 sung color is white alpha 0.70");
+        check(colActive0 == WordAnimation.COLOR_ACTIVE_DARK, "Line 0 active color is #64D2FF");
+
+        // Verify colors for Line 1: dark rgb(29,29,31) sung letters (0xB31D1D1F) and active #0A84FF
+        int colSung1 = WordAnimation.getLetterColor(5000L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(1));
+        int colActive1 = WordAnimation.getLetterColor(1200L, 1000L, 500L, KaraokeWorldRenderer.getLightProgress(1));
+        check(colSung1 == WordAnimation.COLOR_SUNG_LIGHT, "Line 1 sung color is rgb(29,29,31) alpha 0.70");
+        check(colActive1 == WordAnimation.COLOR_ACTIVE_LIGHT, "Line 1 active color is #0A84FF");
+
+        System.out.println("[PASS] 15. Per-line adaptive contrast: Line 0 dark (#64D2FF / white) and Line 1 light (#0A84FF / dark) independently tracked");
     }
 
     private static void check(boolean condition, String description) {

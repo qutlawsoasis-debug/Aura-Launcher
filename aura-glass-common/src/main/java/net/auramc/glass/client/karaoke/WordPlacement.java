@@ -49,16 +49,18 @@ public final class WordPlacement {
         public final float height;
         public final float yaw;
         public final float pitch;
+        public final int lineIndex;
         public final boolean[] lettersDetached;
         public final long[] detachJitters;
 
-        public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch) {
+        public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch, int lineIndex) {
             this.word = word;
             this.position = position;
             this.width = width;
             this.height = height;
             this.yaw = yaw;
             this.pitch = pitch;
+            this.lineIndex = lineIndex;
             int len = (word != null && word.w != null) ? word.w.length() : 0;
             this.lettersDetached = new boolean[len];
             this.detachJitters = new long[len];
@@ -66,6 +68,10 @@ public final class WordPlacement {
             for (int i = 0; i < len; i++) {
                 this.detachJitters[i] = rng.nextInt(61); // 0 to 60 ms random start jitter
             }
+        }
+
+        public WordAnchor(KaraokeModel.KaraokeWord word, Vec3d position, float width, float height, float yaw, float pitch) {
+            this(word, position, width, height, yaw, pitch, 0);
         }
 
         public boolean allLettersDetached() {
@@ -435,7 +441,7 @@ public final class WordPlacement {
                 float wYaw = (float) Math.toDegrees(Math.atan2(-toEye.x, toEye.z));
                 float wPitch = (float) Math.toDegrees(Math.atan2(toEye.y, Math.sqrt(toEye.x * toEye.x + toEye.z * toEye.z)));
 
-                anchors.add(new WordAnchor(item.word, wordPos, item.width, wordHeight, wYaw, wPitch));
+                anchors.add(new WordAnchor(item.word, wordPos, item.width, wordHeight, wYaw, wPitch, line.index));
                 curX += item.width + spaceWidth;
             }
         }
@@ -460,7 +466,7 @@ public final class WordPlacement {
                     if (shiftY > 0) {
                         List<WordAnchor> shifted = new ArrayList<>();
                         for (WordAnchor a : anchors) {
-                            shifted.add(new WordAnchor(a.word, a.position.add(0, shiftY, 0), a.width, a.height, a.yaw, a.pitch));
+                            shifted.add(new WordAnchor(a.word, a.position.add(0, shiftY, 0), a.width, a.height, a.yaw, a.pitch, a.lineIndex));
                         }
                         anchors = shifted;
                     }
