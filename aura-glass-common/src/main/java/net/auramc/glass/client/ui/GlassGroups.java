@@ -4,6 +4,7 @@ import net.auramc.glass.common.render.GlassRenderer;
 import net.auramc.glass.common.style.GlassPreset;
 import net.auramc.glass.common.style.GlassStyles;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.GameMenuScreen;
 import net.minecraft.client.gui.Element;
 import net.minecraft.client.gui.ParentElement;
 import net.minecraft.client.gui.DrawContext;
@@ -108,14 +109,33 @@ public final class GlassGroups {
     private static void collect(ParentElement root, int depth,int clipTop,int clipBottom) {
         if(root instanceof GlassListViewport list){clipTop=Math.max(clipTop,list.aura_glassTop());clipBottom=Math.min(clipBottom,list.aura_glassBottom());}
         if (depth > 32 || widgetCount == MAX_WIDGETS) return;
+        if (depth == 0 && root instanceof GameMenuScreen) {
+            ClickableWidget openToLan = null;
+            ClickableWidget configBtn = null;
+            for (var child : root.children()) {
+                if (child instanceof ClickableWidget w) {
+                    String cn = w.getClass().getName();
+                    if (cn.contains("ConfigButton") || cn.contains("supplementaries")) {
+                        configBtn = w;
+                    } else if (w.getMessage() != null) {
+                        String txt = w.getMessage().getString().toLowerCase();
+                        if (txt.contains("open to lan") || txt.contains("открыть для сети") || txt.contains("share to lan")) {
+                            openToLan = w;
+                        }
+                    }
+                }
+            }
+            if (openToLan != null && configBtn != null && configBtn.getX() > openToLan.getX()) {
+                openToLan.setWidth(74);
+                configBtn.setX(openToLan.getX() + 74 + 4);
+            }
+        }
         var children = root.children();
         for (int i = 0; i < children.size(); i++) {
             Element child = children.get(i);
             if (child instanceof EntryListWidget<?> && !(child instanceof OptionListWidget)) continue;
             if (child instanceof ClickableWidget widget && !(child instanceof EntryListWidget<?>)) {
                 if (!widget.visible || widget instanceof PressableTextWidget || widget instanceof net.minecraft.client.gui.widget.AbstractTextWidget) continue;
-                String className = widget.getClass().getName();
-                if (className.contains("ConfigButton") || className.contains("supplementaries")) continue;
                 int left = Math.max(0, widget.getX());
                 int top = Math.max(clipTop, widget.getY());
                 int right = Math.min(width, widget.getX() + widget.getWidth());
@@ -215,9 +235,15 @@ public final class GlassGroups {
     public static int textColorForGroup(Group group) {
         if (group == null) return 0xEBFFFFFF;
         float t = group.lightProgress;
-        int alpha = Math.round(235 + (217 - 235) * t);
-        int rgb = Math.round(255 * (1.0f - t));
-        return (alpha << 24) | (rgb << 16) | (rgb << 8) | rgb;
+        if (t < 0.50f) {
+            float k = t <= 0.30f ? 0.0f : (t - 0.30f) / 0.20f;
+            int alpha = Math.round(235 - 18 * k);
+            return (alpha << 24) | 0x00FFFFFF;
+        } else {
+            float k = t >= 0.70f ? 1.0f : (t - 0.50f) / 0.20f;
+            int alpha = Math.round(200 + 17 * k);
+            return (alpha << 24);
+        }
     }
 
     public static Group groupAt(float x, float y) {
