@@ -285,12 +285,24 @@ public final class QuickMenuMaxFps {
     }
 
     public static boolean rollbackVanillaOptions(GameOptions opt, SavedState state) {
+        boolean viewDistSet = false;
+        boolean simDistSet = false;
+        boolean particlesSet = false;
+        boolean cloudSet = false;
+        boolean shadowsSet = false;
+        boolean distScalingSet = false;
+        boolean graphicsSet = false;
+        boolean aoSet = false;
+        boolean mipmapSet = false;
+        boolean biomeSet = false;
+        boolean vsyncSet = false;
+
         boolean allSuccess = true;
 
         if (state.hasViewDistance) {
             try {
                 opt.getViewDistance().setValue(state.viewDistance);
-                state.hasViewDistance = false;
+                viewDistSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback viewDistance failed: " + t);
@@ -299,7 +311,7 @@ public final class QuickMenuMaxFps {
         if (state.hasSimulationDistance) {
             try {
                 opt.getSimulationDistance().setValue(state.simulationDistance);
-                state.hasSimulationDistance = false;
+                simDistSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback simulationDistance failed: " + t);
@@ -308,7 +320,7 @@ public final class QuickMenuMaxFps {
         if (state.hasParticles) {
             try {
                 opt.getParticles().setValue(ParticlesMode.valueOf(state.particles));
-                state.hasParticles = false;
+                particlesSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback particles failed: " + t);
@@ -317,7 +329,7 @@ public final class QuickMenuMaxFps {
         if (state.hasCloudRenderMode) {
             try {
                 opt.getCloudRenderMode().setValue(CloudRenderMode.valueOf(state.cloudRenderMode));
-                state.hasCloudRenderMode = false;
+                cloudSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback cloudRenderMode failed: " + t);
@@ -326,7 +338,7 @@ public final class QuickMenuMaxFps {
         if (state.hasEntityShadows) {
             try {
                 opt.getEntityShadows().setValue(state.entityShadows);
-                state.hasEntityShadows = false;
+                shadowsSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback entityShadows failed: " + t);
@@ -335,7 +347,7 @@ public final class QuickMenuMaxFps {
         if (state.hasEntityDistanceScaling) {
             try {
                 opt.getEntityDistanceScaling().setValue(state.entityDistanceScaling);
-                state.hasEntityDistanceScaling = false;
+                distScalingSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback entityDistanceScaling failed: " + t);
@@ -344,7 +356,7 @@ public final class QuickMenuMaxFps {
         if (state.hasGraphicsMode) {
             try {
                 opt.getGraphicsMode().setValue(GraphicsMode.valueOf(state.graphicsMode));
-                state.hasGraphicsMode = false;
+                graphicsSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback graphicsMode failed: " + t);
@@ -353,7 +365,7 @@ public final class QuickMenuMaxFps {
         if (state.hasAo) {
             try {
                 opt.getAo().setValue(state.ao);
-                state.hasAo = false;
+                aoSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback ao failed: " + t);
@@ -362,7 +374,7 @@ public final class QuickMenuMaxFps {
         if (state.hasMipmapLevels) {
             try {
                 opt.getMipmapLevels().setValue(state.mipmapLevels);
-                state.hasMipmapLevels = false;
+                mipmapSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback mipmapLevels failed: " + t);
@@ -371,7 +383,7 @@ public final class QuickMenuMaxFps {
         if (state.hasBiomeBlendRadius) {
             try {
                 opt.getBiomeBlendRadius().setValue(state.biomeBlendRadius);
-                state.hasBiomeBlendRadius = false;
+                biomeSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback biomeBlendRadius failed: " + t);
@@ -380,18 +392,36 @@ public final class QuickMenuMaxFps {
         if (state.hasEnableVsync) {
             try {
                 opt.getEnableVsync().setValue(state.enableVsync);
-                state.hasEnableVsync = false;
+                vsyncSet = true;
             } catch (Throwable t) {
                 allSuccess = false;
                 System.err.println("[AuraMaxFps] Rollback enableVsync failed: " + t);
             }
         }
 
+        boolean writeSuccess = false;
         try {
             opt.write();
+            writeSuccess = true;
         } catch (Throwable t) {
             allSuccess = false;
             System.err.println("[AuraMaxFps] opt.write failed: " + t);
+        }
+
+        if (writeSuccess) {
+            if (viewDistSet) state.hasViewDistance = false;
+            if (simDistSet) state.hasSimulationDistance = false;
+            if (particlesSet) state.hasParticles = false;
+            if (cloudSet) state.hasCloudRenderMode = false;
+            if (shadowsSet) state.hasEntityShadows = false;
+            if (distScalingSet) state.hasEntityDistanceScaling = false;
+            if (graphicsSet) state.hasGraphicsMode = false;
+            if (aoSet) state.hasAo = false;
+            if (mipmapSet) state.hasMipmapLevels = false;
+            if (biomeSet) state.hasBiomeBlendRadius = false;
+            if (vsyncSet) state.hasEnableVsync = false;
+        } else {
+            allSuccess = false;
         }
 
         return allSuccess;
@@ -430,7 +460,11 @@ public final class QuickMenuMaxFps {
     }
 
     private static boolean rollbackIris(SavedState state) {
-        if (!state.hasIrisShaders || !isModLoaded("iris")) return true;
+        if (!state.hasIrisShaders) return true;
+        if (!isModLoaded("iris")) {
+            System.err.println("[AuraMaxFps] Iris is not loaded; retaining iris state for future rollback.");
+            return false;
+        }
         try {
             Class<?> apiClass = Class.forName("net.irisshaders.iris.api.v0.IrisApi");
             Object api = apiClass.getMethod("getInstance").invoke(null);
@@ -506,7 +540,11 @@ public final class QuickMenuMaxFps {
     }
 
     private static boolean rollbackDistantHorizons(SavedState state) {
-        if (!isModLoaded("distanthorizons")) return true;
+        if (!state.hasDhRendering && !state.hasDhChunkDistance) return true;
+        if (!isModLoaded("distanthorizons")) {
+            System.err.println("[AuraMaxFps] Distant Horizons is not loaded; retaining DH state for future rollback.");
+            return false;
+        }
         boolean allSuccess = true;
         try {
             Class<?> dhConfigClass = Class.forName("com.seibel.distanthorizons.core.api.external.methods.config.DhApiConfig");
@@ -571,7 +609,10 @@ public final class QuickMenuMaxFps {
                 try { restoredQuality = GlassQuality.valueOf(state.glassQuality); } catch (Throwable ignored) {}
             }
             GlassStyles.setQuality(restoredQuality);
-            GlassStyles.save();
+            if (!GlassStyles.save()) {
+                System.err.println("[AuraMaxFps] GlassStyles.save() failed during rollback.");
+                return false;
+            }
             state.hasGlassQuality = false;
             return true;
         } catch (Throwable t) {

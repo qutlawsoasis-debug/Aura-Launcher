@@ -18,6 +18,7 @@ public final class QuickMenuMaxFpsTest {
         Path tempDir = Files.createTempDirectory("auratest_quickmenu_main");
         Path cfgFile = tempDir.resolve("quickmenu.json");
         QuickMenuConfig.setConfigFile(cfgFile);
+        GlassStyles.initialize(tempDir);
 
         try {
             testSavedStateDefaults();
@@ -30,6 +31,9 @@ public final class QuickMenuMaxFpsTest {
             testDistantHorizonsPartialCaptureSafety();
             testIrisBooleanRestoration();
             testRestartPersistence();
+            testMissingOptionalModRollbackPending();
+            testVanillaFailurePreservesFlagsOnRestart();
+            testGlassSaveFailurePreservesQualityFlag();
             System.out.println("All QuickMenuMaxFps tests PASSED successfully!");
         } finally {
             deleteRecursively(tempDir.toFile());
@@ -253,6 +257,109 @@ public final class QuickMenuMaxFpsTest {
     private static void check(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError("Assertion failed: " + message);
+        }
+    }
+
+
+    private static void testMissingOptionalModRollbackPending() {
+        var config = QuickMenuConfig.get();
+        config.maxFps = true;
+        QuickMenuMaxFps.SavedState state = new QuickMenuMaxFps.SavedState();
+        state.hasIrisShaders = true;
+        state.irisShadersEnabled = true;
+        state.hasDhRendering = true;
+        state.dhRenderingEnabled = false;
+        state.hasDhChunkDistance = true;
+        state.dhChunkDistance = 48;
+        config.maxFpsSavedState = state;
+
+        // Neither Iris nor DH are loaded in test JVM
+        boolean rollbackResult = QuickMenuMaxFps.toggle();
+        check(!rollbackResult, "toggle() returns false when optional mods are absent during rollback");
+        check(config.maxFps, "maxFps remains true when optional mod fields cannot yet be restored");
+        check(config.maxFpsSavedState != null, "SavedState is retained on disk/memory for future rollback");
+        check(config.maxFpsSavedState.hasIrisShaders, "hasIrisShaders remains true while Iris is absent");
+        check(config.maxFpsSavedState.hasDhRendering, "hasDhRendering remains true while DH is absent");
+        check(config.maxFpsSavedState.hasDhChunkDistance, "hasDhChunkDistance remains true while DH is absent");
+
+        // Clean up
+        config.maxFps = false;
+        config.maxFpsSavedState = null;
+        System.out.println("[PASS] 11. Missing optional mods keep pending fields and retain snapshot");
+    }
+
+    private static void testVanillaFailurePreservesFlagsOnRestart() throws IOException {
+        Path tempDir = Files.createTempDirectory("auratest_vanilla_fail");
+        Path testConfigFile = tempDir.resolve("quickmenu.json");
+        Path origFile = QuickMenuConfig.getConfigFile();
+
+        try {
+            QuickMenuConfig.setConfigFile(testConfigFile);
+            var config = QuickMenuConfig.get();
+            config.maxFps = true;
+            QuickMenuMaxFps.SavedState state = new QuickMenuMaxFps.SavedState();
+            state.hasViewDistance = true;
+            state.viewDistance = 24;
+            state.hasSimulationDistance = true;
+            state.simulationDistance = 14;
+            config.maxFpsSavedState = state;
+            check(QuickMenuConfig.save(), "Initial snapshot saved to test config");
+
+            // Attempt rollback without client (simulates failure to write/apply GameOptions)
+            boolean result = QuickMenuMaxFps.toggle();
+            check(!result, "Rollback fails without client/options");
+            check(config.maxFps, "maxFps remains true");
+            check(config.maxFpsSavedState != null, "Snapshot retained");
+            check(config.maxFpsSavedState.hasViewDistance, "hasViewDistance remains true after write failure");
+            check(config.maxFpsSavedState.hasSimulationDistance, "hasSimulationDistance remains true after write failure");
+
+            // Simulate next JVM / cold restart loading the JSON from disk
+            String jsonText = Files.readString(testConfigFile);
+            QuickMenuConfig restarted = GSON.fromJson(jsonText, QuickMenuConfig.class);
+            check(restarted.maxFps, "Restarted config maxFps is true");
+            check(restarted.maxFpsSavedState != null, "Restarted config retained snapshot");
+            check(restarted.maxFpsSavedState.hasViewDistance, "Restarted config hasViewDistance is true");
+            check(restarted.maxFpsSavedState.viewDistance == 24, "Restarted config viewDistance == 24");
+            check(restarted.maxFpsSavedState.hasSimulationDistance, "Restarted config hasSimulationDistance is true");
+            check(restarted.maxFpsSavedState.simulationDistance == 14, "Restarted config simulationDistance == 14");
+            System.out.println("[PASS] 12. Vanilla write failure preserves all recovery flags across restart");
+        } finally {
+            QuickMenuConfig.setConfigFile(origFile);
+            deleteRecursively(tempDir.toFile());
+        }
+    }
+
+    private static void testGlassSaveFailurePreservesQualityFlag() throws IOException {
+        var config = QuickMenuConfig.get();
+        config.maxFps = true;
+        QuickMenuMaxFps.SavedState state = new QuickMenuMaxFps.SavedState();
+        state.hasGlassQuality = true;
+        state.glassQuality = "LOW";
+        config.maxFpsSavedState = state;
+
+        Path origStylePath = GlassStyles.file();
+        Path dummyUnwritableDir = Files.createTempFile("auratest_unwritable", ".tmp");
+        // Points styles to a path inside a file (not directory), so save() fails
+        Path invalidStylesPath = dummyUnwritableDir.resolve("blocked/styles.json");
+
+        try {
+            GlassStyles.setFile(invalidStylesPath);
+            boolean result = QuickMenuMaxFps.toggle();
+            check(!result, "toggle() fails when GlassStyles.save() fails");
+            check(config.maxFps, "maxFps remains true when Glass save fails");
+            check(config.maxFpsSavedState != null, "SavedState retained on Glass save failure");
+            check(config.maxFpsSavedState.hasGlassQuality, "hasGlassQuality preserved on Glass save failure");
+
+            // Restore valid path and retry
+            GlassStyles.setFile(origStylePath);
+            boolean retryResult = QuickMenuMaxFps.toggle();
+            check(retryResult, "toggle() succeeds when GlassStyles save succeeds");
+            check(!config.maxFps, "maxFps is false after successful rollback");
+            check(config.maxFpsSavedState == null, "SavedState cleared after successful rollback");
+            System.out.println("[PASS] 13. Glass save failure preserves hasGlassQuality and retains snapshot");
+        } finally {
+            GlassStyles.setFile(origStylePath);
+            Files.deleteIfExists(dummyUnwritableDir);
         }
     }
 
