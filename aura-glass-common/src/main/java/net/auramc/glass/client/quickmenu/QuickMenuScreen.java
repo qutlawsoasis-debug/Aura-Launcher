@@ -52,6 +52,7 @@ public final class QuickMenuScreen extends Screen {
     private final net.auramc.glass.common.render.GlassSpring prevSpring = new net.auramc.glass.common.render.GlassSpring(0.25f, 0.85f);
     private final net.auramc.glass.common.render.GlassSpring playSpring = new net.auramc.glass.common.render.GlassSpring(0.25f, 0.85f);
     private final net.auramc.glass.common.render.GlassSpring nextSpring = new net.auramc.glass.common.render.GlassSpring(0.25f, 0.85f);
+    private final net.auramc.glass.common.render.GlassSpring tabSpring = new net.auramc.glass.common.render.GlassSpring(0.30f, 0.85f);
     private double dragX, dragY;
     private long lastHeaderClick, renderedFrames, lastScrollTime;
     private Control pressed;
@@ -200,6 +201,7 @@ public final class QuickMenuScreen extends Screen {
         style.radius = box.radius();
         style.bevel = 2.5f;
         if (GlassStyles.quality().needsBackdrop()) {
+            style.asSurface();
             style.refraction = 0.35f;
             style.dispersion = 0;
             style.wobble = 0;
@@ -372,7 +374,7 @@ public final class QuickMenuScreen extends Screen {
     private float edgeFade(float itemY, float itemH) {
         if (clipBottom <= clipTop) return 1.0f;
         if (itemY + itemH <= clipTop || itemY >= clipBottom) return 0.0f;
-        float topFade = Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
+        float topFade = scroll <= 0 ? 1.0f : Math.min(1.0f, Math.max(0.0f, (itemY - clipTop) / 16.0f));
         float bottomFade = Math.min(1.0f, Math.max(0.0f, (clipBottom - (itemY + itemH)) / 16.0f));
         return Math.max(0.0f, Math.min(1.0f, Math.min(topFade, bottomFade)));
     }
@@ -699,19 +701,22 @@ public final class QuickMenuScreen extends Screen {
         }, false, vol));
 
         // 6. Segmented Tabs «Очередь | Поиск»
-        float segY = volY + 26;
+        float segY = volY + 28;
         float segFade = edgeFade(segY, 32);
         float segW = (w - 4) * 0.5f;
         if (segFade > 0.01f) {
             rect(x, segY, w, 32, 9, 0x3D767680, 0, segFade);
-            float activePillX = musicTab == 0 ? x + 2 : x + 2 + segW;
+            float tabProgress = tabSpring.approach(musicTab == 0 ? 0.0f : 1.0f, System.nanoTime());
+            float activePillX = x + 2 + tabProgress * segW;
             rect(activePillX, segY + 2, segW, 28, 7, 0x2EFFFFFF, 0, segFade);
 
             float qW = AuraRenderer.textWidth("Очередь", 14);
-            text("Очередь", x + 2 + (segW - qW) * 0.5f, segY + 8, 14, musicTab == 0 ? 0xF2FFFFFF : 0x99FFFFFF, musicTab == 0 ? 600 : 500, segFade);
+            int qColor = musicTab == 0 ? 0xF2FFFFFF : 0x99FFFFFF;
+            text("Очередь", x + 2 + (segW - qW) * 0.5f, segY + 8, 14, qColor, musicTab == 0 ? 600 : 500, segFade);
 
             float sW = AuraRenderer.textWidth("Поиск", 14);
-            text("Поиск", x + 2 + segW + (segW - sW) * 0.5f, segY + 8, 14, musicTab == 1 ? 0xF2FFFFFF : 0x99FFFFFF, musicTab == 1 ? 600 : 500, segFade);
+            int sColor = musicTab == 1 ? 0xF2FFFFFF : 0x99FFFFFF;
+            text("Поиск", x + 2 + segW + (segW - sW) * 0.5f, segY + 8, 14, sColor, musicTab == 1 ? 600 : 500, segFade);
         }
         controls.add(new Control(x, segY, segW + 2, 32, "tabQueue", () -> { musicTab = 0; triggerSearchAsync(""); }, null));
         controls.add(new Control(x + segW + 2, segY, segW + 2, 32, "tabSearch", () -> { musicTab = 1; triggerSearchAsync(searchText); }, null));
