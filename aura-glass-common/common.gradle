@@ -16,14 +16,14 @@ tasks.register('runAutoCompleteTest', JavaExec) {
     mainClass = 'net.auramc.glass.client.ui.AutoCompleteGlassTest'
 }
 
-tasks.register('runGlassPerfBenchmark', JavaExec) {
+tasks.register('runGlassInvariantsTest', JavaExec) {
     dependsOn tasks.named('compileTestJava')
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'net.auramc.glass.common.render.GlassPerfBenchmark'
+    mainClass = 'net.auramc.glass.common.render.GlassRenderInvariantsTest'
 }
 
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
-    dependsOn 'runGlassPerfBenchmark'
+    dependsOn 'runGlassInvariantsTest'
 }
