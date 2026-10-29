@@ -34,6 +34,13 @@ public record NowPlaying(
         return state == PlaybackState.STOPPED;
     }
 
+    public long currentPositionMs() {
+        if (!isPlaying() || updatedAtUnixMs <= 0) return positionMs;
+        long elapsed = Math.max(0L, System.currentTimeMillis() - updatedAtUnixMs);
+        long total = positionMs + elapsed;
+        return (track != null && track.durationMs() > 0) ? Math.min(total, track.durationMs()) : total;
+    }
+
     public boolean hasTrack() {
         return track != null && !track.isEmpty();
     }
