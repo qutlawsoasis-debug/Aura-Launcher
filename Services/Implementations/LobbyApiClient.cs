@@ -258,4 +258,35 @@ public class LobbyApiClient : ILobbyApiClient
             return null;
         }
     }
+
+    public async Task<string> SearchMusicRawAsync(string query, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var uri = GetRequestUri($"api/music/search?q={Uri.EscapeDataString(query)}&kind=tracks");
+            using var response = await _httpClient.GetAsync(uri, cancellationToken);
+            if (!response.IsSuccessStatusCode) return "[]";
+            return await response.Content.ReadAsStringAsync(cancellationToken);
+        }
+        catch
+        {
+            return "[]";
+        }
+    }
+
+    public async Task<MusicResolveResult?> ResolveMusicAsync(string artist, string title, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var uri = GetRequestUri($"api/music/resolve?artist={Uri.EscapeDataString(artist)}&title={Uri.EscapeDataString(title)}");
+            using var response = await _httpClient.GetAsync(uri, cancellationToken);
+            if (!response.IsSuccessStatusCode) return null;
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            return JsonSerializer.Deserialize<MusicResolveResult>(json, _jsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

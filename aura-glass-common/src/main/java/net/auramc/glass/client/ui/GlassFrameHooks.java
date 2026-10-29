@@ -51,9 +51,17 @@ public final class GlassFrameHooks {
                 net.minecraft.client.gui.screen.Screen.class.getPackageName(), ingame,
                 screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>,
                 screen instanceof net.minecraft.client.gui.screen.ChatScreen);
-        if(!applies && screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen) applies = true;
+        if(!applies && (screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen || isModScreenStyled(screen.getClass().getName()))) applies = true;
         return applies;
     }
+
+    private static boolean isModScreenStyled(String name) {
+        return name.startsWith("com.terraformersmc.modmenu.gui.")
+                || name.startsWith("me.shedaniel.clothconfig2.gui.")
+                || name.startsWith("dev.isxander.yacl3.gui.")
+                || name.startsWith("net.irisshaders.iris.gui.screen.");
+    }
+
     public static void beginNativeContent(){nativeContentDepth++;}
     public static void endNativeContent(){nativeContentDepth=Math.max(0,nativeContentDepth-1);}
     public static void titleBackdrop(DrawContext context){
@@ -65,7 +73,7 @@ public final class GlassFrameHooks {
         var screen = MinecraftClient.getInstance().currentScreen;
         if (screen == null) return;
         String name = screen.getClass().getName();
-        if (!name.startsWith(net.minecraft.client.gui.screen.Screen.class.getPackageName() + ".") && !name.startsWith("net.auramc.glass.") && !(screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen)) return;
+        if (!name.startsWith(net.minecraft.client.gui.screen.Screen.class.getPackageName() + ".") && !name.startsWith("net.auramc.glass.") && !(screen instanceof net.minecraft.client.gui.screen.option.KeybindsScreen) && !isModScreenStyled(name)) return;
         if (!styledScreen() && !GlassDiagnostics.panelEnabled()) return;
         context.draw();
         GlassRenderer.captureBackdrop();

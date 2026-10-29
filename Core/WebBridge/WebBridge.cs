@@ -31,6 +31,7 @@ public partial class WebBridge : IDisposable
     private readonly IAchievementService? _achievementService;
     private readonly IDiscordRpcService? _discordRpcService;
     private readonly IPrewarmGameService? _prewarmService;
+    private readonly IEmbedMusicPlayer? _embedPlayer;
     private readonly Action<string> _logger;
     private CoreWebView2? _coreWebView2;
     private CancellationTokenSource? _gameLaunchCts;
@@ -55,7 +56,8 @@ public partial class WebBridge : IDisposable
         IAchievementService? achievementService = null,
         IDiscordRpcService? discordRpcService = null,
         IPrewarmGameService? prewarmService = null,
-        Action<string>? logger = null)
+        Action<string>? logger = null,
+        IEmbedMusicPlayer? embedPlayer = null)
     {
         _window = window;
         _gameSessionService = gameSessionService;
@@ -69,6 +71,7 @@ public partial class WebBridge : IDisposable
         _reportService = reportService;
         _prewarmService = prewarmService;
         _logger = logger ?? FabricGameLaunchService.LogLauncherEvent;
+        _embedPlayer = embedPlayer;
 
         _gameSessionService.StateChanged += OnSessionStateChanged;
         _gameSessionService.GameExited += OnSessionGameExited;
@@ -115,6 +118,7 @@ public partial class WebBridge : IDisposable
     {
         _coreWebView2 = coreWebView2;
         _coreWebView2.WebMessageReceived += OnWebMessageReceived;
+        _embedPlayer?.AttachWebView(_coreWebView2);
 
         // Хосты скриншотов регистрируем сразу, до первых запросов превью из галереи
         RegisterShotsHosts(ScreenshotsDir());
@@ -195,6 +199,12 @@ public partial class WebBridge : IDisposable
 
     public async Task ProcessRawMessageAsync(string? rawInput)
     {
+        if (!string.IsNullOrWhiteSpace(rawInput) && rawInput.Contains("aura-yt-embed"))
+        {
+            _embedPlayer?.HandleEmbedMessage(rawInput);
+            return;
+        }
+
         var (msg, parseError) = BridgeMessageParser.Parse(rawInput);
         if (parseError != null || msg == null)
         {
