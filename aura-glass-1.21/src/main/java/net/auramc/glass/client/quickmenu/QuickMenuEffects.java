@@ -72,6 +72,16 @@ public final class QuickMenuEffects {
         if (!Double.isFinite(gamma)) gamma = baseline;
         double targetGamma = QuickMenuConfig.get().fullbright ? 16 : baseline;
         gamma += (targetGamma - gamma) * (1 - Math.exp(-dt * 10));
+        if (!QuickMenuConfig.get().fullbright && Math.abs(gamma - baseline) < 0.001) {
+            gamma = baseline;
+        }
+    }
+    public static boolean needsLightmapUpdate() {
+        var client = MinecraftClient.getInstance();
+        if (client.options == null) return false;
+        double baseline = client.options.getGamma().getValue();
+        if (QuickMenuConfig.get().fullbright) return true;
+        return Double.isFinite(gamma) && Math.abs(gamma - baseline) > 0.001;
     }
     public static double zoomScale() { return zoomScale; }
     public static double effectiveGamma() { return gamma; }

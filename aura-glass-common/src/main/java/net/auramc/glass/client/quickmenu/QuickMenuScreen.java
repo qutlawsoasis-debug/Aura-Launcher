@@ -8,8 +8,8 @@ import net.auramc.glass.common.style.GlassStyles;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
-import net.auramc.glass.client.quickmenu.music.MusicRuntime;
-import net.auramc.glass.client.quickmenu.music.MusicTrack;
+import net.auramc.glass.client.music.*;
+
 import org.lwjgl.glfw.GLFW;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -171,47 +171,89 @@ public final class QuickMenuScreen extends Screen {
         toggle(x,y+=44,w,"Без осадков",()->c.clearWeather,v->c.clearWeather=v);
         text("Меняется только отображение на этом клиенте.",x,y+52,13,0xCCFFFFFF,400);
     }
-    private void music(DrawContext context,float x,float y,float w) {
-        var current=MusicRuntime.current();
-        String title=current==null?"Ничего не играет":current.title();
-        String artist=current==null?"Выберите трек из библиотеки":current.author();
-        rect(x,y,84,84,10,0x3D767680,0x1AFFFFFF);
-        if(current!=null){
-            var cover=net.auramc.glass.client.quickmenu.music.MusicArtwork.texture(current);
-            if(cover!=null){flushNative();context.drawTexture(cover,(int)x,(int)y,0,0,84,84,84,84);context.draw();AuraRenderer.begin(context.getMatrices().peek().getPositionMatrix(),RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix());}
+    private void music(DrawContext context, float x, float y, float w) {
+        var source = MusicSource.get();
+        var now = source.now();
+        var current = now.track();
+        String title = current == null ? "Ничего не играет" : current.title();
+        String artist = current == null ? "Выберите трек из каталога" : current.artist();
+        rect(x, y, 84, 84, 10, 0x3D767680, 0x1AFFFFFF);
+        if (current != null) {
+            var cover = net.auramc.glass.client.quickmenu.music.MusicArtwork.texture(current);
+            if (cover != null) {
+                flushNative();
+                context.drawTexture(cover, (int) x, (int) y, 0, 0, 84, 84, 84, 84);
+                context.draw();
+                AuraRenderer.begin(context.getMatrices().peek().getPositionMatrix(), RenderSystem.getProjectionMatrix(), RenderSystem.getModelViewMatrix());
+            } else {
+                rect(x + 28, y + 24, 6, 28, 2, 0, ACCENT);
+                rect(x + 46, y + 20, 6, 26, 2, 0, ACCENT);
+                rect(x + 28, y + 20, 24, 6, 2, ACCENT, 0);
+                rect(x + 18, y + 46, 16, 10, 5, ACCENT, 0);
+                rect(x + 36, y + 42, 16, 10, 5, ACCENT, 0);
+            }
+        } else {
+            rect(x + 28, y + 24, 6, 28, 2, 0, 0x5C767680);
+            rect(x + 46, y + 20, 6, 26, 2, 0, 0x5C767680);
+            rect(x + 28, y + 20, 24, 6, 2, 0x5C767680, 0);
+            rect(x + 18, y + 46, 16, 10, 5, 0x5C767680, 0);
+            rect(x + 36, y + 42, 16, 10, 5, 0x5C767680, 0);
         }
-        text(fit(title,w-104,22),x+100,y+8,22,0xFFFFFFFF,600);
-        text(fit(artist,w-104,15),x+100,y+40,15,0xDDFFFFFF,400);
-        text(fit(MusicRuntime.status(),w,13),x,y+97,13,0xDDFFFFFF,400);
-        long duration=MusicRuntime.durationMs();
-        slider(x,y+123,w,"Позиция · "+time(MusicRuntime.positionMs())+" / "+time(duration),MusicRuntime.positionMs(),0,Math.max(1,duration),v->MusicRuntime.seek((long)v),"");
-        action(x,y+170,64,"Назад",MusicRuntime::previous);
-        action(x+76,y+170,100,MusicRuntime.playing()?"Пауза":"Играть",MusicRuntime::togglePlayPause);
-        action(x+188,y+170,64,"Далее",MusicRuntime::next);
-        slider(x,y+216,w,"Громкость",MusicRuntime.volume(),0,1,v->{MusicRuntime.volume(v);QuickMenuConfig.get().musicVolume=v;},"");
-        action(x,y+264,w,searching?"Поиск: "+searchText:searchText.isBlank()?"Поиск в каталоге Aura":searchText,()->searching=true);
-        action(x,y+305,100,"Локальные",()->{musicTab=0;MusicRuntime.refreshLocal();});
-        action(x+110,y+305,100,"Каталог",()->{musicTab=1;MusicRuntime.searchAsync(searchText);});
-        action(x+220,y+305,86,"Очередь",()->musicTab=2);
-        var tracks=musicTab==0?MusicRuntime.tracks():musicTab==1?MusicRuntime.results():MusicRuntime.queue();
-        float ty=y+350;
-        if(tracks.isEmpty())text(musicTab==0?"Добавьте WAV, AIFF, AU или OGG в aura-glass/music.":"Нет треков. Измените запрос.",x,ty,14,0xDDFFFFFF,400);
-        for(int i=0;i<Math.min(12,tracks.size());i++){
-            var track=tracks.get(i);final int index=i;float rowY=ty+i*39;
-            rect(x,rowY,w,35,8,0x3D767680,0x1AFFFFFF);
-            text(fit(track.title(),w-20,15),x+10,rowY+3,15,0xFFFFFFFF,500);
-            text(fit(track.author(),w-20,12),x+10,rowY+21,12,0xCCFFFFFF,400);
-            controls.add(new Control(x,rowY,w,35,track.title(),()->{MusicRuntime.setQueue(tracks);MusicRuntime.playTrack(tracks.get(index));},null));
+        text(fit(title, w - 104, 22), x + 100, y + 8, 22, 0xFFFFFFFF, 600);
+        text(fit(artist, w - 104, 15), x + 100, y + 38, 15, 0xDDFFFFFF, 400);
+
+        String status;
+        int statusColor;
+        if (!source.available()) {
+            status = "○ Ожидание Aura Launcher...";
+            statusColor = 0xAAFFFFFF;
+        } else if (now.isPlaying()) {
+            status = "● Воспроизведение · Aura Music";
+            statusColor = ACCENT;
+        } else if (now.isPaused()) {
+            status = "⏸ На паузе · Aura Music";
+            statusColor = 0xDDFFFFFF;
+        } else {
+            status = "○ Остановлено · Aura Music";
+            statusColor = 0x88FFFFFF;
         }
-        ty+=Math.max(1,Math.min(12,tracks.size()))*39+20;
-        var cfg=QuickMenuConfig.get();
-        toggle(x,ty,w,"Караоке в мире",()->cfg.karaoke,v->cfg.karaoke=v);
-        slider(x,ty+=40,w,"Размер слов",cfg.karaokeSize,.5,2,v->cfg.karaokeSize=v,"");
-        slider(x,ty+=40,w,"Дистанция",cfg.karaokeDistance,3,7,v->cfg.karaokeDistance=v," м");
-        choice(x,ty+=40,w,"Плотность",new String[]{"Меньше","Нормально","Больше"},cfg.karaokeDensity,v->cfg.karaokeDensity=v);
-        toggle(x,ty+=40,w,"Физика слов",()->cfg.karaokePhysics,v->cfg.karaokePhysics=v);
-        slider(x,ty+=40,w,"Сдвиг текста",cfg.lyricsOffsetMs,-500,500,v->cfg.lyricsOffsetMs=(int)Math.round(v)," мс");
-        text(fit(net.auramc.glass.client.quickmenu.lyrics.KaraokeRuntime.status(),w,13),x,ty+48,13,0xCCFFFFFF,400);
+        text(fit(status, w - 104, 13), x + 100, y + 62, 13, statusColor, 400);
+
+        long duration = current == null ? 0 : current.durationMs();
+        long pos = now.currentPositionMs();
+        slider(x, y + 100, w, "Позиция · " + time(pos) + " / " + time(duration), pos, 0, Math.max(1, duration), v -> source.seek((long) v), "");
+
+        action(x, y + 144, 76, "Назад", source::prev);
+        action(x + 88, y + 144, 110, now.isPlaying() ? "Пауза" : "Играть", now.isPlaying() ? source::pause : source::play);
+        action(x + 210, y + 144, 76, "Далее", source::next);
+
+        slider(x, y + 188, w, "Громкость", now.volume(), 0, 1, v -> {
+            source.volume((float) v);
+            QuickMenuConfig.get().musicVolume = v;
+        }, "");
+
+        action(x, y + 236, w, searching ? "Поиск: " + searchText : searchText.isBlank() ? "Поиск в каталоге Aura..." : ("Поиск: " + searchText), () -> searching = true);
+
+        action(x, y + 276, 120, "Каталог Aura", () -> musicTab = 0);
+        action(x + 130, y + 276, 100, "Очередь", () -> musicTab = 1);
+
+        var tracks = source.search(searchText);
+        float ty = y + 318;
+        if (tracks.isEmpty()) {
+            text("Нет треков по запросу.", x, ty, 14, 0xDDFFFFFF, 400);
+        } else {
+            for (int i = 0; i < Math.min(10, tracks.size()); i++) {
+                var track = tracks.get(i);
+                float rowY = ty + i * 42;
+                boolean isCurrent = current != null && current.id().equals(track.id());
+                rect(x, rowY, w, 36, 8, isCurrent ? 0x5C767680 : 0x3D767680, isCurrent ? ACCENT : 0x1AFFFFFF);
+                text(fit(track.title(), w - 80, 15), x + 12, rowY + 4, 15, 0xFFFFFFFF, isCurrent ? 600 : 500);
+                text(fit(track.artist(), w - 80, 12), x + 12, rowY + 20, 12, 0xCCFFFFFF, 400);
+                String dur = time(track.durationMs());
+                text(dur, x + w - AuraRenderer.textWidth(dur, 12) - 12, rowY + 11, 12, 0xAAFFFFFF, 400);
+                controls.add(new Control(x, rowY, w, 36, track.title(), () -> source.playTrack(track), null));
+            }
+        }
     }
     private void action(float x,float y,float w,String label,Runnable action){
         rect(x,y,w,30,8,0x5C767680,0x1AFFFFFF);text(fit(label,w-20,14),x+10,y+7,14,0xFFFFFFFF,500);
@@ -281,7 +323,7 @@ public final class QuickMenuScreen extends Screen {
     }
     public boolean mouseScrolled(double x,double y,double amount){return scroll(amount);}
     public boolean mouseScrolled(double x,double y,double horizontal,double vertical){return scroll(vertical);}
-    private boolean scroll(double amount){int max=section==0?Math.max(0,29*38-(int)(geometry().height()-164)):section==2?1400:0;scroll=Math.max(0,Math.min(max,scroll-(int)(amount*28)));return true;}
+    private boolean scroll(double amount){int max=section==0?Math.max(0,29*38-(int)(geometry().height()-164)):section==2?Math.max(0,780-(int)(geometry().height()-164)):0;scroll=Math.max(0,Math.min(max,scroll-(int)(amount*28)));return true;}
     @Override public boolean charTyped(char character,int modifiers) {
         if(searching&&!Character.isISOControl(character)&&searchText.length()<120){searchText+=character;return true;}
         return super.charTyped(character,modifiers);
@@ -302,7 +344,7 @@ public final class QuickMenuScreen extends Screen {
         if(searching){
             if(key==GLFW.GLFW_KEY_ESCAPE){searching=false;return true;}
             if(key==GLFW.GLFW_KEY_BACKSPACE){if(!searchText.isEmpty())searchText=searchText.substring(0,searchText.length()-1);return true;}
-            if(key==GLFW.GLFW_KEY_ENTER){searching=false;musicTab=1;MusicRuntime.searchAsync(searchText);return true;}
+            if(key==GLFW.GLFW_KEY_ENTER){searching=false;return true;}
         }
         if(key==GLFW.GLFW_KEY_ESCAPE){close();return true;}
         if(QuickMenuRuntime.menuKey().matchesKey(key,scan)){while(QuickMenuRuntime.menuKey().wasPressed()){} if(!menuKeyHeld){menuKeyHeld=true;toggle();}return true;}
