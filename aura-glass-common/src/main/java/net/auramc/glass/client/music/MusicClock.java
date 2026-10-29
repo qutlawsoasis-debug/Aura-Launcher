@@ -5,6 +5,7 @@ import java.util.function.LongSupplier;
 
 public final class MusicClock {
     private final MusicSource source;
+    private final java.util.function.Supplier<MusicSource> sourceSupplier;
     private final LongSupplier timeSupplier;
 
     private volatile NowPlaying manualSnapshot;
@@ -31,6 +32,17 @@ public final class MusicClock {
 
     public MusicClock(MusicSource source, LongSupplier timeSupplier) {
         this.source = source;
+        this.sourceSupplier = null;
+        this.timeSupplier = Objects.requireNonNullElse(timeSupplier, System::currentTimeMillis);
+    }
+
+    public MusicClock(java.util.function.Supplier<MusicSource> sourceSupplier) {
+        this(sourceSupplier, System::currentTimeMillis);
+    }
+
+    public MusicClock(java.util.function.Supplier<MusicSource> sourceSupplier, LongSupplier timeSupplier) {
+        this.source = null;
+        this.sourceSupplier = sourceSupplier;
         this.timeSupplier = Objects.requireNonNullElse(timeSupplier, System::currentTimeMillis);
     }
 
@@ -39,6 +51,9 @@ public final class MusicClock {
     }
 
     public MusicSource source() {
+        if (sourceSupplier != null) {
+            return sourceSupplier.get();
+        }
         return source;
     }
 
@@ -51,7 +66,8 @@ public final class MusicClock {
     }
 
     public synchronized void seek(long ms) {
-        NowPlaying current = (source != null) ? source.now() : manualSnapshot;
+        MusicSource s = source();
+        NowPlaying current = (s != null) ? s.now() : manualSnapshot;
         Track track = (current != null) ? current.track() : null;
         long duration = (track != null && track.durationMs() > 0) ? track.durationMs() : Long.MAX_VALUE;
 
@@ -63,8 +79,8 @@ public final class MusicClock {
         this.seekFirstFrame = true;
         this.epoch++;
 
-        if (source != null) {
-            source.seek(ms);
+        if (s != null) {
+            s.seek(ms);
         }
     }
 
@@ -86,7 +102,8 @@ public final class MusicClock {
     }
 
     public synchronized long positionMs(long nowTimeMs) {
-        NowPlaying np = (source != null) ? source.now() : manualSnapshot;
+        MusicSource s = source();
+        NowPlaying np = (s != null) ? s.now() : manualSnapshot;
         if (np == null || np.isStopped() || !np.hasTrack()) {
             renderedPositionMs = 0.0;
             lastFrameTimeMs = nowTimeMs;
