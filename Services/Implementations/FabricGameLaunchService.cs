@@ -1711,7 +1711,25 @@ public class FabricGameLaunchService : IGameLaunchService
         }
     }
 
-    private static bool EnsureBaseCdsArchive(string? javaPath)
+    public static string? CustomLogDirectory { get; set; }
+
+    public static bool IsValidCdsArchive(string? path)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+            var fi = new FileInfo(path);
+            // Hotspot base classes.jsa is typically 10-30MB; header alone is >= 4KB.
+            // A zero-byte or corrupted file must never be accepted as a valid CDS archive.
+            return fi.Length > 4096;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool EnsureBaseCdsArchive(string? javaPath, CancellationToken cancellationToken = default, int timeoutMs = 20000)
     {
         if (string.IsNullOrWhiteSpace(javaPath) || !File.Exists(javaPath))
         {
@@ -1730,9 +1748,22 @@ public class FabricGameLaunchService : IGameLaunchService
                 Path.Combine(binDir, "client", "classes.jsa")
             };
 
-            if (possiblePaths.Any(File.Exists))
+            if (possiblePaths.Any(IsValidCdsArchive))
             {
                 return true;
+            }
+
+            // Remove any 0-byte or corrupted archives so dump can recreate cleanly
+            foreach (var p in possiblePaths)
+            {
+                try
+                {
+                    if (File.Exists(p) && !IsValidCdsArchive(p))
+                    {
+                        File.Delete(p);
+                    }
+                }
+                catch { }
             }
 
             // If base archive is missing, attempt to generate it with java.exe -Xshare:dump
@@ -1748,15 +1779,73 @@ public class FabricGameLaunchService : IGameLaunchService
                 RedirectStandardOutput = true,
                 RedirectStandardError = true
             };
-            using var proc = Process.Start(psi);
-            if (proc != null)
+
+            Process? proc = null;
+            try
             {
-                proc.WaitForExit(20000);
-                if (possiblePaths.Any(File.Exists))
+                proc = Process.Start(psi);
+                if (proc == null) return false;
+
+                // Asynchronously read stdout and stderr to prevent pipe buffer deadlocks
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+                var stderrTask = proc.StandardError.ReadToEndAsync();
+
+                bool exited = false;
+                if (cancellationToken.CanBeCanceled)
+                {
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    var waitTask = proc.WaitForExitAsync(linkedCts.Token);
+                    var timeoutTask = Task.Delay(timeoutMs);
+                    var finished = Task.WhenAny(waitTask, timeoutTask).GetAwaiter().GetResult();
+                    exited = (finished == waitTask && !cancellationToken.IsCancellationRequested);
+                }
+                else
+                {
+                    exited = proc.WaitForExit(timeoutMs);
+                }
+
+                if (!exited || cancellationToken.IsCancellationRequested)
+                {
+                    try
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(3000);
+                    }
+                    catch { }
+                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump timed out after {timeoutMs}ms or was cancelled; process killed");
+                    return false;
+                }
+
+                try
+                {
+                    Task.WaitAll(new[] { stdoutTask, stderrTask }, 2000);
+                }
+                catch { }
+
+                if (proc.ExitCode != 0)
+                {
+                    LogLauncherEvent($"[LAUNCH: CDS: WARN] java -Xshare:dump failed with exit code {proc.ExitCode}");
+                    return false;
+                }
+
+                if (possiblePaths.Any(IsValidCdsArchive))
                 {
                     LogLauncherEvent("[LAUNCH: CDS] Успешно сгенерирован базовый архив CDS classes.jsa");
                     return true;
                 }
+            }
+            finally
+            {
+                try
+                {
+                    if (proc != null && !proc.HasExited)
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(1000);
+                    }
+                }
+                catch { }
+                proc?.Dispose();
             }
         }
         catch (Exception ex)
@@ -1830,8 +1919,24 @@ public class FabricGameLaunchService : IGameLaunchService
     {
         try
         {
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            var logDir = Path.Combine(appData, "Aura");
+            string logDir;
+            if (!string.IsNullOrEmpty(CustomLogDirectory))
+            {
+                logDir = CustomLogDirectory;
+            }
+            else
+            {
+                var envDir = Environment.GetEnvironmentVariable("AURA_LOG_DIR");
+                if (!string.IsNullOrEmpty(envDir))
+                {
+                    logDir = envDir;
+                }
+                else
+                {
+                    var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                    logDir = Path.Combine(appData, "Aura");
+                }
+            }
             Directory.CreateDirectory(logDir);
             var logPath = Path.Combine(logDir, "launcher.log");
             File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
