@@ -18,11 +18,17 @@ public final class WordAnimation {
     public static final long LETTER_STAGGER_MS = 20L;  // 15–25 ms per letter
     public static final long POST_PHRASE_HOLD_MS = 400L;
 
-    // Palette per Apple HIG / Aura Glass spec
-    public static final int COLOR_ACTIVE = 0xFF64D2FF;   // Accent cyan
-    public static final int COLOR_SUNG = 0xFFFFFFFF;     // White
-    public static final int COLOR_UPCOMING = 0xD0C4E8F8; // Translucent sky-white
-    public static final int COLOR_OUTLINE = 0xFF0A1420;  // Deep dark contrast outline
+    // Palette per Apple HIG / W6b spec
+    public static final int COLOR_ACTIVE_DARK = 0xFF64D2FF;  // Accent cyan on dark background
+    public static final int COLOR_ACTIVE_LIGHT = 0xFF0A84FF; // Apple systemBlue on light background / snow
+    public static final int COLOR_ACTIVE = COLOR_ACTIVE_DARK; // Default / fallback
+    public static final int COLOR_UPCOMING = 0xF2FFFFFF;     // White 0.95 (rgba(255, 255, 255, 0.95))
+    public static final int COLOR_SUNG = 0xCCFFFFFF;         // White 0.80 (rgba(255, 255, 255, 0.80))
+    public static final int COLOR_OUTLINE = 0xFF000000;      // rgb(0, 0, 0) deep contrast outline / halo
+
+    // MSDF halo alpha thresholds per W6b ТЗ
+    public static final float HALO_ALPHA_DARK = 0.35f;
+    public static final float HALO_ALPHA_LIGHT = 0.60f;
 
     public enum State {
         ENTERING,
@@ -75,21 +81,54 @@ public final class WordAnimation {
     }
 
     /**
-     * Determines the display color for a word based on current playback time.
+     * Interpolates active word color between #64D2FF (dark bg) and #0A84FF (light bg / snow).
      */
-    public static int getWordColor(long currentPlaybackMs, long wordStartMs, long wordDurationMs, float alpha) {
+    public static int getActiveWordColor(float lightFactor) {
+        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
+        int r = Math.round((1.0f - t) * 0x64 + t * 0x0A);
+        int g = Math.round((1.0f - t) * 0xD2 + t * 0x84);
+        int b = 0xFF;
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    /**
+     * Interpolates MSDF halo alpha between 0.35 (dark bg) and 0.60 (light bg / snow).
+     */
+    public static float getHaloAlpha(float lightFactor) {
+        float t = Math.max(0.0f, Math.min(1.0f, lightFactor));
+        return HALO_ALPHA_DARK + (HALO_ALPHA_LIGHT - HALO_ALPHA_DARK) * t;
+    }
+
+    /**
+     * Applies alpha factor to a color (ARGB).
+     */
+    public static int applyAlpha(int color, float alpha) {
+        int a = Math.max(0, Math.min(255, (int) (((color >>> 24) & 0xFF) * alpha)));
+        return (a << 24) | (color & 0x00FFFFFF);
+    }
+
+    /**
+     * Determines the display color for a word based on current playback time and background light.
+     */
+    public static int getWordColor(long currentPlaybackMs, long wordStartMs, long wordDurationMs, float alpha, float lightFactor) {
         int baseColor;
         long wordEnd = wordStartMs + wordDurationMs;
 
         if (currentPlaybackMs >= wordStartMs && currentPlaybackMs <= wordEnd) {
-            baseColor = COLOR_ACTIVE;
+            baseColor = getActiveWordColor(lightFactor);
         } else if (currentPlaybackMs > wordEnd) {
             baseColor = COLOR_SUNG;
         } else {
             baseColor = COLOR_UPCOMING;
         }
 
-        int a = Math.max(0, Math.min(255, (int) (((baseColor >>> 24) & 0xFF) * alpha)));
-        return (a << 24) | (baseColor & 0x00FFFFFF);
+        return applyAlpha(baseColor, alpha);
+    }
+
+    /**
+     * Determines the display color for a word based on current playback time (default dark background).
+     */
+    public static int getWordColor(long currentPlaybackMs, long wordStartMs, long wordDurationMs, float alpha) {
+        return getWordColor(currentPlaybackMs, wordStartMs, wordDurationMs, alpha, 0.0f);
     }
 }

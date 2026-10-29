@@ -8,6 +8,7 @@ import net.auramc.glass.client.karaoke.KaraokePhysics;
 import net.auramc.glass.client.karaoke.PlayerAdaptiveness;
 import net.auramc.glass.client.karaoke.WordAnimation;
 import net.auramc.glass.client.karaoke.WordPlacement;
+import net.auramc.glass.client.karaoke.KaraokeWorldRenderer;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
@@ -39,6 +40,7 @@ public final class KaraokeSuiteTest {
         testKaraokePhysics();
         testClockAndOnsetStats();
         testWordRectangleNonIntersection();
+        testAdaptiveContrastAndHaloHysteresis();
 
         System.out.println("=== ALL KARAOKE UNIT TESTS PASSED ===");
     }
@@ -416,7 +418,7 @@ public final class KaraokeSuiteTest {
         check(colActive == WordAnimation.COLOR_ACTIVE, "active word color #64D2FF");
 
         int colSung = WordAnimation.getWordColor(2000L, 1400L, 300L, 1.0f);
-        check(colSung == WordAnimation.COLOR_SUNG, "sung word color #FFFFFF");
+        check(colSung == WordAnimation.COLOR_SUNG, "sung word color white 0.80");
 
         int colUpcoming = WordAnimation.getWordColor(1000L, 1400L, 300L, 1.0f);
         check(colUpcoming == WordAnimation.COLOR_UPCOMING, "upcoming word color");
@@ -558,6 +560,70 @@ public final class KaraokeSuiteTest {
 
         check(totalComparisons >= 400, "verified >= 400 rectangle non-intersection pairs: " + totalComparisons);
         System.out.println("[PASS] 8. Word rectangles in screen coordinates NEVER intersect (" + totalComparisons + " pairs verified, 1–6 words, long words, 1.20/1.21 matrices)");
+    }
+
+    private static void testAdaptiveContrastAndHaloHysteresis() {
+        // 1. Palette check per W6b ТЗ
+        check(WordAnimation.COLOR_UPCOMING == 0xF2FFFFFF, "upcoming color white 0.95 (0xF2FFFFFF)");
+        check(WordAnimation.COLOR_SUNG == 0xCCFFFFFF, "sung color white 0.80 (0xCCFFFFFF)");
+        check(WordAnimation.COLOR_OUTLINE == 0xFF000000, "halo color rgb(0, 0, 0)");
+        check(WordAnimation.COLOR_ACTIVE_DARK == 0xFF64D2FF, "active dark color #64D2FF");
+        check(WordAnimation.COLOR_ACTIVE_LIGHT == 0xFF0A84FF, "active light color #0A84FF");
+
+        // 2. Dynamic active word color
+        check(WordAnimation.getActiveWordColor(0.0f) == 0xFF64D2FF, "active color at 0.0 factor is #64D2FF");
+        check(WordAnimation.getActiveWordColor(1.0f) == 0xFF0A84FF, "active color at 1.0 factor is #0A84FF");
+
+        // 3. Dynamic halo alpha: 0.35 on dark bg, 0.60 on light bg
+        check(Math.abs(WordAnimation.getHaloAlpha(0.0f) - 0.35f) < 0.001f, "halo alpha dark 0.35");
+        check(Math.abs(WordAnimation.getHaloAlpha(1.0f) - 0.60f) < 0.001f, "halo alpha light 0.60");
+        check(Math.abs(WordAnimation.getHaloAlpha(0.5f) - 0.475f) < 0.001f, "halo alpha interpolated 0.475");
+
+        // 4. Hysteresis & 300 ms transition
+        KaraokeWorldRenderer.resetState();
+
+        // Initial dark state
+        KaraokeWorldRenderer.setScriptedLuminance(0.40f, 1000L);
+        check(!KaraokeWorldRenderer.isLightBackground(), "luminance 0.40 is dark");
+        check(KaraokeWorldRenderer.getLightProgress() == 0.0f, "initial light progress 0.0");
+
+        // Hysteresis inside [0.50, 0.60]: luminance 0.55 should remain dark
+        KaraokeWorldRenderer.setScriptedLuminance(0.55f, 1100L);
+        check(!KaraokeWorldRenderer.isLightBackground(), "luminance 0.55 retains dark state (hysteresis)");
+
+        // Luminance > 0.60 -> switches to light
+        KaraokeWorldRenderer.setScriptedLuminance(0.72f, 1200L);
+        check(KaraokeWorldRenderer.isLightBackground(), "luminance 0.72 triggers light mode");
+
+        // 300 ms smooth transition: after 150 ms progress is ~0.50
+        KaraokeWorldRenderer.updateTransition(1350L);
+        float pMid = KaraokeWorldRenderer.getLightProgress();
+        check(pMid >= 0.45f && pMid <= 0.55f, "midway transition 150ms ~0.50: " + pMid);
+
+        // After 300 ms progress reaches 1.0
+        KaraokeWorldRenderer.updateTransition(1500L);
+        check(KaraokeWorldRenderer.getLightProgress() == 1.0f, "full transition 300ms reaches 1.0");
+
+        // Hysteresis inside [0.50, 0.60]: luminance 0.53 should remain light
+        KaraokeWorldRenderer.setScriptedLuminance(0.53f, 1600L);
+        check(KaraokeWorldRenderer.isLightBackground(), "luminance 0.53 retains light state (hysteresis)");
+        check(KaraokeWorldRenderer.getLightProgress() == 1.0f, "progress remains 1.0 in hysteresis");
+
+        // Luminance < 0.50 -> switches to dark
+        KaraokeWorldRenderer.setScriptedLuminance(0.45f, 1700L);
+        check(!KaraokeWorldRenderer.isLightBackground(), "luminance 0.45 triggers dark mode");
+
+        // After 300 ms progress reaches 0.0
+        KaraokeWorldRenderer.updateTransition(2000L);
+        check(KaraokeWorldRenderer.getLightProgress() == 0.0f, "transition back to dark reaches 0.0");
+
+        // 5. Falling words halo fades with alpha
+        float haloLight = WordAnimation.getHaloAlpha(1.0f);
+        int outAlpha100 = WordAnimation.applyAlpha(WordAnimation.COLOR_OUTLINE, haloLight * 1.0f) >>> 24;
+        int outAlpha50 = WordAnimation.applyAlpha(WordAnimation.COLOR_OUTLINE, haloLight * 0.5f) >>> 24;
+        check(Math.abs(outAlpha50 - outAlpha100 / 2) <= 1, "falling word halo alpha halves with body alpha");
+
+        System.out.println("[PASS] 9. Adaptive contrast: luminance hysteresis (>0.60 light, <0.50 dark), 300ms transition, colors (#64D2FF / #0A84FF), and falling word halo fade");
     }
 
     private static void check(boolean condition, String description) {
