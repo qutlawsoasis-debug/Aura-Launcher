@@ -106,6 +106,12 @@ void main() {
                      backdrop(uv - offset, optical.y).g,
                      backdrop(uv - offset + split, optical.y).b);
         else color = backdrop(uv, optical.y);
+        // Compact controls share a broad backdrop tone; edge refraction contributes detail.
+        if (extent.y <= 26.0 && extent.x <= 400.0) {
+            vec3 group = (textureLod(Backdrop3,vec2(.35,.4),0.0).rgb + textureLod(Backdrop3,vec2(.65,.4),0.0).rgb
+                        + textureLod(Backdrop3,vec2(.35,.6),0.0).rgb + textureLod(Backdrop3,vec2(.65,.6),0.0).rgb) * (.25*(1.0-.25*Modal));
+            color = mix(group,color,.22);
+        }
         float luma = dot(color, vec3(.2126, .7152, .0722));
         color = mix(vec3(luma), color, finish.x);
     }

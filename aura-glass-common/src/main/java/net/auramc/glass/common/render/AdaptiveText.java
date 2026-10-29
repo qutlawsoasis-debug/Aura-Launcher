@@ -87,7 +87,10 @@ public final class AdaptiveText {
             uniform float Dim; uniform int Available;
             flat in vec2 center; flat in vec4 tint; flat in int slot;
             out vec4 result;
-            void main(){vec3 base=Available!=0?texture(Backdrop,clamp(center,vec2(0),vec2(1))).rgb*Dim:vec3(.5);
+            void main(){vec3 base=vec3(.5);
+            if(Available!=0){vec3 group=(texture(Backdrop,vec2(.35,.4)).rgb+texture(Backdrop,vec2(.65,.4)).rgb
+                +texture(Backdrop,vec2(.35,.6)).rgb+texture(Backdrop,vec2(.65,.6)).rgb)*.25;
+                base=mix(group,texture(Backdrop,clamp(center,vec2(0),vec2(1))).rgb,.22)*Dim;}
             float luma=dot(mix(base,tint.rgb,tint.a),vec3(.2126,.7152,.0722));
             float previous=texelFetch(History,ivec2(slot,0),0).r;
             float dark=previous>.5?(luma>.57?1.0:0.0):(luma>.63?1.0:0.0);
