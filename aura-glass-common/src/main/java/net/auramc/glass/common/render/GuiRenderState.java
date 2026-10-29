@@ -13,20 +13,20 @@ final class GuiRenderState {
     // shader and vertex buffer have been unbound there; engine texture IDs are cached.
     static void restore(int framebuffer, int width, int height) {
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); glViewport(0, 0, width, height);
-        if (RenderSystem.getShader() != null) RenderSystem.getShader().unbind();
+        if (RenderSystem.isOnRenderThread() && RenderSystem.getShader() != null) RenderSystem.getShader().unbind();
         else glUseProgram(0);
         net.minecraft.client.gl.VertexBuffer.unbind(); glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
         for (int unit = 0; unit < 5; unit++) {
             com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0 + unit); GuiRenderState.clearSampler(unit);
-            com.mojang.blaze3d.platform.GlStateManager._bindTexture(RenderSystem.getShaderTexture(unit));
+            com.mojang.blaze3d.platform.GlStateManager._bindTexture(RenderSystem.isOnRenderThread() ? RenderSystem.getShaderTexture(unit) : 0);
         }
         com.mojang.blaze3d.platform.GlStateManager._activeTexture(GL_TEXTURE0);
         glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
         glEnable(GL_DEPTH_TEST); glEnable(GL_CULL_FACE); glDisable(GL_BLEND); glDisable(GL_SCISSOR_TEST);
         glColorMask(true, true, true, true);
-        RenderSystem.enableDepthTest(); RenderSystem.enableCull(); RenderSystem.disableBlend();
-        RenderSystem.defaultBlendFunc();
+        if (RenderSystem.isOnRenderThread()) { RenderSystem.enableDepthTest(); RenderSystem.enableCull(); RenderSystem.disableBlend(); }
+        if (RenderSystem.isOnRenderThread()) RenderSystem.defaultBlendFunc();
     }
 }

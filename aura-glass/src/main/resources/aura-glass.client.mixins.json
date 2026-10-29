@@ -10,6 +10,7 @@
     "AdvancementsScreenMixin",
     "ClickableWidgetMixin",
     "GameMenuScreenMixin",
+    "HtmlGameMenuScreenMixin",
     "GameRendererMixin",
     "KeyboardMixin",
     "MouseMixin",

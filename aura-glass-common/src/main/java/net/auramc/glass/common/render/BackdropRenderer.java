@@ -34,14 +34,16 @@ public final class BackdropRenderer {
         GuiRenderState.restore(f.fbo,f.textureWidth,f.textureHeight);
     }
     public static void worldImage() { if(worldTexture!=0)draw(worldTexture,worldTexture,0,1,true); }
-    static void modal(float progress,boolean available) {
+    public static void modal(float progress,boolean available) {
         if(net.auramc.glass.common.style.GlassStyles.quality() == net.auramc.glass.common.style.GlassQuality.OFF) return;
         boolean timer=GlassDiagnostics.timers().begin(GpuGlassTimers.GLASS);
         try {draw(available ? BlurService.get().texture(0) : 0, available ? BlurService.get().texture(1) : 0, progress, 1-.25f*progress, available);}
         finally {GlassDiagnostics.timers().end(timer);}
     }
     private static void draw(int sharp,int blurred,float amount,float dim,boolean available) {
-        var f=MinecraftClient.getInstance().getFramebuffer();
+        var mc = MinecraftClient.getInstance();
+        if (mc == null || mc.getFramebuffer() == null) return;
+        var f = mc.getFramebuffer();
         try {
             if(program==0)return;
             glBindFramebuffer(GL_FRAMEBUFFER,f.fbo);glViewport(0,0,f.textureWidth,f.textureHeight);

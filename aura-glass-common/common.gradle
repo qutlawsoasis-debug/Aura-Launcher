@@ -40,6 +40,18 @@ tasks.register('runGlassInvariantsTest', JavaExec) {
     mainClass = 'net.auramc.glass.common.render.GlassRenderInvariantsTest'
 }
 
+tasks.register('runUltralightSmokeTest', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.html.UltralightSmokeTest'
+}
+
+tasks.register('runUltralightBenchmark', JavaExec) {
+    dependsOn tasks.named('compileTestJava')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.auramc.glass.client.html.UltralightPauseBenchmark'
+}
+
 tasks.named('test') {
     dependsOn 'runMusicClientTest'
     dependsOn 'runAutoCompleteTest'
