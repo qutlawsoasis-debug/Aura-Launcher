@@ -46,7 +46,7 @@ public final class KaraokeEngine {
     private long lastActiveOnsetRecordedWordT = -1L;
 
     private volatile boolean paused = false;
-    private volatile boolean stopped = false;
+    private volatile boolean stopped = true;
 
     // Client-side combat telemetry
     private float lastRecordedHealth = -1.0f;
@@ -254,7 +254,7 @@ public final class KaraokeEngine {
     /**
      * Headless ticking logic for testing without Minecraft world.
      */
-    public void tickHeadless(long playbackMs) {
+    public synchronized void tickHeadless(long playbackMs) {
         physics.tick(null);
         if (!isPlaying()) return;
         updateLyricsTimeline(playbackMs, null, null);
@@ -263,7 +263,7 @@ public final class KaraokeEngine {
     /**
      * Ticking logic (runs at 20 Hz with world).
      */
-    public void tick(MinecraftClient client) {
+    public synchronized void tick(MinecraftClient client) {
         checkDemoStartup();
         MusicKaraokeBridge.getInstance().update();
 
@@ -514,7 +514,7 @@ public final class KaraokeEngine {
     /**
      * Checks and records word onset events on every render frame and tick for sub-frame accuracy.
      */
-    public void checkWordOnsets(long playbackMs) {
+    public synchronized void checkWordOnsets(long playbackMs) {
         if (activeGroupWords.isEmpty()) return;
         for (KaraokeModel.KaraokeWord w : activeGroupWords) {
             if (playbackMs >= w.t && w.t > lastActiveOnsetRecordedWordT) {
@@ -703,7 +703,7 @@ public final class KaraokeEngine {
     /**
      * In-world render call from WorldRenderer hook.
      */
-    public void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
+    public synchronized void render(Matrix4f viewMatrix, Matrix4f projMatrix, Camera camera, float tickDelta) {
         boolean hasActive = !activeAnchors.isEmpty();
         boolean hasBodies = physics.getBodyCount() > 0;
         if (!hasActive && !hasBodies) {

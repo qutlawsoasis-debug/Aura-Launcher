@@ -4,12 +4,12 @@ import net.auramc.glass.client.lyrics.Line;
 import net.auramc.glass.client.lyrics.Lyrics;
 import net.auramc.glass.client.lyrics.LyricsClient;
 import net.auramc.glass.client.lyrics.Word;
-import net.auramc.glass.client.music.BridgeMusicSource;
 import net.auramc.glass.client.music.MusicClock;
 import net.auramc.glass.client.music.MusicSource;
 import net.auramc.glass.client.music.NowPlaying;
 import net.auramc.glass.client.music.PlaybackState;
 import net.auramc.glass.client.music.Track;
+import net.auramc.glass.client.quickmenu.music.MusicSourceProvider;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,19 +17,22 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Integration bridge connecting MusicClock (W5), LyricsClient (W3b), and KaraokeEngine (W6):
  * 1. Feeds MusicClock.positionMs into KaraokeEngine clock supplier.
- * 2. On track change (id): loads lyrics asynchronously via LyricsClient -> converts to W6 model -> feeds engine.
+ * 2. On track change (id): loads lyrics asynchronously via LyricsClient -> delivers immutable DTO ->
+ *    applies strictly on client tick thread with generation & state validation -> feeds engine.
  *    Missing lyrics or synced=false -> karaoke stays silent with zero errors.
  * 3. On MusicClock epoch increase (seek / track change / resynchronization): resets shown and flying words.
  * 4. Playback state management:
  *    - PAUSED: new words do not appear, existing hanging words remain in place.
- *    - STOPPED: all words dissolve.
- * 5. When bridge is unavailable (MusicSource.available() == false): zero threads / polling beyond W5.
+ *    - STOPPED: all words dissolve, pending requests invalidated, generation bumped.
+ * 5. When bridge is unavailable (MusicSource.available() == false): zero threads / polling beyond W5,
+ *    shares MusicSourceProvider.get() with F8 quick menu.
  */
-public final class MusicKaraokeBridge {
+public final class MusicKaraokeBridge implements AutoCloseable {
 
     private static final MusicKaraokeBridge INSTANCE = new MusicKaraokeBridge();
 
@@ -46,10 +49,18 @@ public final class MusicKaraokeBridge {
     private PlaybackState lastState = PlaybackState.STOPPED;
     private volatile boolean active = false;
 
+    private long requestGeneration = 0L;
     private CompletableFuture<Optional<Lyrics>> currentLyricsFuture = null;
 
+    /**
+     * Immutable container for lyrics delivered from background HTTP/worker threads.
+     * Never mutates KaraokeEngine on completion threads; consumed strictly on client tick thread.
+     */
+    private record PendingLyrics(long generation, String trackId, KaraokeModel.KaraokeLyrics lyrics) {}
+    private final AtomicReference<PendingLyrics> pendingLyrics = new AtomicReference<>();
+
     public MusicKaraokeBridge() {
-        this(new MusicClock(new BridgeMusicSource()), new LyricsClient(), KaraokeEngine.getInstance());
+        this(new MusicClock(MusicSourceProvider::get, System::currentTimeMillis), new LyricsClient(), KaraokeEngine.getInstance());
     }
 
     public MusicKaraokeBridge(MusicClock clock, LyricsClient lyricsClient, KaraokeEngine engine) {
@@ -85,6 +96,10 @@ public final class MusicKaraokeBridge {
         return lastState;
     }
 
+    public long getRequestGeneration() {
+        return requestGeneration;
+    }
+
     public void update() {
         update(System.currentTimeMillis());
     }
@@ -98,6 +113,7 @@ public final class MusicKaraokeBridge {
         if (source == null || !source.available()) {
             if (active) {
                 // Source transitioned to unavailable: silence karaoke and reset state
+                invalidatePendingRequests();
                 engine.resetWords();
                 engine.setLyrics(null);
                 engine.setStopped(true);
@@ -132,6 +148,7 @@ public final class MusicKaraokeBridge {
         // 2. Check for track change
         if (!currentTrackId.equals(lastTrackId)) {
             lastTrackId = currentTrackId;
+            invalidatePendingRequests();
             if (track == null || track.isEmpty()) {
                 // Empty track: silence karaoke
                 engine.resetWords();
@@ -147,72 +164,127 @@ public final class MusicKaraokeBridge {
             handleStateTransition(lastState, currentState);
             lastState = currentState;
         }
+
+        // 4. Drain and apply pending lyrics on client thread with strict generation & state checks
+        drainPendingLyrics(currentState, source.available());
+    }
+
+    private void invalidatePendingRequests() {
+        requestGeneration++;
+        pendingLyrics.set(null);
+        if (currentLyricsFuture != null && !currentLyricsFuture.isDone()) {
+            currentLyricsFuture.cancel(true);
+        }
     }
 
     private void loadLyricsForTrack(Track track) {
-        // Reset words for the new track
+        // Reset words for the new track on client thread
         engine.resetWords();
         engine.setLyrics(null);
+        engine.setStopped(true);
 
-        String trackId = track.id();
+        final long generation = this.requestGeneration;
+        final String trackId = track.id();
         double durationSec = track.durationMs() > 0 ? track.durationMs() / 1000.0 : 0.0;
 
         currentLyricsFuture = lyricsClient.getLyricsAsync(track.artist(), track.title(), durationSec)
                 .thenApply(optLyrics -> {
-                    synchronized (this) {
-                        // Discard if track changed while fetching
-                        if (!trackId.equals(this.lastTrackId)) {
+                    // Running on HTTP completion thread: DO NOT MUTATE KaraokeEngine directly!
+                    // Deliver immutable parsed lyrics DTO to atomic reference.
+                    if (optLyrics.isPresent()) {
+                        Lyrics lyrics = optLyrics.get();
+                        if (lyrics.synced() && !lyrics.lines().isEmpty()) {
+                            KaraokeModel.KaraokeLyrics kLyrics = convertToKaraokeModel(lyrics);
+                            pendingLyrics.set(new PendingLyrics(generation, trackId, kLyrics));
                             return optLyrics;
                         }
-
-                        if (optLyrics.isPresent()) {
-                            Lyrics lyrics = optLyrics.get();
-                            if (lyrics.synced() && !lyrics.lines().isEmpty()) {
-                                KaraokeModel.KaraokeLyrics kLyrics = convertToKaraokeModel(lyrics);
-                                engine.setLyrics(kLyrics);
-                                engine.setStopped(false);
-                                long currentPos = clock.positionMs();
-                                engine.seekTo(currentPos);
-                            } else {
-                                // Missing lyrics or synced == false -> karaoke stays silent, zero errors
-                                engine.setLyrics(null);
-                                engine.setStopped(true);
-                            }
-                        } else {
-                            // No lyrics found -> karaoke stays silent, zero errors
-                            engine.setLyrics(null);
-                            engine.setStopped(true);
-                        }
                     }
+                    // Missing or unsynced: deliver null lyrics sentinel
+                    pendingLyrics.set(new PendingLyrics(generation, trackId, null));
                     return optLyrics;
                 })
                 .exceptionally(ex -> {
-                    synchronized (this) {
-                        if (trackId.equals(this.lastTrackId)) {
-                            engine.setLyrics(null);
-                            engine.setStopped(true);
-                        }
-                    }
+                    // On error: deliver null lyrics sentinel
+                    pendingLyrics.set(new PendingLyrics(generation, trackId, null));
                     return Optional.empty();
                 });
+    }
+
+    private void drainPendingLyrics(PlaybackState currentState, boolean isSourceAvailable) {
+        PendingLyrics pending = pendingLyrics.getAndSet(null);
+        if (pending == null) {
+            return;
+        }
+
+        // Validate generation token: must match current active generation
+        if (pending.generation != this.requestGeneration) {
+            return;
+        }
+
+        // Validate track ID: must match current track
+        if (!pending.trackId.equals(this.lastTrackId)) {
+            return;
+        }
+
+        // Validate source availability and playback state:
+        // If playback is STOPPED or source is offline, NEVER un-stop engine!
+        if (!isSourceAvailable || currentState == PlaybackState.STOPPED) {
+            return;
+        }
+
+        if (pending.lyrics != null && pending.lyrics.synced && !pending.lyrics.lines.isEmpty()) {
+            engine.setLyrics(pending.lyrics);
+            if (currentState == PlaybackState.PLAYING) {
+                engine.setStopped(false);
+                engine.setPaused(false);
+            } else if (currentState == PlaybackState.PAUSED) {
+                engine.setStopped(false);
+                engine.setPaused(true);
+            }
+            long currentPos = clock.positionMs();
+            engine.seekTo(currentPos);
+        } else {
+            // Missing lyrics or synced == false -> karaoke stays silent, zero errors
+            engine.setLyrics(null);
+            engine.setStopped(true);
+        }
     }
 
     private void handleStateTransition(PlaybackState oldState, PlaybackState newState) {
         switch (newState) {
             case PLAYING -> {
-                engine.setStopped(false);
+                if (engine.getLyrics() != null && engine.getLyrics().synced) {
+                    engine.setStopped(false);
+                }
                 engine.setPaused(false);
             }
             case PAUSED -> {
-                engine.setStopped(false);
+                if (engine.getLyrics() != null && engine.getLyrics().synced) {
+                    engine.setStopped(false);
+                }
                 engine.setPaused(true);
             }
             case STOPPED -> {
+                invalidatePendingRequests();
                 engine.setStopped(true);
                 engine.setPaused(false);
                 engine.dissolveAll();
             }
         }
+    }
+
+    @Override
+    public synchronized void close() {
+        invalidatePendingRequests();
+        engine.resetWords();
+        engine.setLyrics(null);
+        engine.setStopped(true);
+        engine.setPaused(false);
+        active = false;
+        lastTrackId = "";
+        lastState = PlaybackState.STOPPED;
+        lastEpoch = -1L;
+        MusicSourceProvider.close();
     }
 
     /**

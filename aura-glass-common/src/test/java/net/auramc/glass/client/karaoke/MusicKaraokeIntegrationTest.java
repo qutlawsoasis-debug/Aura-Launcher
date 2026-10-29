@@ -85,6 +85,11 @@ public final class MusicKaraokeIntegrationTest {
             testSeekResetsWords(tempDir);
             testPauseState(tempDir);
             testStopDissolve(tempDir);
+            testDelayedCompletionAfterStop(tempDir);
+            testDelayedCompletionAfterTrackChange(tempDir);
+            testDelayedCompletionAfterBridgeLost(tempDir);
+            testAsyncCompletionThreadSafetyNoDirectEngineMutation(tempDir);
+            testMusicSourceProviderReuseAndNoExtraPollers();
 
             System.out.println("=== ALL MUSIC-KARAOKE INTEGRATION TESTS PASSED ===");
         } catch (Throwable t) {
@@ -440,4 +445,169 @@ public final class MusicKaraokeIntegrationTest {
         } catch (Throwable ignored) {
         }
     }
+
+    private static void testDelayedCompletionAfterStop(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(50_000L);
+        Track track = new Track("delayed_stop_1", "Artist", "Delayed Stop Song", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_del_stop");
+        ControlledLyricsClient controlledClient = new ControlledLyricsClient(cacheDir);
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, controlledClient, engine);
+
+        // 1. Tick while PLAYING: triggers lyrics request for track
+        bridge.update(virtualTime.get());
+        check(bridge.getRequestGeneration() == 1L, "generation 1 after loading track");
+        check(engine.isStopped(), "engine initially stopped until lyrics arrive");
+
+        // 2. Stop playback before request completes
+        source.stop();
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine is stopped after source.stop()");
+        check(bridge.getRequestGeneration() == 2L, "generation bumped to 2 on STOP");
+
+        // 3. Late lyrics completion fires on background thread
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        controlledClient.future.complete(java.util.Optional.of(lyrics));
+
+        // 4. Client tick runs: late completion MUST NOT un-stop the engine!
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine MUST remain stopped even after late lyrics completion! (qaBridgeProbe fix)");
+        check(engine.getLyrics() == null, "stale lyrics not applied to stopped engine");
+
+        System.out.println("[PASS] 9. Delayed lyrics completion after STOP: engine remains stopped");
+    }
+
+    private static void testDelayedCompletionAfterTrackChange(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(60_000L);
+        Track trackA = new Track("track_A", "Artist A", "Title A", 120_000L, "");
+        Track trackB = new Track("track_B", "Artist B", "Title B", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(trackA, trackB), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_del_track");
+        ControlledLyricsClient controlledClient = new ControlledLyricsClient(cacheDir);
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, controlledClient, engine);
+
+        // 1. Start loading Track A
+        bridge.update(virtualTime.get());
+        check("track_A".equals(bridge.getLastTrackId()), "track A started");
+
+        // 2. Track changes to Track B before Track A resolves
+        source.next();
+        bridge.update(virtualTime.get());
+        check("track_B".equals(bridge.getLastTrackId()), "track B active");
+
+        // 3. Late resolution of Track A occurs
+        Lyrics lyricsA = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        controlledClient.future.complete(java.util.Optional.of(lyricsA));
+
+        // 4. Client tick update: Track A lyrics MUST NOT apply to Track B!
+        bridge.update(virtualTime.get());
+        check(engine.getLyrics() == null, "Track A late lyrics discarded on Track B");
+
+        System.out.println("[PASS] 10. Delayed lyrics completion after track change: stale track lyrics dropped");
+    }
+
+    private static void testDelayedCompletionAfterBridgeLost(Path tempDir) {
+        AtomicLong virtualTime = new AtomicLong(70_000L);
+        Track track = new Track("track_offline", "Artist", "Offline Track", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_del_offline");
+        ControlledLyricsClient controlledClient = new ControlledLyricsClient(cacheDir);
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, controlledClient, engine);
+
+        // 1. Start loading track
+        bridge.update(virtualTime.get());
+
+        // 2. Bridge becomes unavailable
+        source.setAvailable(false);
+        bridge.update(virtualTime.get());
+        check(!bridge.isActive(), "bridge inactive when source unavailable");
+        check(engine.isStopped(), "engine stopped when source offline");
+
+        // 3. Late completion arrives while bridge is unavailable
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        controlledClient.future.complete(java.util.Optional.of(lyrics));
+
+        // 4. Client tick runs
+        bridge.update(virtualTime.get());
+        check(engine.isStopped(), "engine remains stopped when bridge offline");
+        check(engine.getLyrics() == null, "lyrics not applied when bridge offline");
+
+        System.out.println("[PASS] 11. Delayed lyrics completion after bridge lost: lyrics dropped, engine stopped");
+    }
+
+    private static void testAsyncCompletionThreadSafetyNoDirectEngineMutation(Path tempDir) throws Exception {
+        AtomicLong virtualTime = new AtomicLong(80_000L);
+        Track track = new Track("async_safety", "Thread Artist", "Safety Track", 120_000L, "");
+        StubMusicSource source = new StubMusicSource(List.of(track), virtualTime::get);
+        MusicClock clock = new MusicClock(source, virtualTime::get);
+
+        Path cacheDir = tempDir.resolve("cache_async_safety");
+        ControlledLyricsClient controlledClient = new ControlledLyricsClient(cacheDir);
+        KaraokeEngine engine = new KaraokeEngine();
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge(clock, controlledClient, engine);
+
+        // 1. Start request on client tick
+        bridge.update(virtualTime.get());
+        check(engine.getLyrics() == null, "engine lyrics null before completion");
+
+        // 2. Complete future on a separate worker thread
+        Lyrics lyrics = Lyrics.parseJson(SAMPLE_JSON_LYRICS);
+        Thread worker = new Thread(() -> {
+            controlledClient.future.complete(java.util.Optional.of(lyrics));
+        }, "LyricsWorkerThread");
+        worker.start();
+        worker.join();
+
+        // 3. CRITICAL: The background worker thread has completed, BUT bridge.update() has NOT run yet.
+        // KaraokeEngine MUST NOT be mutated by the worker thread!
+        check(engine.getLyrics() == null, "worker thread MUST NOT mutate KaraokeEngine directly! (Render safety fix)");
+        check(engine.getActiveAnchorCount() == 0, "activeAnchors untouched by background thread");
+
+        // 4. Now simulate client tick running on client main thread:
+        bridge.update(virtualTime.get());
+        check(engine.getLyrics() != null, "engine lyrics safely applied on client tick thread");
+        check(!engine.isStopped(), "engine active after client tick apply");
+
+        System.out.println("[PASS] 12. Async completion thread safety: zero direct engine mutation from HTTP threads");
+    }
+
+    private static void testMusicSourceProviderReuseAndNoExtraPollers() {
+        // Set QA stub to avoid network
+        System.setProperty("aura.qa.stubMusic", "true");
+        net.auramc.glass.client.quickmenu.music.MusicSourceProvider.initDefault();
+
+        net.auramc.glass.client.music.MusicSource sharedSource = net.auramc.glass.client.quickmenu.music.MusicSourceProvider.get();
+        check(sharedSource != null, "MusicSourceProvider source available");
+
+        // Default constructor MUST reuse MusicSourceProvider.get()
+        MusicKaraokeBridge bridge = new MusicKaraokeBridge();
+        check(bridge.getMusicClock().source() == sharedSource, "MusicKaraokeBridge shares MusicSourceProvider source");
+
+        // Close bridge
+        bridge.close();
+        System.out.println("[PASS] 13. MusicSourceProvider reuse: 0 extra pollers created, shared with F8 menu");
+    }
+
+    static class ControlledLyricsClient extends LyricsClient {
+        final java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>> future = new java.util.concurrent.CompletableFuture<>();
+
+        ControlledLyricsClient(Path cacheDir) {
+            super("http://127.0.0.1:9999", cacheDir, null);
+        }
+
+        @Override
+        public java.util.concurrent.CompletableFuture<java.util.Optional<Lyrics>> getLyricsAsync(String artist, String title, double durationSec) {
+            return future;
+        }
+    }
+
 }
