@@ -13,6 +13,8 @@ import net.auramc.glass.client.music.*;
 import net.auramc.glass.client.karaoke.KaraokeConfig;
 import net.auramc.glass.client.quickmenu.music.MusicSourceProvider;
 import net.auramc.glass.client.quickmenu.music.MusicArtwork;
+import net.auramc.glass.client.quickmenu.music.QuickMenuMusicController;
+import net.auramc.glass.client.quickmenu.music.QuickMenuMusicSnapshot;
 import net.auramc.glass.common.render.GlassSpring;
 
 import org.lwjgl.glfw.GLFW;
@@ -29,14 +31,7 @@ public final class QuickMenuScreen extends Screen {
     private static final int[] COLORS = {0xFFFFFF, 0x64D2FF, 0x5FD39A, 0xFFCC66, 0xFF8A7A};
     private final QuickMenuMotion motion = new QuickMenuMotion();
     private final List<Control> controls = new ArrayList<>();
-    private final ExecutorService searchExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "Aura-QuickMenu-Search");
-        t.setDaemon(true);
-        return t;
-    });
-    private volatile List<Track> cachedTracks = List.of();
-    private String lastSearchedQuery = null;
-    private long searchRequestEpoch = 0;
+    private final QuickMenuMusicController musicController = new QuickMenuMusicController();
 
     private int section, focused, scroll;
     private boolean dragging, menuKeyHeld = true, searching;
@@ -79,7 +74,11 @@ public final class QuickMenuScreen extends Screen {
         var config = QuickMenuConfig.get();
         if (renderedFrames == 0) motion.setOpen(true, System.nanoTime());
         motion.update(System.nanoTime(), width, height, config.centerX, config.bottomY < 0 ? Double.NaN : config.bottomY);
-        triggerSearchAsync(searchText);
+        if (musicTab == 1) {
+            musicController.requestSearch(searchText);
+        } else {
+            musicController.triggerRefreshAsync();
+        }
     }
 
     public QuickMenuMotion.Geometry geometry() {
@@ -99,7 +98,11 @@ public final class QuickMenuScreen extends Screen {
         scroll = 0;
         focused = 0;
         if (section == 2) {
-            triggerSearchAsync(musicTab == 1 ? searchText : "");
+            if (musicTab == 1) {
+                musicController.requestSearch(searchText);
+            } else {
+                musicController.triggerRefreshAsync();
+            }
         }
     }
 
@@ -107,10 +110,11 @@ public final class QuickMenuScreen extends Screen {
         this.musicTab = tab;
         if (tab == 1) {
             this.scroll = 220;
+            musicController.requestSearch(searchText);
         } else {
             this.scroll = 0;
+            musicController.triggerRefreshAsync();
         }
-        triggerSearchAsync(tab == 1 ? searchText : "");
     }
 
     public void setMusicScroll(int s) {
@@ -128,11 +132,15 @@ public final class QuickMenuScreen extends Screen {
     public void setSearchQuery(String query) {
         this.searchText = query != null ? query : "";
         this.searching = true;
-        var src = MusicSourceProvider.get();
-        if (src != null && src.available()) {
-            this.cachedTracks = src.search(this.searchText);
-        }
-        triggerSearchAsync(this.searchText);
+        musicController.requestSearch(this.searchText);
+    }
+
+    public QuickMenuMusicSnapshot musicSnapshot() {
+        return musicController.snapshot();
+    }
+
+    public QuickMenuMusicController musicController() {
+        return musicController;
     }
 
     public void toggle() {
@@ -143,6 +151,7 @@ public final class QuickMenuScreen extends Screen {
     public void close() {
         qaHoverProgress = false;
         motion.setOpen(false, System.nanoTime());
+        musicController.close();
     }
 
     @Override
@@ -152,26 +161,7 @@ public final class QuickMenuScreen extends Screen {
 
     @Override
     public void removed() {
-        searchExecutor.shutdownNow();
-    }
-
-    private void triggerSearchAsync(String query) {
-        if (Objects.equals(query, lastSearchedQuery)) return;
-        lastSearchedQuery = query;
-        final long epoch = ++searchRequestEpoch;
-        final var src = MusicSourceProvider.get();
-        if (!src.available()) {
-            cachedTracks = List.of();
-            return;
-        }
-        searchExecutor.submit(() -> {
-            try {
-                List<Track> results = src.search(query);
-                if (epoch == searchRequestEpoch) {
-                    cachedTracks = (results != null) ? List.copyOf(results) : List.of();
-                }
-            } catch (Throwable ignored) {}
-        });
+        musicController.close();
     }
 
     private float computeBackdropBrightness() {
@@ -411,7 +401,8 @@ public final class QuickMenuScreen extends Screen {
                 contentH = 80;
             } else {
                 float header = 314;
-                int listCount = musicTab == 0 ? (src.queue() != null ? src.queue().size() : 0) : cachedTracks.size();
+                var snap = musicController.snapshot();
+                int listCount = snap.countForTab(musicTab);
                 float tabContent = (musicTab == 1 ? 48 : 0) + Math.min(10, listCount) * 52;
                 float karaoke = 32 + (karaokeExpanded ? 5 * 38 + 12 : 0);
                 contentH = header + tabContent + karaoke + 24;
@@ -741,12 +732,12 @@ public final class QuickMenuScreen extends Screen {
         controls.add(new Control(x, segY, segW + 2, 32, "tabQueue", () -> {
             musicTab = 0;
             scroll = 0;
-            triggerSearchAsync("");
+            musicController.triggerRefreshAsync();
         }, null));
         controls.add(new Control(x + segW + 2, segY, segW + 2, 32, "tabSearch", () -> {
             musicTab = 1;
             scroll = Math.max(scroll, 220);
-            triggerSearchAsync(searchText);
+            musicController.requestSearch(searchText);
         }, null));
 
         float listY = segY + 40;
@@ -768,12 +759,9 @@ public final class QuickMenuScreen extends Screen {
             listY += 48;
         }
 
-        // List of tracks (Queue or Search Results)
-        List<Track> tracks = (musicTab == 0 && source.available()) ? source.queue() : cachedTracks;
-        if (tracks == null) tracks = List.of();
-        if (tracks.isEmpty() && source.available()) {
-            if (lastSearchedQuery == null) triggerSearchAsync("");
-        }
+        // List of tracks from immutable background snapshot (no IO in render)
+        var snap = musicController.snapshot();
+        List<Track> tracks = source.available() ? snap.tracksForTab(musicTab) : Collections.emptyList();
 
         for (int i = 0; i < Math.min(10, tracks.size()); i++) {
             var track = tracks.get(i);
@@ -1095,7 +1083,7 @@ public final class QuickMenuScreen extends Screen {
     public boolean charTyped(char character, int modifiers) {
         if (searching && !Character.isISOControl(character) && searchText.length() < 120) {
             searchText += character;
-            triggerSearchAsync(searchText);
+            musicController.requestSearch(searchText);
             return true;
         }
         return super.charTyped(character, modifiers);
@@ -1130,14 +1118,15 @@ public final class QuickMenuScreen extends Screen {
             if (key == GLFW.GLFW_KEY_BACKSPACE) {
                 if (!searchText.isEmpty()) {
                     searchText = searchText.substring(0, searchText.length() - 1);
-                    triggerSearchAsync(searchText);
+                    musicController.requestSearch(searchText);
                 }
                 return true;
             }
             if (key == GLFW.GLFW_KEY_ENTER) {
                 searching = false;
-                if (!cachedTracks.isEmpty()) {
-                    MusicSourceProvider.get().playTrack(cachedTracks.get(0));
+                var results = musicController.snapshot().searchResults();
+                if (!results.isEmpty()) {
+                    MusicSourceProvider.get().playTrack(results.get(0));
                 }
                 return true;
             }
