@@ -21,14 +21,10 @@
 
   [ ✨ Возможности ](#-ключевые-возможности) • 
   [ 🚀 Быстрый старт ](#-быстрый-старт) • 
-  [ 📸 Скриншоты ](#-галерея-интерфейса) • 
   [ 🌐 P2P Сеть ](#-как-работает-p2p-мультиплеер) • 
   [ 🏗️ Архитектура ](#-архитектура-проекта) • 
   [ ❓ FAQ ](#-частые-вопросы-faq)
 
-  <br />
-
-  <img src="shots/beta111_menu_and_screens.gif" alt="Aura Launcher Interface Showcase" width="920" style="border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);" />
 
 </div>
 
@@ -70,31 +66,11 @@ Aura решает все эти проблемы в один клик: запу�
 - **Всегда актуальная сборка**: Лаунчер автоматически сверяет хеши файлов с официальным репозиторием [Aura-Pack](https://github.com/qutlawsoasis-debug/Aura-Pack).
 - **Криптографическая проверка SHA-256**: Гарантия целостности модов, шейдеров и ресурспаков перед каждым запуском.
 
-### 💎 Кинематографичный интерфейс (WPF Dark Glass UI)
-- **Плавная физика анимаций**: Кубические кривые сглаживания (`CubicEase`) при переходе между страницами.
-- **Кинетический скролл**: Мягкий и естественный скроллинг списков колесом мыши (`SmoothScroll`).
-- **Скользящий индикатор меню**: Плавное перемещение неонового маркера по разделам боковой панели.
-- **Адаптивная верстка**: Отсутствие прыгающих кнопок и перекрытий текста.
-
----
-
-## 📸 Галерея интерфейса
-
-<div align="center">
-
-| 🎮 Главный экран запуска | 🌐 Лобби и P2P Мультиплеер |
-| :---: | :---: |
-| <img src="shots/beta111_tab_play.png" width="440" alt="Main Play Tab" /> | <img src="shots/beta111_menu_lobby.png" width="440" alt="Lobby Multiplayer Tab" /> |
-
-| 👗 3D Гардероб и Скины | 👥 Список друзей и Статусы |
-| :---: | :---: |
-| <img src="shots/beta111_menu_skin.png" width="440" alt="3D Skin Wardrobe" /> | <img src="shots/beta114_friends_list.png" width="440" alt="Friends and Social Tab" /> |
-
-| ⚙️ Настройки и Диагностика | 🔄 Дельта-обновление Velopack |
-| :---: | :---: |
-| <img src="shots/beta111_menu_settings.png" width="440" alt="Settings Tab" /> | <img src="shots/update_sequence.gif" width="440" alt="Velopack Updater" /> |
-
-</div>
+### 💎 Интерфейс «Остров» (WebView2)
+- **Мир на весь экран**: одна стеклянная капсула внизу вместо окон и боковых панелей.
+- **Разделы внутри капсулы**: карта, лобби, друзья, гардероб, мастерская и настройки.
+- **Запуск из капсулы**: прогресс показывается прямо в кнопке «Играть».
+- **Старое окно WPF**: доступно с флагом `--classic`.
 
 ---
 
@@ -150,9 +126,10 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    subgraph UI ["🎨 Презентационный слой (WPF XAML)"]
+    subgraph UI ["🎨 Презентационный слой (WebView2 и WPF)"]
+        Island["Остров: docs/redesign/v3 (Vite), мост Core/WebBridge"]
         MainWindow["MainWindow & StartupWindow"]
-        Views["Вкладки: Overview, Lobby, Friends, Wardrobe, Workshop, Settings"]
+        Views["Старое окно --classic: Overview, Lobby, Friends, Wardrobe, Workshop, Settings"]
         Behaviors["Behaviors: SmoothScroll, DragMove, Easing"]
         Styles["Themes/Colors.xaml, Icons.xaml & Styles/UiTheme.xaml"]
     end
@@ -187,6 +164,8 @@ graph TD
 ### Требования:
 - **ОС**: Windows 10/11 x64
 - **SDK**: [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **Node.js**: с npm, `dotnet build` собирает интерфейс через Vite
+- **WebView2 Runtime**: нужен для запуска интерфейса
 - **Инструменты**: Git, PowerShell 5.1+
 
 ### Пошаговая сборка:
