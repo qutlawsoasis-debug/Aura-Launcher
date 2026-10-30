@@ -14,6 +14,8 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background:
 <script>
 const params = new URLSearchParams(location.search);
 const channel = params.get('channel');
+const engine = params.get('engine') === 'sc' ? 'sc' : 'yt';
+const source = engine === 'sc' ? 'aura-sc-embed' : 'aura-yt-embed';
 let parentOrigin = null;
 try {
   const url = new URL(params.get('parentOrigin'));
@@ -23,89 +25,202 @@ try {
     parentOrigin = url.origin;
   }
 } catch {}
-let yt = null;
-let ready = false;
-let videoId = null;
-let timer = null;
-
 function notify(message) {
   if (parentOrigin && channel) {
-    window.parent.postMessage({ source: 'aura-yt-embed', channel, ...message }, parentOrigin);
+    window.parent.postMessage({ source, channel, ...message }, parentOrigin);
   }
 }
-function progress() {
-  if (!ready) return;
-  notify({
-    event: 'timeUpdate',
-    videoId,
-    currentTime: yt.getCurrentTime() || 0,
-    duration: yt.getDuration() || 0
-  });
-}
-window.onYouTubeIframeAPIReady = function() {
-  if (!parentOrigin || !channel) return;
-  const frame = document.createElement('iframe');
-  const query = new URLSearchParams({
-    enablejsapi: '1', autoplay: '0', controls: '0', disablekb: '1',
-    fs: '0', rel: '0', playsinline: '1',
-    origin: location.origin, widget_referrer: location.origin
-  });
-  frame.id = 'player';
-  frame.src = 'https://www.youtube.com/embed/?' + query;
-  frame.allow = 'autoplay; encrypted-media; fullscreen';
-  frame.referrerPolicy = 'strict-origin-when-cross-origin';
-  document.getElementById('player').replaceWith(frame);
-  yt = new YT.Player(frame, {
-    events: {
-      onReady: () => {
-        ready = true;
-        notify({ event: 'ready' });
-        timer = setInterval(progress, 250);
-      },
-      onStateChange: (event) => {
-        notify({ event: 'stateChange', state: event.data, videoId });
-        progress();
-      },
-      onError: (event) => notify({ event: 'error', code: event.data, videoId }),
-      onAutoplayBlocked: () => notify({ event: 'autoplayBlocked', videoId })
-    }
-  });
-};
-window.addEventListener('message', (event) => {
-  const data = event.data;
-  if (!parentOrigin || event.source !== window.parent || event.origin !== parentOrigin ||
-      !data || data.source !== 'aura-yt-host' || data.channel !== channel || !ready) return;
-  try {
-    switch (data.op) {
-      case 'load':
-      case 'cue':
-        if (typeof data.videoId !== 'string' || !/^[a-zA-Z0-9_-]{11}$/.test(data.videoId)) return;
-        videoId = data.videoId;
-        const options = { videoId, startSeconds: Number.isFinite(data.startSeconds) ? Math.max(0, data.startSeconds) : 0 };
-        if (data.op === 'load') yt.loadVideoById(options);
-        else yt.cueVideoById(options);
-        break;
-      case 'play': yt.playVideo(); break;
-      case 'pause': yt.pauseVideo(); break;
-      case 'stop': yt.stopVideo(); break;
-      case 'seek':
-        if (Number.isFinite(data.seconds)) yt.seekTo(Math.max(0, data.seconds), true);
-        break;
-      case 'volume':
-        if (Number.isFinite(data.value)) yt.setVolume(Math.max(0, Math.min(100, data.value)));
-        break;
-      case 'ping': notify({ event: 'ready' }); break;
-    }
-  } catch {
-    notify({ event: 'unavailable', videoId });
+if (engine === 'sc') {
+  let sc = null;
+  let ready = false;
+  let pendingUrl = null;
+  function createWidget(url) {
+    const frame = document.createElement('iframe');
+    const query = new URLSearchParams({
+      auto_play: 'false', show_comments: 'false', buying: 'false',
+      sharing: 'false', download: 'false', hide_related: 'true'
+    });
+    frame.id = 'player';
+    frame.src = 'https://w.soundcloud.com/player/?url=' + encodeURIComponent(url) + '&' + query;
+    frame.allow = 'autoplay';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    document.getElementById('player').replaceWith(frame);
+    sc = SC.Widget(frame);
+    sc.bind(SC.Widget.Events.READY, () => {
+      ready = true;
+      notify({ event: 'ready' });
+      if (pendingUrl && pendingUrl !== url) {
+        const next = pendingUrl;
+        pendingUrl = null;
+        loadUrl(next);
+        return;
+      }
+      pendingUrl = null;
+      notify({ event: 'loaded' });
+      sc.getDuration((ms) => notify({ event: 'timeUpdate', currentTime: 0, duration: (ms || 0) / 1000 }));
+      try { sc.play(); } catch {}
+    });
+    sc.bind(SC.Widget.Events.PLAY, () => notify({ event: 'stateChange', state: 1 }));
+    sc.bind(SC.Widget.Events.PAUSE, () => notify({ event: 'stateChange', state: 2 }));
+    sc.bind(SC.Widget.Events.FINISH, () => notify({ event: 'finish' }));
+    sc.bind(SC.Widget.Events.PLAY_PROGRESS, (data) => {
+      if (!data) return;
+      const current = (data.currentPosition || 0) / 1000;
+      const duration = data.relativePosition > 0 ? current / data.relativePosition : 0;
+      notify({ event: 'timeUpdate', currentTime: current, duration: Math.round(duration) });
+    });
   }
-});
-window.addEventListener('pagehide', () => clearInterval(timer));
-if (parentOrigin && channel && window.parent !== window) {
-  const api = document.createElement('script');
-  api.src = 'https://www.youtube.com/iframe_api';
-  api.onerror = () => notify({ event: 'unavailable' });
-  document.head.appendChild(api);
+  function loadUrl(url) {
+    if (typeof url !== 'string' || !/^https:\/\/soundcloud\.com\//.test(url)) return;
+    if (!sc) { createWidgetIfPossible(url); return; }
+    if (!ready) { pendingUrl = url; return; }
+    try {
+      sc.load(url, {
+        auto_play: true, show_comments: false, buying: false,
+        sharing: false, download: false,
+        callback: () => {
+          notify({ event: 'loaded' });
+          sc.getDuration((ms) => notify({ event: 'timeUpdate', currentTime: 0, duration: (ms || 0) / 1000 }));
+          try { sc.play(); } catch {}
+        }
+      });
+    } catch {
+      notify({ event: 'unavailable' });
+    }
+  }
+  function createWidgetIfPossible(url) {
+    if (!window.SC || !SC.Widget) { pendingUrl = url; return; }
+    createWidget(url);
+  }
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!parentOrigin || event.source !== window.parent || event.origin !== parentOrigin ||
+        !data || data.source !== 'aura-sc-host' || data.channel !== channel) return;
+    try {
+      switch (data.op) {
+        case 'load': loadUrl(data.url); break;
+        case 'play': if (ready) sc.play(); break;
+        case 'pause': if (ready) sc.pause(); break;
+        case 'seek':
+          if (ready && Number.isFinite(data.ms)) sc.seekTo(Math.max(0, data.ms));
+          break;
+        case 'volume':
+          if (ready && Number.isFinite(data.value)) sc.setVolume(Math.max(0, Math.min(100, data.value)));
+          break;
+        case 'sounds':
+          if (ready) sc.getSounds((sounds) => {
+            notify({
+              event: 'sounds',
+              sounds: (sounds || []).map((s) => ({
+                title: s.title || '',
+                duration: Math.round((s.duration || 0) / 1000),
+                url: s.permalink_url || '',
+                art: s.artwork_url || ''
+              }))
+            });
+          });
+          break;
+        case 'ping': if (ready) notify({ event: 'ready' }); break;
+      }
+    } catch {
+      notify({ event: 'unavailable' });
+    }
+  });
+  if (parentOrigin && channel && window.parent !== window) {
+    const api = document.createElement('script');
+    api.src = 'https://w.soundcloud.com/player/api.js';
+    api.onload = () => {
+      const initial = params.get('url');
+      if (initial) createWidgetIfPossible(initial);
+      else if (pendingUrl) {
+        const next = pendingUrl;
+        pendingUrl = null;
+        createWidgetIfPossible(next);
+      }
+      notify({ event: 'apiReady' });
+    };
+    api.onerror = () => notify({ event: 'unavailable' });
+    document.head.appendChild(api);
+  }
+} else {
+  let yt = null;
+  let ready = false;
+  let videoId = null;
+  let timer = null;
+  function progress() {
+    if (!ready) return;
+    notify({
+      event: 'timeUpdate',
+      videoId,
+      currentTime: yt.getCurrentTime() || 0,
+      duration: yt.getDuration() || 0
+    });
+  }
+  window.onYouTubeIframeAPIReady = function() {
+    if (!parentOrigin || !channel) return;
+    const frame = document.createElement('iframe');
+    const query = new URLSearchParams({
+      enablejsapi: '1', autoplay: '0', controls: '0', disablekb: '1',
+      fs: '0', rel: '0', playsinline: '1',
+      origin: location.origin, widget_referrer: location.origin
+    });
+    frame.id = 'player';
+    frame.src = 'https://www.youtube.com/embed/?' + query;
+    frame.allow = 'autoplay; encrypted-media; fullscreen';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    document.getElementById('player').replaceWith(frame);
+    yt = new YT.Player(frame, {
+      events: {
+        onReady: () => {
+          ready = true;
+          notify({ event: 'ready' });
+          timer = setInterval(progress, 250);
+        },
+        onStateChange: (event) => {
+          notify({ event: 'stateChange', state: event.data, videoId });
+          progress();
+        },
+        onError: (event) => notify({ event: 'error', code: event.data, videoId }),
+        onAutoplayBlocked: () => notify({ event: 'autoplayBlocked', videoId })
+      }
+    });
+  };
+  window.addEventListener('message', (event) => {
+    const data = event.data;
+    if (!parentOrigin || event.source !== window.parent || event.origin !== parentOrigin ||
+        !data || data.source !== 'aura-yt-host' || data.channel !== channel || !ready) return;
+    try {
+      switch (data.op) {
+        case 'load':
+        case 'cue':
+          if (typeof data.videoId !== 'string' || !/^[a-zA-Z0-9_-]{11}$/.test(data.videoId)) return;
+          videoId = data.videoId;
+          const options = { videoId, startSeconds: Number.isFinite(data.startSeconds) ? Math.max(0, data.startSeconds) : 0 };
+          if (data.op === 'load') yt.loadVideoById(options);
+          else yt.cueVideoById(options);
+          break;
+        case 'play': yt.playVideo(); break;
+        case 'pause': yt.pauseVideo(); break;
+        case 'stop': yt.stopVideo(); break;
+        case 'seek':
+          if (Number.isFinite(data.seconds)) yt.seekTo(Math.max(0, data.seconds), true);
+          break;
+        case 'volume':
+          if (Number.isFinite(data.value)) yt.setVolume(Math.max(0, Math.min(100, data.value)));
+          break;
+        case 'ping': notify({ event: 'ready' }); break;
+      }
+    } catch {
+      notify({ event: 'unavailable', videoId });
+    }
+  });
+  window.addEventListener('pagehide', () => clearInterval(timer));
+  if (parentOrigin && channel && window.parent !== window) {
+    const api = document.createElement('script');
+    api.src = 'https://www.youtube.com/iframe_api';
+    api.onerror = () => notify({ event: 'unavailable' });
+    document.head.appendChild(api);
+  }
 }
 </script>
 </body>
