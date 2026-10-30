@@ -1960,28 +1960,6 @@ public class FabricGameLaunchService : IGameLaunchService
             new MArgument("-Dmodernfix.mixin.perf.dynamic_resources=true")
         };
 
-        try
-        {
-            bool hasBaseCds = EnsureBaseCdsArchive(javaPath);
-            if (hasBaseCds)
-            {
-                string appCdsPath = Path.Combine(targetInstanceDir, "appcds.jsa");
-                if (File.Exists(appCdsPath) && new FileInfo(appCdsPath).Length > 1024)
-                {
-                    list.Add(new MArgument($"-XX:SharedArchiveFile={appCdsPath}"));
-                }
-                else
-                {
-                    list.Add(new MArgument($"-XX:ArchiveClassesAtExit={appCdsPath}"));
-                }
-            }
-            else
-            {
-                LogLauncherEvent("[LAUNCH: CDS] Base CDS archive not available, skipping AppCDS arguments");
-            }
-        }
-        catch { }
-
         if (!string.IsNullOrWhiteSpace(jvmArgs))
         {
             var tokens = jvmArgs.Split(' ', StringSplitOptions.RemoveEmptyEntries);
