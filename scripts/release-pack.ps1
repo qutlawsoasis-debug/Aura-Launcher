@@ -1,26 +1,29 @@
 # scripts/release-pack.ps1
-# Automated, one-command release script for Aura-Pack (aura-glass -> Aura-Pack).
+# Automated, one-command release script for Aura-Pack.
+# Supports releasing aura-client (-ClientJar120, -ClientJar121) and/or aura-glass (-BuildAuraGlass).
 #
 # Usage:
 #   Plan / dry-run only (default, zero side-effects on git branches/PRs or target PackDir):
-#     powershell -ExecutionPolicy Bypass -File scripts\release-pack.ps1 -PackDir "..\Aura-Pack"
+#     powershell -ExecutionPolicy Bypass -File scripts\release-pack.ps1 -PackDir "..\Aura-Pack" -ClientJar120 "path\aura-client-1.0.0.jar" -ClientJar121 "path\aura-client-1.0.0.jar"
 #
-#   Live release (creates branch release/aura-glass-<packVersion>, commits, pushes, creates PR):
-#     powershell -ExecutionPolicy Bypass -File scripts\release-pack.ps1 -PackDir "..\Aura-Pack" -DryRun:$false
-#     or
-#     powershell -ExecutionPolicy Bypass -File scripts\release-pack.ps1 -PackDir "..\Aura-Pack" -NoDryRun
+#   Live release (creates branch release/aura-client-<packVersion>, commits, pushes, creates PR):
+#     powershell -ExecutionPolicy Bypass -File scripts\release-pack.ps1 -PackDir "..\Aura-Pack" -ClientJar120 "path\aura-client-1.0.0.jar" -ClientJar121 "path\aura-client-1.0.0.jar" -NoDryRun
 #
-# Requirements (per W4e & QA Return):
-#   1. Parameters: -LauncherRef (default: origin/main), -PackDir (mandatory), -DryRun (default: ON).
-#   2. Clean copy of sources via git worktree, gradlew build --no-daemon for both modules.
-#   3. DryRun must NOT modify PackDir at all (staging in isolated temp copy, zero side-effects).
-#   4. Strict boundaries: PackDir must not overlap Launcher, user profile or AppData.
-#      Reparse points (symlinks/junctions) inside PackDir are strictly rejected.
-#   5. Strict manifest validation: exactly 1 target entry with valid sha256, size, and packVersion.
-#      Missing size/sha is a hard terminating error. Semantic diff verifies only 3 expected fields change.
-#   6. Clean worktree/index required before live modifications; staged changes verified strictly to 4 files.
-#   7. Run check-parity.ps1 in staging copy -> must PASS before any live modifications.
-#   8. Clean up build worktree and staging directories in finally. %APPDATA% not touched.
+#   Optional aura-glass release:
+#     powershell -ExecutionPolicy Bypass -File scripts\release-pack.ps1 -PackDir "..\Aura-Pack" -BuildAuraGlass
+#
+# Requirements:
+#   1. Parameters: -LauncherRef (default: origin/main), -PackDir (mandatory), -ClientJar120, -ClientJar121, -BuildAuraGlass, -DryRun (default: ON), -NoDryRun.
+#   2. Building aura-glass is optional via -BuildAuraGlass switch. When enabled, builds in clean git worktree via gradlew build --no-daemon.
+#   3. Client jars (-ClientJar120, -ClientJar121) placed into mods/ and versions/1.21.1/mods/.
+#   4. DryRun must NOT modify PackDir at all (staging in isolated temp copy, zero side-effects).
+#   5. Strict boundaries: PackDir must not overlap Launcher, user profile or AppData.
+#      Reparse points (symlinks/junctions) inside PackDir and inputs are strictly rejected.
+#   6. Fail-closed git repository check: valid Git root, remote origin matching qutlawsoasis-debug/Aura-Pack, clean status.
+#   7. Manifest validation: adds or updates target entry (path, sha256, size, mode sync) and packVersion, preserving formatting.
+#   8. Parity check (check-parity.ps1) run in staging copy -> must PASS before any live modifications.
+#   9. Staged changes verified strictly against expected file set.
+#  10. Clean up worktree and staging directories in finally. %APPDATA% not touched.
 
 [CmdletBinding()]
 param(
@@ -29,6 +32,16 @@ param(
 
     [Parameter(Mandatory = $true)]
     [string]$PackDir,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ClientJar120,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ClientJar121,
+
+    [Parameter(Mandatory = $false)]
+    [Alias('BuildGlass')]
+    [switch]$BuildAuraGlass,
 
     [Parameter(Mandatory = $false)]
     [switch]$DryRun = $true,
@@ -43,6 +56,18 @@ $ErrorActionPreference = 'Stop'
 $isDryRun = [bool]$DryRun
 if ($NoDryRun.IsPresent) {
     $isDryRun = $false
+}
+
+# Validate release targets
+$hasClientJars = [bool]([string]::IsNullOrWhiteSpace($ClientJar120) -eq $false -or [string]::IsNullOrWhiteSpace($ClientJar121) -eq $false)
+if ($hasClientJars) {
+    if ([string]::IsNullOrWhiteSpace($ClientJar120) -or [string]::IsNullOrWhiteSpace($ClientJar121)) {
+        throw "Both -ClientJar120 and -ClientJar121 must be provided together."
+    }
+}
+
+if (-not $hasClientJars -and -not $BuildAuraGlass) {
+    throw "Nothing to release: provide -ClientJar120 and -ClientJar121, or specify -BuildAuraGlass."
 }
 
 # 1. Validate PackDir existence and resolve canonical path
@@ -204,9 +229,31 @@ Assert-SafePathInsidePackDir $manifest120 $resolvedPackDir
 Assert-SafePathInsidePackDir $manifest121 $resolvedPackDir
 Assert-SafePathInsidePackDir $parityScript $resolvedPackDir
 
-# 5. Verify required Java tool
-if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
-    throw "java command is required to run GradleWrapperMain."
+# Validate client jars input if provided
+function Assert-SafeClientJar([string]$jarPath, [string]$paramName) {
+    if (-not (Test-Path -LiteralPath $jarPath -PathType Leaf)) {
+        throw "$paramName file not found: $jarPath"
+    }
+    $item = Get-Item -LiteralPath $jarPath -Force
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        throw "Security violation: $paramName is a reparse point (junction/symlink): $jarPath"
+    }
+    $leaf = Split-Path -Leaf $jarPath
+    if ($leaf -notmatch '^aura-client-.*\.jar$') {
+        throw "$paramName filename must match 'aura-client-*.jar', got '$leaf'"
+    }
+}
+
+if ($hasClientJars) {
+    Assert-SafeClientJar $ClientJar120 "-ClientJar120"
+    Assert-SafeClientJar $ClientJar121 "-ClientJar121"
+}
+
+# Verify required Java tool if building aura-glass
+if ($BuildAuraGlass) {
+    if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
+        throw "java command is required to run GradleWrapperMain for aura-glass build."
+    }
 }
 
 # Helper to run Gradle build with --no-daemon
@@ -231,12 +278,11 @@ function Invoke-GradleBuild([string]$modulePath) {
     }
 }
 
-# Helper to validate and prepare manifest update (fail-closed, strictly preserves formatting)
+# Helper to validate and prepare manifest update/addition (fail-closed, strictly preserves formatting)
 function Process-And-ValidateManifest(
     [string]$manifestFilePath,
     [string]$newVersion,
-    [string]$newSha,
-    [long]$newSize
+    [hashtable[]]$entries
 ) {
     if (-not (Test-Path -LiteralPath $manifestFilePath)) {
         throw "Manifest file not found: $manifestFilePath"
@@ -264,69 +310,124 @@ function Process-And-ValidateManifest(
         throw "Manifest '$manifestFilePath' is missing 'files' array."
     }
 
-    # 4. Find matching target entry in parsed JSON
-    $matchingEntries = @($filesProp.Value | Where-Object {
-        $p = $_.PSObject.Properties['path']
-        $p -and (($p.Value -replace '\\', '/') -eq 'mods/aura-glass-1.0.0.jar')
-    })
-
-    if ($matchingEntries.Count -eq 0) {
-        throw "Manifest '$manifestFilePath' does not contain target entry 'mods/aura-glass-1.0.0.jar'."
-    }
-    if ($matchingEntries.Count -gt 1) {
-        throw "Manifest '$manifestFilePath' contains $($matchingEntries.Count) entries for 'mods/aura-glass-1.0.0.jar'; expected exactly 1."
-    }
-
-    $targetEntry = $matchingEntries[0]
-
-    # Validate sha256 property exists and is non-empty
-    $shaProp = $targetEntry.PSObject.Properties['sha256']
-    if ($shaProp -eq $null -or [string]::IsNullOrWhiteSpace("$($shaProp.Value)")) {
-        throw "Manifest '$manifestFilePath' target entry 'mods/aura-glass-1.0.0.jar' is missing required 'sha256' property."
-    }
-
-    # Validate size property exists and is not null
-    $sizeProp = $targetEntry.PSObject.Properties['size']
-    if ($sizeProp -eq $null -or $sizeProp.Value -eq $null -or [string]::IsNullOrWhiteSpace("$($sizeProp.Value)")) {
-        throw "Manifest '$manifestFilePath' target entry 'mods/aura-glass-1.0.0.jar' is missing required 'size' property."
-    }
-
-    # 5. Regex updates preserving original indentation and formatting
-    $pvRegex = New-Object System.Text.RegularExpressions.Regex '("packVersion"\s*:\s*")[^"]+(")'
+    # 4. Regex update for root packVersion preserving formatting
+    $pvRegex = [regex]::new('("packVersion"\s*:\s*")[^"]+(")')
     $pvMatches = $pvRegex.Matches($raw)
     if ($pvMatches.Count -ne 1) {
         throw "Manifest '$manifestFilePath' contains $($pvMatches.Count) matches for 'packVersion' property; expected exactly 1."
     }
     $updated = $pvRegex.Replace($raw, ('${1}' + $newVersion + '$2'), 1)
 
-    $blockRegex = New-Object System.Text.RegularExpressions.Regex '(\{[^{}]*?"path"\s*:\s*"mods[/\\]aura-glass-1\.0\.0\.jar"[^{}]*?\})', ([System.Text.RegularExpressions.RegexOptions]::Singleline)
-    $blockMatches = $blockRegex.Matches($updated)
-    if ($blockMatches.Count -ne 1) {
-        throw "Manifest '$manifestFilePath' contains $($blockMatches.Count) matching JSON blocks for 'mods/aura-glass-1.0.0.jar'; expected exactly 1."
+    $nl = if ($updated.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $replacedOldPaths = [System.Collections.Generic.List[string]]::new()
+    $newlyAddedCount = 0
+
+    foreach ($entry in $entries) {
+        $targetPath = ($entry.Path -replace '\\', '/').Trim()
+        $targetSha = "$($entry.Sha256)".Trim().ToLowerInvariant()
+        $targetSize = [long]$entry.Size
+        $targetMode = if ($entry.Mode) { "$($entry.Mode)".Trim() } else { "sync" }
+
+        # Check existing entries via JSON parse of current text
+        $curJson = $updated | ConvertFrom-Json
+        $matching = @($curJson.files | Where-Object {
+            $p = ($_.path -replace '\\', '/')
+            if ($p -eq $targetPath) { return $true }
+            if ($entry.Kind -eq 'client' -and $p -match '^mods/aura-client-.*\.jar$') { return $true }
+            if ($entry.Kind -eq 'glass' -and $p -match '^mods/aura-glass-.*\.jar$') { return $true }
+            return $false
+        })
+
+        if ($matching.Count -gt 1) {
+            throw "Manifest '$manifestFilePath' contains $($matching.Count) entries matching '$targetPath'; expected at most 1."
+        }
+
+        if ($matching.Count -eq 1) {
+            # UPDATE existing JSON block
+            $existingPath = $matching[0].path
+            if ($existingPath -ne $targetPath) {
+                $replacedOldPaths.Add(($existingPath -replace '\\', '/').ToLowerInvariant())
+            }
+
+            $escapedOldPath = [regex]::Escape($existingPath)
+            $blockRegex = [regex]::new('(\{[^{}]*?"path"\s*:\s*"' + $escapedOldPath + '"[^{}]*?\})', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+            $blockMatches = $blockRegex.Matches($updated)
+            if ($blockMatches.Count -ne 1) {
+                throw "Manifest '$manifestFilePath' contains $($blockMatches.Count) matching JSON blocks for '$existingPath'; expected exactly 1."
+            }
+
+            $blockMatch = $blockMatches[0]
+            $blockText = $blockMatch.Groups[1].Value
+
+            # Update path if filename changed
+            $pathRegex = [regex]::new('("path"\s*:\s*")[^"]+(")')
+            $replacedBlock = $pathRegex.Replace($blockText, ('${1}' + $targetPath + '$2'), 1)
+
+            # Update sha256
+            $shaRegex = [regex]::new('("sha256"\s*:\s*")[0-9a-fA-F]+(")')
+            if ($shaRegex.IsMatch($replacedBlock)) {
+                $replacedBlock = $shaRegex.Replace($replacedBlock, ('${1}' + $targetSha + '$2'), 1)
+            } else {
+                $pathPropRegex = [regex]::new('("path"\s*:\s*"[^"]*",?)')
+                $replacedBlock = $pathPropRegex.Replace($replacedBlock, ('$1' + $nl + '      "sha256": "' + $targetSha + '",'), 1)
+            }
+
+            # Update size
+            $sizeRegex = [regex]::new('("size"\s*:\s*)\d+')
+            if ($sizeRegex.IsMatch($replacedBlock)) {
+                $replacedBlock = $sizeRegex.Replace($replacedBlock, ('${1}' + $targetSize), 1)
+            } else {
+                $shaPropRegex = [regex]::new('("sha256"\s*:\s*"[^"]*",?)')
+                $replacedBlock = $shaPropRegex.Replace($replacedBlock, ('$1' + $nl + '      "size": ' + $targetSize + ','), 1)
+            }
+
+            # Update mode
+            $modeRegex = [regex]::new('("mode"\s*:\s*")[^"]+(")')
+            if ($modeRegex.IsMatch($replacedBlock)) {
+                $replacedBlock = $modeRegex.Replace($replacedBlock, ('${1}' + $targetMode + '$2'), 1)
+            } else {
+                $endBraceRegex = [regex]::new('(\r?\n\s*\})')
+                $replacedBlock = $endBraceRegex.Replace($replacedBlock, (',' + $nl + '      "mode": "' + $targetMode + '"$1'), 1)
+            }
+
+            $updated = $updated.Substring(0, $blockMatch.Index) + $replacedBlock + $updated.Substring($blockMatch.Index + $blockMatch.Length)
+        } else {
+            # ADD new JSON block into files array
+            $newlyAddedCount++
+            $newBlock = "    {" + $nl +
+                        "      `"path`": `"$targetPath`"," + $nl +
+                        "      `"sha256`": `"$targetSha`"," + $nl +
+                        "      `"size`": $targetSize," + $nl +
+                        "      `"mode`": `"$targetMode`"" + $nl +
+                        "    }"
+
+            # Alphabetical insertion before the next entry
+            $nextEntry = $curJson.files | Where-Object { ($_.path -replace '\\', '/') -gt $targetPath } | Select-Object -First 1
+            if ($nextEntry) {
+                $escapedNext = [regex]::Escape($nextEntry.path)
+                $insertPattern = '([ \t]*\{[^{}]*?"path"\s*:\s*"' + $escapedNext + '"[^{}]*?\})'
+                $updated = [regex]::Replace($updated, $insertPattern, ($newBlock + "," + $nl + '$1'), 1)
+            } else {
+                # Insert at end of files array before closing bracket
+                $endPattern = '(\}[ \t]*)([\r\n]+[ \t]*\])'
+                $endRegex = [regex]::new($endPattern, [System.Text.RegularExpressions.RegexOptions]::RightToLeft)
+                if ($endRegex.IsMatch($updated)) {
+                    $updated = $endRegex.Replace($updated, ('},' + $nl + $newBlock + '$2'), 1)
+                } else {
+                    # Empty files array: [ ]
+                    $emptyPattern = '("files"\s*:\s*\[\s*\])'
+                    $emptyRegex = [regex]::new($emptyPattern)
+                    if ($emptyRegex.IsMatch($updated)) {
+                        $updated = $emptyRegex.Replace($updated, ('"files": [' + $nl + $newBlock + $nl + '  ]'), 1)
+                    } else {
+                        throw "Manifest '$manifestFilePath' files array could not be updated with new entry '$targetPath'."
+                    }
+                }
+            }
+        }
     }
 
-    $blockMatch = $blockMatches[0]
-    $blockText = $blockMatch.Groups[1].Value
-
-    # Verify that the block has exactly 1 sha256 property and exactly 1 size property
-    $shaRegex = New-Object System.Text.RegularExpressions.Regex '("sha256"\s*:\s*")[0-9a-fA-F]+(")'
-    $shaBlockMatches = $shaRegex.Matches($blockText)
-    if ($shaBlockMatches.Count -ne 1) {
-        throw "Manifest '$manifestFilePath' target entry block contains $($shaBlockMatches.Count) matches for 'sha256'; expected exactly 1."
-    }
-
-    $sizeRegex = New-Object System.Text.RegularExpressions.Regex '("size"\s*:\s*)\d+'
-    $sizeBlockMatches = $sizeRegex.Matches($blockText)
-    if ($sizeBlockMatches.Count -ne 1) {
-        throw "Manifest '$manifestFilePath' target entry block contains $($sizeBlockMatches.Count) matches for 'size'; expected exactly 1."
-    }
-
-    $replacedBlock = $shaRegex.Replace($blockText, ('${1}' + $newSha + '$2'), 1)
-    $replacedBlock = $sizeRegex.Replace($replacedBlock, ('${1}' + $newSize), 1)
-
-    $updated = $updated.Substring(0, $blockMatch.Index) + $replacedBlock + $updated.Substring($blockMatch.Index + $blockMatch.Length)
-
-    # 6. Post-update JSON validation & semantic diff
+    # 5. Post-update JSON validation & semantic diff
     $newJson = $null
     try {
         $newJson = $updated | ConvertFrom-Json
@@ -338,20 +439,31 @@ function Process-And-ValidateManifest(
         throw "Post-update validation failed: packVersion was '$($newJson.packVersion)', expected '$newVersion'."
     }
 
-    $newMatchingEntries = @($newJson.files | Where-Object {
-        $p = $_.PSObject.Properties['path']
-        $p -and (($p.Value -replace '\\', '/') -eq 'mods/aura-glass-1.0.0.jar')
-    })
-    if ($newMatchingEntries.Count -ne 1) {
-        throw "Post-update validation failed: expected 1 target entry, found $($newMatchingEntries.Count)."
-    }
+    # Verify each target entry in post-update JSON
+    foreach ($entry in $entries) {
+        $pNorm = ($entry.Path -replace '\\', '/').Trim()
+        $newMatchingEntries = @($newJson.files | Where-Object {
+            $p = $_.PSObject.Properties['path']
+            $p -and (($p.Value -replace '\\', '/') -eq $pNorm)
+        })
+        if ($newMatchingEntries.Count -ne 1) {
+            throw "Post-update validation failed: expected 1 target entry for '$pNorm', found $($newMatchingEntries.Count)."
+        }
 
-    $newTarget = $newMatchingEntries[0]
-    if ($newTarget.sha256 -ne $newSha) {
-        throw "Post-update validation failed: sha256 was '$($newTarget.sha256)', expected '$newSha'."
-    }
-    if ([long]$newTarget.size -ne [long]$newSize) {
-        throw "Post-update validation failed: size was '$($newTarget.size)', expected '$newSize'."
+        $newTarget = $newMatchingEntries[0]
+        $expectedSha = "$($entry.Sha256)".Trim().ToLowerInvariant()
+        $expectedSize = [long]$entry.Size
+        $expectedMode = if ($entry.Mode) { "$($entry.Mode)".Trim() } else { "sync" }
+
+        if ($newTarget.sha256 -ne $expectedSha) {
+            throw "Post-update validation failed: sha256 for '$pNorm' was '$($newTarget.sha256)', expected '$expectedSha'."
+        }
+        if ([long]$newTarget.size -ne $expectedSize) {
+            throw "Post-update validation failed: size for '$pNorm' was '$($newTarget.size)', expected '$expectedSize'."
+        }
+        if ($newTarget.mode -ne $expectedMode) {
+            throw "Post-update validation failed: mode for '$pNorm' was '$($newTarget.mode)', expected '$expectedMode'."
+        }
     }
 
     # Semantic comparison: root properties count must be unchanged
@@ -366,74 +478,152 @@ function Process-And-ValidateManifest(
         }
     }
 
-    # Check files array length
-    if (@($json.files).Count -ne @($newJson.files).Count) {
-        throw "Post-update semantic diff failed: files count changed."
+    # Check files array length matches expected count
+    $expectedCount = @($json.files).Count + $newlyAddedCount
+    if (@($newJson.files).Count -ne $expectedCount) {
+        throw "Post-update semantic diff failed: files count was $(@($newJson.files).Count), expected $expectedCount."
     }
 
-    # Check that only the target entry changed
-    $oldFilesList = @($json.files)
-    $newFilesList = @($newJson.files)
-    for ($i = 0; $i -lt $oldFilesList.Count; $i++) {
-        $oldF = $oldFilesList[$i]
-        $newF = $newFilesList[$i]
-        $isTarget = (($oldF.path -replace '\\', '/') -eq 'mods/aura-glass-1.0.0.jar')
-        if (-not $isTarget) {
-            if ($oldF.path -ne $newF.path -or $oldF.sha256 -ne $newF.sha256 -or $oldF.size -ne $newF.size) {
-                throw "Post-update semantic diff failed: unexpected modification in non-target file entry '$($oldF.path)'."
-            }
+    # Check that all non-target entries are preserved intact
+    $targetPathList = @($entries | ForEach-Object { ($_.Path -replace '\\', '/').ToLowerInvariant() })
+    foreach ($oldF in $json.files) {
+        $oldNorm = ($oldF.path -replace '\\', '/').ToLowerInvariant()
+        if ($targetPathList -contains $oldNorm -or $replacedOldPaths.Contains($oldNorm)) {
+            continue
+        }
+        $matchingNew = @($newJson.files | Where-Object { ($_.path -replace '\\', '/').ToLowerInvariant() -eq $oldNorm })
+        if ($matchingNew.Count -ne 1) {
+            throw "Post-update semantic diff failed: non-target file entry '$($oldF.path)' missing or duplicated."
+        }
+        $newF = $matchingNew[0]
+        if ($oldF.sha256 -ne $newF.sha256 -or [long]$oldF.size -ne [long]$newF.size -or $oldF.mode -ne $newF.mode) {
+            throw "Post-update semantic diff failed: unexpected modification in non-target file entry '$($oldF.path)'."
         }
     }
 
     return $updated
 }
 
-# Create clean worktree for the requested LauncherRef
-$worktreeGuid = [Guid]::NewGuid().ToString("N")
-$worktreeDir = Join-Path $env:TEMP "aura-glass-build-$worktreeGuid"
+$worktreeDir = $null
 $stagingGuid = [Guid]::NewGuid().ToString("N")
 $stagingDir = Join-Path $env:TEMP "aura-pack-stage-$stagingGuid"
 
-Write-Host "Creating clean worktree from $LauncherRef at $worktreeDir..." -ForegroundColor Cyan
-git -c core.longpaths=true -C $launcherRoot worktree add --detach $worktreeDir $LauncherRef
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to create git worktree for ref '$LauncherRef'"
-}
-
 try {
-    # 7. Build both modules in worktree
-    Invoke-GradleBuild (Join-Path $worktreeDir "aura-glass")
-    Invoke-GradleBuild (Join-Path $worktreeDir "aura-glass-1.21")
+    # 7. Build aura-glass in worktree only if requested
+    $glassJar120 = $null
+    $glassJar121 = $null
+    $glassSha120 = $null
+    $glassSize120 = 0
+    $glassSha121 = $null
+    $glassSize121 = 0
 
-    # Locate freshly built jars
-    $jar120 = Join-Path $worktreeDir "aura-glass\build\libs\aura-glass-1.0.0.jar"
-    $jar121 = Join-Path $worktreeDir "aura-glass-1.21\build\libs\aura-glass-1.0.0.jar"
+    if ($BuildAuraGlass) {
+        $worktreeGuid = [Guid]::NewGuid().ToString("N")
+        $worktreeDir = Join-Path $env:TEMP "aura-glass-build-$worktreeGuid"
+        Write-Host "Creating clean worktree from $LauncherRef at $worktreeDir..." -ForegroundColor Cyan
+        git -c core.longpaths=true -C $launcherRoot worktree add --detach $worktreeDir $LauncherRef
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create git worktree for ref '$LauncherRef'"
+        }
 
-    if (-not (Test-Path -LiteralPath $jar120)) {
-        throw "Expected jar not found: $jar120"
+        Invoke-GradleBuild (Join-Path $worktreeDir "aura-glass")
+        Invoke-GradleBuild (Join-Path $worktreeDir "aura-glass-1.21")
+
+        $glassJar120 = Join-Path $worktreeDir "aura-glass\build\libs\aura-glass-1.0.0.jar"
+        $glassJar121 = Join-Path $worktreeDir "aura-glass-1.21\build\libs\aura-glass-1.0.0.jar"
+
+        if (-not (Test-Path -LiteralPath $glassJar120)) {
+            throw "Expected jar not found: $glassJar120"
+        }
+        if (-not (Test-Path -LiteralPath $glassJar121)) {
+            throw "Expected jar not found: $glassJar121"
+        }
+
+        $glassSha120 = (Get-FileHash -Path $glassJar120 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $glassSize120 = (Get-Item -LiteralPath $glassJar120).Length
+
+        $glassSha121 = (Get-FileHash -Path $glassJar121 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $glassSize121 = (Get-Item -LiteralPath $glassJar121).Length
     }
-    if (-not (Test-Path -LiteralPath $jar121)) {
-        throw "Expected jar not found: $jar121"
+
+    # 8. Resolve client jars if provided
+    $clientResolved120 = $null
+    $clientResolved121 = $null
+    $clientLeaf120 = $null
+    $clientLeaf121 = $null
+    $clientSha120 = $null
+    $clientSize120 = 0
+    $clientSha121 = $null
+    $clientSize121 = 0
+
+    if ($hasClientJars) {
+        $clientResolved120 = (Resolve-Path -LiteralPath $ClientJar120).Path
+        $clientResolved121 = (Resolve-Path -LiteralPath $ClientJar121).Path
+        $clientLeaf120 = Split-Path -Leaf $clientResolved120
+        $clientLeaf121 = Split-Path -Leaf $clientResolved121
+
+        $clientSha120 = (Get-FileHash -Path $clientResolved120 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $clientSize120 = (Get-Item -LiteralPath $clientResolved120).Length
+
+        $clientSha121 = (Get-FileHash -Path $clientResolved121 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $clientSize121 = (Get-Item -LiteralPath $clientResolved121).Length
     }
 
-    $sha120 = (Get-FileHash -Path $jar120 -Algorithm SHA256).Hash.ToLowerInvariant()
-    $size120 = (Get-Item -LiteralPath $jar120).Length
-
-    $sha121 = (Get-FileHash -Path $jar121 -Algorithm SHA256).Hash.ToLowerInvariant()
-    $size121 = (Get-Item -LiteralPath $jar121).Length
-
-    # 8. Compute common UTC packVersion
+    # 9. Compute common UTC packVersion
     $packVersion = (Get-Date).ToUniversalTime().ToString("yyyyMMdd.HHmm")
 
     Write-Host "`nTarget Pack Version: $packVersion" -ForegroundColor Green
-    Write-Host "aura-glass (1.20.1):  sha256=$sha120, size=$size120" -ForegroundColor Green
-    Write-Host "aura-glass (1.21.1):  sha256=$sha121, size=$size121" -ForegroundColor Green
+    if ($hasClientJars) {
+        Write-Host "aura-client (1.20.1): mods/$clientLeaf120 (sha256=$clientSha120, size=$clientSize120)" -ForegroundColor Green
+        Write-Host "aura-client (1.21.1): versions/1.21.1/mods/$clientLeaf121 (sha256=$clientSha121, size=$clientSize121)" -ForegroundColor Green
+    }
+    if ($BuildAuraGlass) {
+        Write-Host "aura-glass (1.20.1):  mods/aura-glass-1.0.0.jar (sha256=$glassSha120, size=$glassSize120)" -ForegroundColor Green
+        Write-Host "aura-glass (1.21.1):  versions/1.21.1/mods/aura-glass-1.0.0.jar (sha256=$glassSha121, size=$glassSize121)" -ForegroundColor Green
+    }
 
-    # 9. Validate and prepare updated manifests in memory (atomic, fail-closed)
-    $updatedManifestContent120 = Process-And-ValidateManifest -manifestFilePath $manifest120 -newVersion $packVersion -newSha $sha120 -newSize $size120
-    $updatedManifestContent121 = Process-And-ValidateManifest -manifestFilePath $manifest121 -newVersion $packVersion -newSha $sha121 -newSize $size121
+    # 10. Prepare entries and validate/update manifests in memory (atomic, fail-closed)
+    $entries120 = [System.Collections.Generic.List[hashtable]]::new()
+    $entries121 = [System.Collections.Generic.List[hashtable]]::new()
 
-    # 10. Prepare isolated staging copy in temp (PackDir is untouched)
+    if ($hasClientJars) {
+        $entries120.Add(@{
+            Path = "mods/$clientLeaf120"
+            Sha256 = $clientSha120
+            Size = $clientSize120
+            Mode = "sync"
+            Kind = "client"
+        })
+        $entries121.Add(@{
+            Path = "mods/$clientLeaf121"
+            Sha256 = $clientSha121
+            Size = $clientSize121
+            Mode = "sync"
+            Kind = "client"
+        })
+    }
+
+    if ($BuildAuraGlass) {
+        $entries120.Add(@{
+            Path = "mods/aura-glass-1.0.0.jar"
+            Sha256 = $glassSha120
+            Size = $glassSize120
+            Mode = "sync"
+            Kind = "glass"
+        })
+        $entries121.Add(@{
+            Path = "mods/aura-glass-1.0.0.jar"
+            Sha256 = $glassSha121
+            Size = $glassSize121
+            Mode = "sync"
+            Kind = "glass"
+        })
+    }
+
+    $updatedManifestContent120 = Process-And-ValidateManifest -manifestFilePath $manifest120 -newVersion $packVersion -entries $entries120
+    $updatedManifestContent121 = Process-And-ValidateManifest -manifestFilePath $manifest121 -newVersion $packVersion -entries $entries121
+
+    # 11. Prepare isolated staging copy in temp (PackDir is untouched)
     Write-Host "Creating staging copy in $stagingDir..." -ForegroundColor Cyan
     New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
 
@@ -443,13 +633,32 @@ try {
     }
 
     # Place new jars and manifests into staging copy
-    $stagingJar120 = Join-Path $stagingDir "mods\aura-glass-1.0.0.jar"
-    $stagingJar121 = Join-Path $stagingDir "versions\1.21.1\mods\aura-glass-1.0.0.jar"
-    $null = New-Item -ItemType Directory -Path (Split-Path $stagingJar120 -Parent) -Force -ErrorAction SilentlyContinue
-    $null = New-Item -ItemType Directory -Path (Split-Path $stagingJar121 -Parent) -Force -ErrorAction SilentlyContinue
+    if ($hasClientJars) {
+        $stagingClientJar120 = Join-Path $stagingDir "mods\$clientLeaf120"
+        $stagingClientJar121 = Join-Path $stagingDir "versions\1.21.1\mods\$clientLeaf121"
 
-    Copy-Item -LiteralPath $jar120 -Destination $stagingJar120 -Force
-    Copy-Item -LiteralPath $jar121 -Destination $stagingJar121 -Force
+        # Clean old aura-client jars with different names in staging
+        Get-ChildItem -Path (Join-Path $stagingDir "mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne $clientLeaf120 } | Remove-Item -Force
+        Get-ChildItem -Path (Join-Path $stagingDir "versions\1.21.1\mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne $clientLeaf121 } | Remove-Item -Force
+
+        $null = New-Item -ItemType Directory -Path (Split-Path $stagingClientJar120 -Parent) -Force -ErrorAction SilentlyContinue
+        $null = New-Item -ItemType Directory -Path (Split-Path $stagingClientJar121 -Parent) -Force -ErrorAction SilentlyContinue
+
+        Copy-Item -LiteralPath $clientResolved120 -Destination $stagingClientJar120 -Force
+        Copy-Item -LiteralPath $clientResolved121 -Destination $stagingClientJar121 -Force
+    }
+
+    if ($BuildAuraGlass) {
+        $stagingGlassJar120 = Join-Path $stagingDir "mods\aura-glass-1.0.0.jar"
+        $stagingGlassJar121 = Join-Path $stagingDir "versions\1.21.1\mods\aura-glass-1.0.0.jar"
+        $null = New-Item -ItemType Directory -Path (Split-Path $stagingGlassJar120 -Parent) -Force -ErrorAction SilentlyContinue
+        $null = New-Item -ItemType Directory -Path (Split-Path $stagingGlassJar121 -Parent) -Force -ErrorAction SilentlyContinue
+
+        Copy-Item -LiteralPath $glassJar120 -Destination $stagingGlassJar120 -Force
+        Copy-Item -LiteralPath $glassJar121 -Destination $stagingGlassJar121 -Force
+    }
 
     $stagingManifest120 = Join-Path $stagingDir "manifest.json"
     $stagingManifest121 = Join-Path $stagingDir "manifest-1.21.1.json"
@@ -457,7 +666,7 @@ try {
     [System.IO.File]::WriteAllText($stagingManifest120, $updatedManifestContent120, $utf8NoBom)
     [System.IO.File]::WriteAllText($stagingManifest121, $updatedManifestContent121, $utf8NoBom)
 
-    # 11. Run parity check in isolated staging environment
+    # 12. Run parity check in isolated staging environment
     $stagingParityScript = Join-Path $stagingDir "tools\check-parity.ps1"
     $stagingExceptions = Join-Path $stagingDir "tools\parity-exceptions.json"
     Write-Host "Running check-parity.ps1 in staging environment..." -ForegroundColor Cyan
@@ -466,7 +675,7 @@ try {
         throw "PackDir parity check failed in staging with exit code $LASTEXITCODE"
     }
 
-    # 12. Handle DryRun vs Live Release
+    # 13. Handle DryRun vs Live Release
     if ($isDryRun) {
         Write-Host "`n==================================================" -ForegroundColor Green
         Write-Host "                 DRY-RUN PLAN & DIFF              " -ForegroundColor Green
@@ -474,8 +683,14 @@ try {
         Write-Host "LauncherRef: $LauncherRef"
         Write-Host "PackDir:     $resolvedPackDir"
         Write-Host "packVersion: $packVersion"
-        Write-Host "1.20.1 Jar:  mods/aura-glass-1.0.0.jar ($size120 bytes, sha256: $sha120)"
-        Write-Host "1.21.1 Jar:  versions/1.21.1/mods/aura-glass-1.0.0.jar ($size121 bytes, sha256: $sha121)"
+        if ($hasClientJars) {
+            Write-Host "1.20.1 Client: mods/$clientLeaf120 ($clientSize120 bytes, sha256: $clientSha120)"
+            Write-Host "1.21.1 Client: versions/1.21.1/mods/$clientLeaf121 ($clientSize121 bytes, sha256: $clientSha121)"
+        }
+        if ($BuildAuraGlass) {
+            Write-Host "1.20.1 Glass:  mods/aura-glass-1.0.0.jar ($glassSize120 bytes, sha256: $glassSha120)"
+            Write-Host "1.21.1 Glass:  versions/1.21.1/mods/aura-glass-1.0.0.jar ($glassSize121 bytes, sha256: $glassSha121)"
+        }
         Write-Host "`n--- Git Diff of Manifests (DryRun) ---" -ForegroundColor Yellow
         if (Get-Command git -ErrorAction SilentlyContinue) {
             & git -c core.longpaths=true diff --no-index -- $manifest120 $stagingManifest120
@@ -505,24 +720,75 @@ try {
             }
         }
 
-        $branchName = "release/aura-glass-$packVersion"
+        $branchName = if ($hasClientJars -and -not $BuildAuraGlass) {
+            "release/aura-client-$packVersion"
+        } elseif ($BuildAuraGlass -and -not $hasClientJars) {
+            "release/aura-glass-$packVersion"
+        } else {
+            "release/aura-pack-$packVersion"
+        }
+
         Write-Host "Creating branch $branchName in $resolvedPackDir..." -ForegroundColor Cyan
         git -c core.longpaths=true -C $resolvedPackDir checkout -b $branchName
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to create branch $branchName in $resolvedPackDir"
         }
 
-        # Validate destination paths and copy jars to PackDir
-        $destJar120 = Join-Path $resolvedPackDir "mods\aura-glass-1.0.0.jar"
-        $destJar121 = Join-Path $resolvedPackDir "versions\1.21.1\mods\aura-glass-1.0.0.jar"
-        Assert-SafePathInsidePackDir $destJar120 $resolvedPackDir
-        Assert-SafePathInsidePackDir $destJar121 $resolvedPackDir
+        $expectedFilesList = [System.Collections.Generic.List[string]]::new()
+        $expectedFilesList.Add('manifest-1.21.1.json')
+        $expectedFilesList.Add('manifest.json')
+        $removedOldFiles = [System.Collections.Generic.List[string]]::new()
 
-        $null = New-Item -ItemType Directory -Path (Split-Path $destJar120 -Parent) -Force -ErrorAction SilentlyContinue
-        $null = New-Item -ItemType Directory -Path (Split-Path $destJar121 -Parent) -Force -ErrorAction SilentlyContinue
+        # Copy client jars to PackDir if provided
+        if ($hasClientJars) {
+            $destClientJar120 = Join-Path $resolvedPackDir "mods\$clientLeaf120"
+            $destClientJar121 = Join-Path $resolvedPackDir "versions\1.21.1\mods\$clientLeaf121"
+            Assert-SafePathInsidePackDir $destClientJar120 $resolvedPackDir
+            Assert-SafePathInsidePackDir $destClientJar121 $resolvedPackDir
 
-        Copy-Item -LiteralPath $jar120 -Destination $destJar120 -Force
-        Copy-Item -LiteralPath $jar121 -Destination $destJar121 -Force
+            # Remove older aura-client jars from git if names differ
+            $oldJars120 = @(Get-ChildItem -Path (Join-Path $resolvedPackDir "mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ne $clientLeaf120 })
+            foreach ($oj in $oldJars120) {
+                git -c core.longpaths=true -C $resolvedPackDir rm -f "mods/$($oj.Name)" 2>$null
+                if (Test-Path -LiteralPath $oj.FullName) { Remove-Item -LiteralPath $oj.FullName -Force }
+                $removedOldFiles.Add("mods/$($oj.Name)")
+            }
+
+            $oldJars121 = @(Get-ChildItem -Path (Join-Path $resolvedPackDir "versions\1.21.1\mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -ne $clientLeaf121 })
+            foreach ($oj in $oldJars121) {
+                git -c core.longpaths=true -C $resolvedPackDir rm -f "versions/1.21.1/mods/$($oj.Name)" 2>$null
+                if (Test-Path -LiteralPath $oj.FullName) { Remove-Item -LiteralPath $oj.FullName -Force }
+                $removedOldFiles.Add("versions/1.21.1/mods/$($oj.Name)")
+            }
+
+            $null = New-Item -ItemType Directory -Path (Split-Path $destClientJar120 -Parent) -Force -ErrorAction SilentlyContinue
+            $null = New-Item -ItemType Directory -Path (Split-Path $destClientJar121 -Parent) -Force -ErrorAction SilentlyContinue
+
+            Copy-Item -LiteralPath $clientResolved120 -Destination $destClientJar120 -Force
+            Copy-Item -LiteralPath $clientResolved121 -Destination $destClientJar121 -Force
+
+            $expectedFilesList.Add("mods/$clientLeaf120")
+            $expectedFilesList.Add("versions/1.21.1/mods/$clientLeaf121")
+        }
+
+        # Copy glass jars to PackDir if built
+        if ($BuildAuraGlass) {
+            $destGlassJar120 = Join-Path $resolvedPackDir "mods\aura-glass-1.0.0.jar"
+            $destGlassJar121 = Join-Path $resolvedPackDir "versions\1.21.1\mods\aura-glass-1.0.0.jar"
+            Assert-SafePathInsidePackDir $destGlassJar120 $resolvedPackDir
+            Assert-SafePathInsidePackDir $destGlassJar121 $resolvedPackDir
+
+            $null = New-Item -ItemType Directory -Path (Split-Path $destGlassJar120 -Parent) -Force -ErrorAction SilentlyContinue
+            $null = New-Item -ItemType Directory -Path (Split-Path $destGlassJar121 -Parent) -Force -ErrorAction SilentlyContinue
+
+            Copy-Item -LiteralPath $glassJar120 -Destination $destGlassJar120 -Force
+            Copy-Item -LiteralPath $glassJar121 -Destination $destGlassJar121 -Force
+
+            $expectedFilesList.Add('mods/aura-glass-1.0.0.jar')
+            $expectedFilesList.Add('versions/1.21.1/mods/aura-glass-1.0.0.jar')
+        }
 
         # Write updated manifests to PackDir
         Assert-SafePathInsidePackDir $manifest120 $resolvedPackDir
@@ -530,22 +796,31 @@ try {
         [System.IO.File]::WriteAllText($manifest120, $updatedManifestContent120, $utf8NoBom)
         [System.IO.File]::WriteAllText($manifest121, $updatedManifestContent121, $utf8NoBom)
 
+        $filesToStage = @($expectedFilesList | Sort-Object -Unique)
+        $allExpectedStaged = @($expectedFilesList + $removedOldFiles | Sort-Object -Unique)
+
         Write-Host "Staging release artifacts..." -ForegroundColor Cyan
-        git -c core.longpaths=true -C $resolvedPackDir add mods/aura-glass-1.0.0.jar versions/1.21.1/mods/aura-glass-1.0.0.jar manifest.json manifest-1.21.1.json
+        git -c core.longpaths=true -C $resolvedPackDir add -- $filesToStage
         if ($LASTEXITCODE -ne 0) {
             throw "Failed to stage release artifacts in $resolvedPackDir"
         }
 
         # Verify staged files strictly match expected set
         $stagedFiles = @(git -c core.longpaths=true -C $resolvedPackDir diff --cached --name-only)
-        $stagedNormalized = @($stagedFiles | ForEach-Object { ($_ -replace '\\', '/').Trim() } | Where-Object { $_.Length -gt 0 } | Sort-Object)
-        $expectedFiles = @('manifest-1.21.1.json', 'manifest.json', 'mods/aura-glass-1.0.0.jar', 'versions/1.21.1/mods/aura-glass-1.0.0.jar') | Sort-Object
+        $stagedNormalized = @($stagedFiles | ForEach-Object { ($_ -replace '\\', '/').Trim() } | Where-Object { $_.Length -gt 0 } | Sort-Object -Unique)
 
-        if ($stagedNormalized.Count -ne 4 -or ($stagedNormalized -join ';') -ne ($expectedFiles -join ';')) {
-            throw "Security violation: Staged index contains unexpected files! Expected strictly [$($expectedFiles -join ', ')], but found: [$($stagedNormalized -join ', ')]"
+        if ($stagedNormalized.Count -ne $allExpectedStaged.Count -or ($stagedNormalized -join ';') -ne ($allExpectedStaged -join ';')) {
+            throw "Security violation: Staged index contains unexpected files! Expected strictly [$($allExpectedStaged -join ', ')], but found: [$($stagedNormalized -join ', ')]"
         }
 
-        $commitMsg = "release: update aura-glass to $packVersion"
+        $commitMsg = if ($hasClientJars -and -not $BuildAuraGlass) {
+            "release: update aura-client to $packVersion"
+        } elseif ($BuildAuraGlass -and -not $hasClientJars) {
+            "release: update aura-glass to $packVersion"
+        } else {
+            "release: update aura-client and aura-glass to $packVersion"
+        }
+
         Write-Host "Committing changes: $commitMsg" -ForegroundColor Cyan
         git -c core.longpaths=true -C $resolvedPackDir commit -m $commitMsg
         if ($LASTEXITCODE -ne 0) {
@@ -560,17 +835,21 @@ try {
 
         Write-Host "Creating Pull Request (without merge)..." -ForegroundColor Cyan
         if (Get-Command gh -ErrorAction SilentlyContinue) {
+            $artifactBullets = [System.Collections.Generic.List[string]]::new()
+            if ($hasClientJars) {
+                $artifactBullets.Add("- **1.20.1 aura-client**: ``mods/$clientLeaf120```n  - SHA256: ``$clientSha120```n  - Size: $clientSize120 bytes")
+                $artifactBullets.Add("- **1.21.1 aura-client**: ``versions/1.21.1/mods/$clientLeaf121```n  - SHA256: ``$clientSha121```n  - Size: $clientSize121 bytes")
+            }
+            if ($BuildAuraGlass) {
+                $artifactBullets.Add("- **1.20.1 aura-glass**: ``mods/aura-glass-1.0.0.jar```n  - SHA256: ``$glassSha120```n  - Size: $glassSize120 bytes")
+                $artifactBullets.Add("- **1.21.1 aura-glass**: ``versions/1.21.1/mods/aura-glass-1.0.0.jar```n  - SHA256: ``$glassSha121```n  - Size: $glassSize121 bytes")
+            }
             $prBody = @"
 ## Summary
-Automated release of aura-glass $packVersion compiled from $LauncherRef.
+Automated release of $commitMsg.
 
 ### Artifacts:
-- **1.20.1**: ``mods/aura-glass-1.0.0.jar``
-  - SHA256: ``$sha120``
-  - Size: $size120 bytes
-- **1.21.1**: ``versions/1.21.1/mods/aura-glass-1.0.0.jar``
-  - SHA256: ``$sha121``
-  - Size: $size121 bytes
+$($artifactBullets -join "`n")
 
 ### Verification:
 - Parity check (check-parity.ps1): PASS
