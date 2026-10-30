@@ -6,12 +6,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "docs/redesign/v3", "run", "dev"],
       "port": 5173
-    },
-    {
-      "name": "redesign-static",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5180", "--directory", "docs/redesign"],
-      "port": 5180
     }
   ]
 }
