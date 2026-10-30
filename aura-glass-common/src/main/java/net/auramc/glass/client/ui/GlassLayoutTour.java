@@ -76,6 +76,7 @@ public final class GlassLayoutTour {
                 CreateWorldScreen.create(client, new TitleScreen());
             } else if (timer >= 30 && client.currentScreen instanceof CreateWorldScreen) {
                 takeShot(client, "create-game.png");
+                takeShot(client, "create-world-tabs-rest-game.png");
                 step = 3;
                 timer = 0;
             }
@@ -86,14 +87,24 @@ public final class GlassLayoutTour {
         if (step == 3) {
             if (timer == 1 && client.currentScreen instanceof CreateWorldScreen screen) {
                 selectTab(screen, 1);
-            } else if (timer >= 25 && client.currentScreen instanceof CreateWorldScreen) {
+            }
+            if (timer >= 10 && timer <= 18 && client.currentScreen instanceof CreateWorldScreen) {
+                TabSegmentControl.setForceMidFlight(true);
+            }
+            if (timer == 14 && client.currentScreen instanceof CreateWorldScreen) {
+                takeShot(client, "create-world-tabs-flight-mid.png");
+            }
+            if (timer == 19 && client.currentScreen instanceof CreateWorldScreen) {
+                TabSegmentControl.setForceMidFlight(false);
+            }
+            if (timer >= 35 && client.currentScreen instanceof CreateWorldScreen) {
                 takeShot(client, "create-world.png");
+                takeShot(client, "create-world-tabs-rest-world.png");
                 step = 4;
                 timer = 0;
             }
             return;
         }
-
         // Step 4: Open SelectWorldScreen
         if (step == 4) {
             if (timer == 1) {

@@ -561,10 +561,9 @@ public final class GlassGroups {
             style.tintA = 0.30f;
 
             if (group.isTabGroup) {
-                GlassRenderer.drawSurface(group, group.left, 6, w, 24, style, 1);
-            } else {
-                GlassRenderer.drawSurface(group, group.left, group.top, w, h, style, 1);
+                continue;
             }
+            GlassRenderer.drawSurface(group, group.left, group.top, w, h, style, 1);
         }
     }
 
