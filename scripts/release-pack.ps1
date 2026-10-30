@@ -539,10 +539,10 @@ try {
             throw "Expected jar not found: $glassJar121"
         }
 
-        $glassSha120 = (Get-FileHash -Path $glassJar120 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $glassSha120 = (Get-FileHash -LiteralPath $glassJar120 -Algorithm SHA256).Hash.ToLowerInvariant()
         $glassSize120 = (Get-Item -LiteralPath $glassJar120).Length
 
-        $glassSha121 = (Get-FileHash -Path $glassJar121 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $glassSha121 = (Get-FileHash -LiteralPath $glassJar121 -Algorithm SHA256).Hash.ToLowerInvariant()
         $glassSize121 = (Get-Item -LiteralPath $glassJar121).Length
     }
 
@@ -562,10 +562,10 @@ try {
         $clientLeaf120 = Split-Path -Leaf $clientResolved120
         $clientLeaf121 = Split-Path -Leaf $clientResolved121
 
-        $clientSha120 = (Get-FileHash -Path $clientResolved120 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $clientSha120 = (Get-FileHash -LiteralPath $clientResolved120 -Algorithm SHA256).Hash.ToLowerInvariant()
         $clientSize120 = (Get-Item -LiteralPath $clientResolved120).Length
 
-        $clientSha121 = (Get-FileHash -Path $clientResolved121 -Algorithm SHA256).Hash.ToLowerInvariant()
+        $clientSha121 = (Get-FileHash -LiteralPath $clientResolved121 -Algorithm SHA256).Hash.ToLowerInvariant()
         $clientSize121 = (Get-Item -LiteralPath $clientResolved121).Length
     }
 
@@ -637,17 +637,38 @@ try {
         $stagingClientJar120 = Join-Path $stagingDir "mods\$clientLeaf120"
         $stagingClientJar121 = Join-Path $stagingDir "versions\1.21.1\mods\$clientLeaf121"
 
-        # Clean old aura-client jars with different names in staging
-        Get-ChildItem -Path (Join-Path $stagingDir "mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ne $clientLeaf120 } | Remove-Item -Force
-        Get-ChildItem -Path (Join-Path $stagingDir "versions\1.21.1\mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -ne $clientLeaf121 } | Remove-Item -Force
+        $stagingMods120Dir = Join-Path $stagingDir "mods"
+        if (Test-Path -LiteralPath $stagingMods120Dir) {
+            Get-ChildItem -LiteralPath $stagingMods120Dir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "aura-client-*.jar" -and $_.Name -ne $clientLeaf120 } |
+                ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+        }
 
-        $null = New-Item -ItemType Directory -Path (Split-Path $stagingClientJar120 -Parent) -Force -ErrorAction SilentlyContinue
-        $null = New-Item -ItemType Directory -Path (Split-Path $stagingClientJar121 -Parent) -Force -ErrorAction SilentlyContinue
+        $stagingMods121Dir = Join-Path $stagingDir "versions\1.21.1\mods"
+        if (Test-Path -LiteralPath $stagingMods121Dir) {
+            Get-ChildItem -LiteralPath $stagingMods121Dir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like "aura-client-*.jar" -and $_.Name -ne $clientLeaf121 } |
+                ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+        }
+
+        [System.IO.Directory]::CreateDirectory((Split-Path $stagingClientJar120 -Parent)) | Out-Null
+        [System.IO.Directory]::CreateDirectory((Split-Path $stagingClientJar121 -Parent)) | Out-Null
 
         Copy-Item -LiteralPath $clientResolved120 -Destination $stagingClientJar120 -Force
         Copy-Item -LiteralPath $clientResolved121 -Destination $stagingClientJar121 -Force
+
+        # Verify staging has strictly 1 aura-client jar per version
+        $stagingFinal120 = @(Get-ChildItem -LiteralPath $stagingMods120Dir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like 'aura-client-*.jar' })
+        if ($stagingFinal120.Count -ne 1 -or $stagingFinal120[0].Name -ne $clientLeaf120) {
+            throw "Staging verification failed: expected 1 client jar '$clientLeaf120' in mods/, found $($stagingFinal120.Count)."
+        }
+
+        $stagingFinal121 = @(Get-ChildItem -LiteralPath $stagingMods121Dir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like 'aura-client-*.jar' })
+        if ($stagingFinal121.Count -ne 1 -or $stagingFinal121[0].Name -ne $clientLeaf121) {
+            throw "Staging verification failed: expected 1 client jar '$clientLeaf121' in versions/1.21.1/mods/, found $($stagingFinal121.Count)."
+        }
     }
 
     if ($BuildAuraGlass) {
@@ -746,28 +767,46 @@ try {
             Assert-SafePathInsidePackDir $destClientJar120 $resolvedPackDir
             Assert-SafePathInsidePackDir $destClientJar121 $resolvedPackDir
 
-            # Remove older aura-client jars from git if names differ
-            $oldJars120 = @(Get-ChildItem -Path (Join-Path $resolvedPackDir "mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -ne $clientLeaf120 })
-            foreach ($oj in $oldJars120) {
-                git -c core.longpaths=true -C $resolvedPackDir rm -f "mods/$($oj.Name)" 2>$null
-                if (Test-Path -LiteralPath $oj.FullName) { Remove-Item -LiteralPath $oj.FullName -Force }
-                $removedOldFiles.Add("mods/$($oj.Name)")
+            $packMods120Dir = Join-Path $resolvedPackDir "mods"
+            if (Test-Path -LiteralPath $packMods120Dir) {
+                $oldJars120 = @(Get-ChildItem -LiteralPath $packMods120Dir -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -like "aura-client-*.jar" -and $_.Name -ne $clientLeaf120 })
+                foreach ($oj in $oldJars120) {
+                    git -c core.longpaths=true -C $resolvedPackDir rm -f -- "mods/$($oj.Name)" 2>$null
+                    if (Test-Path -LiteralPath $oj.FullName) { Remove-Item -LiteralPath $oj.FullName -Force }
+                    $removedOldFiles.Add("mods/$($oj.Name)")
+                }
             }
 
-            $oldJars121 = @(Get-ChildItem -Path (Join-Path $resolvedPackDir "versions\1.21.1\mods") -Filter "aura-client-*.jar" -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -ne $clientLeaf121 })
-            foreach ($oj in $oldJars121) {
-                git -c core.longpaths=true -C $resolvedPackDir rm -f "versions/1.21.1/mods/$($oj.Name)" 2>$null
-                if (Test-Path -LiteralPath $oj.FullName) { Remove-Item -LiteralPath $oj.FullName -Force }
-                $removedOldFiles.Add("versions/1.21.1/mods/$($oj.Name)")
+            $packMods121Dir = Join-Path $resolvedPackDir "versions\1.21.1\mods"
+            if (Test-Path -LiteralPath $packMods121Dir) {
+                $oldJars121 = @(Get-ChildItem -LiteralPath $packMods121Dir -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -like "aura-client-*.jar" -and $_.Name -ne $clientLeaf121 })
+                foreach ($oj in $oldJars121) {
+                    git -c core.longpaths=true -C $resolvedPackDir rm -f -- "versions/1.21.1/mods/$($oj.Name)" 2>$null
+                    if (Test-Path -LiteralPath $oj.FullName) { Remove-Item -LiteralPath $oj.FullName -Force }
+                    $removedOldFiles.Add("versions/1.21.1/mods/$($oj.Name)")
+                }
             }
 
-            $null = New-Item -ItemType Directory -Path (Split-Path $destClientJar120 -Parent) -Force -ErrorAction SilentlyContinue
-            $null = New-Item -ItemType Directory -Path (Split-Path $destClientJar121 -Parent) -Force -ErrorAction SilentlyContinue
+            [System.IO.Directory]::CreateDirectory((Split-Path $destClientJar120 -Parent)) | Out-Null
+            [System.IO.Directory]::CreateDirectory((Split-Path $destClientJar121 -Parent)) | Out-Null
 
             Copy-Item -LiteralPath $clientResolved120 -Destination $destClientJar120 -Force
             Copy-Item -LiteralPath $clientResolved121 -Destination $destClientJar121 -Force
+
+            # Strict verification of final set before staging and committing
+            $finalJars120 = @(Get-ChildItem -LiteralPath $packMods120Dir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like 'aura-client-*.jar' })
+            if ($finalJars120.Count -ne 1 -or $finalJars120[0].Name -ne $clientLeaf120) {
+                throw "Final set verification failed: expected exactly 1 client jar '$clientLeaf120' in mods/, but found $($finalJars120.Count): [$($finalJars120.Name -join ', ')]"
+            }
+
+            $finalJars121 = @(Get-ChildItem -LiteralPath $packMods121Dir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like 'aura-client-*.jar' })
+            if ($finalJars121.Count -ne 1 -or $finalJars121[0].Name -ne $clientLeaf121) {
+                throw "Final set verification failed: expected exactly 1 client jar '$clientLeaf121' in versions/1.21.1/mods/, but found $($finalJars121.Count): [$($finalJars121.Name -join ', ')]"
+            }
 
             $expectedFilesList.Add("mods/$clientLeaf120")
             $expectedFilesList.Add("versions/1.21.1/mods/$clientLeaf121")
