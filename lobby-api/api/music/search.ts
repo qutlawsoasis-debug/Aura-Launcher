@@ -98,7 +98,7 @@ export default async function handler(req: any, res: any) {
         };
       });
     } else if (kind === 'albums') {
-      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&maxResults=20&q=${encodeURIComponent(q + ' album')}&key=${apiKey}`;
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=playlist&maxResults=20&q=${encodeURIComponent(q)}&key=${apiKey}`;
       const searchRes = await fetch(searchUrl);
       if (!searchRes.ok) {
         const errText = await searchRes.text();
@@ -111,18 +111,38 @@ export default async function handler(req: any, res: any) {
       const searchData: any = await searchRes.json();
       const rawItems = searchData.items || [];
 
+      const playlistIds = rawItems.map((it: any) => it.id?.playlistId).filter(Boolean);
+      const metaMap = new Map<string, any>();
+      if (playlistIds.length > 0) {
+        const listRes = await fetch(
+          `https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${playlistIds.slice(0, 50).join(',')}&key=${apiKey}`
+        );
+        if (listRes.ok) {
+          const listData: any = await listRes.json();
+          for (const pl of (listData.items || [])) {
+            metaMap.set(pl.id, pl);
+          }
+        }
+      }
+
       items = rawItems.map((it: any) => {
         const pid = it.id?.playlistId;
         const snip = it.snippet || {};
+        const meta = metaMap.get(pid);
+        const metaSnip = meta?.snippet || {};
         const artwork = snip.thumbnails?.maxres?.url || snip.thumbnails?.high?.url || snip.thumbnails?.medium?.url || snip.thumbnails?.default?.url || '';
         return {
           id: pid,
           kind: 'album',
           title: cleanTitle(snip.title || ''),
           artist: cleanArtist(snip.channelTitle || ''),
-          artwork
+          artwork,
+          year: metaSnip.publishedAt ? new Date(metaSnip.publishedAt).getFullYear() : 0,
+          trackCount: meta?.contentDetails?.itemCount || 0
         };
       });
+      // Автосгенерированные альбомы каналов "<исполнитель> - Topic" показываем первыми
+      items.sort((a: any, b: any) => (b.artist.toLowerCase().endsWith('- topic') ? 1 : 0) - (a.artist.toLowerCase().endsWith('- topic') ? 1 : 0));
     } else if (kind === 'artists') {
       const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=15&q=${encodeURIComponent(q)}&key=${apiKey}`;
       const searchRes = await fetch(searchUrl);
