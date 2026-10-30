@@ -15,6 +15,8 @@ We are committed to providing a welcoming, diverse, and inclusive environment. P
 ### 1. Prerequisites
 - **Operating System**: Windows 10 or Windows 11 (64-bit)
 - **.NET SDK**: [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- **Node.js**: with npm; `dotnet build` builds the interface with Vite
+- **WebView2 Runtime**: required to run the interface
 - **IDE / Editor**: Visual Studio 2022 (v17.8+), JetBrains Rider, or VS Code with C# Dev Kit
 - **Git**: Installed and configured
 
