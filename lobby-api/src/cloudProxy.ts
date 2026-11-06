@@ -16,7 +16,8 @@ export const UPLOAD_TICKET_SECONDS = 600;
 /** Manager paths the proxy may reach, by lobby-api action. Nothing else is forwarded. */
 export const MANAGER_ROUTES: Record<string, { method: 'GET' | 'POST'; path: string; timeoutMs: number }> = {
   worlds: { method: 'GET', path: 'worlds', timeoutMs: 15_000 },
-  create: { method: 'POST', path: 'lobbies/create', timeoutMs: 120_000 },
+  // Vercel Hobby stops a function at 60 s: answer before that
+  create: { method: 'POST', path: 'lobbies/create', timeoutMs: 55_000 },
   stop: { method: 'POST', path: 'lobbies/stop', timeoutMs: 30_000 },
   share: { method: 'POST', path: 'lobbies/share', timeoutMs: 15_000 },
   delete: { method: 'POST', path: 'worlds/delete', timeoutMs: 30_000 },
