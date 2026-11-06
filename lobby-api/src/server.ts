@@ -23,6 +23,7 @@ import handleMusicList from '../api/music/list.js';
 import handleLyrics from '../api/lyrics.js';
 import handleEmbedPlayer from '../api/embed/player.js';
 import { generateLandingHtml } from './landing.js';
+import { proxyToManager, uploadTicket, MANAGER_ROUTES } from './cloudProxy.js';
 
 function parseBody(req: http.IncomingMessage): Promise<any> {
   return new Promise((resolve, reject) => {
@@ -76,6 +77,17 @@ export const server = http.createServer(async (req, res) => {
     if (pathname === '/embed/player.html' || pathname === '/api/embed/player') {
       return handleEmbedPlayer(req, res);
     }
+    // Cloud worlds (cloud-route): on Vercel this server is the only function, the api/cloud/*.ts files are not
+    // used. The body is not read before this point: the proxy reads it itself, with its 64 KB cap.
+    if (pathname.startsWith('/api/cloud/')) {
+      const action = pathname.substring('/api/cloud/'.length).replace(/\/+$/, '');
+      (req as any).query = parsedUrl.query;
+      if (action === 'upload-ticket') return await uploadTicket(req, res);
+      if (Object.prototype.hasOwnProperty.call(MANAGER_ROUTES, action)) return await proxyToManager(req, res, action);
+      sendJson(res, 404, { error: 'Not Found' });
+      return;
+    }
+
     const store = getStore();
 
     // Task 34: Landing pages for /j/:code, /f/:code, and /api/landing rewrite
